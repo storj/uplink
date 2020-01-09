@@ -89,6 +89,8 @@ func (r *StripeReader) Close() error {
 	return first
 }
 
+var backcompatMon = monkit.ScopeNamed("storj.io/storj/uplink/eestream")
+
 // ReadStripe reads and decodes the num-th stripe and concatenates it to p. The
 // return value is the updated byte slice.
 func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ []byte, err error) {
@@ -115,7 +117,7 @@ func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ [
 		}
 	}
 	// could not read enough shares to attempt a decode
-	mon.Meter("download_stripe_failed_not_enough_pieces_uplink").Mark(1) //locked
+	backcompatMon.Meter("download_stripe_failed_not_enough_pieces_uplink").Mark(1) //locked
 	return nil, r.combineErrs(num)
 }
 
