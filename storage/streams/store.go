@@ -437,51 +437,11 @@ func (s *streamStore) Delete(ctx context.Context, path Path, pathCipher storj.Ci
 		return err
 	}
 
-	batchItems := []metainfo.BatchItem{
-		&metainfo.BeginDeleteObjectParams{
-			Bucket:        []byte(path.Bucket()),
-			EncryptedPath: []byte(encPath.Raw()),
-		},
-		&metainfo.ListSegmentsParams{
-			CursorPosition: storj.SegmentPosition{
-				Index: 0,
-			},
-		},
-	}
-
-	resps, err := s.metainfo.Batch(ctx, batchItems...)
-	if err != nil {
-		return err
-	}
-
-	if len(resps) != 2 {
-		return errs.New(
-			"metainfo.Batch request returned an unexpected number of responses. Want: 2, got: %d", len(resps),
-		)
-	}
-
-	delResp, err := resps[0].BeginDeleteObject()
-	if err != nil {
-		return err
-	}
-
-	listResp, err := resps[1].ListSegment()
-	if err != nil {
-		return err
-	}
-
-	// TODO handle listResp.More
-
-	var errlist errs.Group
-	for _, item := range listResp.Items {
-		err = s.segments.Delete(ctx, delResp.StreamID, item.Position.Index)
-		if err != nil {
-			errlist.Add(err)
-			continue
-		}
-	}
-
-	return errlist.Err()
+	_, err = s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+		Bucket:        []byte(path.Bucket()),
+		EncryptedPath: []byte(encPath.Raw()),
+	})
+	return err
 }
 
 // ListItem is a single item in a listing
