@@ -18,6 +18,10 @@ pipeline {
                 checkout scm
 
                 sh 'mkdir -p .build'
+
+                sh 'service postgresql start'
+
+                sh 'cockroach start-single-node --insecure --store=\'/tmp/crdb\' --listen-addr=localhost:26257 --http-addr=localhost:8080 --cache 512MiB --max-sql-memory 512MiB --background'
             }
         }
 
@@ -43,7 +47,6 @@ pipeline {
                         COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
                     }
                     steps {
-                        sh 'use-ports -from 1024 -to 10000 &'
                         sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
                         sh 'check-clean-directory'
                     }
@@ -62,6 +65,29 @@ pipeline {
                                     cobertura coberturaReportFile: '.build/cobertura.xml'
                                 }
                             }
+                        }
+                    }
+                }
+
+                stage('Testsuite') {
+                    environment {
+                        STORJ_COCKROACH_TEST = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
+                        STORJ_POSTGRES_TEST = 'postgres://postgres@localhost/teststorj?sslmode=disable'
+                        COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                    }
+                    steps {
+                        sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
+                        sh 'psql -U postgres -c \'create database teststorj;\''
+                        sh 'use-ports -from 1024 -to 10000 &'
+                        sh '(cd testsuite && go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml)'
+                        sh 'check-clean-directory'
+                    }
+
+                    post {
+                        always {
+                            sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite.json'
+                            junit '.build/testsuite.xml'
                         }
                     }
                 }
