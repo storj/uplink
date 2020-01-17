@@ -14,7 +14,7 @@ import (
 	"storj.io/uplink"
 )
 
-func TestRequestAccess(t *testing.T) {
+func TestBucket(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
@@ -33,5 +33,13 @@ func TestRequestAccess(t *testing.T) {
 		require.NoError(t, err)
 
 		defer ctx.Check(project.Close)
+
+		bucket, err := project.EnsureBucket(ctx, "testbucket")
+		require.NoError(t, err)
+		require.NotNil(t, bucket)
+		require.Equal(t, "testbucket", bucket.Name)
+
+		err = project.DeleteBucket(ctx, "testbucket")
+		require.NoError(t, err)
 	})
 }
