@@ -123,6 +123,7 @@ github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
+github.com/google/go-cmp v0.3.0 h1:crn/baboCvb5fXaQ0IJ1SGTsTVrWpDsCWC8EGETZijY=
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-github v17.0.0+incompatible/go.mod h1:zLgOLi98H3fifZn+44m+umXrS52loVEgC2AApnigrVQ=
 github.com/google/go-querystring v1.0.0/go.mod h1:odCYkC5MyYFN7vkCjXpyrEuKhc/BUO6wN/zVPAxq5ck=
@@ -172,6 +173,8 @@ github.com/jtolds/gls v4.2.1+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVY
 github.com/jtolds/go-luar v0.0.0-20170419063437-0786921db8c0/go.mod h1:OtVLEpPHGJkn8jgGrHlYELCA3uXLU0YSfNN0faeDM2M=
 github.com/jtolds/monkit-hw v0.0.0-20190108155550-0f753668cf20 h1:XK96humQhnPbQ24uKtSHKbdShDgrKYqlWBNKJTcIKbg=
 github.com/jtolds/monkit-hw v0.0.0-20190108155550-0f753668cf20/go.mod h1:1liUiYZzx8ZoPTfZrBE2q8DFRDPafts0GGjslOtcZcw=
+github.com/jtolds/tracetagger v0.0.0-20200112222712-32e72f1f7180 h1:bQhCPoH0j+N8Zdy3kUXZOgulMR9Ws+RNTOMdRsIhiwY=
+github.com/jtolds/tracetagger v0.0.0-20200112222712-32e72f1f7180/go.mod h1:TuzhgRc1KtjV8osCjF1FTs0GzjFy7Cne1lY4NxLSqpk=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
@@ -202,6 +205,8 @@ github.com/mattn/go-runewidth v0.0.4 h1:2BvfKmzob6Bmd4YsL0zygOqfdFnK7GR4QL06Do4/
 github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-sqlite3 v1.10.0 h1:jbhqpg7tQe4SupckyijYiy0mJJ/pRyHvXf7JdWK860o=
 github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
+github.com/mattn/go-sqlite3 v2.0.2+incompatible h1:qzw9c2GNT8UFrgWNDhCTqRqYUSmu/Dav/9Z58LGpk7U=
+github.com/mattn/go-sqlite3 v2.0.2+incompatible/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/minio/cli v1.3.0/go.mod h1:hLsWNQy2wIf3FKFnMlH69f4RdEyn8nbRA2shaulTjGY=
 github.com/minio/dsync v0.0.0-20180124070302-439a0961af70/go.mod h1:eLQe3mXL0h02kNpPtBJiLr1fIEIJftgXRAjncjQbxJo=
@@ -446,6 +451,8 @@ gopkg.in/resty.v1 v1.12.0/go.mod h1:mDo4pnntr5jdWRML875a/NmxYqAlA73dVijT2AXvQQo=
 gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20180827161543-6ebf5a752f9b/go.mod h1:6UQdi0rNB4YDNwVYP8fJNmjLNaU8MA84WCdXStx3Spo=
 gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190612171030-cf5a9e6f8fd2 h1:Hzf9SARsnWv8oWl9TWmQ3vo3lSqOMByumL6aJ7ehw7g=
 gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190612171030-cf5a9e6f8fd2/go.mod h1:6UQdi0rNB4YDNwVYP8fJNmjLNaU8MA84WCdXStx3Spo=
+gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190623001553-09813957f0a8 h1:nyw4hxw2zz4S0EHqr5nQfA3zGbMFJDRJlQPM4PCb7O4=
+gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190623001553-09813957f0a8/go.mod h1:6UQdi0rNB4YDNwVYP8fJNmjLNaU8MA84WCdXStx3Spo=
 gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7/go.mod h1:dt/ZhP58zS4L8KSrWDmTeBkI65Dw0HsyUHuEVlX15mw=
 gopkg.in/yaml.v2 v2.0.0-20170812160011-eb3733d160e7/go.mod h1:JAlM8MvJe8wmxCU4Bli9HhUf9+ttbYbLASfIpnQbh74=
 gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
@@ -459,8 +466,12 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 storj.io/common v0.0.0-20200107155525-ccc8474e4234/go.mod h1:mDnchZF+e7g7u630Wwgu/X/zCmqpU0lvy5kQ3jQgs5k=
 storj.io/common v0.0.0-20200108114547-1c62e5708bce h1:0okFmuEp38BNSKXQ72PXMTouSYMKMfC6H+GlNRfthbA=
 storj.io/common v0.0.0-20200108114547-1c62e5708bce/go.mod h1:mDnchZF+e7g7u630Wwgu/X/zCmqpU0lvy5kQ3jQgs5k=
+storj.io/common v0.0.0-20200114152414-8dcdd4c9d250 h1:JDScdUShGqfHyiSWtfXhYEK1OkSVD40SHR7fO01k5Xk=
+storj.io/common v0.0.0-20200114152414-8dcdd4c9d250/go.mod h1:0yn1ANoDXETNBREGQHq8d7m1Kq0vWMu6Ul7C2YPZo/E=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2 h1:8SgLYEhe99R8QlAD1EAOBPRyIR+cn2hqkXtWlAUPf/c=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2/go.mod h1:/ascUDbzNAv0A3Jj7wUIKFBH2JdJ2uJIBO/b9+2yHgQ=
+storj.io/storj v0.0.0-20200122093353-6502454947c6 h1:ORi0WfMCL3DO0rXb3B1JRmFRFubiiuOb/HI1t3pBBkk=
+storj.io/storj v0.0.0-20200122093353-6502454947c6/go.mod h1:NEdrDcGpChTlnImJAaqETnIqwe1XutE/s2v6MoKQOJw=
 storj.io/storj v0.29.10 h1:5voSBQ0DNI7WBWKLp7Fok9lT5Ss/JJv1mrXv+HM3t1A=
 storj.io/storj v0.29.10/go.mod h1:dAi267H0blJ432lmYffm00VrXaqv4UY88Asw3sz0+ok=
 storj.io/uplink v0.0.0-20200113130735-92f78cb6f0f0 h1:Qy8ARi/QVtG05r61wevwlpDcqE7DnVD+W8sIXI2VsNY=

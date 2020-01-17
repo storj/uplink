@@ -105,5 +105,6 @@ func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *
 	}
 
 	metainfo, err := metainfo.Dial(ctx, dialer, satelliteNodeURL, apiKey, config.UserAgent)
+
 	return metainfo, dialer, satelliteNodeURL, Error.Wrap(err)
 }
