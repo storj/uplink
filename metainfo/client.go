@@ -18,6 +18,7 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
+	"storj.io/uplink/eestream"
 )
 
 var (
@@ -432,25 +433,45 @@ func (params *BeginObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // BeginObjectResponse response for BeginObject request.
 type BeginObjectResponse struct {
-	StreamID storj.StreamID
+	StreamID             storj.StreamID
+	RedundancyStrategy   eestream.RedundancyStrategy
+	EncryptionParameters storj.EncryptionParameters
 }
 
-func newBeginObjectResponse(response *pb.ObjectBeginResponse) BeginObjectResponse {
+func newBeginObjectResponse(response *pb.ObjectBeginResponse, redundancyStrategy eestream.RedundancyStrategy) BeginObjectResponse {
+	ep := storj.EncryptionParameters{}
+	if response.EncryptionParameters != nil {
+		ep = storj.EncryptionParameters{
+			CipherSuite: storj.CipherSuite(response.EncryptionParameters.CipherSuite),
+			BlockSize:   int32(response.EncryptionParameters.BlockSize),
+		}
+	}
+
 	return BeginObjectResponse{
-		StreamID: response.StreamId,
+		StreamID:             response.StreamId,
+		RedundancyStrategy:   redundancyStrategy,
+		EncryptionParameters: ep,
 	}
 }
 
 // BeginObject begins object creation.
-func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams) (_ storj.StreamID, err error) {
+func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams) (_ BeginObjectResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.BeginObject(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return BeginObjectResponse{}, Error.Wrap(err)
 	}
 
-	return response.StreamId, nil
+	rs := eestream.RedundancyStrategy{}
+	if response.RedundancyScheme != nil {
+		rs, err = eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
+		if err != nil {
+			return BeginObjectResponse{}, Error.Wrap(err)
+		}
+	}
+
+	return newBeginObjectResponse(response, rs), nil
 }
 
 // CommitObjectParams parmaters for CommitObject method.

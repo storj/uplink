@@ -23,36 +23,15 @@ func (db *Project) CreateBucket(ctx context.Context, bucketName string, info *st
 	if info == nil {
 		info = &storj.Bucket{PathCipher: storj.EncAESGCM}
 	}
-	if info.DefaultEncryptionParameters.CipherSuite == storj.EncUnspecified {
-		info.DefaultEncryptionParameters.CipherSuite = storj.EncAESGCM
-	}
-	if info.DefaultEncryptionParameters.BlockSize == 0 {
-		info.DefaultEncryptionParameters.BlockSize = db.encryptedBlockSize
-	}
-	if info.DefaultRedundancyScheme.Algorithm == storj.InvalidRedundancyAlgorithm {
-		info.DefaultRedundancyScheme.Algorithm = storj.ReedSolomon
-	}
-	if info.DefaultRedundancyScheme.RequiredShares == 0 {
-		info.DefaultRedundancyScheme.RequiredShares = int16(db.redundancy.RequiredCount())
-	}
-	if info.DefaultRedundancyScheme.RepairShares == 0 {
-		info.DefaultRedundancyScheme.RepairShares = int16(db.redundancy.RepairThreshold())
-	}
-	if info.DefaultRedundancyScheme.OptimalShares == 0 {
-		info.DefaultRedundancyScheme.OptimalShares = int16(db.redundancy.OptimalThreshold())
-	}
-	if info.DefaultRedundancyScheme.TotalShares == 0 {
-		info.DefaultRedundancyScheme.TotalShares = int16(db.redundancy.TotalCount())
-	}
-	if info.DefaultRedundancyScheme.ShareSize == 0 {
-		info.DefaultRedundancyScheme.ShareSize = int32(db.redundancy.ErasureShareSize())
-	}
+
 	if info.DefaultSegmentsSize == 0 {
 		info.DefaultSegmentsSize = db.segmentsSize
 	}
 
-	if err := validateBlockSize(info.DefaultRedundancyScheme, info.DefaultEncryptionParameters.BlockSize); err != nil {
-		return storj.Bucket{}, storj.ErrBucket.Wrap(err)
+	if !info.DefaultRedundancyScheme.IsZero() {
+		if err := validateBlockSize(info.DefaultRedundancyScheme, info.DefaultEncryptionParameters.BlockSize); err != nil {
+			return storj.Bucket{}, storj.ErrBucket.Wrap(err)
+		}
 	}
 
 	if info.PathCipher < storj.EncNull || info.PathCipher > storj.EncSecretBox {
@@ -86,7 +65,7 @@ func (db *Project) CreateBucket(ctx context.Context, bucketName string, info *st
 func validateBlockSize(redundancyScheme storj.RedundancyScheme, blockSize int32) error {
 	stripeSize := redundancyScheme.StripeSize()
 
-	if blockSize%stripeSize != 0 {
+	if stripeSize == 0 || blockSize%stripeSize != 0 {
 		return errs.New("encryption BlockSize (%d) must be a multiple of RS ShareSize (%d) * RS RequiredShares (%d)",
 			blockSize, redundancyScheme.ShareSize, redundancyScheme.RequiredShares,
 		)

@@ -7,6 +7,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
+	"storj.io/uplink/eestream"
 )
 
 var (
@@ -67,7 +68,13 @@ func (resp *BatchResponse) BeginObject() (BeginObjectResponse, error) {
 	if !ok {
 		return BeginObjectResponse{}, ErrInvalidType
 	}
-	return newBeginObjectResponse(item.ObjectBegin), nil
+
+	rs, err := eestream.NewRedundancyStrategyFromProto(item.ObjectBegin.RedundancyScheme)
+	if err != nil {
+		return BeginObjectResponse{}, Error.Wrap(err)
+	}
+
+	return newBeginObjectResponse(item.ObjectBegin, rs), nil
 }
 
 // BeginDeleteObject returns response for BeginDeleteObject request

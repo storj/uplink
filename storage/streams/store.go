@@ -19,6 +19,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
+	"storj.io/uplink/eestream"
 	"storj.io/uplink/metainfo"
 	"storj.io/uplink/storage/segments"
 )
@@ -137,6 +138,7 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 		lastSegmentSize      int64
 		encryptedKey         []byte
 		keyNonce             storj.Nonce
+		rs                   eestream.RedundancyStrategy
 	)
 
 	eofReader := NewEOFReader(data)
@@ -213,6 +215,7 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 					return Meta{}, err
 				}
 				streamID = objResponse.StreamID
+				rs = objResponse.RedundancyStrategy
 			} else {
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, prevSegmentCommitReq, beginSegment)
@@ -233,7 +236,7 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 			limits := segResponse.Limits
 			piecePrivateKey := segResponse.PiecePrivateKey
 
-			uploadResults, size, err := s.segments.Put(ctx, transformedReader, expiration, limits, piecePrivateKey)
+			uploadResults, size, err := s.segments.Put(ctx, transformedReader, expiration, limits, piecePrivateKey, rs)
 			if err != nil {
 				return Meta{}, err
 			}

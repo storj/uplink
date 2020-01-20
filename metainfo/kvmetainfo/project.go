@@ -4,7 +4,6 @@
 package kvmetainfo
 
 import (
-	"storj.io/uplink/eestream"
 	"storj.io/uplink/metainfo"
 	"storj.io/uplink/storage/streams"
 )
@@ -14,17 +13,15 @@ type Project struct {
 	metainfo           metainfo.Client
 	streams            streams.Store
 	encryptedBlockSize int32
-	redundancy         eestream.RedundancyStrategy
 	segmentsSize       int64
 }
 
 // NewProject constructs a *Project
-func NewProject(streams streams.Store, encryptedBlockSize int32, redundancy eestream.RedundancyStrategy, segmentsSize int64, metainfo metainfo.Client) *Project {
+func NewProject(streams streams.Store, encryptedBlockSize int32, segmentsSize int64, metainfo metainfo.Client) *Project {
 	return &Project{
 		metainfo:           metainfo,
 		streams:            streams,
 		encryptedBlockSize: encryptedBlockSize,
-		redundancy:         redundancy,
 		segmentsSize:       segmentsSize,
 	}
 }

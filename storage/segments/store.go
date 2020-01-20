@@ -37,34 +37,32 @@ type Meta struct {
 type Store interface {
 	// Ranger creates a ranger for downloading erasure codes from piece store nodes.
 	Ranger(ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme) (ranger.Ranger, error)
-	Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey) (_ []*pb.SegmentPieceUploadResult, size int64, err error)
+	Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy) (_ []*pb.SegmentPieceUploadResult, size int64, err error)
 	Delete(ctx context.Context, streamID storj.StreamID, segmentIndex int32) (err error)
 }
 
 type segmentStore struct {
 	metainfo *metainfo.Client
 	ec       ecclient.Client
-	rs       eestream.RedundancyStrategy
 	rngMu    sync.Mutex
 	rng      *rand.Rand
 }
 
 // NewSegmentStore creates a new instance of segmentStore
-func NewSegmentStore(metainfo *metainfo.Client, ec ecclient.Client, rs eestream.RedundancyStrategy) Store {
+func NewSegmentStore(metainfo *metainfo.Client, ec ecclient.Client) Store {
 	return &segmentStore{
 		metainfo: metainfo,
 		ec:       ec,
-		rs:       rs,
 		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
 // Put uploads a segment to an erasure code client
-func (s *segmentStore) Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey) (_ []*pb.SegmentPieceUploadResult, size int64, err error) {
+func (s *segmentStore) Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy) (_ []*pb.SegmentPieceUploadResult, size int64, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	sizedReader := SizeReader(NewPeekThresholdReader(data))
-	successfulNodes, successfulHashes, err := s.ec.Put(ctx, limits, piecePrivateKey, s.rs, sizedReader, expiration)
+	successfulNodes, successfulHashes, err := s.ec.Put(ctx, limits, piecePrivateKey, rs, sizedReader, expiration)
 	if err != nil {
 		return nil, size, Error.Wrap(err)
 	}
@@ -81,8 +79,8 @@ func (s *segmentStore) Put(ctx context.Context, data io.Reader, expiration time.
 		})
 	}
 
-	if l := len(uploadResults); l < s.rs.OptimalThreshold() {
-		return nil, size, Error.New("uploaded results (%d) are below the optimal threshold (%d)", l, s.rs.OptimalThreshold())
+	if l := len(uploadResults); l < rs.OptimalThreshold() {
+		return nil, size, Error.New("uploaded results (%d) are below the optimal threshold (%d)", l, rs.OptimalThreshold())
 	}
 
 	return uploadResults, sizedReader.Size(), nil
