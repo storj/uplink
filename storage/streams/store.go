@@ -131,14 +131,15 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 	}()
 
 	var (
-		currentSegment       int64
-		contentKey           storj.Key
-		prevSegmentCommitReq *metainfo.CommitSegmentParams
-		streamSize           int64
-		lastSegmentSize      int64
-		encryptedKey         []byte
-		keyNonce             storj.Nonce
-		rs                   eestream.RedundancyStrategy
+		currentSegment  int64
+		contentKey      storj.Key
+		streamSize      int64
+		lastSegmentSize int64
+		encryptedKey    []byte
+		keyNonce        storj.Nonce
+		rs              eestream.RedundancyStrategy
+
+		requestsToBatch = make([]metainfo.BatchItem, 0, 2)
 	)
 
 	eofReader := NewEOFReader(data)
@@ -218,7 +219,8 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 				rs = objResponse.RedundancyStrategy
 			} else {
 				beginSegment.StreamID = streamID
-				responses, err = s.metainfo.Batch(ctx, prevSegmentCommitReq, beginSegment)
+				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
+				requestsToBatch = requestsToBatch[:0]
 				if len(responses) > 0 {
 					// We increment because the first request has succeeded
 					committedSegments++
@@ -241,12 +243,12 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 				return Meta{}, err
 			}
 
-			prevSegmentCommitReq = &metainfo.CommitSegmentParams{
+			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
 				SegmentID:         segmentID,
 				SizeEncryptedData: size,
 				Encryption:        segmentEncryption,
 				UploadResult:      uploadResults,
-			}
+			})
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
 			if err != nil {
@@ -276,10 +278,7 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 				streamID = objResponse.StreamID
 			} else {
 				makeInlineSegment.StreamID = streamID
-				err = s.metainfo.MakeInlineSegment(ctx, *makeInlineSegment)
-				if err != nil {
-					return Meta{}, err
-				}
+				requestsToBatch = append(requestsToBatch, makeInlineSegment)
 			}
 
 			committedSegments++
@@ -335,9 +334,9 @@ func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.Ci
 		StreamID:          streamID,
 		EncryptedMetadata: objectMetadata,
 	}
-	if prevSegmentCommitReq != nil {
+	if len(requestsToBatch) > 0 {
 		var responses []metainfo.BatchResponse
-		responses, err = s.metainfo.Batch(ctx, prevSegmentCommitReq, &commitObject)
+		responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
 		if len(responses) > 0 {
 			// We increment because the first request has succeeded
 			committedSegments++
