@@ -11,7 +11,9 @@ import (
 
 	"storj.io/common/encryption"
 	"storj.io/common/macaroon"
+	"storj.io/common/paths"
 	"storj.io/common/pb"
+	"storj.io/common/storj"
 )
 
 // Access contains everything to access a project
@@ -21,6 +23,20 @@ type Access struct {
 	apiKey           *macaroon.APIKey
 	encAccess        *encryptionAccess
 	parseErr         error
+}
+
+// SharePrefix defines a prefix that will be shared.
+type SharePrefix struct {
+	Bucket    string
+	KeyPrefix string
+}
+
+// Permission defines what actions can be used to share.
+type Permission struct {
+	AllowRead   bool
+	AllowWrite  bool
+	AllowList   bool
+	AllowDelete bool
 }
 
 // ParseAccess parses access string.
@@ -132,4 +148,74 @@ func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency
 		apiKey:           parsedAPIKey,
 		encAccess:        encAccess,
 	}, nil
+}
+
+// Share creates new Access with spefic permision. Permission will be applied to namespaces is defined.
+func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
+	caveat := macaroon.Caveat{
+		DisallowReads:   !permission.AllowRead,
+		DisallowWrites:  !permission.AllowWrite,
+		DisallowLists:   !permission.AllowList,
+		DisallowDeletes: !permission.AllowDelete,
+	}
+
+	for _, prefix := range prefixes {
+		unencPath := paths.NewUnencrypted(prefix.KeyPrefix)
+		cipher := storj.EncAESGCM // TODO(jeff): pick the right path cipher
+
+		encPath, err := encryption.EncryptPath(prefix.Bucket, unencPath, cipher, access.encAccess.store)
+		if err != nil {
+			return nil, err
+		}
+		derivedKey, err := encryption.DerivePathKey(prefix.Bucket, unencPath, access.encAccess.store)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := access.encAccess.store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
+			return nil, err
+		}
+		caveat.AllowedPaths = append(caveat.AllowedPaths, &macaroon.Caveat_Path{
+			Bucket:              []byte(prefix.Bucket),
+			EncryptedPathPrefix: []byte(encPath.Raw()),
+		})
+	}
+
+	restrictedAPIKey, err := access.apiKey.Restrict(caveat)
+	if err != nil {
+		return nil, err
+	}
+
+	restrictedAccess := &Access{
+		satelliteNodeURL: access.satelliteNodeURL,
+		apiKey:           restrictedAPIKey,
+		encAccess:        access.encAccess,
+	}
+	return restrictedAccess, nil
+}
+
+// ReadOnlyPermission returns permission that allows reading and listing.
+func ReadOnlyPermission() Permission {
+	return Permission{
+		AllowRead: true,
+		AllowList: true,
+	}
+}
+
+// WriteOnlyPermission returns permission that allows writing and deleting.
+func WriteOnlyPermission() Permission {
+	return Permission{
+		AllowWrite:  true,
+		AllowDelete: true,
+	}
+}
+
+// AllPermissions returns permission that allows all actions.
+func AllPermissions() Permission {
+	return Permission{
+		AllowRead:   true,
+		AllowWrite:  true,
+		AllowList:   true,
+		AllowDelete: true,
+	}
 }
