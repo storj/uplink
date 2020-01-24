@@ -52,29 +52,30 @@ func TestObject(t *testing.T) {
 
 		upload, err := project.UploadObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info())
 
 		randData := testrand.Bytes(10 * memory.KiB)
 		source := bytes.NewBuffer(randData)
 		_, err = io.Copy(upload, source)
 		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info())
 
 		err = upload.Commit(nil)
 		require.NoError(t, err)
+		assertObject(t, upload.Info())
 
 		obj, err := project.Stat(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
-		assert.Equal(t, "test.dat", obj.Key)
-		assert.Condition(t, func() bool {
-			return time.Since(obj.Created) < 10*time.Second
-		})
+		assertObject(t, obj)
 
 		download, err := project.DownloadObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
+		assertObject(t, download.Info())
 
 		var downloaded bytes.Buffer
 		_, err = io.Copy(&downloaded, download)
 		require.NoError(t, err)
-		require.Equal(t, randData, downloaded.Bytes())
+		assert.Equal(t, randData, downloaded.Bytes())
 
 		err = download.Close()
 		require.NoError(t, err)
@@ -87,13 +88,26 @@ func TestObject(t *testing.T) {
 		}
 		download, err = downloadReq.Do(ctx, project)
 		require.NoError(t, err)
+		assertObject(t, download.Info())
 
 		var downloadedRange bytes.Buffer
 		_, err = io.Copy(&downloadedRange, download)
 		require.NoError(t, err)
-		require.Equal(t, randData[100:600], downloadedRange.Bytes())
+		assert.Equal(t, randData[100:600], downloadedRange.Bytes())
 
 		err = download.Close()
 		require.NoError(t, err)
 	})
+}
+
+func assertObject(t *testing.T, obj *uplink.Object) {
+	assert.Equal(t, "test.dat", obj.Key)
+	assert.Condition(t, func() bool {
+		return time.Since(obj.Created) < 10*time.Second
+	})
+}
+
+func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object) {
+	assert.Equal(t, "test.dat", obj.Key)
+	assert.Empty(t, obj.Created)
 }

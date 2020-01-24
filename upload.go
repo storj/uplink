@@ -18,7 +18,7 @@ var ErrUploadDone = errs.Class("upload done")
 // Upload is a partial upload to Storj Network.
 type Upload interface {
 	// Info returns the last information about the uploaded object.
-	// Info() Object
+	Info() *Object
 
 	Write(p []byte) (n int, err error)
 	// ReadFrom(r io.Reader) (int64, error)
@@ -69,6 +69,7 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ Uploa
 		return nil, Error.Wrap(err)
 	}
 
+	info := obj.Info()
 	mutableStream, err := obj.CreateStream(ctx)
 	if err != nil {
 		return nil, Error.Wrap(err)
@@ -76,11 +77,21 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ Uploa
 
 	return &upload{
 		upload: stream.NewUpload(ctx, mutableStream, project.streams),
+		object: convertObject(&info),
 	}, nil
 }
 
 type upload struct {
 	upload *stream.Upload
+	object *Object
+}
+
+func (upload *upload) Info() *Object {
+	meta := upload.upload.Meta()
+	if meta != nil {
+		upload.object.Created = meta.Modified
+	}
+	return upload.object
 }
 
 func (upload *upload) Write(p []byte) (n int, err error) {

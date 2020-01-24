@@ -31,17 +31,20 @@ func (project *Project) Stat(ctx context.Context, bucket, key string) (_ *Object
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
-	info, err := project.db.GetObject(ctx, b, key)
+	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
-	obj := &Object{
-		Key:     info.Path,
-		Created: info.Created,
-		Expires: info.Expires,
-		User:    info.Metadata,
-	}
+	return convertObject(&obj), nil
+}
 
-	return obj, nil
+// convertObject converts storj.Object to uplink.Object.
+func convertObject(obj *storj.Object) *Object {
+	return &Object{
+		Key:     obj.Path,
+		Created: obj.Created,
+		Expires: obj.Expires,
+		User:    obj.Metadata,
+	}
 }

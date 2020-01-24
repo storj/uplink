@@ -13,7 +13,7 @@ import (
 // Download is a partial download to Storj Network.
 type Download interface {
 	// Info returns the last information about the object.
-	// Info() Object
+	Info() *Object
 	Read(data []byte) (n int, err error)
 	Close() error
 }
@@ -58,11 +58,17 @@ func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ Dow
 
 	return &download{
 		download: stream.NewDownloadRange(ctx, objectStream, project.streams, request.Offset, request.Length),
+		object:   convertObject(&obj),
 	}, nil
 }
 
 type download struct {
 	download *stream.Download
+	object   *Object
+}
+
+func (download *download) Info() *Object {
+	return download.object
 }
 
 func (download *download) Read(data []byte) (n int, err error) {

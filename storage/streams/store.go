@@ -333,7 +333,14 @@ func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.Ciphe
 		return Meta{}, err
 	}
 
+	satStreamID := &pb.SatStreamID{}
+	err = proto.Unmarshal(streamID, satStreamID)
+	if err != nil {
+		return Meta{}, err
+	}
+
 	resultMeta := Meta{
+		Modified:   satStreamID.CreationDate,
 		Expiration: expiration,
 		Size:       streamSize,
 		Data:       metadata,

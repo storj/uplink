@@ -6,6 +6,8 @@ package stream
 import (
 	"context"
 	"io"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/zeebo/errs"
@@ -25,6 +27,7 @@ type Upload struct {
 	writer   io.WriteCloser
 	closed   bool
 	errgroup errgroup.Group
+	meta     unsafe.Pointer //*streams.Meta
 }
 
 // NewUpload creates new stream upload.
@@ -50,10 +53,11 @@ func NewUpload(ctx context.Context, stream kvmetainfo.MutableStream, streams str
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
 
-		_, err = streams.Put(ctx, storj.JoinPaths(obj.Bucket.Name, obj.Path), obj.Bucket.PathCipher, reader, metadata, obj.Expires)
+		m, err := streams.Put(ctx, storj.JoinPaths(obj.Bucket.Name, obj.Path), obj.Bucket.PathCipher, reader, metadata, obj.Expires)
 		if err != nil {
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
+		atomic.StorePointer(&upload.meta, unsafe.Pointer(&m))
 
 		return nil
 	})
@@ -84,4 +88,15 @@ func (upload *Upload) Close() error {
 
 	// Wait for streams.Put to commit the upload to the PointerDB
 	return errs.Combine(err, upload.errgroup.Wait())
+}
+
+// Meta returns the metadata of the uploaded object.
+//
+// Will return nil if the upload is still in progress.
+func (upload *Upload) Meta() *streams.Meta {
+	meta := (*streams.Meta)(atomic.LoadPointer(&upload.meta))
+	if meta == nil {
+		return nil
+	}
+	return meta
 }
