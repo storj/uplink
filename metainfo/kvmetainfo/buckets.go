@@ -20,8 +20,13 @@ func (db *Project) CreateBucket(ctx context.Context, bucketName string, info *st
 	if bucketName == "" {
 		return storj.Bucket{}, storj.ErrNoBucket.New("")
 	}
+
 	if info == nil {
 		info = &storj.Bucket{PathCipher: storj.EncAESGCM}
+	} else {
+		// ensure we don't modify the input argument
+		clone := *info
+		info = &clone
 	}
 
 	if info.DefaultSegmentsSize == 0 {
