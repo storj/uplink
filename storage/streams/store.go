@@ -79,24 +79,9 @@ func newTypedStreamStore(metainfo *metainfo.Client, segments segments.Store, seg
 // store the first piece at s0/<path>, second piece at s1/<path>, and the
 // *last* piece at l/<path>. Store the given metadata, along with the number
 // of segments, in a new protobuf, in the metadata of l/<path>.
-func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (m Meta, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	// previously file uploaded?
-	err = s.Delete(ctx, path, pathCipher)
-	if err != nil && !storj.ErrObjectNotFound.Has(err) {
-		// something wrong happened checking for an existing
-		// file with the same name
-		return Meta{}, err
-	}
-
-	return s.upload(ctx, path, pathCipher, data, metadata, expiration)
-}
-
-// upload registers segments in metainfo and uploads them to storage nodes.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *streamStore) upload(ctx context.Context, path Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
+func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
