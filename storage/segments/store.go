@@ -97,7 +97,7 @@ func (s *segmentStore) Ranger(
 		return ranger.ByteRanger(info.EncryptedInlineData), nil
 	}
 
-	needed := CalcNeededNodes(objectRS)
+	needed := objectRS.DownloadNodes()
 	selected := make([]*pb.AddressedOrderLimit, len(limits))
 	s.rngMu.Lock()
 	perm := s.rng.Perm(len(limits))
@@ -158,25 +158,4 @@ func (s *segmentStore) Delete(ctx context.Context, streamID storj.StreamID, segm
 	// FinishDeleteSegment doesn't implement any specific logic at the moment
 
 	return nil
-}
-
-// CalcNeededNodes calculate how many minimum nodes are needed for download,
-// based on t = k + (n-o)k/o
-func CalcNeededNodes(rs storj.RedundancyScheme) int32 {
-	extra := int32(1)
-
-	if rs.OptimalShares > 0 {
-		extra = int32(((rs.TotalShares - rs.OptimalShares) * rs.RequiredShares) / rs.OptimalShares)
-		if extra == 0 {
-			// ensure there is at least one extra node, so we can have error detection/correction
-			extra = 1
-		}
-	}
-
-	needed := int32(rs.RequiredShares) + extra
-
-	if needed > int32(rs.TotalShares) {
-		needed = int32(rs.TotalShares)
-	}
-	return needed
 }
