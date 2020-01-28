@@ -15,24 +15,6 @@ import (
 // ErrUploadDone is returned when either Abort or Commit has already been called.
 var ErrUploadDone = errs.Class("upload done")
 
-// Upload is a partial upload to Storj Network.
-type Upload interface {
-	// Info returns the last information about the uploaded object.
-	Info() *Object
-
-	Write(p []byte) (n int, err error)
-	// ReadFrom(r io.Reader) (int64, error)
-
-	// Commit commits data to the store.
-	//
-	// Returns ErrUploadDone when either Abort or Commit has already been called.
-	Commit(opts *CommitOptions) error
-	// Abort aborts partial upload.
-	//
-	// Returns ErrUploadDone when either Abort or Commit has already been called.
-	// Abort() error
-}
-
 // CommitOptions allows to specify additional metadata about the object.
 // The options will override any previous data.
 type CommitOptions struct {
@@ -41,7 +23,7 @@ type CommitOptions struct {
 }
 
 // UploadObject starts an upload to the specified key.
-func (project *Project) UploadObject(ctx context.Context, bucket, key string) (Upload, error) {
+func (project *Project) UploadObject(ctx context.Context, bucket, key string) (*Upload, error) {
 	return (&UploadRequest{
 		Bucket: bucket,
 		Key:    key,
@@ -60,7 +42,7 @@ type UploadRequest struct {
 }
 
 // Do executes the upload request.
-func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ Upload, err error) {
+func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: request.Bucket, PathCipher: storj.EncAESGCM}
@@ -75,18 +57,20 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ Uploa
 		return nil, Error.Wrap(err)
 	}
 
-	return &upload{
+	return &Upload{
 		upload: stream.NewUpload(ctx, mutableStream, project.streams),
 		object: convertObject(&info),
 	}, nil
 }
 
-type upload struct {
+// Upload is a partial upload to Storj Network.
+type Upload struct {
 	upload *stream.Upload
 	object *Object
 }
 
-func (upload *upload) Info() *Object {
+// Info returns the last information about the uploaded object.
+func (upload *Upload) Info() *Object {
 	meta := upload.upload.Meta()
 	if meta != nil {
 		upload.object.Created = meta.Modified
@@ -94,10 +78,16 @@ func (upload *upload) Info() *Object {
 	return upload.object
 }
 
-func (upload *upload) Write(p []byte) (n int, err error) {
+// Write uploads len(p) bytes from p to the object's data stream.
+// It returns the number of bytes written from p (0 <= n <= len(p))
+// and any error encountered that caused the write to stop early.
+func (upload *Upload) Write(p []byte) (n int, err error) {
 	return upload.upload.Write(p)
 }
 
-func (upload *upload) Commit(opts *CommitOptions) error {
+// Commit commits data to the store.
+//
+// Returns ErrUploadDone when either Abort or Commit has already been called.
+func (upload *Upload) Commit(opts *CommitOptions) error {
 	return upload.upload.Close()
 }

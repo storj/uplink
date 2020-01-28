@@ -10,16 +10,8 @@ import (
 	"storj.io/uplink/stream"
 )
 
-// Download is a partial download to Storj Network.
-type Download interface {
-	// Info returns the last information about the object.
-	Info() *Object
-	Read(data []byte) (n int, err error)
-	Close() error
-}
-
 // DownloadObject starts an download to the specified key.
-func (project *Project) DownloadObject(ctx context.Context, bucket, key string) (Download, error) {
+func (project *Project) DownloadObject(ctx context.Context, bucket, key string) (*Download, error) {
 	return (&DownloadRequest{
 		Bucket: bucket,
 		Key:    key,
@@ -41,7 +33,7 @@ type DownloadRequest struct {
 }
 
 // Do executes the download request.
-func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ Download, err error) {
+func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: request.Bucket, PathCipher: storj.EncAESGCM}
@@ -56,25 +48,30 @@ func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ Dow
 		return nil, Error.Wrap(err)
 	}
 
-	return &download{
+	return &Download{
 		download: stream.NewDownloadRange(ctx, objectStream, project.streams, request.Offset, request.Length),
 		object:   convertObject(&obj),
 	}, nil
 }
 
-type download struct {
+// Download is a partial download to Storj Network.
+type Download struct {
 	download *stream.Download
 	object   *Object
 }
 
-func (download *download) Info() *Object {
+// Info returns the last information about the object.
+func (download *Download) Info() *Object {
 	return download.object
 }
 
-func (download *download) Read(data []byte) (n int, err error) {
+// Read downloads up to len(p) bytes into p from the object's data stream.
+// It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
+func (download *Download) Read(data []byte) (n int, err error) {
 	return download.download.Read(data)
 }
 
-func (download *download) Close() error {
+// Close closes the reader of the download.
+func (download *Download) Close() error {
 	return download.download.Close()
 }
