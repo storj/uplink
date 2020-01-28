@@ -17,5 +17,5 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190612171030-cf5a9e6f8fd2
-	storj.io/common v0.0.0-20200127192906-afcfc1488e5e
+	storj.io/common v0.0.0-20200128165341-932febe7e00f
 )

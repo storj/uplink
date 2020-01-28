@@ -39,6 +39,7 @@ pipeline {
                         sh 'check-errs ./...'
                         sh 'staticcheck ./...'
                         sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
+                        sh 'go-licenses check ./...'
                     }
                 }
 
