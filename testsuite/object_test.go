@@ -100,6 +100,12 @@ func TestObject(t *testing.T) {
 
 		err = download.Close()
 		require.NoError(t, err)
+
+		err = project.DeleteObject(ctx, "testbucket", "test.dat")
+		require.NoError(t, err)
+
+		obj, err = project.Stat(ctx, "testbucket", "test.dat")
+		require.True(t, storj.ErrObjectNotFound.Has(err))
 	})
 }
 

@@ -39,6 +39,16 @@ func (project *Project) Stat(ctx context.Context, bucket, key string) (_ *Object
 	return convertObject(&obj), nil
 }
 
+// DeleteObject deletes the object at the specific key.
+func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
+	err = project.db.DeleteObject(ctx, b, key)
+
+	return Error.Wrap(err)
+}
+
 // convertObject converts storj.Object to uplink.Object.
 func convertObject(obj *storj.Object) *Object {
 	return &Object{
