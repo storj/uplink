@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/zeebo/errs"
 
@@ -57,7 +58,10 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Uplo
 		return nil, Error.Wrap(err)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &Upload{
+		cancel: cancel,
 		upload: stream.NewUpload(ctx, mutableStream, project.streams),
 		object: convertObject(&info),
 	}, nil
@@ -65,8 +69,10 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Uplo
 
 // Upload is a partial upload to Storj Network.
 type Upload struct {
-	upload *stream.Upload
-	object *Object
+	aborted int32
+	cancel  context.CancelFunc
+	upload  *stream.Upload
+	object  *Object
 }
 
 // Info returns the last information about the uploaded object.
@@ -89,5 +95,30 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Commit(opts *CommitOptions) error {
-	return upload.upload.Close()
+	if atomic.LoadInt32(&upload.aborted) == 1 {
+		return ErrUploadDone.New("already aborted")
+	}
+
+	err := upload.upload.Close()
+	if err != nil && errs.Unwrap(err).Error() == "already closed" {
+		return ErrUploadDone.New("already committed")
+	}
+
+	return nil
+}
+
+// Abort aborts partial upload.
+//
+// Returns ErrUploadDone when either Abort or Commit has already been called.
+func (upload *Upload) Abort() error {
+	if upload.upload.Meta() != nil {
+		return ErrUploadDone.New("already committed")
+	}
+
+	if !atomic.CompareAndSwapInt32(&upload.aborted, 0, 1) {
+		return ErrUploadDone.New("already aborted")
+	}
+
+	upload.cancel()
+	return nil
 }
