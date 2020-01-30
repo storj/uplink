@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
-	monkit "gopkg.in/spacemonkeygo/monkit.v2"
 
 	"storj.io/common/encryption"
 	"storj.io/common/pb"

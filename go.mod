@@ -11,11 +11,11 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/skyrings/skyring-common v0.0.0-20160929130248-d1c0bb1cbd5e
 	github.com/spacemonkeygo/errors v0.0.0-20171212215202-9064522e9fd1 // indirect
+	github.com/spacemonkeygo/monkit/v3 v3.0.1
 	github.com/stretchr/testify v1.3.0
 	github.com/vivint/infectious v0.0.0-20190108171102-2455b059135b
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.10.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190612171030-cf5a9e6f8fd2
-	storj.io/common v0.0.0-20200128165341-932febe7e00f
+	storj.io/common v0.0.0-20200130005211-04afbf4cd6a5
 )
