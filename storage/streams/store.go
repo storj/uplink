@@ -99,18 +99,17 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 	}
 
 	var (
-		committedSegments int64
-		streamID          storj.StreamID
+		streamID storj.StreamID
 	)
 	defer func() {
 		if err != nil {
-			s.cancelHandler(context.Background(), streamID, committedSegments, path)
+			s.cancelHandler(context.Background(), path)
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			s.cancelHandler(context.Background(), streamID, committedSegments, path)
+			s.cancelHandler(context.Background(), path)
 		default:
 		}
 	}()
@@ -206,10 +205,6 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
 				requestsToBatch = requestsToBatch[:0]
-				if len(responses) > 0 {
-					// We increment because the first request has succeeded
-					committedSegments++
-				}
 				if err != nil {
 					return Meta{}, err
 				}
@@ -265,8 +260,6 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 				makeInlineSegment.StreamID = streamID
 				requestsToBatch = append(requestsToBatch, makeInlineSegment)
 			}
-
-			committedSegments++
 		}
 
 		lastSegmentSize = sizeReader.Size()
@@ -320,12 +313,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		EncryptedMetadata: objectMetadata,
 	}
 	if len(requestsToBatch) > 0 {
-		var responses []metainfo.BatchResponse
-		responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
-		if len(responses) > 0 {
-			// We increment because the first request has succeeded
-			committedSegments++
-		}
+		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
 	} else {
 		err = s.metainfo.CommitObject(ctx, commitObject)
 	}
@@ -531,15 +519,13 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, c
 }
 
 // CancelHandler handles clean up of segments on receiving CTRL+C
-func (s *streamStore) cancelHandler(ctx context.Context, streamID storj.StreamID, totalSegments int64, path Path) {
+func (s *streamStore) cancelHandler(ctx context.Context, path Path) {
 	defer mon.Task()(&ctx)(nil)
 
-	for i := int64(0); i < totalSegments; i++ {
-		err := s.segments.Delete(ctx, streamID, int32(i))
-		if err != nil {
-			zap.L().Warn("Failed deleting segment", zap.Stringer("path", path), zap.Int64("Segment Index", i), zap.Error(err))
-			continue
-		}
+	// satellite deletes now from 0 to l so we can just use BeginDeleteObject
+	err := s.Delete(ctx, path)
+	if err != nil {
+		zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
 	}
 }
 
