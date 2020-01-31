@@ -270,6 +270,8 @@ github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR
 github.com/satori/go.uuid v1.2.0/go.mod h1:dA0hQrYB0VpLJoorglMZABFdXlWrHn1NEOzdhQKdks0=
 github.com/segmentio/go-prompt v1.2.1-0.20161017233205-f0d19b6901ad/go.mod h1:B3ehdD1xPoWDKgrQgUaGk+m8H1xb1J5TyYDfKpKNeEE=
 github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24/go.mod h1:M+9NzErvs504Cn4c5DxATwIqPbtswREoFCre64PpcG4=
+github.com/shopspring/decimal v0.0.0-20200105231215-408a2507e114 h1:Pm6R878vxWWWR+Sa3ppsLce/Zq+JNTs6aVvRu13jv9A=
+github.com/shopspring/decimal v0.0.0-20200105231215-408a2507e114/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMBDgk/93Q=
 github.com/skyrings/skyring-common v0.0.0-20160929130248-d1c0bb1cbd5e h1:jrZSSgPUDtBeJbGXqgGUeupQH8I+ZvGXfhpIahye2Bc=
@@ -280,6 +282,8 @@ github.com/smartystreets/goconvey v0.0.0-20180222194500-ef6db91d284a/go.mod h1:X
 github.com/soheilhy/cmux v0.1.4/go.mod h1:IM3LyeVVIOuxMH7sFAkER9+bJ4dT7Ms6E4xg4kGIyLM=
 github.com/spacemonkeygo/errors v0.0.0-20171212215202-9064522e9fd1 h1:xHQewZjohU9/wUsyC99navCjQDNHtTgUOM/J1jAbzfw=
 github.com/spacemonkeygo/errors v0.0.0-20171212215202-9064522e9fd1/go.mod h1:7NL9UAYQnRM5iKHUCld3tf02fKb5Dft+41+VckASUy0=
+github.com/spacemonkeygo/monkit/v3 v3.0.1 h1:mSZQU+LOFuN5KSUvE1EiU1lxlFcOz/r0N5Tz8z+TwN0=
+github.com/spacemonkeygo/monkit/v3 v3.0.1/go.mod h1:JcK1pCbReQsOsMKF/POFSZCq7drXFybgGmbc27tuwes=
 github.com/spacemonkeygo/monotime v0.0.0-20180824235756-e3f48a95f98a h1:8+cCjxhToanKmxLIbuyBNe2EnpgwhiivsIaRJstDRFA=
 github.com/spacemonkeygo/monotime v0.0.0-20180824235756-e3f48a95f98a/go.mod h1:ul4bvvnCOPZgq8w0nTkSmWVg/hauVpFS97Am1YM1XXo=
 github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 h1:RC6RW7j+1+HkWaX/Yh71Ee5ZHaHYt7ZP4sQgUrm6cDU=
@@ -373,6 +377,8 @@ golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6/go.mod h1:t9HGtf8HONx5eT2rtn
 golang.org/x/net v0.0.0-20190522155817-f3200d17e092/go.mod h1:HSz+uSET+XFnRR8LxR5pz3Of3rY3CfYBVs4xY44aLks=
 golang.org/x/net v0.0.0-20190916140828-c8589233b77d h1:mCMDWKhNO37A7GAhOpHPbIw1cjd0V86kX1/WA9c7FZ8=
 golang.org/x/net v0.0.0-20190916140828-c8589233b77d/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/net v0.0.0-20190923162816-aa69164e4478 h1:l5EDrHhldLYb3ZRHDUhXF7Om7MvYXnkV9/iQNo1lX6g=
+golang.org/x/net v0.0.0-20190923162816-aa69164e4478/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20181106182150-f42d05182288/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
@@ -468,10 +474,15 @@ storj.io/common v0.0.0-20200108114547-1c62e5708bce h1:0okFmuEp38BNSKXQ72PXMTouSY
 storj.io/common v0.0.0-20200108114547-1c62e5708bce/go.mod h1:mDnchZF+e7g7u630Wwgu/X/zCmqpU0lvy5kQ3jQgs5k=
 storj.io/common v0.0.0-20200114152414-8dcdd4c9d250 h1:JDScdUShGqfHyiSWtfXhYEK1OkSVD40SHR7fO01k5Xk=
 storj.io/common v0.0.0-20200114152414-8dcdd4c9d250/go.mod h1:0yn1ANoDXETNBREGQHq8d7m1Kq0vWMu6Ul7C2YPZo/E=
+storj.io/common v0.0.0-20200128165341-932febe7e00f/go.mod h1:0yn1ANoDXETNBREGQHq8d7m1Kq0vWMu6Ul7C2YPZo/E=
+storj.io/common v0.0.0-20200130005211-04afbf4cd6a5 h1:BqnkK/pId17R1a70qWcCm2fBgR3kQ5fLBKZ69W+8ecU=
+storj.io/common v0.0.0-20200130005211-04afbf4cd6a5/go.mod h1:n4sxosrQlw5iDBlbTdBtae/8ZqnXUG3nA5XZdIHJibY=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2 h1:8SgLYEhe99R8QlAD1EAOBPRyIR+cn2hqkXtWlAUPf/c=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2/go.mod h1:/ascUDbzNAv0A3Jj7wUIKFBH2JdJ2uJIBO/b9+2yHgQ=
 storj.io/storj v0.0.0-20200122093353-6502454947c6 h1:ORi0WfMCL3DO0rXb3B1JRmFRFubiiuOb/HI1t3pBBkk=
 storj.io/storj v0.0.0-20200122093353-6502454947c6/go.mod h1:NEdrDcGpChTlnImJAaqETnIqwe1XutE/s2v6MoKQOJw=
+storj.io/storj v0.12.1-0.20200130224754-2968857e2178 h1:J2844iVp7K1N/mHIXBG4V4rV+RIJje6xsUWqn5PqcJ8=
+storj.io/storj v0.12.1-0.20200130224754-2968857e2178/go.mod h1:wrR4UjfbR4NtMHEv3sczJF2dI/RGZ3RBbthML8aw1bM=
 storj.io/storj v0.29.10 h1:5voSBQ0DNI7WBWKLp7Fok9lT5Ss/JJv1mrXv+HM3t1A=
 storj.io/storj v0.29.10/go.mod h1:dAi267H0blJ432lmYffm00VrXaqv4UY88Asw3sz0+ok=
 storj.io/uplink v0.0.0-20200113130735-92f78cb6f0f0 h1:Qy8ARi/QVtG05r61wevwlpDcqE7DnVD+W8sIXI2VsNY=

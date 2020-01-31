@@ -22,6 +22,7 @@ import (
 // Project provides access to managing buckets.
 type Project struct {
 	config   Config
+	access   *Access
 	dialer   rpc.Dialer
 	metainfo *metainfo.Client
 	project  *kvmetainfo.Project
@@ -92,6 +93,7 @@ func (config Config) Open(ctx context.Context, access *Access) (_ *Project, err 
 
 	return &Project{
 		config:   config,
+		access:   access,
 		dialer:   dialer,
 		metainfo: metainfo,
 		project:  project,

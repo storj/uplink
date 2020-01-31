@@ -36,9 +36,9 @@ type Meta struct {
 
 // Store interface methods for streams to satisfy to be a store
 type typedStore interface {
-	Get(ctx context.Context, path Path, object storj.Object, pathCipher storj.CipherSuite) (ranger.Ranger, error)
-	Put(ctx context.Context, path Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
-	Delete(ctx context.Context, path Path, pathCipher storj.CipherSuite) error
+	Get(ctx context.Context, path Path, object storj.Object) (ranger.Ranger, error)
+	Put(ctx context.Context, path Path, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
+	Delete(ctx context.Context, path Path) error
 }
 
 // streamStore is a store for streams. It implements typedStore as part of an ongoing migration
@@ -81,13 +81,13 @@ func newTypedStreamStore(metainfo *metainfo.Client, segments segments.Store, seg
 // of segments, in a new protobuf, in the metadata of l/<path>.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
+func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
 		return Meta{}, err
 	}
-	encPath, err := encryption.EncryptPath(path.Bucket(), path.UnencryptedPath(), pathCipher, s.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
 		return Meta{}, err
 	}
@@ -104,13 +104,13 @@ func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.Ciphe
 	)
 	defer func() {
 		if err != nil {
-			s.cancelHandler(context.Background(), streamID, committedSegments, path, pathCipher)
+			s.cancelHandler(context.Background(), streamID, committedSegments, path)
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			s.cancelHandler(context.Background(), streamID, committedSegments, path, pathCipher)
+			s.cancelHandler(context.Background(), streamID, committedSegments, path)
 		default:
 		}
 	}()
@@ -352,7 +352,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, pathCipher storj.Ciphe
 // Get returns a ranger that knows what the overall size is (from l/<path>)
 // and then returns the appropriate data from segments s0/<path>, s1/<path>,
 // ..., l/<path>.
-func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object, pathCipher storj.CipherSuite) (rr ranger.Ranger, err error) {
+func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
@@ -423,10 +423,10 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object, p
 }
 
 // Delete all the segments, with the last one last
-func (s *streamStore) Delete(ctx context.Context, path Path, pathCipher storj.CipherSuite) (err error) {
+func (s *streamStore) Delete(ctx context.Context, path Path) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	encPath, err := encryption.EncryptPath(path.Bucket(), path.UnencryptedPath(), pathCipher, s.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
 		return err
 	}
@@ -531,7 +531,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, c
 }
 
 // CancelHandler handles clean up of segments on receiving CTRL+C
-func (s *streamStore) cancelHandler(ctx context.Context, streamID storj.StreamID, totalSegments int64, path Path, pathCipher storj.CipherSuite) {
+func (s *streamStore) cancelHandler(ctx context.Context, streamID storj.StreamID, totalSegments int64, path Path) {
 	defer mon.Task()(&ctx)(nil)
 
 	for i := int64(0); i < totalSegments; i++ {

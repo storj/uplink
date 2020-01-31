@@ -53,7 +53,7 @@ func NewUpload(ctx context.Context, stream kvmetainfo.MutableStream, streams str
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
 
-		m, err := streams.Put(ctx, storj.JoinPaths(obj.Bucket.Name, obj.Path), obj.Bucket.PathCipher, reader, metadata, obj.Expires)
+		m, err := streams.Put(ctx, storj.JoinPaths(obj.Bucket.Name, obj.Path), reader, metadata, obj.Expires)
 		if err != nil {
 			return errs.Combine(err, reader.CloseWithError(err))
 		}

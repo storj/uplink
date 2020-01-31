@@ -19,9 +19,9 @@ type encryptionAccess struct {
 
 // newEncryptionAccess creates an encryption access context
 func newEncryptionAccess() *encryptionAccess {
-	return &encryptionAccess{
-		store: encryption.NewStore(),
-	}
+	store := encryption.NewStore()
+	store.SetDefaultPathCipher(storj.EncAESGCM)
+	return &encryptionAccess{store: store}
 }
 
 // newEncryptionAccessWithDefaultKey creates an encryption access context with
@@ -46,12 +46,13 @@ func (s *encryptionAccess) setDefaultKey(defaultKey *storj.Key) {
 
 func (s *encryptionAccess) toProto() (*pb.EncryptionAccess, error) {
 	var storeEntries []*pb.EncryptionAccess_StoreEntry
-	err := s.store.Iterate(func(bucket string, unenc paths.Unencrypted, enc paths.Encrypted, key storj.Key) error {
+	err := s.store.IterateWithCipher(func(bucket string, unenc paths.Unencrypted, enc paths.Encrypted, key storj.Key, pathCipher storj.CipherSuite) error {
 		storeEntries = append(storeEntries, &pb.EncryptionAccess_StoreEntry{
 			Bucket:          []byte(bucket),
 			UnencryptedPath: []byte(unenc.Raw()),
 			EncryptedPath:   []byte(enc.Raw()),
 			Key:             key[:],
+			PathCipher:      pb.CipherSuite(pathCipher),
 		})
 		return nil
 	})
@@ -88,11 +89,13 @@ func parseEncryptionAccessFromProto(p *pb.EncryptionAccess) (*encryptionAccess, 
 		var key storj.Key
 		copy(key[:], entry.Key)
 
-		err := access.store.Add(
+		err := access.store.AddWithCipher(
 			string(entry.Bucket),
 			paths.NewUnencrypted(string(entry.UnencryptedPath)),
 			paths.NewEncrypted(string(entry.EncryptedPath)),
-			key)
+			key,
+			storj.CipherSuite(entry.PathCipher),
+		)
 		if err != nil {
 			return nil, Error.New("invalid encryption access entry: %v", err)
 		}

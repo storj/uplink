@@ -37,13 +37,12 @@ type Store interface {
 }
 
 type objStore struct {
-	store      streams.Store
-	pathCipher storj.CipherSuite
+	store streams.Store
 }
 
 // NewStore for objects
-func NewStore(store streams.Store, pathCipher storj.CipherSuite) Store {
-	return &objStore{store: store, pathCipher: pathCipher}
+func NewStore(store streams.Store) Store {
+	return &objStore{store: store}
 }
 
 func (o *objStore) Get(ctx context.Context, path storj.Path, object storj.Object) (
@@ -54,7 +53,7 @@ func (o *objStore) Get(ctx context.Context, path storj.Path, object storj.Object
 		return nil, storj.ErrNoPath.New("")
 	}
 
-	rr, err = o.store.Get(ctx, path, object, o.pathCipher)
+	rr, err = o.store.Get(ctx, path, object)
 	return rr, err
 }
 
@@ -72,7 +71,7 @@ func (o *objStore) Put(ctx context.Context, path storj.Path, data io.Reader, met
 	if err != nil {
 		return Meta{}, err
 	}
-	m, err := o.store.Put(ctx, path, o.pathCipher, data, b, expiration)
+	m, err := o.store.Put(ctx, path, data, b, expiration)
 	return convertMeta(m), err
 }
 
@@ -83,7 +82,7 @@ func (o *objStore) Delete(ctx context.Context, path storj.Path) (err error) {
 		return storj.ErrNoPath.New("")
 	}
 
-	return o.store.Delete(ctx, path, o.pathCipher)
+	return o.store.Delete(ctx, path)
 }
 
 // convertMeta converts stream metadata to object metadata

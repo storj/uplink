@@ -122,13 +122,6 @@ func (db *DB) ModifyObject(ctx context.Context, bucket storj.Bucket, path storj.
 	return nil, errors.New("not implemented")
 }
 
-func (db *DB) pathCipher(bucketInfo storj.Bucket) storj.CipherSuite {
-	if db.encStore.EncryptionBypass {
-		return storj.EncNullBase64URL
-	}
-	return bucketInfo.PathCipher
-}
-
 // DeleteObject deletes an object from database
 func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -138,7 +131,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 	}
 
 	prefixed := prefixedObjStore{
-		store:  objects.NewStore(db.streams, db.pathCipher(bucket)),
+		store:  objects.NewStore(db.streams),
 		prefix: bucket.Name,
 	}
 	return prefixed.Delete(ctx, path)
@@ -190,15 +183,13 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// metaFlags |= meta.UserDefined
 	// }
 
-	pathCipher := db.pathCipher(bucket)
-
 	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, options.Prefix))
 	prefixKey, err := encryption.DerivePathKey(prefix.Bucket(), streams.PathForKey(prefix.UnencryptedPath().Raw()), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
-	encPrefix, err := encryption.EncryptPath(prefix.Bucket(), prefix.UnencryptedPath(), pathCipher, db.encStore)
+	encPrefix, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket(), prefix.UnencryptedPath(), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
 	}
@@ -218,7 +209,9 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// and that isn't known at compile time.
 	needsEncryption := prefix.Bucket() != ""
 	if needsEncryption {
-		startAfter, err = encryption.EncryptPathRaw(startAfter, pathCipher, prefixKey)
+		_, _, base := db.encStore.LookupEncrypted(prefix.Bucket(), encPrefix)
+
+		startAfter, err = encryption.EncryptPathRaw(startAfter, base.PathCipher, prefixKey)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -247,10 +240,11 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 		var itemPath string
 
 		if needsEncryption {
-			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), pathCipher, prefixKey)
+			unencPath, err := encryption.DecryptPathWithStoreCipher(bucket.Name, paths.NewEncrypted(string(item.EncryptedPath)), db.encStore)
 			if err != nil {
 				return storj.ObjectList{}, errClass.Wrap(err)
 			}
+			itemPath = unencPath.Raw()
 
 			// TODO(jeff): this shouldn't be necessary if we handled trailing slashes
 			// appropriately. there's some issues with list.
@@ -258,7 +252,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			if len(fullPath) > 0 && fullPath[len(fullPath)-1] != '/' {
 				fullPath += "/"
 			}
-			fullPath += itemPath
+			fullPath += unencPath.Raw()
 
 			path = streams.CreatePath(prefix.Bucket(), paths.NewUnencrypted(fullPath))
 		} else {
@@ -304,7 +298,7 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 
 	fullpath := streams.CreatePath(bucket.Name, paths.NewUnencrypted(path))
 
-	encPath, err := encryption.EncryptPath(bucket.Name, paths.NewUnencrypted(path), db.pathCipher(bucket), db.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
 	if err != nil {
 		return object{}, storj.Object{}, err
 	}

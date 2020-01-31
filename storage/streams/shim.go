@@ -17,9 +17,9 @@ import (
 
 // Store interface methods for streams to satisfy to be a store
 type Store interface {
-	Get(ctx context.Context, path storj.Path, object storj.Object, pathCipher storj.CipherSuite) (ranger.Ranger, error)
-	Put(ctx context.Context, path storj.Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
-	Delete(ctx context.Context, path storj.Path, pathCipher storj.CipherSuite) error
+	Get(ctx context.Context, path storj.Path, object storj.Object) (ranger.Ranger, error)
+	Put(ctx context.Context, path storj.Path, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
+	Delete(ctx context.Context, path storj.Path) error
 }
 
 type shimStore struct {
@@ -36,22 +36,22 @@ func NewStreamStore(metainfo *metainfo.Client, segments segments.Store, segmentS
 }
 
 // Get parses the passed in path and dispatches to the typed store.
-func (s *shimStore) Get(ctx context.Context, path storj.Path, object storj.Object, pathCipher storj.CipherSuite) (_ ranger.Ranger, err error) {
+func (s *shimStore) Get(ctx context.Context, path storj.Path, object storj.Object) (_ ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	return s.store.Get(ctx, ParsePath(path), object, pathCipher)
+	return s.store.Get(ctx, ParsePath(path), object)
 }
 
 // Put parses the passed in path and dispatches to the typed store.
-func (s *shimStore) Put(ctx context.Context, path storj.Path, pathCipher storj.CipherSuite, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
+func (s *shimStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	return s.store.Put(ctx, ParsePath(path), pathCipher, data, metadata, expiration)
+	return s.store.Put(ctx, ParsePath(path), data, metadata, expiration)
 }
 
 // Delete parses the passed in path and dispatches to the typed store.
-func (s *shimStore) Delete(ctx context.Context, path storj.Path, pathCipher storj.CipherSuite) (err error) {
+func (s *shimStore) Delete(ctx context.Context, path storj.Path) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	return s.store.Delete(ctx, ParsePath(path), pathCipher)
+	return s.store.Delete(ctx, ParsePath(path))
 }
