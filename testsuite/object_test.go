@@ -26,54 +26,39 @@ func TestObject(t *testing.T) {
 		StorageNodeCount: 4,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{
-			Whitelist: uplink.InsecureSkipConnectionVerify(),
-		}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
-		require.NoError(t, err)
-
-		project, err := uplinkConfig.Open(ctx, access)
-		require.NoError(t, err)
-
+		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
-		bucket, err := project.EnsureBucket(ctx, "testbucket")
-		require.NoError(t, err)
-		require.NotNil(t, bucket)
-		require.Equal(t, "testbucket", bucket.Name)
-
+		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err = project.DeleteBucket(ctx, "testbucket")
+			err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
 		upload, err := project.UploadObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
-		assertObjectEmptyCreated(t, upload.Info())
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		randData := testrand.Bytes(10 * memory.KiB)
 		source := bytes.NewBuffer(randData)
 		_, err = io.Copy(upload, source)
 		require.NoError(t, err)
-		assertObjectEmptyCreated(t, upload.Info())
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		err = upload.Commit()
 		require.NoError(t, err)
-		assertObject(t, upload.Info())
+		assertObject(t, upload.Info(), "test.dat")
 
 		obj, err := project.Stat(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
-		assertObject(t, obj)
+		assertObject(t, obj, "test.dat")
 
 		err = upload.Commit()
 		require.True(t, uplink.ErrUploadDone.Has(err))
 
 		download, err := project.DownloadObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
-		assertObject(t, download.Info())
+		assertObject(t, download.Info(), "test.dat")
 
 		var downloaded bytes.Buffer
 		_, err = io.Copy(&downloaded, download)
@@ -91,7 +76,7 @@ func TestObject(t *testing.T) {
 		}
 		download, err = downloadReq.Do(ctx, project)
 		require.NoError(t, err)
-		assertObject(t, download.Info())
+		assertObject(t, download.Info(), "test.dat")
 
 		var downloadedRange bytes.Buffer
 		_, err = io.Copy(&downloadedRange, download)
@@ -115,39 +100,24 @@ func TestAbortUpload(t *testing.T) {
 		StorageNodeCount: 4,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{
-			Whitelist: uplink.InsecureSkipConnectionVerify(),
-		}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
-		require.NoError(t, err)
-
-		project, err := uplinkConfig.Open(ctx, access)
-		require.NoError(t, err)
-
+		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
-		bucket, err := project.EnsureBucket(ctx, "testbucket")
-		require.NoError(t, err)
-		require.NotNil(t, bucket)
-		require.Equal(t, "testbucket", bucket.Name)
-
+		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err = project.DeleteBucket(ctx, "testbucket")
+			err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
 		upload, err := project.UploadObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
-		assertObjectEmptyCreated(t, upload.Info())
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		randData := testrand.Bytes(10 * memory.KiB)
 		source := bytes.NewBuffer(randData)
 		_, err = io.Copy(upload, source)
 		require.NoError(t, err)
-		assertObjectEmptyCreated(t, upload.Info())
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		err = upload.Abort()
 		require.NoError(t, err)
@@ -163,14 +133,32 @@ func TestAbortUpload(t *testing.T) {
 	})
 }
 
-func assertObject(t *testing.T, obj *uplink.Object) {
-	assert.Equal(t, "test.dat", obj.Key)
+func assertObject(t *testing.T, obj *uplink.Object, expectedKey string) {
+	assert.Equal(t, expectedKey, obj.Key)
 	assert.Condition(t, func() bool {
 		return time.Since(obj.Info.Created) < 10*time.Second
 	})
 }
 
-func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object) {
-	assert.Equal(t, "test.dat", obj.Key)
+func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey string) {
+	assert.Equal(t, expectedKey, obj.Key)
 	assert.Empty(t, obj.Info.Created)
+}
+
+func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string) *uplink.Object {
+	upload, err := project.UploadObject(ctx, bucket, key)
+	require.NoError(t, err)
+	assertObjectEmptyCreated(t, upload.Info(), key)
+
+	randData := testrand.Bytes(10 * memory.KiB)
+	source := bytes.NewBuffer(randData)
+	_, err = io.Copy(upload, source)
+	require.NoError(t, err)
+	assertObjectEmptyCreated(t, upload.Info(), key)
+
+	err = upload.Commit()
+	require.NoError(t, err)
+	assertObject(t, upload.Info(), key)
+
+	return upload.Info()
 }

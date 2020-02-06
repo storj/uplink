@@ -54,7 +54,7 @@ func TestSharePermisions(t *testing.T) {
 
 		expectedData := testrand.Bytes(10 * memory.KiB)
 		{
-			project, err := uplinkConfig.Open(ctx, access)
+			project := openProject(t, ctx, planet)
 			require.NoError(t, err)
 
 			// prepare bucket and object for all test cases

@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
@@ -20,26 +19,19 @@ func TestBucket(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{
-			Whitelist: uplink.InsecureSkipConnectionVerify(),
-		}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
-		require.NoError(t, err)
-
-		project, err := uplinkConfig.Open(ctx, access)
-		require.NoError(t, err)
-
+		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
-		bucket, err := project.EnsureBucket(ctx, "testbucket")
-		require.NoError(t, err)
-		require.NotNil(t, bucket)
-		require.Equal(t, "testbucket", bucket.Name)
-
-		err = project.DeleteBucket(ctx, "testbucket")
+		createBucket(t, ctx, project, "testbucket")
+		err := project.DeleteBucket(ctx, "testbucket")
 		require.NoError(t, err)
 	})
+}
+
+func createBucket(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucketName string) *uplink.Bucket {
+	bucket, err := project.EnsureBucket(ctx, bucketName)
+	require.NoError(t, err)
+	require.NotNil(t, bucket)
+	require.Equal(t, bucketName, bucket.Name)
+	return bucket
 }
