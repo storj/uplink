@@ -70,7 +70,7 @@ type Upload struct {
 func (upload *Upload) Info() *Object {
 	meta := upload.upload.Meta()
 	if meta != nil {
-		upload.object.Created = meta.Modified
+		upload.object.Info.Created = meta.Modified
 	}
 	return upload.object
 }
