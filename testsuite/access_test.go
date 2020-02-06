@@ -72,7 +72,7 @@ func TestSharePermisions(t *testing.T) {
 				_, err = io.Copy(upload, source)
 				require.NoError(t, err)
 
-				err = upload.Commit(nil)
+				err = upload.Commit()
 				require.NoError(t, err)
 			}
 
@@ -141,7 +141,7 @@ func TestSharePermisions(t *testing.T) {
 					if item.AllowWrite {
 						require.NoError(t, err)
 
-						err = upload.Commit(nil)
+						err = upload.Commit()
 						require.NoError(t, err)
 					} else {
 						require.Error(t, err)

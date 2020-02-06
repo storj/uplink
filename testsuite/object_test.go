@@ -60,7 +60,7 @@ func TestObject(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info())
 
-		err = upload.Commit(nil)
+		err = upload.Commit()
 		require.NoError(t, err)
 		assertObject(t, upload.Info())
 
@@ -68,7 +68,7 @@ func TestObject(t *testing.T) {
 		require.NoError(t, err)
 		assertObject(t, obj)
 
-		err = upload.Commit(nil)
+		err = upload.Commit()
 		require.True(t, uplink.ErrUploadDone.Has(err))
 
 		download, err := project.DownloadObject(ctx, "testbucket", "test.dat")
@@ -152,7 +152,7 @@ func TestAbortUpload(t *testing.T) {
 		err = upload.Abort()
 		require.NoError(t, err)
 
-		err = upload.Commit(nil)
+		err = upload.Commit()
 		require.Error(t, err)
 
 		_, err = project.Stat(ctx, "testbucket", "test.dat")

@@ -16,13 +16,6 @@ import (
 // ErrUploadDone is returned when either Abort or Commit has already been called.
 var ErrUploadDone = errs.Class("upload done")
 
-// CommitOptions allows to specify additional metadata about the object.
-// The options will override any previous data.
-type CommitOptions struct {
-	// ContentType string
-	// User        Metadata
-}
-
 // UploadObject starts an upload to the specified key.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string) (*Upload, error) {
 	return (&UploadRequest{
@@ -38,8 +31,6 @@ type UploadRequest struct {
 
 	// TODO: Add upload options later
 	// Expires     time.Time
-	// ContentType string
-	// User        Metadata
 }
 
 // Do executes the upload request.
@@ -84,6 +75,8 @@ func (upload *Upload) Info() *Object {
 	return upload.object
 }
 
+// TODO: (upload *Upload) (Update|Set)Metadata(ctx context.Context, ???) error {
+
 // Write uploads len(p) bytes from p to the object's data stream.
 // It returns the number of bytes written from p (0 <= n <= len(p))
 // and any error encountered that caused the write to stop early.
@@ -94,7 +87,7 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 // Commit commits data to the store.
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
-func (upload *Upload) Commit(opts *CommitOptions) error {
+func (upload *Upload) Commit() error {
 	if atomic.LoadInt32(&upload.aborted) == 1 {
 		return ErrUploadDone.New("already aborted")
 	}
