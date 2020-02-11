@@ -38,7 +38,6 @@ type Store interface {
 	// Ranger creates a ranger for downloading erasure codes from piece store nodes.
 	Ranger(ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme) (ranger.Ranger, error)
 	Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy) (_ []*pb.SegmentPieceUploadResult, size int64, err error)
-	Delete(ctx context.Context, streamID storj.StreamID, segmentIndex int32) (err error)
 }
 
 type segmentStore struct {
@@ -129,33 +128,4 @@ func (s *segmentStore) Ranger(
 
 	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.Size)
 	return rr, Error.Wrap(err)
-}
-
-// Delete requests the satellite to delete a segment and tells storage nodes
-// to delete the segment's pieces.
-func (s *segmentStore) Delete(ctx context.Context, streamID storj.StreamID, segmentIndex int32) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	_, limits, privateKey, err := s.metainfo.BeginDeleteSegment(ctx, metainfo.BeginDeleteSegmentParams{
-		StreamID: streamID,
-		Position: storj.SegmentPosition{
-			Index: segmentIndex,
-		},
-	})
-	if err != nil {
-		return Error.Wrap(err)
-	}
-
-	if len(limits) != 0 {
-		// remote segment - delete the pieces from storage nodes
-		err = s.ec.Delete(ctx, limits, privateKey)
-		if err != nil {
-			return Error.Wrap(err)
-		}
-	}
-
-	// don't do FinishDeleteSegment at the moment to avoid satellite round trip
-	// FinishDeleteSegment doesn't implement any specific logic at the moment
-
-	return nil
 }
