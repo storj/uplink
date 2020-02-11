@@ -208,10 +208,11 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// string instead of a typed string: it's either a bucket or an unencrypted path component
 	// and that isn't known at compile time.
 	needsEncryption := prefix.Bucket() != ""
+	var base *encryption.Base
 	if needsEncryption {
-		_, _, base := db.encStore.LookupEncrypted(prefix.Bucket(), encPrefix)
+		_, _, base = db.encStore.LookupEncrypted(prefix.Bucket(), encPrefix)
 
-		startAfter, err = encryption.EncryptPathRaw(startAfter, base.PathCipher, prefixKey)
+		startAfter, err = encryption.EncryptPathRaw(startAfter, db.pathCipher(base.PathCipher), prefixKey)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -240,11 +241,10 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 		var itemPath string
 
 		if needsEncryption {
-			unencPath, err := encryption.DecryptPathWithStoreCipher(bucket.Name, paths.NewEncrypted(string(item.EncryptedPath)), db.encStore)
+			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.pathCipher(base.PathCipher), prefixKey)
 			if err != nil {
 				return storj.ObjectList{}, errClass.Wrap(err)
 			}
-			itemPath = unencPath.Raw()
 
 			// TODO(jeff): this shouldn't be necessary if we handled trailing slashes
 			// appropriately. there's some issues with list.
@@ -252,7 +252,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			if len(fullPath) > 0 && fullPath[len(fullPath)-1] != '/' {
 				fullPath += "/"
 			}
-			fullPath += unencPath.Raw()
+			fullPath += itemPath
 
 			path = streams.CreatePath(prefix.Bucket(), paths.NewUnencrypted(fullPath))
 		} else {
@@ -274,6 +274,13 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	}
 
 	return list, nil
+}
+
+func (db *DB) pathCipher(pathCipher storj.CipherSuite) storj.CipherSuite {
+	if db.encStore.EncryptionBypass {
+		return storj.EncNullBase64URL
+	}
+	return pathCipher
 }
 
 type object struct {
