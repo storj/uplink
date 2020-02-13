@@ -20,7 +20,6 @@ type encryptionAccess struct {
 // newEncryptionAccess creates an encryption access context
 func newEncryptionAccess() *encryptionAccess {
 	store := encryption.NewStore()
-	store.SetDefaultPathCipher(storj.EncAESGCM)
 	return &encryptionAccess{store: store}
 }
 
@@ -42,6 +41,10 @@ func (s *encryptionAccess) Store() *encryption.Store {
 // Use (*Project).SaltedKeyFromPassphrase to generate a default key
 func (s *encryptionAccess) setDefaultKey(defaultKey *storj.Key) {
 	s.store.SetDefaultKey(defaultKey)
+}
+
+func (s *encryptionAccess) setDefaultPathCipher(defaultPathCipher storj.CipherSuite) {
+	s.store.SetDefaultPathCipher(defaultPathCipher)
 }
 
 func (s *encryptionAccess) toProto() (*pb.EncryptionAccess, error) {
@@ -66,8 +69,9 @@ func (s *encryptionAccess) toProto() (*pb.EncryptionAccess, error) {
 	}
 
 	return &pb.EncryptionAccess{
-		DefaultKey:   defaultKey,
-		StoreEntries: storeEntries,
+		DefaultKey:        defaultKey,
+		StoreEntries:      storeEntries,
+		DefaultPathCipher: pb.CipherSuite(s.store.GetDefaultPathCipher()),
 	}, nil
 }
 
@@ -80,6 +84,13 @@ func parseEncryptionAccessFromProto(p *pb.EncryptionAccess) (*encryptionAccess, 
 		var defaultKey storj.Key
 		copy(defaultKey[:], p.DefaultKey)
 		access.setDefaultKey(&defaultKey)
+	}
+
+	access.setDefaultPathCipher(storj.CipherSuite(p.DefaultPathCipher))
+	// Unspecified cipher suite means that most probably access was serialized
+	// before path cipher was moved to encryption access
+	if p.DefaultPathCipher == pb.CipherSuite_ENC_UNSPECIFIED {
+		access.setDefaultPathCipher(storj.EncAESGCM)
 	}
 
 	for _, entry := range p.StoreEntries {

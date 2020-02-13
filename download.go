@@ -36,7 +36,7 @@ type DownloadRequest struct {
 func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: request.Bucket, PathCipher: storj.EncAESGCM}
+	b := storj.Bucket{Name: request.Bucket}
 
 	obj, err := project.db.GetObject(ctx, b, request.Key)
 	if err != nil {

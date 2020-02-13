@@ -43,7 +43,7 @@ type CustomMetadata map[string]string
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
+	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		return nil, Error.Wrap(err)
@@ -56,7 +56,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
+	b := storj.Bucket{Name: bucket}
 	err = project.db.DeleteObject(ctx, b, key)
 
 	return Error.Wrap(err)

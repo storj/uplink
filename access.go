@@ -142,7 +142,7 @@ func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency
 	}
 
 	encAccess := newEncryptionAccessWithDefaultKey(key)
-
+	encAccess.setDefaultPathCipher(storj.EncAESGCM)
 	return &Access{
 		satelliteNodeURL: fullNodeURL,
 		apiKey:           parsedAPIKey,

@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"time"
-
-	"storj.io/common/storj"
 )
 
 var (
@@ -45,14 +43,7 @@ func (project *Project) StatBucket(ctx context.Context, name string) (_ *Bucket,
 func (project *Project) CreateBucket(ctx context.Context, name string) (_ *Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	info := storj.Bucket{
-		// TODO: This is required for creating bucket at the moment.
-		// PathCipher should be part of the EncryptionAccess and used
-		// with object operations instead of creating a bucket.
-		PathCipher: storj.EncAESGCM,
-	}
-
-	b, err := project.project.CreateBucket(ctx, name, &info)
+	b, err := project.project.CreateBucket(ctx, name, nil)
 
 	bucket := &Bucket{
 		Name:    b.Name,

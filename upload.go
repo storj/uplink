@@ -37,7 +37,7 @@ type UploadRequest struct {
 func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: request.Bucket, PathCipher: storj.EncAESGCM}
+	b := storj.Bucket{Name: request.Bucket}
 	obj, err := project.db.CreateObject(ctx, b, request.Key, nil)
 	if err != nil {
 		return nil, Error.Wrap(err)

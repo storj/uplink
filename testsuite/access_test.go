@@ -163,3 +163,58 @@ func TestSharePermisions(t *testing.T) {
 		}
 	})
 }
+
+func TestAccessSerialization(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		uplinkConfig := uplink.Config{
+			Whitelist: uplink.InsecureSkipConnectionVerify(),
+		}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		// try to serialize and deserialize access and use it for upload/download
+		serializedAccess, err := access.Serialize()
+		require.NoError(t, err)
+
+		access = uplink.ParseAccess(serializedAccess)
+		require.NoError(t, access.IsValid())
+
+		project, err := uplinkConfig.Open(ctx, access)
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		bucket, err := project.EnsureBucket(ctx, "test-bucket")
+		require.NoError(t, err)
+		require.NotNil(t, bucket)
+		require.Equal(t, "test-bucket", bucket.Name)
+
+		upload, err := project.UploadObject(ctx, "test-bucket", "test.dat")
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		randData := testrand.Bytes(1 * memory.KiB)
+		source := bytes.NewBuffer(randData)
+		_, err = io.Copy(upload, source)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		err = upload.Commit()
+		require.NoError(t, err)
+		assertObject(t, upload.Info(), "test.dat")
+
+		err = upload.Commit()
+		require.True(t, uplink.ErrUploadDone.Has(err))
+
+		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat")
+		require.NoError(t, err)
+		assertObject(t, download.Info(), "test.dat")
+	})
+}
