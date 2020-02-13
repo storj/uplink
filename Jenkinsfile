@@ -48,8 +48,10 @@ pipeline {
                         COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
                     }
                     steps {
+                        sh 'go vet ./...'
                         sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
-                        sh 'check-clean-directory'
+                        // TODO enable this later 
+                        // sh 'check-clean-directory'
                     }
 
                     post {
@@ -80,8 +82,12 @@ pipeline {
                         sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         sh 'use-ports -from 1024 -to 10000 &'
-                        sh '(cd testsuite && go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml)'
-                        sh 'check-clean-directory'
+                        dir('testsuite'){
+                            sh 'go vet ./...'
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                        }
+                        // TODO enable this later 
+                        // sh 'check-clean-directory'
                     }
 
                     post {

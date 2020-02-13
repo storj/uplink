@@ -166,11 +166,11 @@ func TestAbortUpload(t *testing.T) {
 func assertObject(t *testing.T, obj *uplink.Object) {
 	assert.Equal(t, "test.dat", obj.Key)
 	assert.Condition(t, func() bool {
-		return time.Since(obj.Created) < 10*time.Second
+		return time.Since(obj.Info.Created) < 10*time.Second
 	})
 }
 
 func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object) {
 	assert.Equal(t, "test.dat", obj.Key)
-	assert.Empty(t, obj.Created)
+	assert.Empty(t, obj.Info.Created)
 }
