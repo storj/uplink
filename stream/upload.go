@@ -9,11 +9,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/zeebo/errs"
 	"golang.org/x/sync/errgroup"
 
-	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/metainfo/kvmetainfo"
 	"storj.io/uplink/storage/streams"
@@ -42,18 +40,7 @@ func NewUpload(ctx context.Context, stream kvmetainfo.MutableStream, streams str
 	}
 
 	upload.errgroup.Go(func() error {
-		obj := stream.Info()
-
-		serMetaInfo := pb.SerializableMeta{
-			ContentType: obj.ContentType,
-			UserDefined: obj.Metadata,
-		}
-		metadata, err := proto.Marshal(&serMetaInfo)
-		if err != nil {
-			return errs.Combine(err, reader.CloseWithError(err))
-		}
-
-		m, err := streams.Put(ctx, storj.JoinPaths(obj.Bucket.Name, obj.Path), reader, metadata, obj.Expires)
+		m, err := streams.Put(ctx, storj.JoinPaths(stream.BucketName(), stream.Path()), reader, stream, stream.Expires())
 		if err != nil {
 			return errs.Combine(err, reader.CloseWithError(err))
 		}

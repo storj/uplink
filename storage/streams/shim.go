@@ -15,10 +15,15 @@ import (
 	"storj.io/uplink/storage/segments"
 )
 
+// Metadata interface returns the latest metadata for an object.
+type Metadata interface {
+	Metadata() ([]byte, error)
+}
+
 // Store interface methods for streams to satisfy to be a store
 type Store interface {
 	Get(ctx context.Context, path storj.Path, object storj.Object) (ranger.Ranger, error)
-	Put(ctx context.Context, path storj.Path, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
+	Put(ctx context.Context, path storj.Path, data io.Reader, metadata Metadata, expiration time.Time) (Meta, error)
 	Delete(ctx context.Context, path storj.Path) error
 }
 
@@ -43,7 +48,7 @@ func (s *shimStore) Get(ctx context.Context, path storj.Path, object storj.Objec
 }
 
 // Put parses the passed in path and dispatches to the typed store.
-func (s *shimStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
+func (s *shimStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	return s.store.Put(ctx, ParsePath(path), data, metadata, expiration)

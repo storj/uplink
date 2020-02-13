@@ -38,19 +38,19 @@ func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ *Do
 
 	b := storj.Bucket{Name: request.Bucket}
 
-	obj, err := project.db.GetObject(ctx, b, request.Key)
+	obj, err := project.db.GetObjectExtended(ctx, b, request.Key)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
-	objectStream, err := project.db.GetObjectStream(ctx, b, obj)
+	objectStream, err := project.db.GetObjectExtendedStream(ctx, b, obj)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
 	return &Download{
 		download: stream.NewDownloadRange(ctx, objectStream, project.streams, request.Offset, request.Length),
-		object:   convertObject(&obj),
+		object:   convertObjectExtended(&obj),
 	}, nil
 }
 

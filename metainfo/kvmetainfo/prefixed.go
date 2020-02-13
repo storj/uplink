@@ -8,7 +8,6 @@ import (
 	"io"
 	"time"
 
-	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
 	"storj.io/uplink/storage/objects"
@@ -29,7 +28,7 @@ func (o *prefixedObjStore) Get(ctx context.Context, path storj.Path, object stor
 	return o.store.Get(ctx, storj.JoinPaths(o.prefix, path), object)
 }
 
-func (o *prefixedObjStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata pb.SerializableMeta, expiration time.Time) (meta objects.Meta, err error) {
+func (o *prefixedObjStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata objects.Metadata, expiration time.Time) (meta objects.Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(path) == 0 {

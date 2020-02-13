@@ -89,11 +89,7 @@ gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190623001553-09813957f0a8 h1:nyw4hxw2z
 gopkg.in/spacemonkeygo/monkit.v2 v2.0.0-20190623001553-09813957f0a8/go.mod h1:6UQdi0rNB4YDNwVYP8fJNmjLNaU8MA84WCdXStx3Spo=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-storj.io/common v0.0.0-20200130000209-2a8633a28e58 h1:/RUHhls/OCLvvARM46uWFU/z24Fk2VWvkiHjpgiYyI8=
-storj.io/common v0.0.0-20200130000209-2a8633a28e58/go.mod h1:n4sxosrQlw5iDBlbTdBtae/8ZqnXUG3nA5XZdIHJibY=
-storj.io/common v0.0.0-20200130005211-04afbf4cd6a5 h1:BqnkK/pId17R1a70qWcCm2fBgR3kQ5fLBKZ69W+8ecU=
-storj.io/common v0.0.0-20200130005211-04afbf4cd6a5/go.mod h1:n4sxosrQlw5iDBlbTdBtae/8ZqnXUG3nA5XZdIHJibY=
-storj.io/common v0.0.0-20200211234528-928d4b01dcc4 h1:2DaULsipg+Ut2jvJ4ZIOar+Svv0Y9VIhJfVzKqGVxA4=
-storj.io/common v0.0.0-20200211234528-928d4b01dcc4/go.mod h1:MlYmhIuKHfD15puGH7Su5lv0bt4ojZ7IfrPnAmR4NeI=
+storj.io/common v0.0.0-20200214070817-cfd197b055d7 h1:/ZBREex7JB8JC00R7O8RO17nIAKk6b/sJ+i7/66PzGU=
+storj.io/common v0.0.0-20200214070817-cfd197b055d7/go.mod h1:MlYmhIuKHfD15puGH7Su5lv0bt4ojZ7IfrPnAmR4NeI=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2 h1:8SgLYEhe99R8QlAD1EAOBPRyIR+cn2hqkXtWlAUPf/c=
 storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2/go.mod h1:/ascUDbzNAv0A3Jj7wUIKFBH2JdJ2uJIBO/b9+2yHgQ=

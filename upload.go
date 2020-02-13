@@ -6,10 +6,14 @@ package uplink
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/uplink/metainfo/kvmetainfo"
 	"storj.io/uplink/stream"
 )
 
@@ -29,8 +33,7 @@ type UploadRequest struct {
 	Bucket string
 	Key    string
 
-	// TODO: Add upload options later
-	// Expires     time.Time
+	Expires time.Time
 }
 
 // Do executes the upload request.
@@ -51,11 +54,16 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Uplo
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	return &Upload{
+	upload := &Upload{
 		cancel: cancel,
-		upload: stream.NewUpload(ctx, mutableStream, project.streams),
 		object: convertObject(&info),
-	}, nil
+	}
+	upload.upload = stream.NewUpload(ctx, dynamicMetadata{
+		MutableStream: mutableStream,
+		object:        upload.object,
+		expires:       request.Expires,
+	}, project.streams)
+	return upload, nil
 }
 
 // Upload is a partial upload to Storj Network.
@@ -74,8 +82,6 @@ func (upload *Upload) Info() *Object {
 	}
 	return upload.object
 }
-
-// TODO: (upload *Upload) (Update|Set)Metadata(ctx context.Context, ???) error {
 
 // Write uploads len(p) bytes from p to the object's data stream.
 // It returns the number of bytes written from p (0 <= n <= len(p))
@@ -114,4 +120,56 @@ func (upload *Upload) Abort() error {
 
 	upload.cancel()
 	return nil
+}
+
+// SetMetadata updates metadata to be included with the object.
+// If standard or custom is nil, they won't be modified.
+func (upload *Upload) SetMetadata(ctx context.Context, standard *StandardMetadata, custom CustomMetadata) error {
+	if atomic.LoadInt32(&upload.aborted) == 1 {
+		return ErrUploadDone.New("upload aborted")
+	}
+	if upload.upload.Meta() != nil {
+		return ErrUploadDone.New("already committed")
+	}
+
+	if standard != nil {
+		upload.object.Standard = standard.Clone()
+	}
+	if custom != nil {
+		upload.object.Custom = custom.Clone()
+	}
+
+	return nil
+}
+
+type dynamicMetadata struct {
+	kvmetainfo.MutableStream
+	object  *Object
+	expires time.Time
+}
+
+func (meta dynamicMetadata) Metadata() ([]byte, error) {
+	return proto.Marshal(&pb.SerializableMeta{
+		UserDefined: meta.object.Custom.Clone(),
+
+		ContentType:   meta.object.Standard.ContentType,
+		ContentLength: meta.object.Standard.ContentLength,
+
+		FileCreated:     timePointer(meta.object.Standard.FileCreated),
+		FileModified:    timePointer(meta.object.Standard.FileModified),
+		FilePermissions: meta.object.Standard.FilePermissions,
+
+		XXX_unrecognized: append([]byte{}, meta.object.Standard.Unknown...),
+	})
+}
+
+func (meta dynamicMetadata) Expires() time.Time {
+	return meta.expires
+}
+
+func timePointer(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }

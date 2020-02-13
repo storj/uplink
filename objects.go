@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
 // ObjectsOptions defines iteration options.
@@ -60,7 +61,7 @@ type Objects struct {
 	bucket     storj.Bucket
 	options    storj.ListOptions
 	objOptions ObjectsOptions
-	list       *storj.ObjectList
+	list       *kvmetainfo.ObjectListExtended
 	position   int
 	completed  bool
 	err        error
@@ -96,7 +97,7 @@ func (objects *Objects) Next() bool {
 }
 
 func (objects *Objects) loadNext() bool {
-	list, err := objects.project.db.ListObjects(objects.ctx, objects.bucket, objects.options)
+	list, err := objects.project.db.ListObjectsExtended(objects.ctx, objects.bucket, objects.options)
 	if err != nil {
 		objects.err = err
 		return false
@@ -142,32 +143,34 @@ func (objects *Objects) Item() *ListObject {
 	// TODO: Make this filtering on the satellite
 	if objects.objOptions.Info {
 		obj.Info = ObjectInfo{
-			Created: item.Created,
-			Expires: item.Expires,
+			Created: item.Info.Created,
+			Expires: item.Info.Expires,
 		}
 	}
 
 	// TODO: Make this filtering on the satellite
 	if objects.objOptions.Standard {
 		obj.Standard = StandardMetadata{
-			ContentLength: item.Size,
-			ContentType:   item.ContentType,
-			ETag:          string(item.Checksum),
-			// FileCreated:     // TODO
-			// FileModified:    // TODO
-			// FilePermissions: // TODO
+			ContentLength: item.Standard.ContentLength,
+			ContentType:   item.Standard.ContentType,
+
+			FileCreated:     item.Standard.FileCreated,
+			FileModified:    item.Standard.FileModified,
+			FilePermissions: item.Standard.FilePermissions,
+
+			Unknown: item.Standard.Unknown,
 		}
 	}
 
 	// TODO: Make this filtering on the satellite
 	if objects.objOptions.Custom {
-		obj.Custom = item.Metadata
+		obj.Custom = item.Custom
 	}
 
 	return &obj
 }
 
-func (objects *Objects) item() *storj.Object {
+func (objects *Objects) item() *kvmetainfo.ObjectExtended {
 	if objects.completed {
 		return nil
 	}

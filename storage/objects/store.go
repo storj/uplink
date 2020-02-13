@@ -29,10 +29,15 @@ type Meta struct {
 	Checksum   string
 }
 
+// Metadata interface returns the latest metadata for an object.
+type Metadata interface {
+	Metadata() ([]byte, error)
+}
+
 // Store for objects
 type Store interface {
 	Get(ctx context.Context, path storj.Path, object storj.Object) (rr ranger.Ranger, err error)
-	Put(ctx context.Context, path storj.Path, data io.Reader, metadata pb.SerializableMeta, expiration time.Time) (meta Meta, err error)
+	Put(ctx context.Context, path storj.Path, data io.Reader, metadata Metadata, expiration time.Time) (meta Meta, err error)
 	Delete(ctx context.Context, path storj.Path) (err error)
 }
 
@@ -57,21 +62,14 @@ func (o *objStore) Get(ctx context.Context, path storj.Path, object storj.Object
 	return rr, err
 }
 
-func (o *objStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata pb.SerializableMeta, expiration time.Time) (meta Meta, err error) {
+func (o *objStore) Put(ctx context.Context, path storj.Path, data io.Reader, metadata Metadata, expiration time.Time) (meta Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(path) == 0 {
 		return Meta{}, storj.ErrNoPath.New("")
 	}
 
-	// TODO(kaloyan): autodetect content type
-	// if metadata.GetContentType() == "" {}
-
-	b, err := proto.Marshal(&metadata)
-	if err != nil {
-		return Meta{}, err
-	}
-	m, err := o.store.Put(ctx, path, data, b, expiration)
+	m, err := o.store.Put(ctx, path, data, metadata, expiration)
 	return convertMeta(m), err
 }
 

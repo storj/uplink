@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
 // Object contains information about an object.
@@ -29,27 +30,47 @@ type ObjectInfo struct {
 type StandardMetadata struct {
 	ContentLength int64
 	ContentType   string
-	ETag          string
 
 	FileCreated     time.Time
 	FileModified    time.Time
 	FilePermissions uint32
+
+	// Unknown stores fields that this version of the client does not know about.
+	// The client should copy this information verbatim when updating metadata
+	// otherwise the unknown fields will be deleted.
+	Unknown []byte
+}
+
+// Clone makes a deep clone.
+func (meta StandardMetadata) Clone() StandardMetadata {
+	clone := meta
+	clone.Unknown = append([]byte{}, meta.Unknown...)
+	return clone
 }
 
 // CustomMetadata contains custom user metadata about the object.
 type CustomMetadata map[string]string
+
+// Clone makes a deep clone.
+func (meta CustomMetadata) Clone() CustomMetadata {
+	r := CustomMetadata{}
+	for k, v := range meta {
+		r[k] = v
+	}
+	return r
+}
 
 // StatObject returns information about an object at the specific key.
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: bucket}
-	obj, err := project.db.GetObject(ctx, b, key)
+	obj, err := project.db.GetObjectExtended(ctx, b, key)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
-	return convertObject(&obj), nil
+	return convertObjectExtended(&obj), nil
 }
 
 // DeleteObject deletes the object at the specific key.
@@ -71,5 +92,27 @@ func convertObject(obj *storj.Object) *Object {
 			Expires: obj.Expires,
 		},
 		Custom: obj.Metadata,
+	}
+}
+
+// convertObjectExtended converts kvmetainfo.ObjectExtended to uplink.Object.
+func convertObjectExtended(obj *kvmetainfo.ObjectExtended) *Object {
+	return &Object{
+		Key: obj.Path,
+		Info: ObjectInfo{
+			Created: obj.Info.Created,
+			Expires: obj.Info.Expires,
+		},
+		Standard: StandardMetadata{
+			ContentLength: obj.Standard.ContentLength,
+			ContentType:   obj.Standard.ContentType,
+
+			FileCreated:     obj.Standard.FileCreated,
+			FileModified:    obj.Standard.FileModified,
+			FilePermissions: obj.Standard.FilePermissions,
+
+			Unknown: obj.Standard.Unknown,
+		},
+		Custom: obj.Custom,
 	}
 }

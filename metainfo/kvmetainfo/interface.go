@@ -70,9 +70,12 @@ type MutableObject interface {
 
 // MutableStream is an interface for manipulating stream information
 type MutableStream interface {
-	// TODO: methods for finding partially uploaded segments
+	BucketName() string
+	Path() string
 
-	Info() storj.Object
+	Expires() time.Time
+	Metadata() ([]byte, error)
+
 	// AddSegments adds segments to the stream.
 	AddSegments(ctx context.Context, segments ...storj.Segment) error
 	// UpdateSegments updates information about segments.

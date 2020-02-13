@@ -6,9 +6,13 @@ package kvmetainfo
 import (
 	"context"
 	"errors"
+	"time"
+
+	"github.com/gogo/protobuf/proto"
 
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
+	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/metainfo"
 )
@@ -118,7 +122,19 @@ type mutableStream struct {
 	info storj.Object
 }
 
+func (stream *mutableStream) BucketName() string { return stream.info.Bucket.Name }
+func (stream *mutableStream) Path() string       { return stream.info.Path }
+
 func (stream *mutableStream) Info() storj.Object { return stream.info }
+
+func (stream *mutableStream) Expires() time.Time { return stream.info.Expires }
+
+func (stream *mutableStream) Metadata() ([]byte, error) {
+	return proto.Marshal(&pb.SerializableMeta{
+		ContentType: stream.info.ContentType,
+		UserDefined: stream.info.Metadata,
+	})
+}
 
 func (stream *mutableStream) AddSegments(ctx context.Context, segments ...storj.Segment) (err error) {
 	defer mon.Task()(&ctx)(&err)

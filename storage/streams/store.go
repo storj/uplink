@@ -37,7 +37,7 @@ type Meta struct {
 // Store interface methods for streams to satisfy to be a store
 type typedStore interface {
 	Get(ctx context.Context, path Path, object storj.Object) (ranger.Ranger, error)
-	Put(ctx context.Context, path Path, data io.Reader, metadata []byte, expiration time.Time) (Meta, error)
+	Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (Meta, error)
 	Delete(ctx context.Context, path Path) error
 }
 
@@ -81,7 +81,7 @@ func newTypedStreamStore(metainfo *metainfo.Client, segments segments.Store, seg
 // of segments, in a new protobuf, in the metadata of l/<path>.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metadata []byte, expiration time.Time) (_ Meta, err error) {
+func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
@@ -273,11 +273,16 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		return Meta{}, eofReader.err
 	}
 
+	metadataBytes, err := metadata.Metadata()
+	if err != nil {
+		return Meta{}, err
+	}
+
 	streamInfo, err := proto.Marshal(&pb.StreamInfo{
 		DeprecatedNumberOfSegments: totalSegments,
 		SegmentsSize:               s.segmentSize,
 		LastSegmentSize:            lastSegmentSize,
-		Metadata:                   metadata,
+		Metadata:                   metadataBytes,
 	})
 	if err != nil {
 		return Meta{}, err
@@ -331,7 +336,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		Modified:   satStreamID.CreationDate,
 		Expiration: expiration,
 		Size:       streamSize,
-		Data:       metadata,
+		Data:       metadataBytes,
 	}
 
 	return resultMeta, nil
