@@ -39,8 +39,8 @@ type StandardMetadata struct {
 // CustomMetadata contains custom user metadata about the object.
 type CustomMetadata map[string]string
 
-// Stat returns information about an object at the specific key.
-func (project *Project) Stat(ctx context.Context, bucket, key string) (_ *Object, err error) {
+// StatObject returns information about an object at the specific key.
+func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}

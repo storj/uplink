@@ -6,6 +6,7 @@ package uplink
 import (
 	"context"
 	"errors"
+	"time"
 
 	"storj.io/common/storj"
 )
@@ -20,7 +21,22 @@ var (
 
 // Bucket contains information about the bucket.
 type Bucket struct {
-	Name string
+	Name    string
+	Created time.Time
+}
+
+// StatBucket returns information about a bucket.
+func (project *Project) StatBucket(ctx context.Context, name string) (_ *Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	b, err := project.project.GetBucket(ctx, name)
+
+	bucket := &Bucket{
+		Name:    b.Name,
+		Created: b.Created,
+	}
+
+	return bucket, Error.Wrap(err)
 }
 
 // CreateBucket creates a new bucket.
@@ -39,7 +55,8 @@ func (project *Project) CreateBucket(ctx context.Context, name string) (_ *Bucke
 	b, err := project.project.CreateBucket(ctx, name, &info)
 
 	bucket := &Bucket{
-		Name: b.Name,
+		Name:    b.Name,
+		Created: b.Created,
 	}
 
 	return bucket, Error.Wrap(err)

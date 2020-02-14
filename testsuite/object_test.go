@@ -49,7 +49,7 @@ func TestObject(t *testing.T) {
 		require.NoError(t, err)
 		assertObject(t, upload.Info(), "test.dat")
 
-		obj, err := project.Stat(ctx, "testbucket", "test.dat")
+		obj, err := project.StatObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
 		assertObject(t, obj, "test.dat")
 
@@ -89,7 +89,7 @@ func TestObject(t *testing.T) {
 		err = project.DeleteObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
 
-		obj, err = project.Stat(ctx, "testbucket", "test.dat")
+		obj, err = project.StatObject(ctx, "testbucket", "test.dat")
 		require.True(t, storj.ErrObjectNotFound.Has(err))
 	})
 }
@@ -125,7 +125,7 @@ func TestAbortUpload(t *testing.T) {
 		err = upload.Commit()
 		require.Error(t, err)
 
-		_, err = project.Stat(ctx, "testbucket", "test.dat")
+		_, err = project.StatObject(ctx, "testbucket", "test.dat")
 		require.True(t, storj.ErrObjectNotFound.Has(err))
 
 		err = upload.Abort()
