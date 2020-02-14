@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
@@ -29,7 +30,7 @@ func TestListObjects_NonExistingBucket(t *testing.T) {
 		require.Empty(t, list.Key())
 		require.Nil(t, list.Item())
 
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -50,7 +51,7 @@ func TestListObjects_EmptyBucket(t *testing.T) {
 
 		list := listObjects(t, ctx, project, "testbucket", nil)
 
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -84,7 +85,7 @@ func TestListObjects_SingleObject(t *testing.T) {
 		require.False(t, list.Item().IsPrefix)
 		require.Equal(t, "test.dat", list.Item().Key)
 
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -103,23 +104,21 @@ func TestListObjects_TwoObjects(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		uploadObject(t, ctx, project, "testbucket", "test1.dat")
-		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "test1.dat")
-			require.NoError(t, err)
-		}()
-
-		uploadObject(t, ctx, project, "testbucket", "test2.dat")
-		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "test2.dat")
-			require.NoError(t, err)
-		}()
-
-		list := listObjects(t, ctx, project, "testbucket", nil)
 		expectedObjects := map[string]bool{
 			"test1.dat": true,
 			"test2.dat": true,
 		}
+
+		for object := range expectedObjects {
+			object := object
+			uploadObject(t, ctx, project, "testbucket", object)
+			defer func() {
+				err := project.DeleteObject(ctx, "testbucket", object)
+				require.NoError(t, err)
+			}()
+		}
+
+		list := listObjects(t, ctx, project, "testbucket", nil)
 
 		more := list.Next()
 		require.True(t, more)
@@ -138,7 +137,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 		require.Equal(t, list.Key(), list.Item().Key)
 
 		require.Empty(t, expectedObjects)
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -175,7 +174,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 		require.False(t, list.Item().IsPrefix)
 		require.Equal(t, "a/b/c/test.dat", list.Item().Key)
 
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -209,7 +208,7 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 		require.True(t, list.Item().IsPrefix)
 		require.Equal(t, "a/b/c/", list.Item().Key)
 
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -228,23 +227,21 @@ func TestListObjects_Cursor(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		uploadObject(t, ctx, project, "testbucket", "test1.dat")
-		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "test1.dat")
-			require.NoError(t, err)
-		}()
-
-		uploadObject(t, ctx, project, "testbucket", "test2.dat")
-		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "test2.dat")
-			require.NoError(t, err)
-		}()
-
-		list := listObjects(t, ctx, project, "testbucket", nil)
 		expectedObjects := map[string]bool{
 			"test1.dat": true,
 			"test2.dat": true,
 		}
+
+		for object := range expectedObjects {
+			object := object
+			uploadObject(t, ctx, project, "testbucket", object)
+			defer func() {
+				err := project.DeleteObject(ctx, "testbucket", object)
+				require.NoError(t, err)
+			}()
+		}
+
+		list := listObjects(t, ctx, project, "testbucket", nil)
 
 		// get the first list item and make it a cursor for the next list request
 		more := list.Next()
@@ -266,7 +263,7 @@ func TestListObjects_Cursor(t *testing.T) {
 		require.Equal(t, list.Key(), list.Item().Key)
 
 		require.Empty(t, expectedObjects)
-		assertNoNext(t, list)
+		assertNoNextObject(t, list)
 	})
 }
 
@@ -278,7 +275,7 @@ func listObjects(t *testing.T, ctx context.Context, project *uplink.Project, buc
 	return list
 }
 
-func assertNoNext(t *testing.T, list *uplink.Objects) {
+func assertNoNextObject(t *testing.T, list *uplink.Objects) {
 	require.False(t, list.Next())
 	require.NoError(t, list.Err())
 	require.Empty(t, list.Key())

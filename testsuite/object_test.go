@@ -135,9 +135,7 @@ func TestAbortUpload(t *testing.T) {
 
 func assertObject(t *testing.T, obj *uplink.Object, expectedKey string) {
 	assert.Equal(t, expectedKey, obj.Key)
-	assert.Condition(t, func() bool {
-		return time.Since(obj.Info.Created) < 10*time.Second
-	})
+	assert.WithinDuration(t, time.Now(), obj.Info.Created, 10*time.Second)
 }
 
 func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey string) {

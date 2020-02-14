@@ -67,7 +67,7 @@ type Objects struct {
 }
 
 // Next prepares next Object for reading.
-// It returns false when there are no more results or there is an error.
+// It returns false if the end of the iteration is reached and there are no more objects, or if there is an error.
 func (objects *Objects) Next() bool {
 	if objects.err != nil {
 		objects.completed = true
@@ -111,7 +111,7 @@ func (objects *Objects) Err() error {
 	return Error.Wrap(objects.err)
 }
 
-// Key returns the object key without the prefix.
+// Key returns the key without the prefix of the current object.
 func (objects *Objects) Key() string {
 	item := objects.item()
 	if item == nil {
@@ -120,7 +120,7 @@ func (objects *Objects) Key() string {
 	return item.Path
 }
 
-// Item returns a bucket that can be used to access objects.
+// Item returns the current object in the iterator.
 func (objects *Objects) Item() *ListObject {
 	item := objects.item()
 	if item == nil {
