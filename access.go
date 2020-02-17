@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/gogo/protobuf/proto"
+	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/macaroon"
@@ -120,7 +121,7 @@ func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteN
 }
 
 // BackwardCompatibleRequestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
-func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency(ctx context.Context, satelliteNodeURL, apiKey, passphrase string, concurrency uint8) (*Access, error) {
+func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency(ctx context.Context, satelliteNodeURL, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
 		return nil, Error.Wrap(err)
@@ -130,6 +131,7 @@ func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
+	defer func() { err = errs.Combine(err, metainfo.Close()) }()
 
 	info, err := metainfo.GetProjectInfo(ctx)
 	if err != nil {
