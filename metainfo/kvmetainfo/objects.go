@@ -366,6 +366,10 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 		return ObjectListExtended{}, storj.ErrNoBucket.New("")
 	}
 
+	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") {
+		return ObjectListExtended{}, Error.New("prefix should end with slash")
+	}
+
 	var startAfter string
 	switch options.Direction {
 	// TODO for now we are supporting only storj.After
@@ -794,6 +798,10 @@ func objectExtendedStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID
 		rv.Stream.SegmentCount = numberOfSegments
 		rv.Stream.FixedSegmentSize = stream.SegmentsSize
 		rv.Stream.LastSegment.Size = stream.LastSegmentSize
+
+		if serMetaInfo.ContentLength == 0 && rv.Stream.Size != 0 {
+			rv.Standard.ContentLength = rv.Stream.Size
+		}
 	}
 
 	return rv, nil

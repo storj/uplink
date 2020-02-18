@@ -12,7 +12,7 @@ import (
 
 // ObjectsOptions defines iteration options.
 type ObjectsOptions struct {
-	// Prefix allows to filter objects by a key prefix.
+	// Prefix allows to filter objects by a key prefix. Should always end with slash.
 	Prefix string
 	// The first item listed will be cursor or the one after it.
 	Cursor string
@@ -130,7 +130,7 @@ func (objects *Objects) Item() *ListObject {
 
 	key := item.Path
 	if len(objects.options.Prefix) > 0 {
-		key = storj.JoinPaths(objects.options.Prefix, item.Path)
+		key = objects.options.Prefix + item.Path
 	}
 
 	obj := ListObject{
@@ -159,6 +159,10 @@ func (objects *Objects) Item() *ListObject {
 			FilePermissions: item.Standard.FilePermissions,
 
 			Unknown: item.Standard.Unknown,
+		}
+
+		if obj.Standard.ContentLength == 0 && item.Stream.Size != 0 {
+			obj.Standard.ContentLength = item.Stream.Size
 		}
 	}
 

@@ -163,7 +163,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 		}()
 
 		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{
-			Prefix:    "a/b",
+			Prefix:    "a/b/",
 			Recursive: true,
 		})
 
@@ -199,7 +199,7 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{Prefix: "a/b"})
+		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{Prefix: "a/b/"})
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
