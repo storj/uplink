@@ -25,13 +25,43 @@ func TestBucket(t *testing.T) {
 
 		bucket := createBucket(t, ctx, project, "testbucket")
 
-		statBucket, err := project.StatBucket(ctx, "testbucket")
-		require.NoError(t, err)
-		require.Equal(t, bucket.Name, statBucket.Name)
-		require.Equal(t, bucket.Created, statBucket.Created)
+		{
+			// statting a bucket
+			statBucket, err := project.StatBucket(ctx, "testbucket")
+			require.NoError(t, err)
+			require.Equal(t, bucket.Name, statBucket.Name)
+			require.Equal(t, bucket.Created, statBucket.Created)
+		}
 
-		err = project.DeleteBucket(ctx, "testbucket")
-		require.NoError(t, err)
+		{
+			// creating existing bucket
+			existing, err := project.CreateBucket(ctx, bucket.Name)
+			require.Error(t, err)
+			require.NotNil(t, existing)
+			require.Equal(t, bucket.Name, existing.Name)
+			require.Equal(t, bucket.Created, existing.Created)
+		}
+
+		{
+			// ensuring existing bucket
+			existing, err := project.EnsureBucket(ctx, bucket.Name)
+			require.NoError(t, err)
+			require.NotNil(t, existing)
+			require.Equal(t, bucket.Name, existing.Name)
+			require.Equal(t, bucket.Created, existing.Created)
+		}
+
+		{ // deleting a bucket
+			err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}
+
+		{ // deleting a missing bucket
+			err := project.DeleteBucket(ctx, "missing")
+			_ = err
+			// TODO: requires satellite fix
+			// require.Error(t, err)
+		}
 	})
 }
 

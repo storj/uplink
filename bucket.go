@@ -58,6 +58,11 @@ func (project *Project) CreateBucket(ctx context.Context, name string) (_ *Bucke
 		Created: b.Created,
 	}
 	if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
+		// TODO: Ideally, the satellite should return the existing bucket when this error occurs.
+		bucket, err = project.StatBucket(ctx, name)
+		if err != nil {
+			return bucket, errs.Combine(ErrBucketExists.New(name), err)
+		}
 		return bucket, ErrBucketExists.New(name)
 	}
 
@@ -71,7 +76,7 @@ func (project *Project) EnsureBucket(ctx context.Context, name string) (_ *Bucke
 	defer mon.Task()(&ctx)(&err)
 
 	bucket, err := project.CreateBucket(ctx, name)
-	if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
+	if ErrBucketExists.Has(err) {
 		err = nil
 	}
 
