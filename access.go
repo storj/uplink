@@ -15,6 +15,7 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/uplink/internal/expose"
 )
 
 // Access contains everything to access a project
@@ -117,11 +118,18 @@ func RequestAccessWithPassphrase(ctx context.Context, satelliteNodeURL, apiKey, 
 
 // RequestAccessWithPassphrase requests satellite for a new access using a passphrase.
 func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteNodeURL, apiKey, passphrase string) (*Access, error) {
-	return config.BackwardCompatibleRequestAccessWithPassphraseAndConcurrency(ctx, satelliteNodeURL, apiKey, passphrase, 8)
+	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteNodeURL, apiKey, passphrase, 8)
 }
 
-// BackwardCompatibleRequestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
-func (config Config) BackwardCompatibleRequestAccessWithPassphraseAndConcurrency(ctx context.Context, satelliteNodeURL, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
+func init() {
+	// expose this method for backcomp package.
+	expose.RequestAccessWithPassphraseAndConcurrency = requestAccessWithPassphraseAndConcurrency
+}
+
+// requestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
+//
+// NB: when modifying the signature of this func, also update backcomp and internal/expose packages.
+func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteNodeURL, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
 		return nil, Error.Wrap(err)
