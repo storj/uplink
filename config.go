@@ -5,7 +5,6 @@ package uplink
 
 import (
 	"context"
-	"crypto/x509"
 	"time"
 
 	"storj.io/common/identity"
@@ -27,37 +26,9 @@ type Config struct {
 	Log       Logger
 	UserAgent string
 
-	// When whitelist is not defined then it uses system defaults.
-	Whitelist CAWhitelist
-
 	// DialTimeout defines how long client should wait for establishing
 	// a connection to peers.
 	DialTimeout time.Duration
-}
-
-// CAWhitelist defines which peers can be contacted.
-// TODO: should this be called TLSCAWhitelist or something?
-type CAWhitelist interface {
-	InsecureSkipVerify() bool
-	Certificates() []*x509.Certificate
-}
-
-// InsecureSkipConnectionVerify returns a whitelist that allows to connecting untrusted nodes.
-func InsecureSkipConnectionVerify() CAWhitelist {
-	return &caWhitelist{skip: true}
-}
-
-type caWhitelist struct {
-	skip         bool
-	certificates []*x509.Certificate
-}
-
-func (whitelist *caWhitelist) InsecureSkipVerify() bool {
-	return whitelist.skip
-}
-
-func (whitelist *caWhitelist) Certificates() []*x509.Certificate {
-	return whitelist.certificates
 }
 
 func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
@@ -69,12 +40,8 @@ func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *
 		return nil, rpc.Dialer{}, "", Error.Wrap(err)
 	}
 
-	if config.Whitelist == nil {
-		config.Whitelist = &caWhitelist{skip: false}
-	}
-
 	tlsConfig := tlsopts.Config{
-		UsePeerCAWhitelist: !config.Whitelist.InsecureSkipVerify(),
+		UsePeerCAWhitelist: false,
 		PeerIDVersions:     "0",
 	}
 
@@ -104,7 +71,7 @@ func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *
 		}.String()
 	}
 
-	metainfo, err := metainfo.Dial(ctx, dialer, satelliteNodeURL, apiKey, config.UserAgent)
+	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteNodeURL, apiKey, config.UserAgent)
 
 	return metainfo, dialer, satelliteNodeURL, Error.Wrap(err)
 }

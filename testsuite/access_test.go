@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
-	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
@@ -27,12 +26,9 @@ func TestSharePermisions(t *testing.T) {
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
 		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{
-			Whitelist: uplink.InsecureSkipConnectionVerify(),
-		}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.NoError(t, err)
 
 		items := []struct {
@@ -171,12 +167,10 @@ func TestAccessSerialization(t *testing.T) {
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
 		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{
-			Whitelist: uplink.InsecureSkipConnectionVerify(),
-		}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
+		uplinkConfig := uplink.Config{}
+
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.NoError(t, err)
 
 		// try to serialize and deserialize access and use it for upload/download

@@ -69,6 +69,30 @@ func Dial(ctx context.Context, dialer rpc.Dialer, address string, apiKey *macaro
 	}, nil
 }
 
+// DialNodeURL dials to metainfo endpoint with the specified api key.
+func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey *macaroon.APIKey, userAgent string) (*Client, error) {
+	url, err := storj.ParseNodeURL(nodeURL)
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	if url.ID.IsZero() {
+		return nil, Error.New("node ID is required in node URL %q", nodeURL)
+	}
+
+	conn, err := dialer.DialAddressID(ctx, url.Address, url.ID)
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	return &Client{
+		conn:      conn,
+		client:    pb.NewDRPCMetainfoClient(conn.Raw()),
+		apiKeyRaw: apiKey.SerializeRaw(),
+		userAgent: userAgent,
+	}, nil
+}
+
 // Close closes the dialed connection.
 func (client *Client) Close() error {
 	if client.conn != nil {

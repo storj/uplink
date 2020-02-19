@@ -22,17 +22,24 @@ func TestRequestAccess(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
 		ctx.Check(project.Close)
+
+		t.Run("satellite url without id", func(t *testing.T) {
+			// try connecting without a proper satellite url
+			satellite := planet.Satellites[0]
+			satelliteurl := satellite.URL()
+			apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+			satelliteurl.ID = storj.NodeID{}
+			_, err := uplink.RequestAccessWithPassphrase(ctx, satelliteurl.String(), apiKey.Serialize(), "mypassphrase")
+			require.Error(t, err)
+		})
 	})
 }
 
 func openProject(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) *uplink.Project {
 	satellite := planet.Satellites[0]
-	satelliteNodeURL := storj.NodeURL{ID: satellite.ID(), Address: satellite.Addr()}.String()
 	apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-	uplinkConfig := uplink.Config{
-		Whitelist: uplink.InsecureSkipConnectionVerify(),
-	}
-	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey.Serialize(), "mypassphrase")
+	uplinkConfig := uplink.Config{}
+	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 	require.NoError(t, err)
 
 	project, err := uplinkConfig.Open(ctx, access)
