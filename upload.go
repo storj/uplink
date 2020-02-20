@@ -20,29 +20,22 @@ import (
 // ErrUploadDone is returned when either Abort or Commit has already been called.
 var ErrUploadDone = errs.Class("upload done")
 
-// UploadObject starts an upload to the specified key.
-// If you wish extended options like expiration time, use UploadRequest.
-func (project *Project) UploadObject(ctx context.Context, bucket, key string) (*Upload, error) {
-	return (&UploadRequest{
-		Bucket: bucket,
-		Key:    key,
-	}).Do(ctx, project)
-}
-
-// UploadRequest specifies all parameters for an upload.
-type UploadRequest struct {
-	Bucket string
-	Key    string
-
+// UploadOptions contains additional options for uploading.
+type UploadOptions struct {
+	// When Expires is zero, there is no expiration.
 	Expires time.Time
 }
 
-// Do executes the upload request.
-func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Upload, err error) {
+// UploadObject starts an upload to the specified key.
+func (project *Project) UploadObject(ctx context.Context, bucket, key string, opts *UploadOptions) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: request.Bucket}
-	obj, err := project.db.CreateObject(ctx, b, request.Key, nil)
+	if opts == nil {
+		opts = &UploadOptions{}
+	}
+
+	b := storj.Bucket{Name: bucket}
+	obj, err := project.db.CreateObject(ctx, b, key, nil)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
@@ -62,7 +55,7 @@ func (request *UploadRequest) Do(ctx context.Context, project *Project) (_ *Uplo
 	upload.upload = stream.NewUpload(ctx, dynamicMetadata{
 		MutableStream: mutableStream,
 		object:        upload.object,
-		expires:       request.Expires,
+		expires:       opts.Expires,
 	}, project.streams)
 	return upload, nil
 }

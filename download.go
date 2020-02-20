@@ -10,36 +10,27 @@ import (
 	"storj.io/uplink/stream"
 )
 
-// DownloadObject starts an download to the specified key.
-// If you wish extended options like offset and length, use DownloadRequest.
-func (project *Project) DownloadObject(ctx context.Context, bucket, key string) (*Download, error) {
-	return (&DownloadRequest{
-		Bucket: bucket,
-		Key:    key,
-		Offset: 0,
-		Length: -1,
-	}).Do(ctx, project)
-}
-
-// DownloadRequest specifies all parameters for a download.
-//
-// Downloads at most Length bytes.
-// If Length is negative it will read until the end of the blob.
-type DownloadRequest struct {
-	Bucket string
-	Key    string
-
+// DownloadOptions contains additional options for downloading.
+type DownloadOptions struct {
 	Offset int64
+	// When Length is negative it will read until the end of the blob.
 	Length int64
 }
 
-// Do executes the download request.
-func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ *Download, err error) {
+// DownloadObject starts a download to the specified key.
+func (project *Project) DownloadObject(ctx context.Context, bucket, key string, opts *DownloadOptions) (_ *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	b := storj.Bucket{Name: request.Bucket}
+	if opts == nil {
+		opts = &DownloadOptions{
+			Offset: 0,
+			Length: -1,
+		}
+	}
 
-	obj, err := project.db.GetObjectExtended(ctx, b, request.Key)
+	b := storj.Bucket{Name: bucket}
+
+	obj, err := project.db.GetObjectExtended(ctx, b, key)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
@@ -50,7 +41,7 @@ func (request *DownloadRequest) Do(ctx context.Context, project *Project) (_ *Do
 	}
 
 	return &Download{
-		download: stream.NewDownloadRange(ctx, objectStream, project.streams, request.Offset, request.Length),
+		download: stream.NewDownloadRange(ctx, objectStream, project.streams, opts.Offset, opts.Length),
 		object:   convertObjectExtended(&obj),
 	}, nil
 }

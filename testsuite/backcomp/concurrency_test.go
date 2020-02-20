@@ -39,7 +39,7 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		bucket, err := project.CreateBucket(ctx, "bucket-abcd")
 		require.NoError(t, err)
 
-		upload, err := project.UploadObject(ctx, bucket.Name, "test.dat")
+		upload, err := project.UploadObject(ctx, bucket.Name, "test.dat", nil)
 		require.NoError(t, err)
 
 		source := bytes.NewBuffer(testrand.Bytes(1 * memory.KiB))

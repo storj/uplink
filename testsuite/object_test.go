@@ -34,7 +34,7 @@ func TestObject(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		upload, err := project.UploadObject(ctx, "testbucket", "test.dat")
+		upload, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
@@ -55,7 +55,7 @@ func TestObject(t *testing.T) {
 		err = upload.Commit()
 		require.True(t, uplink.ErrUploadDone.Has(err))
 
-		download, err := project.DownloadObject(ctx, "testbucket", "test.dat")
+		download, err := project.DownloadObject(ctx, "testbucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")
 
@@ -67,13 +67,11 @@ func TestObject(t *testing.T) {
 		err = download.Close()
 		require.NoError(t, err)
 
-		downloadReq := uplink.DownloadRequest{
-			Bucket: "testbucket",
-			Key:    "test.dat",
-			Offset: 100,
-			Length: 500,
-		}
-		download, err = downloadReq.Do(ctx, project)
+		download, err = project.DownloadObject(ctx, "testbucket", "test.dat",
+			&uplink.DownloadOptions{
+				Offset: 100,
+				Length: 500,
+			})
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")
 
@@ -115,7 +113,7 @@ func TestAbortUpload(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		upload, err := project.UploadObject(ctx, "testbucket", "test.dat")
+		upload, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
@@ -150,7 +148,7 @@ func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey stri
 }
 
 func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string) *uplink.Object {
-	upload, err := project.UploadObject(ctx, bucket, key)
+	upload, err := project.UploadObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 	assertObjectEmptyCreated(t, upload.Info(), key)
 

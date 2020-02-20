@@ -35,7 +35,7 @@ func TestSetMetadata(t *testing.T) {
 		}()
 
 		key := "object-with-metadata"
-		upload, err := project.UploadObject(ctx, bucket.Name, key)
+		upload, err := project.UploadObject(ctx, bucket.Name, key, nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), key)
 
@@ -130,7 +130,7 @@ func TestSetMetadataAfterCommit(t *testing.T) {
 		}()
 
 		key := "object-with-metadata"
-		upload, err := project.UploadObject(ctx, bucket.Name, key)
+		upload, err := project.UploadObject(ctx, bucket.Name, key, nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), key)
 
@@ -166,7 +166,7 @@ func TestSetMetadataAfterAbort(t *testing.T) {
 		}()
 
 		key := "object-with-metadata"
-		upload, err := project.UploadObject(ctx, bucket.Name, key)
+		upload, err := project.UploadObject(ctx, bucket.Name, key, nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), key)
 

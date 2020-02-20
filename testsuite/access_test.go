@@ -61,7 +61,7 @@ func TestSharePermisions(t *testing.T) {
 				require.NotNil(t, bucket)
 				require.Equal(t, bucketName, bucket.Name)
 
-				upload, err := project.UploadObject(ctx, bucketName, "test.dat")
+				upload, err := project.UploadObject(ctx, bucketName, "test.dat", nil)
 				require.NoError(t, err)
 
 				source := bytes.NewBuffer(expectedData)
@@ -117,7 +117,7 @@ func TestSharePermisions(t *testing.T) {
 
 				bucketName := "testbucket" + strconv.Itoa(i)
 				{ // reading
-					download, err := project.DownloadObject(ctx, bucketName, "test.dat")
+					download, err := project.DownloadObject(ctx, bucketName, "test.dat", nil)
 					if item.AllowRead {
 						require.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestSharePermisions(t *testing.T) {
 					}
 				}
 				{ // writing
-					upload, err := project.UploadObject(ctx, bucketName, "new-test.dat")
+					upload, err := project.UploadObject(ctx, bucketName, "new-test.dat", nil)
 					require.NoError(t, err)
 
 					source := bytes.NewBuffer(expectedData)
@@ -195,7 +195,7 @@ func TestAccessSerialization(t *testing.T) {
 		require.NotNil(t, bucket)
 		require.Equal(t, "test-bucket", bucket.Name)
 
-		upload, err := project.UploadObject(ctx, "test-bucket", "test.dat")
+		upload, err := project.UploadObject(ctx, "test-bucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
@@ -212,7 +212,7 @@ func TestAccessSerialization(t *testing.T) {
 		err = upload.Commit()
 		require.True(t, uplink.ErrUploadDone.Has(err))
 
-		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat")
+		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")
 	})
