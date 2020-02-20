@@ -52,15 +52,23 @@ func TestBucket(t *testing.T) {
 		}
 
 		{ // deleting a bucket
-			err := project.DeleteBucket(ctx, "testbucket")
+			deleted, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
+			require.NotNil(t, deleted)
+			require.Equal(t, "testbucket", deleted.Name)
+		}
+
+		{
+			// statting a missing bucket
+			statBucket, err := project.StatBucket(ctx, "testbucket")
+			require.True(t, uplink.ErrBucketNotFound.Has(err))
+			require.Nil(t, statBucket)
 		}
 
 		{ // deleting a missing bucket
-			err := project.DeleteBucket(ctx, "missing")
-			_ = err
-			// TODO: requires satellite fix
-			// require.Error(t, err)
+			deleted, err := project.DeleteBucket(ctx, "missing")
+			require.True(t, uplink.ErrBucketNotFound.Has(err))
+			require.Nil(t, deleted)
 		}
 	})
 }

@@ -10,8 +10,8 @@ import (
 	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
-// ObjectsOptions defines iteration options.
-type ObjectsOptions struct {
+// ObjectIteratorOptions defines iteration options.
+type ObjectIteratorOptions struct {
 	// Prefix allows to filter objects by a key prefix. Should always end with slash.
 	Prefix string
 	// The first item listed will be cursor or the one after it.
@@ -28,7 +28,7 @@ type ObjectsOptions struct {
 }
 
 // ListObjects returns an iterator over the objects.
-func (project *Project) ListObjects(ctx context.Context, bucket string, options *ObjectsOptions) *Objects {
+func (project *Project) ListObjects(ctx context.Context, bucket string, options *ObjectIteratorOptions) *ObjectIterator {
 	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
 	opts := storj.ListOptions{
 		Direction: storj.After,
@@ -40,7 +40,7 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 		opts.Recursive = options.Recursive
 	}
 
-	objects := Objects{
+	objects := ObjectIterator{
 		ctx:     ctx,
 		project: project,
 		bucket:  b,
@@ -54,13 +54,13 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 	return &objects
 }
 
-// Objects is an iterator over a collection of objects or prefixes.
-type Objects struct {
+// ObjectIterator is an iterator over a collection of objects or prefixes.
+type ObjectIterator struct {
 	ctx        context.Context
 	project    *Project
 	bucket     storj.Bucket
 	options    storj.ListOptions
-	objOptions ObjectsOptions
+	objOptions ObjectIteratorOptions
 	list       *kvmetainfo.ObjectListExtended
 	position   int
 	completed  bool
@@ -69,7 +69,7 @@ type Objects struct {
 
 // Next prepares next Object for reading.
 // It returns false if the end of the iteration is reached and there are no more objects, or if there is an error.
-func (objects *Objects) Next() bool {
+func (objects *ObjectIterator) Next() bool {
 	if objects.err != nil {
 		objects.completed = true
 		return false
@@ -96,7 +96,7 @@ func (objects *Objects) Next() bool {
 	return true
 }
 
-func (objects *Objects) loadNext() bool {
+func (objects *ObjectIterator) loadNext() bool {
 	list, err := objects.project.db.ListObjectsExtended(objects.ctx, objects.bucket, objects.options)
 	if err != nil {
 		objects.err = err
@@ -108,21 +108,12 @@ func (objects *Objects) loadNext() bool {
 }
 
 // Err returns error, if one happened during iteration.
-func (objects *Objects) Err() error {
+func (objects *ObjectIterator) Err() error {
 	return Error.Wrap(objects.err)
 }
 
-// Key returns the key without the prefix of the current object.
-func (objects *Objects) Key() string {
-	item := objects.item()
-	if item == nil {
-		return ""
-	}
-	return item.Path
-}
-
 // Item returns the current object in the iterator.
-func (objects *Objects) Item() *ListObject {
+func (objects *ObjectIterator) Item() *Object {
 	item := objects.item()
 	if item == nil {
 		return nil
@@ -133,10 +124,8 @@ func (objects *Objects) Item() *ListObject {
 		key = objects.options.Prefix + item.Path
 	}
 
-	obj := ListObject{
-		Object: Object{
-			Key: key,
-		},
+	obj := Object{
+		Key:      key,
 		IsPrefix: item.IsPrefix,
 	}
 
@@ -174,7 +163,7 @@ func (objects *Objects) Item() *ListObject {
 	return &obj
 }
 
-func (objects *Objects) item() *kvmetainfo.ObjectExtended {
+func (objects *ObjectIterator) item() *kvmetainfo.ObjectExtended {
 	if objects.completed {
 		return nil
 	}
@@ -192,11 +181,4 @@ func (objects *Objects) item() *kvmetainfo.ObjectExtended {
 	}
 
 	return &objects.list.Items[objects.position]
-}
-
-// ListObject reprsents an object from objects iterator.
-type ListObject struct {
-	Object
-	// IsPrefix indicates whether the Key is a prefix for other objects.
-	IsPrefix bool
 }

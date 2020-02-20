@@ -23,7 +23,7 @@ type Logger interface {
 
 // Config defines configuration for using uplink library.
 type Config struct {
-	Log       Logger
+	// Log       Logger
 	UserAgent string
 
 	// DialTimeout defines how long client should wait for establishing
@@ -31,7 +31,7 @@ type Config struct {
 	DialTimeout time.Duration
 }
 
-func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
+func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
 		Difficulty:  9,
 		Concurrency: 1,
@@ -53,7 +53,7 @@ func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *
 	dialer := rpc.NewDefaultDialer(tlsOptions)
 	dialer.DialTimeout = config.DialTimeout
 
-	nodeURL, err := storj.ParseNodeURL(satelliteNodeURL)
+	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
 	if err != nil {
 		return nil, rpc.Dialer{}, "", Error.Wrap(err)
 	}
@@ -65,13 +65,13 @@ func (config Config) dial(ctx context.Context, satelliteNodeURL string, apiKey *
 		if !found {
 			return nil, rpc.Dialer{}, "", Error.New("node id is required in satelliteNodeURL")
 		}
-		satelliteNodeURL = storj.NodeURL{
+		satelliteAddress = storj.NodeURL{
 			ID:      nodeID,
 			Address: nodeURL.Address,
 		}.String()
 	}
 
-	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteNodeURL, apiKey, config.UserAgent)
+	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteAddress, apiKey, config.UserAgent)
 
-	return metainfo, dialer, satelliteNodeURL, Error.Wrap(err)
+	return metainfo, dialer, satelliteAddress, Error.Wrap(err)
 }

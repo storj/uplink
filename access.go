@@ -21,10 +21,10 @@ import (
 // Access contains everything to access a project
 // and specific buckets.
 type Access struct {
-	satelliteNodeURL string
+	satelliteAddress string
 	apiKey           *macaroon.APIKey
 	encAccess        *encryptionAccess
-	parseErr         error
+	// TODO: bypassObjectKeyEncryption bool
 }
 
 // SharePrefix defines a prefix that will be shared.
@@ -39,54 +39,46 @@ type Permission struct {
 	AllowWrite  bool
 	AllowList   bool
 	AllowDelete bool
+	// TODO: add NotBefore and NotAfter
 }
 
 // ParseAccess parses access string.
-//
-// For convenience with using other arguments,
-// parse does not return an error. But, instead
-// delays the calls.
-func ParseAccess(access string) *Access {
+func ParseAccess(access string) (*Access, error) {
 	data, version, err := base58.CheckDecode(access)
 	if err != nil || version != 0 {
-		return &Access{parseErr: Error.New("invalid access format")}
+		return nil, Error.New("invalid access format")
 	}
 
 	p := new(pb.Scope)
 	if err := proto.Unmarshal(data, p); err != nil {
-		return &Access{parseErr: Error.New("unable to unmarshal access: %v", err)}
+		return nil, Error.New("unable to unmarshal access: %v", err)
 	}
 
 	if len(p.SatelliteAddr) == 0 {
-		return &Access{parseErr: Error.New("access missing satellite address")}
+		return nil, Error.New("access missing satellite address")
 	}
 
 	apiKey, err := macaroon.ParseRawAPIKey(p.ApiKey)
 	if err != nil {
-		return &Access{parseErr: Error.New("access has malformed api key: %v", err)}
+		return nil, Error.New("access has malformed api key: %v", err)
 	}
 
 	encAccess, err := parseEncryptionAccessFromProto(p.EncryptionAccess)
 	if err != nil {
-		return &Access{parseErr: Error.New("access has malformed encryption access: %v", err)}
+		return nil, Error.New("access has malformed encryption access: %v", err)
 	}
 
 	return &Access{
-		satelliteNodeURL: p.SatelliteAddr,
+		satelliteAddress: p.SatelliteAddr,
 		apiKey:           apiKey,
 		encAccess:        encAccess,
-	}
-}
-
-// IsValid returns error if parsing was unsuccessful.
-func (access *Access) IsValid() error {
-	return access.parseErr
+	}, nil
 }
 
 // Serialize serializes access such that it can be used with ParseAccess.
 func (access *Access) Serialize() (string, error) {
 	switch {
-	case len(access.satelliteNodeURL) == 0:
+	case len(access.satelliteAddress) == 0:
 		return "", Error.New("access missing satellite address")
 	case access.apiKey == nil:
 		return "", Error.New("access missing api key")
@@ -100,7 +92,7 @@ func (access *Access) Serialize() (string, error) {
 	}
 
 	data, err := proto.Marshal(&pb.Scope{
-		SatelliteAddr:    access.satelliteNodeURL,
+		SatelliteAddr:    access.satelliteAddress,
 		ApiKey:           access.apiKey.SerializeRaw(),
 		EncryptionAccess: enc,
 	})
@@ -112,13 +104,13 @@ func (access *Access) Serialize() (string, error) {
 }
 
 // RequestAccessWithPassphrase requests satellite for a new access using a passhprase.
-func RequestAccessWithPassphrase(ctx context.Context, satelliteNodeURL, apiKey, passphrase string) (*Access, error) {
-	return (Config{}).RequestAccessWithPassphrase(ctx, satelliteNodeURL, apiKey, passphrase)
+func RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
+	return (Config{}).RequestAccessWithPassphrase(ctx, satelliteAddress, apiKey, passphrase)
 }
 
 // RequestAccessWithPassphrase requests satellite for a new access using a passphrase.
-func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteNodeURL, apiKey, passphrase string) (*Access, error) {
-	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteNodeURL, apiKey, passphrase, 8)
+func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
+	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteAddress, apiKey, passphrase, 8)
 }
 
 func init() {
@@ -129,13 +121,13 @@ func init() {
 // requestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
 //
 // NB: when modifying the signature of this func, also update backcomp and internal/expose packages.
-func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteNodeURL, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
+func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
-	metainfo, _, fullNodeURL, err := config.dial(ctx, satelliteNodeURL, parsedAPIKey)
+	metainfo, _, fullNodeURL, err := config.dial(ctx, satelliteAddress, parsedAPIKey)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
@@ -154,7 +146,7 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 	encAccess := newEncryptionAccessWithDefaultKey(key)
 	encAccess.setDefaultPathCipher(storj.EncAESGCM)
 	return &Access{
-		satelliteNodeURL: fullNodeURL,
+		satelliteAddress: fullNodeURL,
 		apiKey:           parsedAPIKey,
 		encAccess:        encAccess,
 	}, nil
@@ -162,6 +154,10 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 
 // Share creates new Access with spefic permision. Permission will be applied to namespaces is defined.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
+	if permission == (Permission{}) {
+		return nil, Error.New("permission is empty")
+	}
+
 	caveat := macaroon.Caveat{
 		DisallowReads:   !permission.AllowRead,
 		DisallowWrites:  !permission.AllowWrite,
@@ -197,7 +193,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	restrictedAccess := &Access{
-		satelliteNodeURL: access.satelliteNodeURL,
+		satelliteAddress: access.satelliteAddress,
 		apiKey:           restrictedAPIKey,
 		encAccess:        access.encAccess,
 	}
@@ -220,8 +216,8 @@ func WriteOnlyPermission() Permission {
 	}
 }
 
-// AllPermissions returns permission that allows all actions.
-func AllPermissions() Permission {
+// FullPermission returns permission that allows all actions.
+func FullPermission() Permission {
 	return Permission{
 		AllowRead:   true,
 		AllowWrite:  true,

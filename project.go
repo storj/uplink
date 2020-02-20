@@ -43,11 +43,7 @@ func (config Config) Open(ctx context.Context, access *Access) (_ *Project, err 
 		return nil, Error.New("access is nil")
 	}
 
-	if err := access.IsValid(); err != nil {
-		return nil, Error.Wrap(err)
-	}
-
-	metainfo, dialer, _, err := config.dial(ctx, access.satelliteNodeURL, access.apiKey)
+	metainfo, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}

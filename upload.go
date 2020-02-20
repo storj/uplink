@@ -21,6 +21,7 @@ import (
 var ErrUploadDone = errs.Class("upload done")
 
 // UploadObject starts an upload to the specified key.
+// If you wish extended options like expiration time, use UploadRequest.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string) (*Upload, error) {
 	return (&UploadRequest{
 		Bucket: bucket,

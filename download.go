@@ -11,6 +11,7 @@ import (
 )
 
 // DownloadObject starts an download to the specified key.
+// If you wish extended options like offset and length, use DownloadRequest.
 func (project *Project) DownloadObject(ctx context.Context, bucket, key string) (*Download, error) {
 	return (&DownloadRequest{
 		Bucket: bucket,

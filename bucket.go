@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	// ErrBucketExists is returned when the bucket already exists during creation.
-	ErrBucketExists = errs.Class("bucket already exists")
+	// ErrBucketAlreadyExists is returned when the bucket already exists during creation.
+	ErrBucketAlreadyExists = errs.Class("bucket already exists")
 
 	// ErrBucketNotEmpty is returned when the bucket is not empty during deletion.
 	ErrBucketNotEmpty = errs.Class("bucket not empty")
@@ -36,13 +36,17 @@ func (project *Project) StatBucket(ctx context.Context, name string) (_ *Bucket,
 	defer mon.Task()(&ctx)(&err)
 
 	b, err := project.project.GetBucket(ctx, name)
-
-	bucket := &Bucket{
-		Name:    b.Name,
-		Created: b.Created,
+	if err != nil {
+		if storj.ErrBucketNotFound.Has(err) {
+			return nil, ErrBucketNotFound.New(name)
+		}
+		return nil, Error.Wrap(err)
 	}
 
-	return bucket, Error.Wrap(err)
+	return &Bucket{
+		Name:    b.Name,
+		Created: b.Created,
+	}, nil
 }
 
 // CreateBucket creates a new bucket.
@@ -61,9 +65,9 @@ func (project *Project) CreateBucket(ctx context.Context, name string) (_ *Bucke
 		// TODO: Ideally, the satellite should return the existing bucket when this error occurs.
 		bucket, err = project.StatBucket(ctx, name)
 		if err != nil {
-			return bucket, errs.Combine(ErrBucketExists.New(name), err)
+			return bucket, errs.Combine(ErrBucketAlreadyExists.New(name), err)
 		}
-		return bucket, ErrBucketExists.New(name)
+		return bucket, ErrBucketAlreadyExists.New(name)
 	}
 
 	return bucket, Error.Wrap(err)
@@ -76,7 +80,7 @@ func (project *Project) EnsureBucket(ctx context.Context, name string) (_ *Bucke
 	defer mon.Task()(&ctx)(&err)
 
 	bucket, err := project.CreateBucket(ctx, name)
-	if ErrBucketExists.Has(err) {
+	if ErrBucketAlreadyExists.Has(err) {
 		err = nil
 	}
 
@@ -86,16 +90,24 @@ func (project *Project) EnsureBucket(ctx context.Context, name string) (_ *Bucke
 // DeleteBucket deletes a bucket.
 //
 // When bucket is not empty it returns ErrBucketNotEmpty.
-func (project *Project) DeleteBucket(ctx context.Context, name string) (err error) {
+func (project *Project) DeleteBucket(ctx context.Context, name string) (deleted *Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	// TODO: Most probably this will delete any objects in the bucket.
-	// We may need to add a check that the bucket is empty.
-	err = project.project.DeleteBucket(ctx, name)
-	if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-		return ErrBucketNotEmpty.New(name)
-	} else if storj.ErrBucketNotFound.Has(err) {
-		return ErrBucketNotFound.New(name)
+	// TODO: Ideally, this should be done on the satellite
+	bucket, err := project.StatBucket(ctx, name)
+	if err != nil {
+		return nil, err
 	}
-	return Error.Wrap(err)
+
+	err = project.project.DeleteBucket(ctx, name)
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
+			return nil, ErrBucketNotEmpty.New(name)
+		}
+		if storj.ErrBucketNotFound.Has(err) {
+			return nil, ErrBucketNotFound.New(name)
+		}
+		return nil, Error.Wrap(err)
+	}
+	return bucket, nil
 }

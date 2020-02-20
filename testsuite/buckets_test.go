@@ -41,7 +41,7 @@ func TestListBuckets_SingleBucket(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -49,7 +49,6 @@ func TestListBuckets_SingleBucket(t *testing.T) {
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
-		require.Equal(t, "testbucket", list.Name())
 		require.NotNil(t, list.Item())
 		require.Equal(t, "testbucket", list.Item().Name)
 		require.WithinDuration(t, time.Now(), list.Item().Created, 10*time.Second)
@@ -76,7 +75,7 @@ func TestListBuckets_TwoBuckets(t *testing.T) {
 			bucket := bucket
 			createBucket(t, ctx, project, bucket)
 			defer func() {
-				err := project.DeleteBucket(ctx, bucket)
+				_, err := project.DeleteBucket(ctx, bucket)
 				require.NoError(t, err)
 			}()
 		}
@@ -86,18 +85,16 @@ func TestListBuckets_TwoBuckets(t *testing.T) {
 		more := list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedBuckets, list.Name())
 		require.NotNil(t, list.Item())
-		require.Equal(t, list.Name(), list.Item().Name)
 		require.WithinDuration(t, time.Now(), list.Item().Created, 10*time.Second)
+		delete(expectedBuckets, list.Item().Name)
 
 		more = list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedBuckets, list.Name())
 		require.NotNil(t, list.Item())
-		require.Equal(t, list.Name(), list.Item().Name)
 		require.WithinDuration(t, time.Now(), list.Item().Created, 10*time.Second)
+		delete(expectedBuckets, list.Item().Name)
 
 		require.Empty(t, expectedBuckets)
 		assertNoNextBucket(t, list)
@@ -122,7 +119,7 @@ func TestListBuckets_Cursor(t *testing.T) {
 			bucket := bucket
 			createBucket(t, ctx, project, bucket)
 			defer func() {
-				err := project.DeleteBucket(ctx, bucket)
+				_, err := project.DeleteBucket(ctx, bucket)
 				require.NoError(t, err)
 			}()
 		}
@@ -133,37 +130,34 @@ func TestListBuckets_Cursor(t *testing.T) {
 		more := list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedBuckets, list.Name())
-		cursor := list.Name()
+		delete(expectedBuckets, list.Item().Name)
+		cursor := list.Item().Name
 
 		// list again with cursor set to the first item from previous list request
-		list = listBuckets(t, ctx, project, &uplink.BucketsOptions{Cursor: cursor})
+		list = listBuckets(t, ctx, project, &uplink.BucketIteratorOptions{Cursor: cursor})
 
 		// expect the second item as the first item in this new list request
 		more = list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedBuckets, list.Name())
 		require.NotNil(t, list.Item())
-		require.Equal(t, list.Name(), list.Item().Name)
 		require.WithinDuration(t, time.Now(), list.Item().Created, 10*time.Second)
+		delete(expectedBuckets, list.Item().Name)
 
 		require.Empty(t, expectedBuckets)
 		assertNoNextBucket(t, list)
 	})
 }
 
-func listBuckets(t *testing.T, ctx context.Context, project *uplink.Project, options *uplink.BucketsOptions) *uplink.Buckets {
+func listBuckets(t *testing.T, ctx context.Context, project *uplink.Project, options *uplink.BucketIteratorOptions) *uplink.BucketIterator {
 	list := project.ListBuckets(ctx, options)
 	require.NoError(t, list.Err())
-	require.Empty(t, list.Name())
 	require.Nil(t, list.Item())
 	return list
 }
 
-func assertNoNextBucket(t *testing.T, list *uplink.Buckets) {
+func assertNoNextBucket(t *testing.T, list *uplink.BucketIterator) {
 	require.False(t, list.Next())
 	require.NoError(t, list.Err())
-	require.Empty(t, list.Name())
 	require.Nil(t, list.Item())
 }

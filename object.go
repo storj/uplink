@@ -7,13 +7,20 @@ import (
 	"context"
 	"time"
 
+	"github.com/zeebo/errs"
+
 	"storj.io/common/storj"
 	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
+// ErrObjectNotFound is returned when the object is not found.
+var ErrObjectNotFound = errs.Class("object not found")
+
 // Object contains information about an object.
 type Object struct {
 	Key string
+	// IsPrefix indicates whether the Key is a prefix for other objects.
+	IsPrefix bool
 
 	Info     ObjectInfo
 	Standard StandardMetadata
@@ -67,6 +74,9 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.GetObjectExtended(ctx, b, key)
 	if err != nil {
+		if storj.ErrObjectNotFound.Has(err) {
+			return nil, ErrObjectNotFound.New(key)
+		}
 		return nil, Error.Wrap(err)
 	}
 
@@ -74,13 +84,24 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *
 }
 
 // DeleteObject deletes the object at the specific key.
-func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (err error) {
+func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
+
+	// TODO: Ideally, this should be done on the satellite
+	object, err := project.StatObject(ctx, bucket, key)
+	if err != nil {
+		return nil, err
+	}
 
 	b := storj.Bucket{Name: bucket}
 	err = project.db.DeleteObject(ctx, b, key)
-
-	return Error.Wrap(err)
+	if err != nil {
+		if storj.ErrObjectNotFound.Has(err) {
+			return nil, ErrObjectNotFound.New(key)
+		}
+		return nil, Error.Wrap(err)
+	}
+	return object, nil
 }
 
 // convertObject converts storj.Object to uplink.Object.

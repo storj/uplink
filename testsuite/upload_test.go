@@ -30,7 +30,7 @@ func TestSetMetadata(t *testing.T) {
 
 		bucket := createBucket(t, ctx, project, "test-bucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "test-bucket")
+			_, err := project.DeleteBucket(ctx, "test-bucket")
 			require.NoError(t, err)
 		}()
 
@@ -82,7 +82,7 @@ func TestSetMetadata(t *testing.T) {
 			require.Equal(t, expectedCustomMetadata, obj.Custom)
 		}
 		{ // test metadata from ListObjects
-			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectsOptions{
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectIteratorOptions{
 				Standard: true,
 				Custom:   true,
 			})
@@ -93,11 +93,11 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
-			require.Equal(t, *expectedStdMetadata, listObject.Object.Standard)
-			require.Equal(t, expectedCustomMetadata, listObject.Object.Custom)
+			require.Equal(t, *expectedStdMetadata, listObject.Standard)
+			require.Equal(t, expectedCustomMetadata, listObject.Custom)
 		}
 		{ // test metadata from ListObjects and disabled standard and custom metadata
-			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectsOptions{
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectIteratorOptions{
 				Standard: false,
 				Custom:   false,
 			})
@@ -108,8 +108,8 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
-			require.Equal(t, uplink.StandardMetadata{}, listObject.Object.Standard)
-			require.Equal(t, uplink.CustomMetadata(nil), listObject.Object.Custom)
+			require.Equal(t, uplink.StandardMetadata{}, listObject.Standard)
+			require.Equal(t, uplink.CustomMetadata(nil), listObject.Custom)
 		}
 	})
 }
@@ -125,7 +125,7 @@ func TestSetMetadataAfterCommit(t *testing.T) {
 
 		bucket := createBucket(t, ctx, project, "test-bucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "test-bucket")
+			_, err := project.DeleteBucket(ctx, "test-bucket")
 			require.NoError(t, err)
 		}()
 
@@ -161,7 +161,7 @@ func TestSetMetadataAfterAbort(t *testing.T) {
 
 		bucket := createBucket(t, ctx, project, "test-bucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "test-bucket")
+			_, err := project.DeleteBucket(ctx, "test-bucket")
 			require.NoError(t, err)
 		}()
 

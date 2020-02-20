@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
-	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
@@ -31,7 +30,7 @@ func TestObject(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -86,11 +85,18 @@ func TestObject(t *testing.T) {
 		err = download.Close()
 		require.NoError(t, err)
 
-		err = project.DeleteObject(ctx, "testbucket", "test.dat")
+		deleted, err := project.DeleteObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
+		require.NotNil(t, deleted)
+		require.Equal(t, "test.dat", deleted.Key)
 
 		obj, err = project.StatObject(ctx, "testbucket", "test.dat")
-		require.True(t, storj.ErrObjectNotFound.Has(err))
+		require.True(t, uplink.ErrObjectNotFound.Has(err))
+
+		// delete missing object
+		deleted, err = project.DeleteObject(ctx, "testbucket", "test.dat")
+		require.True(t, uplink.ErrObjectNotFound.Has(err))
+		require.Nil(t, deleted)
 	})
 }
 
@@ -105,7 +111,7 @@ func TestAbortUpload(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -126,7 +132,7 @@ func TestAbortUpload(t *testing.T) {
 		require.Error(t, err)
 
 		_, err = project.StatObject(ctx, "testbucket", "test.dat")
-		require.True(t, storj.ErrObjectNotFound.Has(err))
+		require.True(t, uplink.ErrObjectNotFound.Has(err))
 
 		err = upload.Abort()
 		require.True(t, uplink.ErrUploadDone.Has(err))

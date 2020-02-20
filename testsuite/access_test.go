@@ -97,12 +97,17 @@ func TestSharePermisions(t *testing.T) {
 			}
 
 			t.Run(name(), func(t *testing.T) {
-				sharedAccess, err := access.Share(uplink.Permission{
+				permission := uplink.Permission{
 					AllowRead:   item.AllowRead,
 					AllowWrite:  item.AllowWrite,
 					AllowDelete: item.AllowDelete,
 					AllowList:   item.AllowList,
-				})
+				}
+				sharedAccess, err := access.Share(permission)
+				if permission == (uplink.Permission{}) {
+					require.Error(t, err)
+					return
+				}
 				require.NoError(t, err)
 
 				project, err := uplinkConfig.Open(ctx, sharedAccess)
@@ -145,7 +150,7 @@ func TestSharePermisions(t *testing.T) {
 				}
 				{ // deleting
 					// TODO test removing object
-					err := project.DeleteBucket(ctx, bucketName)
+					_, err := project.DeleteBucket(ctx, bucketName)
 					if item.AllowDelete {
 						require.NoError(t, err)
 					} else {
@@ -177,8 +182,8 @@ func TestAccessSerialization(t *testing.T) {
 		serializedAccess, err := access.Serialize()
 		require.NoError(t, err)
 
-		access = uplink.ParseAccess(serializedAccess)
-		require.NoError(t, access.IsValid())
+		access, err = uplink.ParseAccess(serializedAccess)
+		require.NoError(t, err)
 
 		project, err := uplinkConfig.Open(ctx, access)
 		require.NoError(t, err)

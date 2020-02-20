@@ -27,7 +27,6 @@ func TestListObjects_NonExistingBucket(t *testing.T) {
 		// TODO: Should this return BucketNotFound error?
 		list := project.ListObjects(ctx, "testbucket", nil)
 		require.NoError(t, list.Err())
-		require.Empty(t, list.Key())
 		require.Nil(t, list.Item())
 
 		assertNoNextObject(t, list)
@@ -45,7 +44,7 @@ func TestListObjects_EmptyBucket(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -66,13 +65,13 @@ func TestListObjects_SingleObject(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
 		uploadObject(t, ctx, project, "testbucket", "test.dat")
 		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "test.dat")
+			_, err := project.DeleteObject(ctx, "testbucket", "test.dat")
 			require.NoError(t, err)
 		}()
 
@@ -80,7 +79,6 @@ func TestListObjects_SingleObject(t *testing.T) {
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
-		require.Equal(t, "test.dat", list.Key())
 		require.NotNil(t, list.Item())
 		require.False(t, list.Item().IsPrefix)
 		require.Equal(t, "test.dat", list.Item().Key)
@@ -100,7 +98,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -113,7 +111,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 			object := object
 			uploadObject(t, ctx, project, "testbucket", object)
 			defer func() {
-				err := project.DeleteObject(ctx, "testbucket", object)
+				_, err := project.DeleteObject(ctx, "testbucket", object)
 				require.NoError(t, err)
 			}()
 		}
@@ -123,18 +121,16 @@ func TestListObjects_TwoObjects(t *testing.T) {
 		more := list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedObjects, list.Key())
 		require.NotNil(t, list.Item())
 		require.False(t, list.Item().IsPrefix)
-		require.Equal(t, list.Key(), list.Item().Key)
+		delete(expectedObjects, list.Item().Key)
 
 		more = list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedObjects, list.Key())
 		require.NotNil(t, list.Item())
 		require.False(t, list.Item().IsPrefix)
-		require.Equal(t, list.Key(), list.Item().Key)
+		delete(expectedObjects, list.Item().Key)
 
 		require.Empty(t, expectedObjects)
 		assertNoNextObject(t, list)
@@ -152,24 +148,23 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
 		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat")
 		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
+			_, err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{
+		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectIteratorOptions{
 			Prefix:    "a/b/",
 			Recursive: true,
 		})
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
-		require.Equal(t, "c/test.dat", list.Key())
 		require.NotNil(t, list.Item())
 		require.False(t, list.Item().IsPrefix)
 		require.Equal(t, "a/b/c/test.dat", list.Item().Key)
@@ -189,21 +184,20 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
 		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat")
 		defer func() {
-			err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
+			_, err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{Prefix: "a/b/"})
+		list := listObjects(t, ctx, project, "testbucket", &uplink.ObjectIteratorOptions{Prefix: "a/b/"})
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
-		require.Equal(t, "c/", list.Key())
 		require.NotNil(t, list.Item())
 		require.True(t, list.Item().IsPrefix)
 		require.Equal(t, "a/b/c/", list.Item().Key)
@@ -223,7 +217,7 @@ func TestListObjects_Cursor(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucket(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -236,7 +230,7 @@ func TestListObjects_Cursor(t *testing.T) {
 			object := object
 			uploadObject(t, ctx, project, "testbucket", object)
 			defer func() {
-				err := project.DeleteObject(ctx, "testbucket", object)
+				_, err := project.DeleteObject(ctx, "testbucket", object)
 				require.NoError(t, err)
 			}()
 		}
@@ -247,37 +241,34 @@ func TestListObjects_Cursor(t *testing.T) {
 		more := list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedObjects, list.Key())
-		cursor := list.Key()
+		delete(expectedObjects, list.Item().Key)
+		cursor := list.Item().Key
 
 		// list again with cursor set to the first item from previous list request
-		list = listObjects(t, ctx, project, "testbucket", &uplink.ObjectsOptions{Cursor: cursor})
+		list = listObjects(t, ctx, project, "testbucket", &uplink.ObjectIteratorOptions{Cursor: cursor})
 
 		// expect the second item as the first item in this new list request
 		more = list.Next()
 		require.True(t, more)
 		require.NoError(t, list.Err())
-		delete(expectedObjects, list.Key())
 		require.NotNil(t, list.Item())
 		require.False(t, list.Item().IsPrefix)
-		require.Equal(t, list.Key(), list.Item().Key)
+		delete(expectedObjects, list.Item().Key)
 
 		require.Empty(t, expectedObjects)
 		assertNoNextObject(t, list)
 	})
 }
 
-func listObjects(t *testing.T, ctx context.Context, project *uplink.Project, bucket string, options *uplink.ObjectsOptions) *uplink.Objects {
+func listObjects(t *testing.T, ctx context.Context, project *uplink.Project, bucket string, options *uplink.ObjectIteratorOptions) *uplink.ObjectIterator {
 	list := project.ListObjects(ctx, bucket, options)
 	require.NoError(t, list.Err())
-	require.Empty(t, list.Key())
 	require.Nil(t, list.Item())
 	return list
 }
 
-func assertNoNextObject(t *testing.T, list *uplink.Objects) {
+func assertNoNextObject(t *testing.T, list *uplink.ObjectIterator) {
 	require.False(t, list.Next())
 	require.NoError(t, list.Err())
-	require.Empty(t, list.Key())
 	require.Nil(t, list.Item())
 }

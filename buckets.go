@@ -9,14 +9,14 @@ import (
 	"storj.io/common/storj"
 )
 
-// BucketsOptions defines iteration options.
-type BucketsOptions struct {
+// BucketIteratorOptions defines iteration options.
+type BucketIteratorOptions struct {
 	// The first item listed will be cursor or the one after it.
 	Cursor string
 }
 
 // ListBuckets returns an iterator over the buckets.
-func (project *Project) ListBuckets(ctx context.Context, options *BucketsOptions) *Buckets {
+func (project *Project) ListBuckets(ctx context.Context, options *BucketIteratorOptions) *BucketIterator {
 	opts := storj.BucketListOptions{
 		Direction: storj.After,
 	}
@@ -25,7 +25,7 @@ func (project *Project) ListBuckets(ctx context.Context, options *BucketsOptions
 		opts.Cursor = options.Cursor
 	}
 
-	buckets := Buckets{
+	buckets := BucketIterator{
 		ctx:     ctx,
 		project: project,
 		options: opts,
@@ -34,8 +34,8 @@ func (project *Project) ListBuckets(ctx context.Context, options *BucketsOptions
 	return &buckets
 }
 
-// Buckets is an iterator over a collection of buckets.
-type Buckets struct {
+// BucketIterator is an iterator over a collection of buckets.
+type BucketIterator struct {
 	ctx       context.Context
 	project   *Project
 	options   storj.BucketListOptions
@@ -47,7 +47,7 @@ type Buckets struct {
 
 // Next prepares next Bucket for reading.
 // It returns false if the end of the iteration is reached and there are no more buckets, or if there is an error.
-func (buckets *Buckets) Next() bool {
+func (buckets *BucketIterator) Next() bool {
 	if buckets.err != nil {
 		buckets.completed = true
 		return false
@@ -74,7 +74,7 @@ func (buckets *Buckets) Next() bool {
 	return true
 }
 
-func (buckets *Buckets) loadNext() bool {
+func (buckets *BucketIterator) loadNext() bool {
 	list, err := buckets.project.db.ListBuckets(buckets.ctx, buckets.options)
 	if err != nil {
 		buckets.err = err
@@ -86,21 +86,12 @@ func (buckets *Buckets) loadNext() bool {
 }
 
 // Err returns error, if one happened during iteration.
-func (buckets *Buckets) Err() error {
+func (buckets *BucketIterator) Err() error {
 	return Error.Wrap(buckets.err)
 }
 
-// Name returns the bucket name.
-func (buckets *Buckets) Name() string {
-	item := buckets.item()
-	if item == nil {
-		return ""
-	}
-	return item.Name
-}
-
 // Item returns the current bucket in the iterator.
-func (buckets *Buckets) Item() *Bucket {
+func (buckets *BucketIterator) Item() *Bucket {
 	item := buckets.item()
 	if item == nil {
 		return nil
@@ -111,7 +102,7 @@ func (buckets *Buckets) Item() *Bucket {
 	}
 }
 
-func (buckets *Buckets) item() *storj.Bucket {
+func (buckets *BucketIterator) item() *storj.Bucket {
 	if buckets.completed {
 		return nil
 	}
