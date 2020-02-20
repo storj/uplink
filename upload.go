@@ -37,6 +37,9 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.CreateObject(ctx, b, key, nil)
 	if err != nil {
+		if storj.ErrNoPath.Has(err) {
+			return nil, ErrObjectKeyInvalid.New("%v", key)
+		}
 		return nil, Error.Wrap(err)
 	}
 

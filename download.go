@@ -32,6 +32,11 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	obj, err := project.db.GetObjectExtended(ctx, b, key)
 	if err != nil {
+		if storj.ErrNoPath.Has(err) {
+			return nil, ErrObjectKeyInvalid.New("%v", key)
+		} else if storj.ErrObjectNotFound.Has(err) {
+			return nil, ErrObjectNotFound.New("%v", key)
+		}
 		return nil, Error.Wrap(err)
 	}
 

@@ -15,6 +15,9 @@ import (
 )
 
 var (
+	// ErrBucketNameInvalid is returned when the bucket name is invalid.
+	ErrBucketNameInvalid = errs.Class("bucket name invalid")
+
 	// ErrBucketAlreadyExists is returned when the bucket already exists during creation.
 	ErrBucketAlreadyExists = errs.Class("bucket already exists")
 
@@ -37,8 +40,10 @@ func (project *Project) StatBucket(ctx context.Context, name string) (_ *Bucket,
 
 	b, err := project.project.GetBucket(ctx, name)
 	if err != nil {
-		if storj.ErrBucketNotFound.Has(err) {
-			return nil, ErrBucketNotFound.New(name)
+		if storj.ErrNoBucket.Has(err) {
+			return nil, ErrBucketNameInvalid.New("%v", name)
+		} else if storj.ErrBucketNotFound.Has(err) {
+			return nil, ErrBucketNotFound.New("%v", name)
 		}
 		return nil, Error.Wrap(err)
 	}
@@ -61,13 +66,16 @@ func (project *Project) CreateBucket(ctx context.Context, name string) (_ *Bucke
 		Name:    b.Name,
 		Created: b.Created,
 	}
-	if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
+
+	if storj.ErrNoBucket.Has(err) {
+		return nil, ErrBucketNameInvalid.New("%v", name)
+	} else if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
 		// TODO: Ideally, the satellite should return the existing bucket when this error occurs.
 		bucket, err = project.StatBucket(ctx, name)
 		if err != nil {
-			return bucket, errs.Combine(ErrBucketAlreadyExists.New(name), err)
+			return bucket, errs.Combine(ErrBucketAlreadyExists.New("%v", name), err)
 		}
-		return bucket, ErrBucketAlreadyExists.New(name)
+		return bucket, ErrBucketAlreadyExists.New("%v", name)
 	}
 
 	return bucket, Error.Wrap(err)
@@ -102,10 +110,10 @@ func (project *Project) DeleteBucket(ctx context.Context, name string) (deleted 
 	err = project.project.DeleteBucket(ctx, name)
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-			return nil, ErrBucketNotEmpty.New(name)
+			return nil, ErrBucketNotEmpty.New("%v", name)
 		}
 		if storj.ErrBucketNotFound.Has(err) {
-			return nil, ErrBucketNotFound.New(name)
+			return nil, ErrBucketNotFound.New("%v", name)
 		}
 		return nil, Error.Wrap(err)
 	}
