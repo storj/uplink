@@ -82,7 +82,7 @@ func TestSetMetadata(t *testing.T) {
 			require.Equal(t, expectedCustomMetadata, obj.Custom)
 		}
 		{ // test metadata from ListObjects
-			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectIteratorOptions{
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
 				Standard: true,
 				Custom:   true,
 			})
@@ -97,7 +97,7 @@ func TestSetMetadata(t *testing.T) {
 			require.Equal(t, expectedCustomMetadata, listObject.Custom)
 		}
 		{ // test metadata from ListObjects and disabled standard and custom metadata
-			objects := project.ListObjects(ctx, bucket.Name, &uplink.ObjectIteratorOptions{
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
 				Standard: false,
 				Custom:   false,
 			})

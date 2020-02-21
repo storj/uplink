@@ -134,7 +134,7 @@ func TestListBuckets_Cursor(t *testing.T) {
 		cursor := list.Item().Name
 
 		// list again with cursor set to the first item from previous list request
-		list = listBuckets(t, ctx, project, &uplink.BucketIteratorOptions{Cursor: cursor})
+		list = listBuckets(t, ctx, project, &uplink.ListBucketsOptions{Cursor: cursor})
 
 		// expect the second item as the first item in this new list request
 		more = list.Next()
@@ -149,7 +149,7 @@ func TestListBuckets_Cursor(t *testing.T) {
 	})
 }
 
-func listBuckets(t *testing.T, ctx context.Context, project *uplink.Project, options *uplink.BucketIteratorOptions) *uplink.BucketIterator {
+func listBuckets(t *testing.T, ctx context.Context, project *uplink.Project, options *uplink.ListBucketsOptions) *uplink.BucketIterator {
 	list := project.ListBuckets(ctx, options)
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())

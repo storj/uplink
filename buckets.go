@@ -9,14 +9,14 @@ import (
 	"storj.io/common/storj"
 )
 
-// BucketIteratorOptions defines iteration options.
-type BucketIteratorOptions struct {
+// ListBucketsOptions defines bucket listing options.
+type ListBucketsOptions struct {
 	// The first item listed will be cursor or the one after it.
 	Cursor string
 }
 
 // ListBuckets returns an iterator over the buckets.
-func (project *Project) ListBuckets(ctx context.Context, options *BucketIteratorOptions) *BucketIterator {
+func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOptions) *BucketIterator {
 	opts := storj.BucketListOptions{
 		Direction: storj.After,
 	}

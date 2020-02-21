@@ -10,8 +10,8 @@ import (
 	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
-// ObjectIteratorOptions defines iteration options.
-type ObjectIteratorOptions struct {
+// ListObjectsOptions defines object listing options.
+type ListObjectsOptions struct {
 	// Prefix allows to filter objects by a key prefix. Should always end with slash.
 	Prefix string
 	// The first item listed will be cursor or the one after it.
@@ -28,7 +28,7 @@ type ObjectIteratorOptions struct {
 }
 
 // ListObjects returns an iterator over the objects.
-func (project *Project) ListObjects(ctx context.Context, bucket string, options *ObjectIteratorOptions) *ObjectIterator {
+func (project *Project) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) *ObjectIterator {
 	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
 	opts := storj.ListOptions{
 		Direction: storj.After,
@@ -60,7 +60,7 @@ type ObjectIterator struct {
 	project    *Project
 	bucket     storj.Bucket
 	options    storj.ListOptions
-	objOptions ObjectIteratorOptions
+	objOptions ListObjectsOptions
 	list       *kvmetainfo.ObjectListExtended
 	position   int
 	completed  bool
