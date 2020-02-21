@@ -72,17 +72,6 @@ func (client *Client) Delete(ctx context.Context, limit *pb.OrderLimit, privateK
 	return Error.Wrap(err)
 }
 
-// DeletePiece deletes a piece.
-//
-// DEPRECATED in favor of DeletePieces.
-func (client *Client) DeletePiece(ctx context.Context, id storj.PieceID) (err error) {
-	defer mon.Task()(&ctx, id.String())(&err)
-	_, err = client.client.DeletePiece(ctx, &pb.PieceDeletePieceRequest{
-		PieceId: id,
-	})
-	return Error.Wrap(err)
-}
-
 // DeletePieces deletes a set of pieces.
 func (client *Client) DeletePieces(ctx context.Context, ids ...storj.PieceID) (err error) {
 	defer mon.Task()(&ctx)(&err)
