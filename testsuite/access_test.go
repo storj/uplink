@@ -173,9 +173,8 @@ func TestAccessSerialization(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
 		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		uplinkConfig := uplink.Config{}
 
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.NoError(t, err)
 
 		// try to serialize and deserialize access and use it for upload/download
@@ -185,7 +184,7 @@ func TestAccessSerialization(t *testing.T) {
 		access, err = uplink.ParseAccess(serializedAccess)
 		require.NoError(t, err)
 
-		project, err := uplinkConfig.OpenProject(ctx, access)
+		project, err := uplink.OpenProject(ctx, access)
 		require.NoError(t, err)
 
 		defer ctx.Check(project.Close)
@@ -215,5 +214,49 @@ func TestAccessSerialization(t *testing.T) {
 		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")
+	})
+}
+
+func TestUploadNotAllowedPath(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].CreateBucket(ctx, satellite, "testbucket")
+		require.NoError(t, err)
+
+		sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
+			Bucket: "testbucket",
+			Prefix: "videos",
+		})
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, sharedAccess)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		testData := bytes.NewBuffer(testrand.Bytes(1 * memory.KiB))
+
+		upload, err := project.UploadObject(ctx, "testbucket", "first-level-object", nil)
+		require.NoError(t, err)
+
+		_, err = io.Copy(upload, testData)
+		require.Error(t, err)
+
+		err = upload.Abort()
+		require.NoError(t, err)
+
+		upload, err = project.UploadObject(ctx, "testbucket", "videos/second-level-object", nil)
+		require.NoError(t, err)
+
+		_, err = io.Copy(upload, testData)
+		require.NoError(t, err)
+
+		err = upload.Commit()
+		require.NoError(t, err)
 	})
 }

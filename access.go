@@ -165,11 +165,16 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		DisallowDeletes: !permission.AllowDelete,
 	}
 
+	sharedAccess := newEncryptionAccess()
+	sharedAccess.setDefaultPathCipher(access.encAccess.Store().GetDefaultPathCipher())
+	if len(prefixes) == 0 {
+		sharedAccess.setDefaultKey(access.encAccess.Store().GetDefaultKey())
+	}
+
 	for _, prefix := range prefixes {
 		unencPath := paths.NewUnencrypted(prefix.Prefix)
-		cipher := storj.EncAESGCM // TODO(jeff): pick the right path cipher
 
-		encPath, err := encryption.EncryptPath(prefix.Bucket, unencPath, cipher, access.encAccess.store)
+		encPath, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket, unencPath, access.encAccess.store)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +183,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 			return nil, err
 		}
 
-		if err := access.encAccess.store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
+		if err := sharedAccess.store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
 			return nil, err
 		}
 		caveat.AllowedPaths = append(caveat.AllowedPaths, &macaroon.Caveat_Path{
@@ -195,7 +200,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	restrictedAccess := &Access{
 		satelliteAddress: access.satelliteAddress,
 		apiKey:           restrictedAPIKey,
-		encAccess:        access.encAccess,
+		encAccess:        sharedAccess,
 	}
 	return restrictedAccess, nil
 }
