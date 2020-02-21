@@ -41,7 +41,7 @@ func TestSetMetadata(t *testing.T) {
 
 		expectedStdMetadata := &uplink.StandardMetadata{
 			ContentLength: testrand.Int63n(200000),
-			ContentType:   "aplication/json",
+			ContentType:   "application/json",
 
 			FileCreated:     time.Now(),
 			FileModified:    time.Now().Add(1 * time.Hour),
