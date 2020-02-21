@@ -14,7 +14,7 @@ import (
 type ListObjectsOptions struct {
 	// Prefix allows to filter objects by a key prefix. Should always end with slash.
 	Prefix string
-	// The first item listed will be cursor or the one after it.
+	// The first item listed will be the one after the cursor.
 	Cursor string
 	// Recursive iterates objects as a single namespace.
 	Recursive bool

@@ -23,7 +23,6 @@ type Logger interface {
 
 // Config defines configuration for using uplink library.
 type Config struct {
-	// Log       Logger
 	UserAgent string
 
 	// DialTimeout defines how long client should wait for establishing

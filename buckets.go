@@ -11,7 +11,7 @@ import (
 
 // ListBucketsOptions defines bucket listing options.
 type ListBucketsOptions struct {
-	// The first item listed will be cursor or the one after it.
+	// The first item listed will be the one after the cursor.
 	Cursor string
 }
 
