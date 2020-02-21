@@ -32,7 +32,7 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		customAccess, err := backcomp.RequestAccessWithPassphraseAndConcurrency(ctx, uplinkConfig, satellite.URL().String(), apiKey.Serialize(), "mypassphrase", 4)
 		require.NoError(t, err)
 
-		project, err := uplinkConfig.Open(ctx, customAccess)
+		project, err := uplinkConfig.OpenProject(ctx, customAccess)
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
@@ -57,7 +57,7 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		standardAccess, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.NoError(t, err)
 
-		differentProject, err := uplinkConfig.Open(ctx, standardAccess)
+		differentProject, err := uplinkConfig.OpenProject(ctx, standardAccess)
 		require.NoError(t, err)
 		defer ctx.Check(differentProject.Close)
 

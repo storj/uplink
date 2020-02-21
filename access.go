@@ -18,8 +18,7 @@ import (
 	"storj.io/uplink/internal/expose"
 )
 
-// Access contains everything to access a project
-// and specific buckets.
+// Access contains everything to access a project and specific buckets.
 type Access struct {
 	satelliteAddress string
 	apiKey           *macaroon.APIKey
@@ -29,8 +28,9 @@ type Access struct {
 
 // SharePrefix defines a prefix that will be shared.
 type SharePrefix struct {
-	Bucket    string
-	KeyPrefix string
+	Bucket string
+	// Prefix is the prefix of the shared object keys.
+	Prefix string
 }
 
 // Permission defines what actions can be used to share.
@@ -152,7 +152,7 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 	}, nil
 }
 
-// Share creates new Access with spefic permision. Permission will be applied to namespaces is defined.
+// Share creates new Access with specific permission. Permission will be applied to prefixes when defined.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
 	if permission == (Permission{}) {
 		return nil, Error.New("permission is empty")
@@ -166,7 +166,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	for _, prefix := range prefixes {
-		unencPath := paths.NewUnencrypted(prefix.KeyPrefix)
+		unencPath := paths.NewUnencrypted(prefix.Prefix)
 		cipher := storj.EncAESGCM // TODO(jeff): pick the right path cipher
 
 		encPath, err := encryption.EncryptPath(prefix.Bucket, unencPath, cipher, access.encAccess.store)

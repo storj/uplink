@@ -15,12 +15,6 @@ import (
 	"storj.io/uplink/metainfo"
 )
 
-// Logger defines the minimal logger that uplink can use.
-// TODO: how complicated should be this logger?
-type Logger interface {
-	Println(...interface{})
-}
-
 // Config defines configuration for using uplink library.
 type Config struct {
 	UserAgent string

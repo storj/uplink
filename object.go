@@ -13,13 +13,11 @@ import (
 	"storj.io/uplink/metainfo/kvmetainfo"
 )
 
-var (
-	// ErrObjectKeyInvalid is returned when the object key is invalid.
-	ErrObjectKeyInvalid = errs.Class("object key invalid")
+// ErrObjectKeyInvalid is returned when the object key is invalid.
+var ErrObjectKeyInvalid = errs.Class("object key invalid")
 
-	// ErrObjectNotFound is returned when the object is not found.
-	ErrObjectNotFound = errs.Class("object not found")
-)
+// ErrObjectNotFound is returned when the object is not found.
+var ErrObjectNotFound = errs.Class("object not found")
 
 // Object contains information about an object.
 type Object struct {
@@ -73,7 +71,7 @@ func (meta CustomMetadata) Clone() CustomMetadata {
 }
 
 // StatObject returns information about an object at the specific key.
-func (project *Project) StatObject(ctx context.Context, bucket, key string) (_ *Object, err error) {
+func (project *Project) StatObject(ctx context.Context, bucket, key string) (info *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: bucket}

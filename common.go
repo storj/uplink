@@ -8,9 +8,7 @@ import (
 	"github.com/zeebo/errs"
 )
 
-var (
-	mon = monkit.Package()
+var mon = monkit.Package()
 
-	// Error is default error class for uplink.
-	Error = errs.Class("uplink")
-)
+// Error is default error class for uplink.
+var Error = errs.Class("uplink")

@@ -19,7 +19,7 @@ import (
 	"storj.io/uplink/storage/streams"
 )
 
-// Project provides access to managing buckets.
+// Project provides access to managing buckets and objects.
 type Project struct {
 	config   Config
 	access   *Access
@@ -30,13 +30,13 @@ type Project struct {
 	streams  streams.Store
 }
 
-// Open opens a project with the specified access.
-func Open(ctx context.Context, access *Access) (*Project, error) {
-	return (Config{}).Open(ctx, access)
+// OpenProject opens a project with the specific access.
+func OpenProject(ctx context.Context, access *Access) (*Project, error) {
+	return (Config{}).OpenProject(ctx, access)
 }
 
-// Open opens a project with the specified access.
-func (config Config) Open(ctx context.Context, access *Access) (_ *Project, err error) {
+// OpenProject opens a project with the specific access.
+func (config Config) OpenProject(ctx context.Context, access *Access) (project *Project, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if access == nil {
@@ -48,7 +48,7 @@ func (config Config) Open(ctx context.Context, access *Access) (_ *Project, err 
 		return nil, Error.Wrap(err)
 	}
 
-	project, err := kvmetainfo.SetupProject(metainfo)
+	proj, err := kvmetainfo.SetupProject(metainfo)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
@@ -85,14 +85,14 @@ func (config Config) Open(ctx context.Context, access *Access) (_ *Project, err 
 		return nil, Error.Wrap(err)
 	}
 
-	db := kvmetainfo.New(project, metainfo, streamStore, segmentStore, access.encAccess.Store())
+	db := kvmetainfo.New(proj, metainfo, streamStore, segmentStore, access.encAccess.Store())
 
 	return &Project{
 		config:   config,
 		access:   access,
 		dialer:   dialer,
 		metainfo: metainfo,
-		project:  project,
+		project:  proj,
 		db:       db,
 		streams:  streamStore,
 	}, nil

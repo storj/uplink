@@ -26,12 +26,12 @@ type UploadOptions struct {
 	Expires time.Time
 }
 
-// UploadObject starts an upload to the specified key.
-func (project *Project) UploadObject(ctx context.Context, bucket, key string, opts *UploadOptions) (_ *Upload, err error) {
+// UploadObject starts an upload to the specific key.
+func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (upload *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if opts == nil {
-		opts = &UploadOptions{}
+	if options == nil {
+		options = &UploadOptions{}
 	}
 
 	b := storj.Bucket{Name: bucket}
@@ -51,19 +51,19 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	upload := &Upload{
+	upload = &Upload{
 		cancel: cancel,
 		object: convertObject(&info),
 	}
 	upload.upload = stream.NewUpload(ctx, dynamicMetadata{
 		MutableStream: mutableStream,
 		object:        upload.object,
-		expires:       opts.Expires,
+		expires:       options.Expires,
 	}, project.streams)
 	return upload, nil
 }
 
-// Upload is a partial upload to Storj Network.
+// Upload is an upload to Storj Network.
 type Upload struct {
 	aborted int32
 	cancel  context.CancelFunc
@@ -103,7 +103,7 @@ func (upload *Upload) Commit() error {
 	return nil
 }
 
-// Abort aborts partial upload.
+// Abort aborts the upload.
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Abort() error {

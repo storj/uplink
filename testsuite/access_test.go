@@ -110,7 +110,7 @@ func TestSharePermisions(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				project, err := uplinkConfig.Open(ctx, sharedAccess)
+				project, err := uplinkConfig.OpenProject(ctx, sharedAccess)
 				require.NoError(t, err)
 
 				defer ctx.Check(project.Close)
@@ -185,7 +185,7 @@ func TestAccessSerialization(t *testing.T) {
 		access, err = uplink.ParseAccess(serializedAccess)
 		require.NoError(t, err)
 
-		project, err := uplinkConfig.Open(ctx, access)
+		project, err := uplinkConfig.OpenProject(ctx, access)
 		require.NoError(t, err)
 
 		defer ctx.Check(project.Close)

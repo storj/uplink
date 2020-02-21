@@ -42,7 +42,7 @@ func openProject(t *testing.T, ctx *testcontext.Context, planet *testplanet.Plan
 	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 	require.NoError(t, err)
 
-	project, err := uplinkConfig.Open(ctx, access)
+	project, err := uplinkConfig.OpenProject(ctx, access)
 	require.NoError(t, err)
 
 	return project

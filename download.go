@@ -17,12 +17,12 @@ type DownloadOptions struct {
 	Length int64
 }
 
-// DownloadObject starts a download to the specified key.
-func (project *Project) DownloadObject(ctx context.Context, bucket, key string, opts *DownloadOptions) (_ *Download, err error) {
+// DownloadObject starts a download from the specific key.
+func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (download *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if opts == nil {
-		opts = &DownloadOptions{
+	if options == nil {
+		options = &DownloadOptions{
 			Offset: 0,
 			Length: -1,
 		}
@@ -46,12 +46,12 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	}
 
 	return &Download{
-		download: stream.NewDownloadRange(ctx, objectStream, project.streams, opts.Offset, opts.Length),
+		download: stream.NewDownloadRange(ctx, objectStream, project.streams, options.Offset, options.Length),
 		object:   convertObjectExtended(&obj),
 	}, nil
 }
 
-// Download is a partial download to Storj Network.
+// Download is a download from Storj Network.
 type Download struct {
 	download *stream.Download
 	object   *Object
