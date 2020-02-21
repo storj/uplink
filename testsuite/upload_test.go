@@ -70,6 +70,11 @@ func TestSetMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assertObject(t, upload.Info(), key)
 
+		defer func() {
+			_, err := project.DeleteObject(ctx, "test-bucket", key)
+			require.NoError(t, err)
+		}()
+
 		// time is unserialized to UTC
 		expectedStdMetadata.FileCreated = expectedStdMetadata.FileCreated.UTC()
 		expectedStdMetadata.FileModified = expectedStdMetadata.FileModified.UTC()
@@ -143,6 +148,11 @@ func TestSetMetadataAfterCommit(t *testing.T) {
 		err = upload.Commit()
 		require.NoError(t, err)
 		assertObject(t, upload.Info(), key)
+
+		defer func() {
+			_, err := project.DeleteObject(ctx, "test-bucket", key)
+			require.NoError(t, err)
+		}()
 
 		err = upload.SetMetadata(ctx, &uplink.StandardMetadata{}, uplink.CustomMetadata{})
 		require.Error(t, err)
