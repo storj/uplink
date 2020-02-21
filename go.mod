@@ -16,6 +16,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20190108171102-2455b059135b
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.10.0
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	storj.io/common v0.0.0-20200214070817-cfd197b055d7
 )
