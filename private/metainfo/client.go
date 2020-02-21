@@ -18,7 +18,7 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
-	"storj.io/uplink/eestream"
+	"storj.io/uplink/private/eestream"
 )
 
 var (

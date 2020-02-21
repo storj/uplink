@@ -9,9 +9,9 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/memory"
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo"
-	"storj.io/uplink/storage/segments"
-	"storj.io/uplink/storage/streams"
+	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/storage/segments"
+	"storj.io/uplink/private/storage/streams"
 )
 
 var (

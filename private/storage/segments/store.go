@@ -16,9 +16,9 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
-	"storj.io/uplink/ecclient"
-	"storj.io/uplink/eestream"
-	"storj.io/uplink/metainfo"
+	"storj.io/uplink/private/ecclient"
+	"storj.io/uplink/private/eestream"
+	"storj.io/uplink/private/metainfo"
 )
 
 var (

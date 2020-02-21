@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo/kvmetainfo"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
 )
 
 // ListObjectsOptions defines object listing options.

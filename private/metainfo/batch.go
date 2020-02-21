@@ -7,7 +7,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
-	"storj.io/uplink/eestream"
+	"storj.io/uplink/private/eestream"
 )
 
 var (

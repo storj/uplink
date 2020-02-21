@@ -19,9 +19,9 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
-	"storj.io/uplink/eestream"
-	"storj.io/uplink/metainfo"
-	"storj.io/uplink/storage/segments"
+	"storj.io/uplink/private/eestream"
+	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/storage/segments"
 )
 
 var mon = monkit.Package()

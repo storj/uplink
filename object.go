@@ -10,7 +10,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo/kvmetainfo"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
 )
 
 // ErrObjectKeyInvalid is returned when the object key is invalid.

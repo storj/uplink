@@ -10,7 +10,7 @@ import (
 
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
-	"storj.io/uplink/storage/objects"
+	"storj.io/uplink/private/storage/objects"
 )
 
 type prefixedObjStore struct {

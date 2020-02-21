@@ -16,10 +16,10 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo"
-	"storj.io/uplink/storage/objects"
-	"storj.io/uplink/storage/segments"
-	"storj.io/uplink/storage/streams"
+	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/storage/objects"
+	"storj.io/uplink/private/storage/segments"
+	"storj.io/uplink/private/storage/streams"
 )
 
 // DefaultRS default values for RedundancyScheme

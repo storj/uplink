@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/stream"
+	"storj.io/uplink/private/stream"
 )
 
 // DownloadOptions contains additional options for downloading.

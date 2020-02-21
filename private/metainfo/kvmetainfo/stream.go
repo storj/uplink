@@ -14,7 +14,7 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo"
+	"storj.io/uplink/private/metainfo"
 )
 
 var _ ReadOnlyStream = (*readonlyStream)(nil)

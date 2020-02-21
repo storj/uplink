@@ -8,8 +8,8 @@ import (
 	"io"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo/kvmetainfo"
-	"storj.io/uplink/storage/streams"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/storage/streams"
 )
 
 // Download implements Reader, Seeker and Closer for reading from stream.

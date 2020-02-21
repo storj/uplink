@@ -13,8 +13,8 @@ import (
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo/kvmetainfo"
-	"storj.io/uplink/stream"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/stream"
 )
 
 // ErrUploadDone is returned when either Abort or Commit has already been called.

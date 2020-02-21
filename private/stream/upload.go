@@ -13,8 +13,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo/kvmetainfo"
-	"storj.io/uplink/storage/streams"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/storage/streams"
 )
 
 // Upload implements Writer and Closer for writing to stream.

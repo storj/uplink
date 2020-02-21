@@ -12,7 +12,7 @@ import (
 	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/uplink/metainfo"
+	"storj.io/uplink/private/metainfo"
 )
 
 // Config defines configuration for using uplink library.
