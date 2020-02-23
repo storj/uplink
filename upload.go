@@ -100,7 +100,7 @@ func (upload *Upload) Commit() error {
 		return ErrUploadDone.New("already committed")
 	}
 
-	return nil
+	return err
 }
 
 // Abort aborts the upload.

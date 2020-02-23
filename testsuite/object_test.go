@@ -138,6 +138,34 @@ func TestAbortUpload(t *testing.T) {
 	})
 }
 
+func TestUploadError(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		upload, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		randData := testrand.Bytes(1 * memory.KiB)
+		source := bytes.NewBuffer(randData)
+		_, err = io.Copy(upload, source)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		planet.StopPeer(planet.Satellites[0])
+
+		err = upload.Commit()
+		require.Error(t, err)
+	})
+}
+
 func assertObject(t *testing.T, obj *uplink.Object, expectedKey string) {
 	assert.Equal(t, expectedKey, obj.Key)
 	assert.WithinDuration(t, time.Now(), obj.Info.Created, 10*time.Second)
