@@ -38,6 +38,8 @@ var DefaultES = storj.EncryptionParameters{
 	BlockSize:   DefaultRS.StripeSize(),
 }
 
+var contentTypeKey = "content-type"
+
 // GetObject returns information about an object
 func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -496,8 +498,12 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 			return storj.Object{}, err
 		}
 
+		_, found := serializableMeta.UserDefined[contentTypeKey]
+		if !found && serializableMeta.ContentType != "" {
+			serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
+		}
+
 		object.Metadata = serializableMeta.UserDefined
-		object.ContentType = serializableMeta.ContentType
 		object.Stream.Size = ((numberOfSegments(stream, streamMeta) - 1) * stream.SegmentsSize) + stream.LastSegmentSize
 	}
 
@@ -524,7 +530,6 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.S
 
 		Stream: storj.Stream{
 			ID: streamID,
-			// Checksum: []byte(object.Checksum),
 
 			RedundancyScheme: redundancyScheme,
 			EncryptionParameters: storj.EncryptionParameters{
@@ -550,8 +555,12 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.S
 			numberOfSegments = stream.DeprecatedNumberOfSegments
 		}
 
+		_, found := serMetaInfo.UserDefined[contentTypeKey]
+		if !found && serMetaInfo.ContentType != "" {
+			serMetaInfo.UserDefined[contentTypeKey] = serMetaInfo.ContentType
+		}
+
 		rv.Metadata = serMetaInfo.UserDefined
-		rv.ContentType = serMetaInfo.ContentType
 		rv.Stream.Size = stream.SegmentsSize*(numberOfSegments-1) + stream.LastSegmentSize
 		rv.Stream.SegmentCount = numberOfSegments
 		rv.Stream.FixedSegmentSize = stream.SegmentsSize
