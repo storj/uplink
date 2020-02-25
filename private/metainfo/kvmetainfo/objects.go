@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -48,15 +47,6 @@ func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Pat
 	return info, err
 }
 
-// GetObjectExtended returns information about an object with additional fields.
-func (db *DB) GetObjectExtended(ctx context.Context, bucket storj.Bucket, path storj.Path) (info ObjectExtended, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	_, info, err = db.getInfoExtended(ctx, bucket, path)
-
-	return info, err
-}
-
 // GetObjectStream returns interface for reading the object stream
 func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream ReadOnlyStream, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -72,24 +62,6 @@ func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object s
 	return &readonlyStream{
 		db:   db,
 		info: object,
-	}, nil
-}
-
-// GetObjectExtendedStream returns interface for reading the object stream
-func (db *DB) GetObjectExtendedStream(ctx context.Context, bucket storj.Bucket, object ObjectExtended) (stream ReadOnlyStream, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if bucket.Name == "" {
-		return nil, storj.ErrNoBucket.New("")
-	}
-
-	if object.Path == "" {
-		return nil, storj.ErrNoPath.New("")
-	}
-
-	return &readonlyStream{
-		db:   db,
-		info: object.asStorj(),
 	}, nil
 }
 
@@ -304,70 +276,16 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	return list, nil
 }
 
-// ObjectListExtended contains objects with additional fields.
-type ObjectListExtended struct {
-	Bucket string
-	Prefix storj.Path
-	More   bool
-
-	// Items paths are relative to Prefix
-	// To get the full path use list.Prefix + list.Items[0].Path
-	Items []ObjectExtended
-}
-
-// ObjectExtended contains information about a specific object with new metadata.
-type ObjectExtended struct {
-	Version  uint32
-	Bucket   storj.Bucket
-	Path     storj.Path
-	IsPrefix bool
-
-	Info struct {
-		Created time.Time
-		Expires time.Time
-	}
-
-	Standard struct {
-		ContentLength int64
-		ContentType   string
-
-		FileCreated     time.Time
-		FileModified    time.Time
-		FilePermissions uint32
-
-		Unknown []byte
-	}
-
-	Custom map[string]string
-
-	storj.Stream
-}
-
-// asStorj converts kvmetainfo.ObjectExtended to storj.Object.
-func (obj ObjectExtended) asStorj() storj.Object {
-	return storj.Object{
-		Version:  obj.Version,
-		Bucket:   obj.Bucket,
-		Path:     obj.Path,
-		IsPrefix: obj.IsPrefix,
-
-		Created:  obj.Info.Created,
-		Expires:  obj.Info.Expires,
-		Metadata: obj.Custom,
-		Stream:   obj.Stream,
-	}
-}
-
 // ListObjectsExtended lists objects in bucket based on the ListOptions
-func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, options storj.ListOptions) (list ObjectListExtended, err error) {
+func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, options storj.ListOptions) (list storj.ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
-		return ObjectListExtended{}, storj.ErrNoBucket.New("")
+		return storj.ObjectList{}, storj.ErrNoBucket.New("")
 	}
 
 	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") {
-		return ObjectListExtended{}, Error.New("prefix should end with slash")
+		return storj.ObjectList{}, Error.New("prefix should end with slash")
 	}
 
 	var startAfter string
@@ -380,7 +298,7 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 		// after lists forwards from cursor, without cursor
 		startAfter = options.Cursor
 	default:
-		return ObjectListExtended{}, errClass.New("invalid direction %d", options.Direction)
+		return storj.ObjectList{}, errClass.New("invalid direction %d", options.Direction)
 	}
 
 	// TODO: we should let libuplink users be able to determine what metadata fields they request as well
@@ -399,12 +317,12 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, options.Prefix))
 	prefixKey, err := encryption.DerivePathKey(prefix.Bucket(), streams.PathForKey(prefix.UnencryptedPath().Raw()), db.encStore)
 	if err != nil {
-		return ObjectListExtended{}, errClass.Wrap(err)
+		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket(), prefix.UnencryptedPath(), db.encStore)
 	if err != nil {
-		return ObjectListExtended{}, errClass.Wrap(err)
+		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
 	// If the raw unencrypted path ends in a `/` we need to remove the final
@@ -427,7 +345,7 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 
 		startAfter, err = encryption.EncryptPathRaw(startAfter, db.pathCipher(base.PathCipher), prefixKey)
 		if err != nil {
-			return ObjectListExtended{}, errClass.Wrap(err)
+			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 	}
 
@@ -439,14 +357,14 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 		Recursive:       options.Recursive,
 	})
 	if err != nil {
-		return ObjectListExtended{}, errClass.Wrap(err)
+		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
-	list = ObjectListExtended{
+	list = storj.ObjectList{
 		Bucket: bucket.Name,
 		Prefix: options.Prefix,
 		More:   more,
-		Items:  make([]ObjectExtended, len(items)),
+		Items:  make([]storj.Object, len(items)),
 	}
 
 	for i, item := range items {
@@ -456,7 +374,7 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 		if needsEncryption {
 			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.pathCipher(base.PathCipher), prefixKey)
 			if err != nil {
-				return ObjectListExtended{}, errClass.Wrap(err)
+				return storj.ObjectList{}, errClass.Wrap(err)
 			}
 
 			// TODO(jeff): this shouldn't be necessary if we handled trailing slashes
@@ -475,12 +393,12 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 
 		stream, streamMeta, err := streams.TypedDecryptStreamInfo(ctx, item.EncryptedMetadata, path, db.encStore)
 		if err != nil {
-			return ObjectListExtended{}, errClass.Wrap(err)
+			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		object, err := objectExtendedFromMeta(bucket, itemPath, item, stream, &streamMeta)
+		object, err := objectFromMeta(bucket, itemPath, item, stream, &streamMeta)
 		if err != nil {
-			return ObjectListExtended{}, errClass.Wrap(err)
+			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
 		list.Items[i] = object
@@ -560,61 +478,6 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 	}, info, nil
 }
 
-func (db *DB) getInfoExtended(ctx context.Context, bucket storj.Bucket, path storj.Path) (obj object, info ObjectExtended, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if bucket.Name == "" {
-		return object{}, ObjectExtended{}, storj.ErrNoBucket.New("")
-	}
-
-	if path == "" {
-		return object{}, ObjectExtended{}, storj.ErrNoPath.New("")
-	}
-
-	fullpath := streams.CreatePath(bucket.Name, paths.NewUnencrypted(path))
-
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
-	if err != nil {
-		return object{}, ObjectExtended{}, err
-	}
-
-	objectInfo, err := db.metainfo.GetObject(ctx, metainfo.GetObjectParams{
-		Bucket:        []byte(bucket.Name),
-		EncryptedPath: []byte(encPath.Raw()),
-	})
-	if err != nil {
-		return object{}, ObjectExtended{}, err
-	}
-
-	redundancyScheme := objectInfo.Stream.RedundancyScheme
-
-	lastSegmentMeta := segments.Meta{
-		Modified:   objectInfo.Created,
-		Expiration: objectInfo.Expires,
-		Size:       objectInfo.Size,
-		Data:       objectInfo.Metadata,
-	}
-
-	streamInfo, streamMeta, err := streams.TypedDecryptStreamInfo(ctx, lastSegmentMeta.Data, fullpath, db.encStore)
-	if err != nil {
-		return object{}, ObjectExtended{}, err
-	}
-
-	info, err = objectExtendedStreamFromMeta(bucket, path, objectInfo.StreamID, lastSegmentMeta, streamInfo, streamMeta, redundancyScheme)
-	if err != nil {
-		return object{}, ObjectExtended{}, err
-	}
-
-	return object{
-		fullpath:        fullpath,
-		bucket:          bucket.Name,
-		encPath:         encPath,
-		lastSegmentMeta: lastSegmentMeta,
-		streamInfo:      streamInfo,
-		streamMeta:      streamMeta,
-	}, info, nil
-}
-
 func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta *pb.StreamMeta) (storj.Object, error) {
 	object := storj.Object{
 		Version:  0, // TODO:
@@ -635,43 +498,6 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 
 		object.Metadata = serializableMeta.UserDefined
 		object.ContentType = serializableMeta.ContentType
-		object.Stream.Size = ((numberOfSegments(stream, streamMeta) - 1) * stream.SegmentsSize) + stream.LastSegmentSize
-	}
-
-	return object, nil
-}
-
-func objectExtendedFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta *pb.StreamMeta) (ObjectExtended, error) {
-	object := ObjectExtended{
-		Version:  0, // TODO:
-		Bucket:   bucket,
-		Path:     path,
-		IsPrefix: listItem.IsPrefix,
-	}
-
-	object.Info.Created = listItem.CreatedAt
-	object.Info.Expires = listItem.ExpiresAt
-
-	if stream != nil {
-		serializableMeta := pb.SerializableMeta{}
-		err := proto.Unmarshal(stream.Metadata, &serializableMeta)
-		if err != nil {
-			return ObjectExtended{}, err
-		}
-
-		object.Standard.ContentLength = serializableMeta.ContentLength
-		object.Standard.ContentType = serializableMeta.ContentType
-
-		if serializableMeta.FileCreated != nil {
-			object.Standard.FileCreated = *serializableMeta.FileCreated
-		}
-		if serializableMeta.FileModified != nil {
-			object.Standard.FileModified = *serializableMeta.FileModified
-		}
-		object.Standard.FilePermissions = serializableMeta.FilePermissions
-		object.Standard.Unknown = serializableMeta.XXX_unrecognized
-
-		object.Custom = serializableMeta.UserDefined
 		object.Stream.Size = ((numberOfSegments(stream, streamMeta) - 1) * stream.SegmentsSize) + stream.LastSegmentSize
 	}
 
@@ -730,78 +556,6 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.S
 		rv.Stream.SegmentCount = numberOfSegments
 		rv.Stream.FixedSegmentSize = stream.SegmentsSize
 		rv.Stream.LastSegment.Size = stream.LastSegmentSize
-	}
-
-	return rv, nil
-}
-
-func objectExtendedStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.StreamID, lastSegment segments.Meta, stream *pb.StreamInfo, streamMeta pb.StreamMeta, redundancyScheme storj.RedundancyScheme) (ObjectExtended, error) {
-	var nonce storj.Nonce
-	var encryptedKey storj.EncryptedPrivateKey
-	if streamMeta.LastSegmentMeta != nil {
-		copy(nonce[:], streamMeta.LastSegmentMeta.KeyNonce)
-		encryptedKey = streamMeta.LastSegmentMeta.EncryptedKey
-	}
-
-	rv := ObjectExtended{
-		Version:  0, // TODO:
-		Bucket:   bucket,
-		Path:     path,
-		IsPrefix: false,
-
-		Stream: storj.Stream{
-			ID: streamID,
-			// Checksum: []byte(object.Checksum),
-
-			RedundancyScheme: redundancyScheme,
-			EncryptionParameters: storj.EncryptionParameters{
-				CipherSuite: storj.CipherSuite(streamMeta.EncryptionType),
-				BlockSize:   streamMeta.EncryptionBlockSize,
-			},
-			LastSegment: storj.LastSegment{
-				EncryptedKeyNonce: nonce,
-				EncryptedKey:      encryptedKey,
-			},
-		},
-	}
-
-	rv.Info.Created = lastSegment.Modified
-	rv.Info.Expires = lastSegment.Expiration
-
-	if stream != nil {
-		serMetaInfo := pb.SerializableMeta{}
-		err := proto.Unmarshal(stream.Metadata, &serMetaInfo)
-		if err != nil {
-			return ObjectExtended{}, err
-		}
-
-		numberOfSegments := streamMeta.NumberOfSegments
-		if streamMeta.NumberOfSegments == 0 {
-			numberOfSegments = stream.DeprecatedNumberOfSegments
-		}
-
-		rv.Custom = serMetaInfo.UserDefined
-
-		rv.Standard.ContentLength = serMetaInfo.ContentLength
-		rv.Standard.ContentType = serMetaInfo.ContentType
-
-		if serMetaInfo.FileCreated != nil {
-			rv.Standard.FileCreated = *serMetaInfo.FileCreated
-		}
-		if serMetaInfo.FileModified != nil {
-			rv.Standard.FileModified = *serMetaInfo.FileModified
-		}
-		rv.Standard.FilePermissions = serMetaInfo.FilePermissions
-		rv.Standard.Unknown = serMetaInfo.XXX_unrecognized
-
-		rv.Stream.Size = stream.SegmentsSize*(numberOfSegments-1) + stream.LastSegmentSize
-		rv.Stream.SegmentCount = numberOfSegments
-		rv.Stream.FixedSegmentSize = stream.SegmentsSize
-		rv.Stream.LastSegment.Size = stream.LastSegmentSize
-
-		if serMetaInfo.ContentLength == 0 && rv.Stream.Size != 0 {
-			rv.Standard.ContentLength = rv.Stream.Size
-		}
 	}
 
 	return rv, nil

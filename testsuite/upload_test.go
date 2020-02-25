@@ -8,7 +8,6 @@ import (
 	"io"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -39,25 +38,13 @@ func TestSetMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), key)
 
-		expectedStdMetadata := &uplink.StandardMetadata{
-			ContentLength: testrand.Int63n(200000),
-			ContentType:   "application/json",
-
-			FileCreated:     time.Now(),
-			FileModified:    time.Now().Add(1 * time.Hour),
-			FilePermissions: 666,
-
-			// https://protogen.marcgravell.com/decode 78-96-01
-			Unknown: []byte{120, 150, 01},
-		}
-
 		expectedCustomMetadata := uplink.CustomMetadata{}
 		for i := 0; i < 10; i++ {
 			// TODO figure out why its failing with
 			// expectedCustomMetadata[string(testrand.BytesInt(10))] = string(testrand.BytesInt(100))
 			expectedCustomMetadata["key"+strconv.Itoa(i)] = "value" + strconv.Itoa(i)
 		}
-		err = upload.SetMetadata(ctx, expectedStdMetadata, expectedCustomMetadata)
+		err = upload.SetCustomMetadata(ctx, expectedCustomMetadata)
 		require.NoError(t, err)
 
 		randData := testrand.Bytes(1 * memory.KiB)
@@ -75,21 +62,17 @@ func TestSetMetadata(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		// time is unserialized to UTC
-		expectedStdMetadata.FileCreated = expectedStdMetadata.FileCreated.UTC()
-		expectedStdMetadata.FileModified = expectedStdMetadata.FileModified.UTC()
-
 		{ // test metadata from Stat
 			obj, err := project.StatObject(ctx, bucket.Name, key)
 			require.NoError(t, err)
 
-			require.Equal(t, *expectedStdMetadata, obj.Standard)
+			require.Equal(t, memory.KiB.Int64(), obj.System.ContentLength)
 			require.Equal(t, expectedCustomMetadata, obj.Custom)
 		}
 		{ // test metadata from ListObjects
 			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
-				Standard: true,
-				Custom:   true,
+				System: true,
+				Custom: true,
 			})
 			require.NoError(t, objects.Err())
 
@@ -98,13 +81,13 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
-			require.Equal(t, *expectedStdMetadata, listObject.Standard)
+			require.Equal(t, memory.KiB.Int64(), listObject.System.ContentLength)
 			require.Equal(t, expectedCustomMetadata, listObject.Custom)
 		}
 		{ // test metadata from ListObjects and disabled standard and custom metadata
 			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
-				Standard: false,
-				Custom:   false,
+				System: false,
+				Custom: false,
 			})
 			require.NoError(t, objects.Err())
 
@@ -113,7 +96,7 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
-			require.Equal(t, uplink.StandardMetadata{}, listObject.Standard)
+			require.Equal(t, int64(0), listObject.System.ContentLength)
 			require.Equal(t, uplink.CustomMetadata(nil), listObject.Custom)
 		}
 	})
@@ -154,7 +137,7 @@ func TestSetMetadataAfterCommit(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		err = upload.SetMetadata(ctx, &uplink.StandardMetadata{}, uplink.CustomMetadata{})
+		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{})
 		require.Error(t, err)
 		require.True(t, uplink.ErrUploadDone.Has(err))
 	})
@@ -192,7 +175,7 @@ func TestSetMetadataAfterAbort(t *testing.T) {
 		err = upload.Commit()
 		require.Error(t, err)
 
-		err = upload.SetMetadata(ctx, &uplink.StandardMetadata{}, uplink.CustomMetadata{})
+		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{})
 		require.Error(t, err)
 		require.True(t, uplink.ErrUploadDone.Has(err))
 	})

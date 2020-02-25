@@ -17,5 +17,5 @@ require (
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.10.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	storj.io/common v0.0.0-20200221161141-79b008e3eff0
+	storj.io/common v0.0.0-20200225073704-29368fd1e212
 )

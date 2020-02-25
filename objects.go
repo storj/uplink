@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo/kvmetainfo"
 )
 
 // ListObjectsOptions defines object listing options.
@@ -19,10 +18,8 @@ type ListObjectsOptions struct {
 	// Recursive iterates the objects without collapsing prefixes.
 	Recursive bool
 
-	// Info includes ObjectInfo in the results.
-	Info bool
-	// Standard includes StandardMetadata in the results.
-	Standard bool
+	// System includes SystemMetadata in the results.
+	System bool
 	// Custom includes CustomMetadata in the results.
 	Custom bool
 }
@@ -61,7 +58,7 @@ type ObjectIterator struct {
 	bucket     storj.Bucket
 	options    storj.ListOptions
 	objOptions ListObjectsOptions
-	list       *kvmetainfo.ObjectListExtended
+	list       *storj.ObjectList
 	position   int
 	completed  bool
 	err        error
@@ -130,40 +127,23 @@ func (objects *ObjectIterator) Item() *Object {
 	}
 
 	// TODO: Make this filtering on the satellite
-	if objects.objOptions.Info {
-		obj.Info = ObjectInfo{
-			Created: item.Info.Created,
-			Expires: item.Info.Expires,
-		}
-	}
-
-	// TODO: Make this filtering on the satellite
-	if objects.objOptions.Standard {
-		obj.Standard = StandardMetadata{
-			ContentLength: item.Standard.ContentLength,
-			ContentType:   item.Standard.ContentType,
-
-			FileCreated:     item.Standard.FileCreated,
-			FileModified:    item.Standard.FileModified,
-			FilePermissions: item.Standard.FilePermissions,
-
-			Unknown: item.Standard.Unknown,
-		}
-
-		if obj.Standard.ContentLength == 0 && item.Stream.Size != 0 {
-			obj.Standard.ContentLength = item.Stream.Size
+	if objects.objOptions.System {
+		obj.System = SystemMetadata{
+			Created:       item.Created,
+			Expires:       item.Expires,
+			ContentLength: item.Size,
 		}
 	}
 
 	// TODO: Make this filtering on the satellite
 	if objects.objOptions.Custom {
-		obj.Custom = item.Custom
+		obj.Custom = item.Metadata
 	}
 
 	return &obj
 }
 
-func (objects *ObjectIterator) item() *kvmetainfo.ObjectExtended {
+func (objects *ObjectIterator) item() *storj.Object {
 	if objects.completed {
 		return nil
 	}

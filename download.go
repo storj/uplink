@@ -30,7 +30,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	b := storj.Bucket{Name: bucket}
 
-	obj, err := project.db.GetObjectExtended(ctx, b, key)
+	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrNoPath.Has(err) {
 			return nil, ErrObjectKeyInvalid.New("%v", key)
@@ -40,14 +40,14 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, Error.Wrap(err)
 	}
 
-	objectStream, err := project.db.GetObjectExtendedStream(ctx, b, obj)
+	objectStream, err := project.db.GetObjectStream(ctx, b, obj)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
 	return &Download{
 		download: stream.NewDownloadRange(ctx, objectStream, project.streams, options.Offset, options.Length),
-		object:   convertObjectExtended(&obj),
+		object:   convertObject(&obj),
 	}, nil
 }
 

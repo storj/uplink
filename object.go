@@ -10,7 +10,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo/kvmetainfo"
 )
 
 // ErrObjectKeyInvalid is returned when the object key is invalid.
@@ -25,37 +24,15 @@ type Object struct {
 	// IsPrefix indicates whether the Key is a prefix for other objects.
 	IsPrefix bool
 
-	Info     ObjectInfo
-	Standard StandardMetadata
-	Custom   CustomMetadata
+	System SystemMetadata
+	Custom CustomMetadata
 }
 
-// ObjectInfo contains information about the object that cannot be changed directly.
-type ObjectInfo struct {
-	Created time.Time
-	Expires time.Time
-}
-
-// StandardMetadata is user metadata for standard information for web and files.
-type StandardMetadata struct {
+// SystemMetadata contains information about the object that cannot be changed directly.
+type SystemMetadata struct {
+	Created       time.Time
+	Expires       time.Time
 	ContentLength int64
-	ContentType   string
-
-	FileCreated     time.Time
-	FileModified    time.Time
-	FilePermissions uint32
-
-	// Unknown stores fields that this version of the client does not know about.
-	// The client should copy this information verbatim when updating metadata
-	// otherwise the unknown fields will be deleted.
-	Unknown []byte
-}
-
-// Clone makes a deep clone.
-func (meta StandardMetadata) Clone() StandardMetadata {
-	clone := meta
-	clone.Unknown = append([]byte{}, meta.Unknown...)
-	return clone
 }
 
 // CustomMetadata contains custom user metadata about the object.
@@ -75,7 +52,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	defer mon.Task()(&ctx)(&err)
 
 	b := storj.Bucket{Name: bucket}
-	obj, err := project.db.GetObjectExtended(ctx, b, key)
+	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrNoPath.Has(err) {
 			return nil, ErrObjectKeyInvalid.New("%v", key)
@@ -85,7 +62,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 		return nil, Error.Wrap(err)
 	}
 
-	return convertObjectExtended(&obj), nil
+	return convertObject(&obj), nil
 }
 
 // DeleteObject deletes the object at the specific key.
@@ -113,32 +90,11 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 func convertObject(obj *storj.Object) *Object {
 	return &Object{
 		Key: obj.Path,
-		Info: ObjectInfo{
-			Created: obj.Created,
-			Expires: obj.Expires,
+		System: SystemMetadata{
+			Created:       obj.Created,
+			Expires:       obj.Expires,
+			ContentLength: obj.Size,
 		},
 		Custom: obj.Metadata,
-	}
-}
-
-// convertObjectExtended converts kvmetainfo.ObjectExtended to uplink.Object.
-func convertObjectExtended(obj *kvmetainfo.ObjectExtended) *Object {
-	return &Object{
-		Key: obj.Path,
-		Info: ObjectInfo{
-			Created: obj.Info.Created,
-			Expires: obj.Info.Expires,
-		},
-		Standard: StandardMetadata{
-			ContentLength: obj.Standard.ContentLength,
-			ContentType:   obj.Standard.ContentType,
-
-			FileCreated:     obj.Standard.FileCreated,
-			FileModified:    obj.Standard.FileModified,
-			FilePermissions: obj.Standard.FilePermissions,
-
-			Unknown: obj.Standard.Unknown,
-		},
-		Custom: obj.Custom,
 	}
 }

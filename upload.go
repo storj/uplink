@@ -75,7 +75,7 @@ type Upload struct {
 func (upload *Upload) Info() *Object {
 	meta := upload.upload.Meta()
 	if meta != nil {
-		upload.object.Info.Created = meta.Modified
+		upload.object.System.Created = meta.Modified
 	}
 	return upload.object
 }
@@ -119,9 +119,9 @@ func (upload *Upload) Abort() error {
 	return nil
 }
 
-// SetMetadata updates metadata to be included with the object.
-// If standard or custom is nil, they won't be modified.
-func (upload *Upload) SetMetadata(ctx context.Context, standard *StandardMetadata, custom CustomMetadata) error {
+// SetCustomMetadata updates custom metadata to be included with the object.
+// If it is nil, it won't be modified.
+func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetadata) error {
 	if atomic.LoadInt32(&upload.aborted) == 1 {
 		return ErrUploadDone.New("upload aborted")
 	}
@@ -129,9 +129,6 @@ func (upload *Upload) SetMetadata(ctx context.Context, standard *StandardMetadat
 		return ErrUploadDone.New("already committed")
 	}
 
-	if standard != nil {
-		upload.object.Standard = standard.Clone()
-	}
 	if custom != nil {
 		upload.object.Custom = custom.Clone()
 	}
@@ -147,26 +144,11 @@ type dynamicMetadata struct {
 
 func (meta dynamicMetadata) Metadata() ([]byte, error) {
 	return proto.Marshal(&pb.SerializableMeta{
-		UserDefined: meta.object.Custom.Clone(),
-
-		ContentType:   meta.object.Standard.ContentType,
-		ContentLength: meta.object.Standard.ContentLength,
-
-		FileCreated:     timePointer(meta.object.Standard.FileCreated),
-		FileModified:    timePointer(meta.object.Standard.FileModified),
-		FilePermissions: meta.object.Standard.FilePermissions,
-
-		XXX_unrecognized: append([]byte{}, meta.object.Standard.Unknown...),
+		UserDefined:   meta.object.Custom.Clone(),
+		ContentLength: meta.object.System.ContentLength,
 	})
 }
 
 func (meta dynamicMetadata) Expires() time.Time {
 	return meta.expires
-}
-
-func timePointer(t time.Time) *time.Time {
-	if t.IsZero() {
-		return nil
-	}
-	return &t
 }

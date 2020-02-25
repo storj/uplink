@@ -168,12 +168,12 @@ func TestUploadError(t *testing.T) {
 
 func assertObject(t *testing.T, obj *uplink.Object, expectedKey string) {
 	assert.Equal(t, expectedKey, obj.Key)
-	assert.WithinDuration(t, time.Now(), obj.Info.Created, 10*time.Second)
+	assert.WithinDuration(t, time.Now(), obj.System.Created, 10*time.Second)
 }
 
 func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey string) {
 	assert.Equal(t, expectedKey, obj.Key)
-	assert.Empty(t, obj.Info.Created)
+	assert.Empty(t, obj.System.Created)
 }
 
 func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string) *uplink.Object {
