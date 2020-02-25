@@ -130,6 +130,9 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 	}
 
 	if custom != nil {
+		if err := custom.Verify(); err != nil {
+			return Error.Wrap(err)
+		}
 		upload.object.Custom = custom.Clone()
 	}
 

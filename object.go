@@ -5,7 +5,10 @@ package uplink
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/zeebo/errs"
 
@@ -36,6 +39,11 @@ type SystemMetadata struct {
 }
 
 // CustomMetadata contains custom user metadata about the object.
+//
+// The keys and values in custom metadata are expected to be valid UTF-8.
+//
+// When choosing a custom key for your application start it with a prefix "app:key",
+// as an example application named "Image Board" might use a key "image-board:title".
 type CustomMetadata map[string]string
 
 // Clone makes a deep clone.
@@ -45,6 +53,28 @@ func (meta CustomMetadata) Clone() CustomMetadata {
 		r[k] = v
 	}
 	return r
+}
+
+// Verify verifies whether CustomMetadata contains only "utf-8" data without 0 char.
+func (meta CustomMetadata) Verify() error {
+	var invalid []string
+	for k, v := range meta {
+		if !utf8.ValidString(k) || !utf8.ValidString(v) {
+			invalid = append(invalid, fmt.Sprintf("not utf-8 %q=%q", k, v))
+		}
+		if strings.IndexByte(k, 0) >= 0 || strings.IndexByte(v, 0) >= 0 {
+			invalid = append(invalid, fmt.Sprintf("contains 0 byte: %q=%q", k, v))
+		}
+		if k == "" {
+			invalid = append(invalid, "empty key")
+		}
+	}
+
+	if len(invalid) > 0 {
+		return errs.New("invalid pairs %v", invalid)
+	}
+
+	return nil
 }
 
 // StatObject returns information about an object at the specific key.

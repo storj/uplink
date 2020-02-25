@@ -44,8 +44,15 @@ func TestSetMetadata(t *testing.T) {
 			// expectedCustomMetadata[string(testrand.BytesInt(10))] = string(testrand.BytesInt(100))
 			expectedCustomMetadata["key"+strconv.Itoa(i)] = "value" + strconv.Itoa(i)
 		}
+
 		err = upload.SetCustomMetadata(ctx, expectedCustomMetadata)
 		require.NoError(t, err)
+
+		// don't allow invalid metadata
+		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{
+			"\x00": "alpha",
+		})
+		require.Error(t, err)
 
 		randData := testrand.Bytes(1 * memory.KiB)
 		source := bytes.NewBuffer(randData)
