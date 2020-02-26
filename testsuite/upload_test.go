@@ -109,6 +109,55 @@ func TestSetMetadata(t *testing.T) {
 	})
 }
 
+func TestSetNilMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		ctx.Check(project.Close)
+
+		bucket := createBucket(t, ctx, project, "test-bucket")
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "test-bucket")
+			require.NoError(t, err)
+		}()
+
+		key := "object-with-metadata"
+		upload, err := project.UploadObject(ctx, bucket.Name, key, nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), key)
+
+		// set nil to be sure we are not breaking anything internally
+		err = upload.SetCustomMetadata(ctx, nil)
+		require.NoError(t, err)
+
+		randData := testrand.Bytes(1 * memory.KiB)
+		source := bytes.NewBuffer(randData)
+		_, err = io.Copy(upload, source)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), key)
+
+		err = upload.Commit()
+		require.NoError(t, err)
+		assertObject(t, upload.Info(), key)
+
+		defer func() {
+			_, err := project.DeleteObject(ctx, "test-bucket", key)
+			require.NoError(t, err)
+		}()
+
+		{ // test metadata from Stat
+			obj, err := project.StatObject(ctx, bucket.Name, key)
+			require.NoError(t, err)
+
+			require.Equal(t, memory.KiB.Int64(), obj.System.ContentLength)
+			require.Equal(t, uplink.CustomMetadata(nil), obj.Custom)
+		}
+	})
+}
+
 func TestSetMetadataAfterCommit(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,

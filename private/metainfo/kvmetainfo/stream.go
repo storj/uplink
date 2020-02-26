@@ -130,9 +130,16 @@ func (stream *mutableStream) Info() storj.Object { return stream.info }
 func (stream *mutableStream) Expires() time.Time { return stream.info.Expires }
 
 func (stream *mutableStream) Metadata() ([]byte, error) {
-	_, found := stream.info.Metadata[contentTypeKey]
-	if !found && stream.info.ContentType != "" {
-		stream.info.Metadata[contentTypeKey] = stream.info.ContentType
+	if stream.info.ContentType != "" {
+		if stream.info.Metadata == nil {
+			stream.info.Metadata = make(map[string]string)
+			stream.info.Metadata[contentTypeKey] = stream.info.ContentType
+		} else if _, found := stream.info.Metadata[contentTypeKey]; !found {
+			stream.info.Metadata[contentTypeKey] = stream.info.ContentType
+		}
+	}
+	if stream.info.Metadata == nil {
+		return []byte{}, nil
 	}
 	return proto.Marshal(&pb.SerializableMeta{
 		UserDefined: stream.info.Metadata,
