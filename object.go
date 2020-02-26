@@ -55,7 +55,7 @@ func (meta CustomMetadata) Clone() CustomMetadata {
 	return r
 }
 
-// Verify verifies whether CustomMetadata contains only "utf-8" data without 0 char.
+// Verify verifies whether CustomMetadata contains only "utf-8".
 func (meta CustomMetadata) Verify() error {
 	var invalid []string
 	for k, v := range meta {

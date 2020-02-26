@@ -147,8 +147,7 @@ type dynamicMetadata struct {
 
 func (meta dynamicMetadata) Metadata() ([]byte, error) {
 	return proto.Marshal(&pb.SerializableMeta{
-		UserDefined:   meta.object.Custom.Clone(),
-		ContentLength: meta.object.System.ContentLength,
+		UserDefined: meta.object.Custom.Clone(),
 	})
 }
 
