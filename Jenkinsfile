@@ -37,6 +37,7 @@ pipeline {
                         sh 'storj-protobuf --protoc=$HOME/protoc/bin/protoc check-lock'
                         sh 'check-atomic-align ./...'
                         sh 'check-errs ./...'
+                        sh './scripts/check-dependencies.sh'
                         sh 'staticcheck ./...'
                         sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
                         sh 'go-licenses check ./...'
