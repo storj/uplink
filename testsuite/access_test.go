@@ -5,7 +5,9 @@ package testsuite_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,10 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
+	"storj.io/common/paths"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	privateAccess "storj.io/uplink/private/access"
 )
 
 func TestSharePermisions(t *testing.T) {
@@ -257,6 +261,103 @@ func TestUploadNotAllowedPath(t *testing.T) {
 		require.NoError(t, err)
 
 		err = upload.Commit()
+		require.NoError(t, err)
+	})
+}
+
+func TestListObjects_EncryptionBypass(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		bucketName := "testbucket"
+		err = planet.Uplinks[0].CreateBucket(ctx, satellite, bucketName)
+		require.NoError(t, err)
+
+		filePaths := []string{
+			"a", "aa", "b", "bb", "c",
+			"a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc",
+			"b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc",
+		}
+
+		for _, path := range filePaths {
+			err = planet.Uplinks[0].Upload(ctx, satellite, bucketName, path, testrand.Bytes(memory.KiB))
+			require.NoError(t, err)
+		}
+		sort.Strings(filePaths)
+
+		// Enable encryption bypass
+		err = privateAccess.EnablePathEncryptionBypass(access)
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+
+		objects := project.ListObjects(ctx, bucketName, &uplink.ListObjectsOptions{
+			Recursive: true,
+		})
+
+		// TODO verify that decoded string can be decrypted to defined filePaths,
+		// currently it's not possible because we have no access encryption access store.
+		for objects.Next() {
+			item := objects.Item()
+
+			iter := paths.NewUnencrypted(item.Key).Iterator()
+			for !iter.Done() {
+				next := iter.Next()
+
+				// verify that path segments are encoded with base64
+				_, err = base64.URLEncoding.DecodeString(next)
+				require.NoError(t, err)
+			}
+		}
+		require.NoError(t, objects.Err())
+	})
+}
+
+func TestDeleteObject_EncryptionBypass(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		bucketName := "testbucket"
+		err = planet.Uplinks[0].CreateBucket(ctx, satellite, bucketName)
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].Upload(ctx, satellite, bucketName, "test-file", testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		err = privateAccess.EnablePathEncryptionBypass(access)
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+
+		objects := project.ListObjects(ctx, bucketName, &uplink.ListObjectsOptions{
+			Recursive: true,
+		})
+
+		for objects.Next() {
+			item := objects.Item()
+
+			_, err = base64.URLEncoding.DecodeString(item.Key)
+			require.NoError(t, err)
+
+			_, err = project.DeleteObject(ctx, bucketName, item.Key)
+			require.NoError(t, err)
+		}
+		require.NoError(t, objects.Err())
+
+		// this means that object was deleted and empty bucket can be deleted
+		_, err = project.DeleteBucket(ctx, bucketName)
 		require.NoError(t, err)
 	})
 }

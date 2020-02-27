@@ -116,6 +116,9 @@ func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteA
 func init() {
 	// expose this method for backcomp package.
 	expose.RequestAccessWithPassphraseAndConcurrency = requestAccessWithPassphraseAndConcurrency
+
+	// expose this method for private/access package.
+	expose.EnablePathEncryptionBypass = enablePathEncryptionBypass
 }
 
 // requestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
@@ -150,6 +153,14 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 		apiKey:           parsedAPIKey,
 		encAccess:        encAccess,
 	}, nil
+}
+
+// enablePathEncryptionBypass enables path encryption bypass for embedded encryption access.
+//
+// NB: when modifying the signature of this func, also update private/access and internal/expose packages.
+func enablePathEncryptionBypass(access *Access) error {
+	access.encAccess.Store().EncryptionBypass = true
+	return nil
 }
 
 // Share creates new Access with specific permission. Permission will be applied to prefixes when defined.
