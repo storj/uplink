@@ -55,6 +55,12 @@ func TestObject(t *testing.T) {
 		err = upload.Commit()
 		require.True(t, uplink.ErrUploadDone.Has(err))
 
+		uploadInfo := upload.Info()
+		assertObject(t, uploadInfo, "test.dat")
+		require.True(t, uploadInfo.System.Expires.IsZero())
+		require.False(t, uploadInfo.IsPrefix)
+		require.EqualValues(t, len(randData), uploadInfo.System.ContentLength)
+
 		download, err := project.DownloadObject(ctx, "testbucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")

@@ -75,6 +75,7 @@ type Upload struct {
 func (upload *Upload) Info() *Object {
 	meta := upload.upload.Meta()
 	if meta != nil {
+		upload.object.System.ContentLength = meta.Size
 		upload.object.System.Created = meta.Modified
 	}
 	return upload.object
