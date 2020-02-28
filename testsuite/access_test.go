@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -165,6 +166,41 @@ func TestSharePermisions(t *testing.T) {
 				// TODO test listing buckets and objects
 
 			})
+		}
+	})
+}
+
+func TestSharePermisionsNotAfterNotBefore(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		{ // error when Before is earlier then After
+			permission := uplink.FullPermission()
+			permission.NotBefore = time.Now()
+			permission.NotAfter = permission.NotBefore.Add(-1 * time.Hour)
+			_, err := access.Share(permission)
+			require.Error(t, err)
+		}
+		{ // don't permit operations until one hour from now
+			permission := uplink.FullPermission()
+			permission.NotBefore = time.Now().Add(time.Hour)
+			sharedAccess, err := access.Share(permission)
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, sharedAccess)
+			require.NoError(t, err)
+
+			bucket, err := project.EnsureBucket(ctx, "test-bucket")
+			require.Error(t, err)
+			require.Nil(t, bucket)
 		}
 	})
 }

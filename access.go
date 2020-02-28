@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/gogo/protobuf/proto"
@@ -39,7 +40,10 @@ type Permission struct {
 	AllowWrite  bool
 	AllowList   bool
 	AllowDelete bool
-	// TODO: add NotBefore and NotAfter
+	// NotBefore if set should be always before NotAfter.
+	NotBefore time.Time
+	// NotAfter if set should be always after NotBefore.
+	NotAfter time.Time
 }
 
 // ParseAccess parses access string.
@@ -169,11 +173,25 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		return nil, Error.New("permission is empty")
 	}
 
+	var notBefore, notAfter *time.Time
+	if !permission.NotBefore.IsZero() {
+		notBefore = &permission.NotBefore
+	}
+	if !permission.NotAfter.IsZero() {
+		notAfter = &permission.NotAfter
+	}
+
+	if notBefore != nil && notAfter != nil && notAfter.Before(*notBefore) {
+		return nil, Error.New("invalid time range")
+	}
+
 	caveat := macaroon.Caveat{
 		DisallowReads:   !permission.AllowRead,
 		DisallowWrites:  !permission.AllowWrite,
 		DisallowLists:   !permission.AllowList,
 		DisallowDeletes: !permission.AllowDelete,
+		NotBefore:       notBefore,
+		NotAfter:        notAfter,
 	}
 
 	sharedAccess := newEncryptionAccess()
