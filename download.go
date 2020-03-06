@@ -7,6 +7,8 @@ import (
 	"context"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
 
@@ -46,14 +48,21 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	}
 
 	return &Download{
-		download: stream.NewDownloadRange(ctx, objectStream, project.streams, options.Offset, options.Length),
-		object:   convertObject(&obj),
+		ctx:     ctx,
+		stream:  objectStream,
+		streams: project.streams,
+		options: options,
+		object:  convertObject(&obj),
 	}, nil
 }
 
 // Download is a download from Storj Network.
 type Download struct {
 	download *stream.Download
+	ctx      context.Context
+	stream   kvmetainfo.ReadOnlyStream
+	streams  streams.Store
+	options  *DownloadOptions
 	object   *Object
 }
 
@@ -65,7 +74,19 @@ func (download *Download) Info() *Object {
 // Read downloads up to len(p) bytes into p from the object's data stream.
 // It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
 func (download *Download) Read(data []byte) (n int, err error) {
+	download.download = stream.NewDownloadRange(download.ctx, download.stream, download.streams, download.options.Offset, download.options.Length)
 	return download.download.Read(data)
+}
+
+func (download *Download) Range(opts *DownloadOptions) *Download {
+	return &Download{
+		download: nil,
+		ctx:      download.ctx,
+		stream:   download.stream,
+		streams:  download.streams,
+		options:  opts,
+		object:   download.object,
+	}
 }
 
 // Close closes the reader of the download.
