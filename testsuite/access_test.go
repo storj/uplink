@@ -37,10 +37,10 @@ func TestSharePermisions(t *testing.T) {
 		require.NoError(t, err)
 
 		items := []struct {
-			AllowRead   bool
-			AllowWrite  bool
-			AllowList   bool
-			AllowDelete bool
+			AllowDownload bool
+			AllowUpload   bool
+			AllowList     bool
+			AllowDelete   bool
 		}{
 			{false, false, false, false},
 			{true, true, true, true},
@@ -86,11 +86,11 @@ func TestSharePermisions(t *testing.T) {
 
 			name := func() string {
 				result := make([]string, 0, 4)
-				if item.AllowRead {
-					result = append(result, "AllowRead")
+				if item.AllowDownload {
+					result = append(result, "AllowDownload")
 				}
-				if item.AllowWrite {
-					result = append(result, "AllowWrite")
+				if item.AllowUpload {
+					result = append(result, "AllowUpload")
 				}
 				if item.AllowDelete {
 					result = append(result, "AllowDelete")
@@ -103,10 +103,10 @@ func TestSharePermisions(t *testing.T) {
 
 			t.Run(name(), func(t *testing.T) {
 				permission := uplink.Permission{
-					AllowRead:   item.AllowRead,
-					AllowWrite:  item.AllowWrite,
-					AllowDelete: item.AllowDelete,
-					AllowList:   item.AllowList,
+					AllowDownload: item.AllowDownload,
+					AllowUpload:   item.AllowUpload,
+					AllowDelete:   item.AllowDelete,
+					AllowList:     item.AllowList,
 				}
 				sharedAccess, err := access.Share(permission)
 				if permission == (uplink.Permission{}) {
@@ -123,7 +123,7 @@ func TestSharePermisions(t *testing.T) {
 				bucketName := "testbucket" + strconv.Itoa(i)
 				{ // reading
 					download, err := project.DownloadObject(ctx, bucketName, "test.dat", nil)
-					if item.AllowRead {
+					if item.AllowDownload {
 						require.NoError(t, err)
 
 						var downloaded bytes.Buffer
@@ -144,7 +144,7 @@ func TestSharePermisions(t *testing.T) {
 
 					source := bytes.NewBuffer(expectedData)
 					_, err = io.Copy(upload, source)
-					if item.AllowWrite {
+					if item.AllowUpload {
 						require.NoError(t, err)
 
 						err = upload.Commit()

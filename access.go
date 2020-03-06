@@ -36,9 +36,19 @@ type SharePrefix struct {
 
 // Permission defines what actions can be used to share.
 type Permission struct {
-	AllowRead   bool
-	AllowWrite  bool
-	AllowList   bool
+	// AllowDownaload gives permission to download the object's content. It
+	// allows getting object metadata, but it does not allow listing buckets.
+	AllowDownload bool
+	// AllowUpload gives permission to create buckets and upload new objects.
+	// It does not allow overwriting existing objects unless AllowDelete is
+	// granted too.
+	AllowUpload bool
+	// AllowList gives permission to list buckets. It allows getting object
+	// metadata, but it does not allow downloading the object's content.
+	AllowList bool
+	// AllowDelete gives permission to delete buckets and objects. Unless
+	// either AllowDownload or AllowList is granted too, no object metadata and
+	// no error info will be returned for deleted objects.
 	AllowDelete bool
 	// NotBefore if set should be always before NotAfter.
 	NotBefore time.Time
@@ -186,8 +196,8 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	caveat := macaroon.Caveat{
-		DisallowReads:   !permission.AllowRead,
-		DisallowWrites:  !permission.AllowWrite,
+		DisallowReads:   !permission.AllowDownload,
+		DisallowWrites:  !permission.AllowUpload,
 		DisallowLists:   !permission.AllowList,
 		DisallowDeletes: !permission.AllowDelete,
 		NotBefore:       notBefore,
@@ -237,15 +247,15 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 // ReadOnlyPermission returns permission that allows reading and listing.
 func ReadOnlyPermission() Permission {
 	return Permission{
-		AllowRead: true,
-		AllowList: true,
+		AllowDownload: true,
+		AllowList:     true,
 	}
 }
 
 // WriteOnlyPermission returns permission that allows writing and deleting.
 func WriteOnlyPermission() Permission {
 	return Permission{
-		AllowWrite:  true,
+		AllowUpload: true,
 		AllowDelete: true,
 	}
 }
@@ -253,9 +263,9 @@ func WriteOnlyPermission() Permission {
 // FullPermission returns permission that allows all actions.
 func FullPermission() Permission {
 	return Permission{
-		AllowRead:   true,
-		AllowWrite:  true,
-		AllowList:   true,
-		AllowDelete: true,
+		AllowDownload: true,
+		AllowUpload:   true,
+		AllowList:     true,
+		AllowDelete:   true,
 	}
 }
