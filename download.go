@@ -80,6 +80,8 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	return download.download.Read(data)
 }
 
+// Range allows to further specify the offset and length of the initial requested download.
+// It returns a new Download on which one can just call Read() again.
 func (download *Download) Range(opts *DownloadOptions) *Download {
 	return &Download{
 		download: nil,
