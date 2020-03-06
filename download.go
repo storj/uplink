@@ -74,7 +74,9 @@ func (download *Download) Info() *Object {
 // Read downloads up to len(p) bytes into p from the object's data stream.
 // It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
 func (download *Download) Read(data []byte) (n int, err error) {
-	download.download = stream.NewDownloadRange(download.ctx, download.stream, download.streams, download.options.Offset, download.options.Length)
+	if download.download == nil {
+		download.download = stream.NewDownloadRange(download.ctx, download.stream, download.streams, download.options.Offset, download.options.Length)
+	}
 	return download.download.Read(data)
 }
 
