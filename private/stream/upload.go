@@ -6,8 +6,7 @@ package stream
 import (
 	"context"
 	"io"
-	"sync/atomic"
-	"unsafe"
+	"sync"
 
 	"github.com/zeebo/errs"
 	"golang.org/x/sync/errgroup"
@@ -25,7 +24,10 @@ type Upload struct {
 	writer   io.WriteCloser
 	closed   bool
 	errgroup errgroup.Group
-	meta     unsafe.Pointer //*streams.Meta
+
+	// mu protects meta
+	mu   sync.RWMutex
+	meta *streams.Meta
 }
 
 // NewUpload creates new stream upload.
@@ -44,7 +46,10 @@ func NewUpload(ctx context.Context, stream kvmetainfo.MutableStream, streams str
 		if err != nil {
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
-		atomic.StorePointer(&upload.meta, unsafe.Pointer(&m))
+
+		upload.mu.Lock()
+		upload.meta = &m
+		upload.mu.Unlock()
 
 		return nil
 	})
@@ -81,9 +86,10 @@ func (upload *Upload) Close() error {
 //
 // Will return nil if the upload is still in progress.
 func (upload *Upload) Meta() *streams.Meta {
-	meta := (*streams.Meta)(atomic.LoadPointer(&upload.meta))
-	if meta == nil {
-		return nil
-	}
-	return meta
+	upload.mu.RLock()
+	defer upload.mu.RUnlock()
+
+	// we can safely return the pointer because it doesn't change after the
+	// upload finishes
+	return upload.meta
 }
