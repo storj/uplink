@@ -11,6 +11,6 @@ require (
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	google.golang.org/grpc v1.28.0 // indirect
 	storj.io/common v0.0.0-20200818131620-f9cddf66b4be
-	storj.io/storj v0.12.1-0.20200826132400-4f28bf07207f
-	storj.io/uplink v1.2.1-0.20200819113156-adca79cc8927
+	storj.io/storj v0.12.1-0.20200901184054-1f711523d5cc
+	storj.io/uplink v1.2.1-0.20200819222810-c04778f35988
 )

@@ -22,7 +22,6 @@ var Error = errs.Class("piecestore")
 
 // Config defines piecestore client parameters for upload and download.
 type Config struct {
-	UploadBufferSize   int64
 	DownloadBufferSize int64
 
 	InitialStep int64
@@ -31,11 +30,10 @@ type Config struct {
 
 // DefaultConfig are the default params used for upload and download.
 var DefaultConfig = Config{
-	UploadBufferSize:   256 * memory.KiB.Int64(),
 	DownloadBufferSize: 256 * memory.KiB.Int64(),
 
 	InitialStep: 64 * memory.KiB.Int64(),
-	MaximumStep: 1 * memory.MiB.Int64(),
+	MaximumStep: 256 * memory.KiB.Int64(),
 }
 
 // Client implements uploading, downloading and deleting content from a piecestore.
