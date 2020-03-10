@@ -153,7 +153,7 @@ func TestSetNilMetadata(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, memory.KiB.Int64(), obj.System.ContentLength)
-			require.Equal(t, uplink.CustomMetadata(nil), obj.Custom)
+			require.Equal(t, uplink.CustomMetadata{}, obj.Custom)
 		}
 	})
 }

@@ -267,7 +267,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		object, err := objectFromMeta(bucket, itemPath, item, stream, &streamMeta)
+		object, err := objectFromMeta(bucket, itemPath, item, stream, streamMeta)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -398,7 +398,7 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		object, err := objectFromMeta(bucket, itemPath, item, stream, &streamMeta)
+		object, err := objectFromMeta(bucket, itemPath, item, stream, streamMeta)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -480,7 +480,7 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 	}, info, nil
 }
 
-func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta *pb.StreamMeta) (storj.Object, error) {
+func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
 	object := storj.Object{
 		Version:  0, // TODO:
 		Bucket:   bucket,
@@ -491,25 +491,10 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 		Modified: listItem.CreatedAt, // TODO: use correct field
 		Expires:  listItem.ExpiresAt,
 	}
-	if stream != nil {
-		serializableMeta := pb.SerializableMeta{}
-		err := proto.Unmarshal(stream.Metadata, &serializableMeta)
-		if err != nil {
-			return storj.Object{}, err
-		}
 
-		// ensure that the map is not nil
-		if serializableMeta.UserDefined == nil {
-			serializableMeta.UserDefined = map[string]string{}
-		}
-
-		_, found := serializableMeta.UserDefined[contentTypeKey]
-		if !found && serializableMeta.ContentType != "" {
-			serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
-		}
-
-		object.Metadata = serializableMeta.UserDefined
-		object.Stream.Size = ((numberOfSegments(stream, streamMeta) - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+	err := updateObjectWithStream(&object, stream, streamMeta)
+	if err != nil {
+		return storj.Object{}, err
 	}
 
 	return object, nil
@@ -548,31 +533,43 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.S
 		},
 	}
 
-	if stream != nil {
-		serMetaInfo := pb.SerializableMeta{}
-		err := proto.Unmarshal(stream.Metadata, &serMetaInfo)
-		if err != nil {
-			return storj.Object{}, err
-		}
-
-		numberOfSegments := streamMeta.NumberOfSegments
-		if streamMeta.NumberOfSegments == 0 {
-			numberOfSegments = stream.DeprecatedNumberOfSegments
-		}
-
-		_, found := serMetaInfo.UserDefined[contentTypeKey]
-		if !found && serMetaInfo.ContentType != "" {
-			serMetaInfo.UserDefined[contentTypeKey] = serMetaInfo.ContentType
-		}
-
-		rv.Metadata = serMetaInfo.UserDefined
-		rv.Stream.Size = stream.SegmentsSize*(numberOfSegments-1) + stream.LastSegmentSize
-		rv.Stream.SegmentCount = numberOfSegments
-		rv.Stream.FixedSegmentSize = stream.SegmentsSize
-		rv.Stream.LastSegment.Size = stream.LastSegmentSize
+	err := updateObjectWithStream(&rv, stream, streamMeta)
+	if err != nil {
+		return storj.Object{}, err
 	}
 
 	return rv, nil
+}
+
+func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamMeta pb.StreamMeta) error {
+	if stream == nil {
+		return nil
+	}
+
+	serializableMeta := pb.SerializableMeta{}
+	err := proto.Unmarshal(stream.Metadata, &serializableMeta)
+	if err != nil {
+		return err
+	}
+
+	// ensure that the map is not nil
+	if serializableMeta.UserDefined == nil {
+		serializableMeta.UserDefined = map[string]string{}
+	}
+
+	_, found := serializableMeta.UserDefined[contentTypeKey]
+	if !found && serializableMeta.ContentType != "" {
+		serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
+	}
+
+	segmentCount := numberOfSegments(stream, streamMeta)
+	object.Metadata = serializableMeta.UserDefined
+	object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+	object.Stream.SegmentCount = segmentCount
+	object.Stream.FixedSegmentSize = stream.SegmentsSize
+	object.Stream.LastSegment.Size = stream.LastSegmentSize
+
+	return nil
 }
 
 type mutableObject struct {
@@ -607,7 +604,7 @@ func (object *mutableObject) Commit(ctx context.Context) (err error) {
 	return err
 }
 
-func numberOfSegments(stream *pb.StreamInfo, streamMeta *pb.StreamMeta) int64 {
+func numberOfSegments(stream *pb.StreamInfo, streamMeta pb.StreamMeta) int64 {
 	if streamMeta.NumberOfSegments > 0 {
 		return streamMeta.NumberOfSegments
 	}
