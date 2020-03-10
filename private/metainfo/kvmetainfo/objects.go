@@ -498,6 +498,11 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 			return storj.Object{}, err
 		}
 
+		// ensure that the map is not nil
+		if serializableMeta.UserDefined == nil {
+			serializableMeta.UserDefined = map[string]string{}
+		}
+
 		_, found := serializableMeta.UserDefined[contentTypeKey]
 		if !found && serializableMeta.ContentType != "" {
 			serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
