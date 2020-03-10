@@ -152,7 +152,7 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 
 	info, err := metainfo.GetProjectInfo(ctx)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 
 	key, err := encryption.DeriveRootKey([]byte(passphrase), info.ProjectSalt, "", concurrency)

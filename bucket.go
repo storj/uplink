@@ -44,7 +44,7 @@ func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bu
 		} else if storj.ErrBucketNotFound.Has(err) {
 			return nil, ErrBucketNotFound.New("%v", bucket)
 		}
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 
 	return &Bucket{
@@ -80,17 +80,17 @@ func (project *Project) CreateBucket(ctx context.Context, bucket string) (create
 			// TODO: Ideally, the satellite should return the existing bucket when this error occurs.
 			existing, err := project.StatBucket(ctx, bucket)
 			if err != nil {
-				return existing, errs.Combine(ErrBucketAlreadyExists.New("%v", bucket), err)
+				return existing, errs.Combine(ErrBucketAlreadyExists.New("%v", bucket), convertKnownErrors(err))
 			}
 			return existing, ErrBucketAlreadyExists.New("%v", bucket)
 		}
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 
 	return &Bucket{
 		Name:    b.Name,
 		Created: b.Created,
-	}, Error.Wrap(err)
+	}, nil
 }
 
 // EnsureBucket ensures that a bucket exists or creates a new one.
@@ -101,7 +101,7 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 
 	ensured, err = project.CreateBucket(ctx, bucket)
 	if err != nil && !ErrBucketAlreadyExists.Has(err) {
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 
 	return ensured, nil
@@ -127,7 +127,7 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 		if storj.ErrBucketNotFound.Has(err) {
 			return nil, ErrBucketNotFound.New("%v", bucket)
 		}
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 	return existing, nil
 }

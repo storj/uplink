@@ -89,7 +89,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 		} else if storj.ErrObjectNotFound.Has(err) {
 			return nil, ErrObjectNotFound.New("%v", key)
 		}
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 
 	return convertObject(&obj), nil
@@ -111,7 +111,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 		if storj.ErrObjectNotFound.Has(err) {
 			return nil, ErrObjectNotFound.New("%v", key)
 		}
-		return nil, Error.Wrap(err)
+		return nil, convertKnownErrors(err)
 	}
 	return object, nil
 }
