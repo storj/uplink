@@ -6,17 +6,21 @@ package uplink
 import (
 	"context"
 
+	"github.com/zeebo/errs"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/encryption"
 	"storj.io/common/memory"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
+	comtelem "storj.io/common/telemetry"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/metainfo/kvmetainfo"
 	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
+	"storj.io/uplink/telemetry"
 )
 
 // Project provides access to managing buckets and objects.
@@ -28,6 +32,9 @@ type Project struct {
 	project  *kvmetainfo.Project
 	db       *kvmetainfo.DB
 	streams  streams.Store
+
+	eg          *errgroup.Group
+	telemClient *comtelem.Client
 }
 
 // OpenProject opens a project with the specific access.
@@ -41,6 +48,17 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	if access == nil {
 		return nil, Error.New("access is nil")
+	}
+
+	var telemClient *comtelem.Client
+	if options := telemetry.ExtractOptions(ctx); options != nil {
+		telemClient, err = comtelem.NewClient(zap.L(), options.Endpoint, comtelem.ClientOpts{
+			Application: options.Application,
+			Headers:     map[string]string{"sat": access.satelliteAddress},
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	metainfo, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
@@ -87,18 +105,35 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	db := kvmetainfo.New(proj, metainfo, streamStore, segmentStore, access.encAccess.Store())
 
+	var eg errgroup.Group
+	if telemClient != nil {
+		eg.Go(func() error {
+			telemClient.Run(ctx)
+			return nil
+		})
+	}
+
 	return &Project{
-		config:   config,
-		access:   access,
-		dialer:   dialer,
-		metainfo: metainfo,
-		project:  proj,
-		db:       db,
-		streams:  streamStore,
+		config:      config,
+		access:      access,
+		dialer:      dialer,
+		metainfo:    metainfo,
+		project:     proj,
+		db:          db,
+		streams:     streamStore,
+		eg:          &eg,
+		telemClient: telemClient,
 	}, nil
 }
 
 // Close closes the project and all associated resources.
-func (project *Project) Close() error {
-	return Error.Wrap(project.metainfo.Close())
+func (project *Project) Close() (err error) {
+	if project.telemClient != nil {
+		project.telemClient.Stop()
+		err = errs.Combine(
+			project.eg.Wait(),
+			project.telemClient.Report(context.Background()),
+		)
+	}
+	return Error.Wrap(errs.Combine(err, project.metainfo.Close()))
 }
