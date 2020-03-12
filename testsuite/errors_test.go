@@ -35,7 +35,7 @@ func TestErrRateLimitExceeded(t *testing.T) {
 		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		_, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.Error(t, err)
-		require.True(t, uplink.ErrRequestsLimitExceeded.Has(err))
+		require.True(t, uplink.ErrTooManyRequests.Has(err))
 
 		// TODO add check for other methods but currently we are not able to manipulate
 		// rate limit when test planet is started

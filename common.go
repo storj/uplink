@@ -16,8 +16,8 @@ var mon = monkit.Package()
 // Error is default error class for uplink.
 var Error = errs.Class("uplink")
 
-// ErrRequestsLimitExceeded is returned when project will exceeded requests limit per second.
-var ErrRequestsLimitExceeded = errs.Class("requests limit exceeded")
+// ErrTooManyRequests is returned when user has sent too many requests in a given amount of time.
+var ErrTooManyRequests = errs.Class("too many requests")
 
 // ErrBandwidthLimitExceeded is returned when project will exceeded bandwidth limit.
 var ErrBandwidthLimitExceeded = errs.Class("bandwidth limit exceeded")
@@ -29,7 +29,7 @@ func convertKnownErrors(err error) error {
 		if reErr.Error() == "Exceeded Usage Limit" {
 			return ErrBandwidthLimitExceeded.New("")
 		} else if reErr.Error() == "Too Many Requests" {
-			return ErrRequestsLimitExceeded.New("")
+			return ErrTooManyRequests.New("")
 		}
 	}
 
