@@ -60,7 +60,7 @@ func (s *encryptionAccess) toProto() (*pb.EncryptionAccess, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	var defaultKey []byte
@@ -79,7 +79,7 @@ func parseEncryptionAccessFromProto(p *pb.EncryptionAccess) (*encryptionAccess, 
 	access := newEncryptionAccess()
 	if len(p.DefaultKey) > 0 {
 		if len(p.DefaultKey) != len(storj.Key{}) {
-			return nil, Error.New("invalid default key in encryption access")
+			return nil, packageError.New("invalid default key in encryption access")
 		}
 		var defaultKey storj.Key
 		copy(defaultKey[:], p.DefaultKey)
@@ -95,7 +95,7 @@ func parseEncryptionAccessFromProto(p *pb.EncryptionAccess) (*encryptionAccess, 
 
 	for _, entry := range p.StoreEntries {
 		if len(entry.Key) != len(storj.Key{}) {
-			return nil, Error.New("invalid key in encryption access entry")
+			return nil, packageError.New("invalid key in encryption access entry")
 		}
 		var key storj.Key
 		copy(key[:], entry.Key)
@@ -108,7 +108,7 @@ func parseEncryptionAccessFromProto(p *pb.EncryptionAccess) (*encryptionAccess, 
 			storj.CipherSuite(entry.PathCipher),
 		)
 		if err != nil {
-			return nil, Error.New("invalid encryption access entry: %v", err)
+			return nil, packageError.New("invalid encryption access entry: %v", err)
 		}
 	}
 

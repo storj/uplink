@@ -47,7 +47,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	defer mon.Task()(&ctx)(&err)
 
 	if access == nil {
-		return nil, Error.New("access is nil")
+		return nil, packageError.New("access is nil")
 	}
 
 	var telemClient *comtelem.Client
@@ -63,12 +63,12 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	metainfo, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	proj, err := kvmetainfo.SetupProject(metainfo)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	// TODO: All these should be controlled by the satellite and not configured by the uplink.
@@ -95,12 +95,12 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(segmentsSize, encryptionParameters)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	streamStore, err := streams.NewStreamStore(metainfo, segmentStore, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	db := kvmetainfo.New(proj, metainfo, streamStore, segmentStore, access.encAccess.Store())
@@ -135,5 +135,5 @@ func (project *Project) Close() (err error) {
 			project.telemClient.Report(context.Background()),
 		)
 	}
-	return Error.Wrap(errs.Combine(err, project.metainfo.Close()))
+	return packageError.Wrap(errs.Combine(err, project.metainfo.Close()))
 }

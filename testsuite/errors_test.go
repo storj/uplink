@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 
@@ -35,7 +36,7 @@ func TestErrRateLimitExceeded(t *testing.T) {
 		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		_, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.Error(t, err)
-		require.True(t, uplink.ErrTooManyRequests.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrTooManyRequests))
 
 		// TODO add check for other methods but currently we are not able to manipulate
 		// rate limit when test planet is started
@@ -81,6 +82,6 @@ func TestErrResourceExhausted(t *testing.T) {
 
 		err = upload.Commit()
 		require.Error(t, err)
-		require.True(t, uplink.ErrBandwidthLimitExceeded.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrBandwidthLimitExceeded))
 	})
 }

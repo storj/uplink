@@ -106,7 +106,7 @@ func (objects *ObjectIterator) loadNext() bool {
 
 // Err returns error, if one happened during iteration.
 func (objects *ObjectIterator) Err() error {
-	return Error.Wrap(objects.err)
+	return packageError.Wrap(objects.err)
 }
 
 // Item returns the current object in the iterator.

@@ -33,16 +33,16 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrNoPath.Has(err) {
-			return nil, ErrObjectKeyInvalid.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 		} else if storj.ErrObjectNotFound.Has(err) {
-			return nil, ErrObjectNotFound.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 		return nil, convertKnownErrors(err)
 	}
 
 	objectStream, err := project.db.GetObjectStream(ctx, b, obj)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	return &Download{

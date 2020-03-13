@@ -4,6 +4,8 @@
 package access
 
 import (
+	"github.com/zeebo/errs"
+
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 )
@@ -12,7 +14,7 @@ import (
 func EnablePathEncryptionBypass(access *uplink.Access) error {
 	fn, ok := expose.EnablePathEncryptionBypass.(func(access *uplink.Access) error)
 	if !ok {
-		return uplink.Error.New("invalid type %T", fn)
+		return errs.New("invalid type %T", fn)
 	}
 	return fn(access)
 }

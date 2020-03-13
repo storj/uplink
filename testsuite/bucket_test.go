@@ -4,6 +4,7 @@
 package testsuite_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -61,13 +62,13 @@ func TestBucket(t *testing.T) {
 		{
 			// statting a missing bucket
 			statBucket, err := project.StatBucket(ctx, "testbucket")
-			require.True(t, uplink.ErrBucketNotFound.Has(err))
+			require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 			require.Nil(t, statBucket)
 		}
 
 		{ // deleting a missing bucket
 			deleted, err := project.DeleteBucket(ctx, "missing")
-			require.True(t, uplink.ErrBucketNotFound.Has(err))
+			require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 			require.Nil(t, deleted)
 		}
 	})

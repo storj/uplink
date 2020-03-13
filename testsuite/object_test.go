@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -53,7 +54,7 @@ func TestObject(t *testing.T) {
 		assertObject(t, obj, "test.dat")
 
 		err = upload.Commit()
-		require.True(t, uplink.ErrUploadDone.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
 
 		uploadInfo := upload.Info()
 		assertObject(t, uploadInfo, "test.dat")
@@ -95,12 +96,12 @@ func TestObject(t *testing.T) {
 		require.Equal(t, "test.dat", deleted.Key)
 
 		obj, err = project.StatObject(ctx, "testbucket", "test.dat")
-		require.True(t, uplink.ErrObjectNotFound.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 		require.Nil(t, obj)
 
 		// delete missing object
 		deleted, err = project.DeleteObject(ctx, "testbucket", "test.dat")
-		require.True(t, uplink.ErrObjectNotFound.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 		require.Nil(t, deleted)
 	})
 }
@@ -137,10 +138,10 @@ func TestAbortUpload(t *testing.T) {
 		require.Error(t, err)
 
 		_, err = project.StatObject(ctx, "testbucket", "test.dat")
-		require.True(t, uplink.ErrObjectNotFound.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 
 		err = upload.Abort()
-		require.True(t, uplink.ErrUploadDone.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
 	})
 }
 

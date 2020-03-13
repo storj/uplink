@@ -30,7 +30,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 		Concurrency: 1,
 	})
 	if err != nil {
-		return nil, rpc.Dialer{}, "", Error.Wrap(err)
+		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
 	tlsConfig := tlsopts.Config{
@@ -40,7 +40,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
 	if err != nil {
-		return nil, rpc.Dialer{}, "", Error.Wrap(err)
+		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
 	dialer := rpc.NewDefaultDialer(tlsOptions)
@@ -48,7 +48,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
 	if err != nil {
-		return nil, rpc.Dialer{}, "", Error.Wrap(err)
+		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
 	// Node id is required in satelliteNodeID for all unknown (non-storj) satellites.
@@ -56,7 +56,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 	if nodeURL.ID.IsZero() {
 		nodeID, found := rpc.KnownNodeID(nodeURL.Address)
 		if !found {
-			return nil, rpc.Dialer{}, "", Error.New("node id is required in satelliteNodeURL")
+			return nil, rpc.Dialer{}, "", packageError.New("node id is required in satelliteNodeURL")
 		}
 		satelliteAddress = storj.NodeURL{
 			ID:      nodeID,
@@ -66,5 +66,5 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteAddress, apiKey, config.UserAgent)
 
-	return metainfo, dialer, satelliteAddress, Error.Wrap(err)
+	return metainfo, dialer, satelliteAddress, packageError.Wrap(err)
 }

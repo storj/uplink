@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -16,10 +17,10 @@ import (
 )
 
 // ErrObjectKeyInvalid is returned when the object key is invalid.
-var ErrObjectKeyInvalid = errs.Class("object key invalid")
+var ErrObjectKeyInvalid = errors.New("object key invalid")
 
 // ErrObjectNotFound is returned when the object is not found.
-var ErrObjectNotFound = errs.Class("object not found")
+var ErrObjectNotFound = errors.New("object not found")
 
 // Object contains information about an object.
 type Object struct {
@@ -85,9 +86,9 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrNoPath.Has(err) {
-			return nil, ErrObjectKeyInvalid.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 		} else if storj.ErrObjectNotFound.Has(err) {
-			return nil, ErrObjectNotFound.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 		return nil, convertKnownErrors(err)
 	}
@@ -109,7 +110,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	err = project.db.DeleteObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrObjectNotFound.Has(err) {
-			return nil, ErrObjectNotFound.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 		return nil, convertKnownErrors(err)
 	}

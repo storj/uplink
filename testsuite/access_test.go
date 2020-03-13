@@ -6,6 +6,7 @@ package testsuite_test
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"io"
 	"sort"
 	"strconv"
@@ -249,7 +250,7 @@ func TestAccessSerialization(t *testing.T) {
 		assertObject(t, upload.Info(), "test.dat")
 
 		err = upload.Commit()
-		require.True(t, uplink.ErrUploadDone.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
 
 		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat", nil)
 		require.NoError(t, err)

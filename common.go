@@ -4,6 +4,9 @@
 package uplink
 
 import (
+	"fmt"
+
+	"github.com/spacemonkeygo/errors"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
@@ -14,24 +17,31 @@ import (
 var mon = monkit.Package()
 
 // Error is default error class for uplink.
-var Error = errs.Class("uplink")
+var packageError = errs.Class("uplink")
 
 // ErrTooManyRequests is returned when user has sent too many requests in a given amount of time.
-var ErrTooManyRequests = errs.Class("too many requests")
+var ErrTooManyRequests = errors.New("too many requests")
 
 // ErrBandwidthLimitExceeded is returned when project will exceeded bandwidth limit.
-var ErrBandwidthLimitExceeded = errs.Class("bandwidth limit exceeded")
+var ErrBandwidthLimitExceeded = errors.New("bandwidth limit exceeded")
 
 func convertKnownErrors(err error) error {
 	if errs2.IsRPC(err, rpcstatus.ResourceExhausted) {
 		// TODO is a better way to do this?
 		reErr := errs.Unwrap(err)
 		if reErr.Error() == "Exceeded Usage Limit" {
-			return ErrBandwidthLimitExceeded.New("")
+			return packageError.Wrap(ErrBandwidthLimitExceeded)
 		} else if reErr.Error() == "Too Many Requests" {
-			return ErrTooManyRequests.New("")
+			return packageError.Wrap(ErrTooManyRequests)
 		}
 	}
 
-	return Error.Wrap(err)
+	return packageError.Wrap(err)
+}
+
+func errwrapf(format string, err error, args ...interface{}) error {
+	var all []interface{}
+	all = append(all, err)
+	all = append(all, args...)
+	return packageError.Wrap(fmt.Errorf(format, all...))
 }

@@ -60,26 +60,26 @@ type Permission struct {
 func ParseAccess(access string) (*Access, error) {
 	data, version, err := base58.CheckDecode(access)
 	if err != nil || version != 0 {
-		return nil, Error.New("invalid access format")
+		return nil, packageError.New("invalid access format")
 	}
 
 	p := new(pb.Scope)
 	if err := proto.Unmarshal(data, p); err != nil {
-		return nil, Error.New("unable to unmarshal access: %v", err)
+		return nil, packageError.New("unable to unmarshal access: %v", err)
 	}
 
 	if len(p.SatelliteAddr) == 0 {
-		return nil, Error.New("access missing satellite address")
+		return nil, packageError.New("access missing satellite address")
 	}
 
 	apiKey, err := macaroon.ParseRawAPIKey(p.ApiKey)
 	if err != nil {
-		return nil, Error.New("access has malformed api key: %v", err)
+		return nil, packageError.New("access has malformed api key: %v", err)
 	}
 
 	encAccess, err := parseEncryptionAccessFromProto(p.EncryptionAccess)
 	if err != nil {
-		return nil, Error.New("access has malformed encryption access: %v", err)
+		return nil, packageError.New("access has malformed encryption access: %v", err)
 	}
 
 	return &Access{
@@ -93,16 +93,16 @@ func ParseAccess(access string) (*Access, error) {
 func (access *Access) Serialize() (string, error) {
 	switch {
 	case len(access.satelliteAddress) == 0:
-		return "", Error.New("access missing satellite address")
+		return "", packageError.New("access missing satellite address")
 	case access.apiKey == nil:
-		return "", Error.New("access missing api key")
+		return "", packageError.New("access missing api key")
 	case access.encAccess == nil:
-		return "", Error.New("access missing encryption access")
+		return "", packageError.New("access missing encryption access")
 	}
 
 	enc, err := access.encAccess.toProto()
 	if err != nil {
-		return "", Error.Wrap(err)
+		return "", packageError.Wrap(err)
 	}
 
 	data, err := proto.Marshal(&pb.Scope{
@@ -111,7 +111,7 @@ func (access *Access) Serialize() (string, error) {
 		EncryptionAccess: enc,
 	})
 	if err != nil {
-		return "", Error.New("unable to marshal access: %v", err)
+		return "", packageError.New("unable to marshal access: %v", err)
 	}
 
 	return base58.CheckEncode(data, 0), nil
@@ -141,12 +141,12 @@ func init() {
 func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	metainfo, _, fullNodeURL, err := config.dial(ctx, satelliteAddress, parsedAPIKey)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, metainfo.Close()) }()
 
@@ -157,7 +157,7 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 
 	key, err := encryption.DeriveRootKey([]byte(passphrase), info.ProjectSalt, "", concurrency)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	encAccess := newEncryptionAccessWithDefaultKey(key)
@@ -180,7 +180,7 @@ func enablePathEncryptionBypass(access *Access) error {
 // Share creates new Access with specific permission. Permission will be applied to prefixes when defined.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
 	if permission == (Permission{}) {
-		return nil, Error.New("permission is empty")
+		return nil, packageError.New("permission is empty")
 	}
 
 	var notBefore, notAfter *time.Time
@@ -192,7 +192,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	if notBefore != nil && notAfter != nil && notAfter.Before(*notBefore) {
-		return nil, Error.New("invalid time range")
+		return nil, packageError.New("invalid time range")
 	}
 
 	caveat := macaroon.Caveat{

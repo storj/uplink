@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 )
 
 // ErrUploadDone is returned when either Abort or Commit has already been called.
-var ErrUploadDone = errs.Class("upload done")
+var ErrUploadDone = errors.New("upload done")
 
 // UploadOptions contains additional options for uploading.
 type UploadOptions struct {
@@ -38,7 +39,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	obj, err := project.db.CreateObject(ctx, b, key, nil)
 	if err != nil {
 		if storj.ErrNoPath.Has(err) {
-			return nil, ErrObjectKeyInvalid.New("%v", key)
+			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 		}
 		return nil, convertKnownErrors(err)
 	}
@@ -46,7 +47,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	info := obj.Info()
 	mutableStream, err := obj.CreateStream(ctx)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -93,12 +94,12 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Commit() error {
 	if atomic.LoadInt32(&upload.aborted) == 1 {
-		return ErrUploadDone.New("already aborted")
+		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
 
 	err := upload.upload.Close()
 	if err != nil && errs.Unwrap(err).Error() == "already closed" {
-		return ErrUploadDone.New("already committed")
+		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
 	return convertKnownErrors(err)
@@ -109,11 +110,11 @@ func (upload *Upload) Commit() error {
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Abort() error {
 	if upload.upload.Meta() != nil {
-		return ErrUploadDone.New("already committed")
+		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
 	if !atomic.CompareAndSwapInt32(&upload.aborted, 0, 1) {
-		return ErrUploadDone.New("already aborted")
+		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
 
 	upload.cancel()
@@ -124,15 +125,15 @@ func (upload *Upload) Abort() error {
 // If it is nil, it won't be modified.
 func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetadata) error {
 	if atomic.LoadInt32(&upload.aborted) == 1 {
-		return ErrUploadDone.New("upload aborted")
+		return errwrapf("%w: upload aborted", ErrUploadDone)
 	}
 	if upload.upload.Meta() != nil {
-		return ErrUploadDone.New("already committed")
+		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
 	if custom != nil {
 		if err := custom.Verify(); err != nil {
-			return Error.Wrap(err)
+			return packageError.Wrap(err)
 		}
 		upload.object.Custom = custom.Clone()
 	}

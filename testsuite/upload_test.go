@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"strconv"
 	"testing"
@@ -195,7 +196,7 @@ func TestSetMetadataAfterCommit(t *testing.T) {
 
 		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{})
 		require.Error(t, err)
-		require.True(t, uplink.ErrUploadDone.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
 	})
 }
 
@@ -233,6 +234,6 @@ func TestSetMetadataAfterAbort(t *testing.T) {
 
 		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{})
 		require.Error(t, err)
-		require.True(t, uplink.ErrUploadDone.Has(err))
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
 	})
 }

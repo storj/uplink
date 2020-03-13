@@ -87,7 +87,7 @@ func (buckets *BucketIterator) loadNext() bool {
 
 // Err returns error, if one happened during iteration.
 func (buckets *BucketIterator) Err() error {
-	return Error.Wrap(buckets.err)
+	return packageError.Wrap(buckets.err)
 }
 
 // Item returns the current bucket in the iterator.
