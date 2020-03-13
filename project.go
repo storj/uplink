@@ -37,17 +37,17 @@ type Project struct {
 	telemClient *comtelem.Client
 }
 
-// OpenProject opens a project with the specific access.
+// OpenProject opens a project with the specific access grant.
 func OpenProject(ctx context.Context, access *Access) (*Project, error) {
 	return (Config{}).OpenProject(ctx, access)
 }
 
-// OpenProject opens a project with the specific access.
+// OpenProject opens a project with the specific access grant.
 func (config Config) OpenProject(ctx context.Context, access *Access) (project *Project, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if access == nil {
-		return nil, packageError.New("access is nil")
+		return nil, packageError.New("access grant is nil")
 	}
 
 	var telemClient *comtelem.Client

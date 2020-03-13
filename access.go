@@ -19,12 +19,11 @@ import (
 	"storj.io/uplink/internal/expose"
 )
 
-// Access contains everything to access a project and specific buckets.
+// Access grant contains everything to access a project and specific buckets.
 type Access struct {
 	satelliteAddress string
 	apiKey           *macaroon.APIKey
 	encAccess        *encryptionAccess
-	// TODO: bypassObjectKeyEncryption bool
 }
 
 // SharePrefix defines a prefix that will be shared.
@@ -56,30 +55,30 @@ type Permission struct {
 	NotAfter time.Time
 }
 
-// ParseAccess parses access string.
+// ParseAccess parses serialized access grant string.
 func ParseAccess(access string) (*Access, error) {
 	data, version, err := base58.CheckDecode(access)
 	if err != nil || version != 0 {
-		return nil, packageError.New("invalid access format")
+		return nil, packageError.New("invalid access grant format")
 	}
 
 	p := new(pb.Scope)
 	if err := proto.Unmarshal(data, p); err != nil {
-		return nil, packageError.New("unable to unmarshal access: %v", err)
+		return nil, packageError.New("unable to unmarshal access grant: %v", err)
 	}
 
 	if len(p.SatelliteAddr) == 0 {
-		return nil, packageError.New("access missing satellite address")
+		return nil, packageError.New("access grant is missing satellite address")
 	}
 
 	apiKey, err := macaroon.ParseRawAPIKey(p.ApiKey)
 	if err != nil {
-		return nil, packageError.New("access has malformed api key: %v", err)
+		return nil, packageError.New("access grant has malformed api key: %v", err)
 	}
 
 	encAccess, err := parseEncryptionAccessFromProto(p.EncryptionAccess)
 	if err != nil {
-		return nil, packageError.New("access has malformed encryption access: %v", err)
+		return nil, packageError.New("access grant has malformed encryption access: %v", err)
 	}
 
 	return &Access{
@@ -89,15 +88,15 @@ func ParseAccess(access string) (*Access, error) {
 	}, nil
 }
 
-// Serialize serializes access such that it can be used with ParseAccess.
+// Serialize serializes access grant such that it can be used with ParseAccess.
 func (access *Access) Serialize() (string, error) {
 	switch {
 	case len(access.satelliteAddress) == 0:
-		return "", packageError.New("access missing satellite address")
+		return "", packageError.New("access grant is missing satellite address")
 	case access.apiKey == nil:
-		return "", packageError.New("access missing api key")
+		return "", packageError.New("access grant is missing api key")
 	case access.encAccess == nil:
-		return "", packageError.New("access missing encryption access")
+		return "", packageError.New("access grant is missing encryption access")
 	}
 
 	enc, err := access.encAccess.toProto()
@@ -111,18 +110,18 @@ func (access *Access) Serialize() (string, error) {
 		EncryptionAccess: enc,
 	})
 	if err != nil {
-		return "", packageError.New("unable to marshal access: %v", err)
+		return "", packageError.New("unable to marshal access grant: %v", err)
 	}
 
 	return base58.CheckEncode(data, 0), nil
 }
 
-// RequestAccessWithPassphrase requests satellite for a new access using a passhprase.
+// RequestAccessWithPassphrase requests satellite for a new access grant using a passhprase.
 func RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
 	return (Config{}).RequestAccessWithPassphrase(ctx, satelliteAddress, apiKey, passphrase)
 }
 
-// RequestAccessWithPassphrase requests satellite for a new access using a passphrase.
+// RequestAccessWithPassphrase requests satellite for a new access grant using a passphrase.
 func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
 	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteAddress, apiKey, passphrase, 8)
 }
@@ -135,7 +134,7 @@ func init() {
 	expose.EnablePathEncryptionBypass = enablePathEncryptionBypass
 }
 
-// requestAccessWithPassphraseAndConcurrency requests satellite for a new access using a passhprase and specific concurrency for the Argon2 key derivation.
+// requestAccessWithPassphraseAndConcurrency requests satellite for a new access grant using a passhprase and specific concurrency for the Argon2 key derivation.
 //
 // NB: when modifying the signature of this func, also update backcomp and internal/expose packages.
 func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
@@ -177,7 +176,7 @@ func enablePathEncryptionBypass(access *Access) error {
 	return nil
 }
 
-// Share creates new Access with specific permission. Permission will be applied to prefixes when defined.
+// Share creates new access grant with specific permission. Permission will be applied to prefixes when defined.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
 	if permission == (Permission{}) {
 		return nil, packageError.New("permission is empty")
