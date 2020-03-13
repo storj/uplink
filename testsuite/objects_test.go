@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
@@ -57,7 +58,7 @@ func TestListObjects_EmptyBucket(t *testing.T) {
 func TestListObjects_SingleObject(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
@@ -69,7 +70,7 @@ func TestListObjects_SingleObject(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		uploadObject(t, ctx, project, "testbucket", "test.dat")
+		uploadObject(t, ctx, project, "testbucket", "test.dat", 1*memory.KiB)
 		defer func() {
 			_, err := project.DeleteObject(ctx, "testbucket", "test.dat")
 			require.NoError(t, err)
@@ -90,7 +91,7 @@ func TestListObjects_SingleObject(t *testing.T) {
 func TestListObjects_TwoObjects(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
@@ -109,7 +110,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 
 		for object := range expectedObjects {
 			object := object
-			uploadObject(t, ctx, project, "testbucket", object)
+			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
 			defer func() {
 				_, err := project.DeleteObject(ctx, "testbucket", object)
 				require.NoError(t, err)
@@ -140,7 +141,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 func TestListObjects_PrefixRecursive(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
@@ -152,7 +153,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat")
+		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat", 1*memory.KiB)
 		defer func() {
 			_, err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
 			require.NoError(t, err)
@@ -176,7 +177,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 func TestListObjects_PrefixNonRecursive(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
@@ -188,7 +189,7 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat")
+		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat", 1*memory.KiB)
 		defer func() {
 			_, err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
 			require.NoError(t, err)
@@ -209,7 +210,7 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 func TestListObjects_Cursor(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
@@ -228,7 +229,7 @@ func TestListObjects_Cursor(t *testing.T) {
 
 		for object := range expectedObjects {
 			object := object
-			uploadObject(t, ctx, project, "testbucket", object)
+			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
 			defer func() {
 				_, err := project.DeleteObject(ctx, "testbucket", object)
 				require.NoError(t, err)

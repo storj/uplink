@@ -183,12 +183,12 @@ func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey stri
 	assert.Empty(t, obj.System.Created)
 }
 
-func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string) *uplink.Object {
+func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string, objectSize memory.Size) *uplink.Object {
 	upload, err := project.UploadObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 	assertObjectEmptyCreated(t, upload.Info(), key)
 
-	randData := testrand.Bytes(10 * memory.KiB)
+	randData := testrand.Bytes(objectSize)
 	source := bytes.NewBuffer(randData)
 	_, err = io.Copy(upload, source)
 	require.NoError(t, err)
