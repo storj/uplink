@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,12 +26,13 @@ func TestListObjects_NonExistingBucket(t *testing.T) {
 		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
-		// TODO: Should this return BucketNotFound error?
-		list := project.ListObjects(ctx, "testbucket", nil)
+		list := project.ListObjects(ctx, "non-existing-bucket", nil)
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
 
-		assertNoNextObject(t, list)
+		require.False(t, list.Next())
+		require.Error(t, list.Err())
+		require.True(t, errors.Is(list.Err(), uplink.ErrBucketNotFound))
 	})
 }
 

@@ -27,6 +27,7 @@ github.com/Microsoft/go-winio v0.4.11/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcy
 github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5/go.mod h1:lmUJ/7eu/Q8D7ML55dXQrVaamCz2vxCfdQBasLZfHKk=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/Shopify/go-lua v0.0.0-20181106184032-48449c60c0a9/go.mod h1:lvS2IGWEGk+KQkRrCXuWlcsHO5BitT0HyhnP51rh3gA=
+github.com/Shopify/go-lua v0.0.0-20191113154418-05ce435a9edd/go.mod h1:lvS2IGWEGk+KQkRrCXuWlcsHO5BitT0HyhnP51rh3gA=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/VividCortex/ewma v1.1.1 h1:MnEK4VOv6n0RSY4vtRe3h11qjxL3+t0B8yOL8iMXdcM=
@@ -219,6 +220,7 @@ github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1
 github.com/jstemmer/go-junit-report v0.9.1 h1:6QPYqodiu3GuPL+7mfx+NwDdp2eTkp9IfEUpgAwUN0o=
 github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/XSXhF0NWZEnDohbsk=
 github.com/jtolds/go-luar v0.0.0-20170419063437-0786921db8c0/go.mod h1:OtVLEpPHGJkn8jgGrHlYELCA3uXLU0YSfNN0faeDM2M=
+github.com/jtolds/go-luar v0.0.0-20200310225017-6fa637b8208b/go.mod h1:UwIGIJbOORRy7+4CFdO5gF6ghf3/tgtR7HvrG5RLEOU=
 github.com/jtolds/monkit-hw/v2 v2.0.0-20191108235325-141a0da276b3 h1:dITCBge70U9RDyZUL/Thn/yAT/ct4Rz40mNUX51dFCk=
 github.com/jtolds/monkit-hw/v2 v2.0.0-20191108235325-141a0da276b3/go.mod h1:eo5po8nCwRcvZIIR8eGi7PKthzXuunpXzUmXzxCBfBc=
 github.com/jtolds/tracetagger/v2 v2.0.0-rc3 h1:I7OKb1wBTqhyKe135DoumYG5TiuHZR0Ab554R1/8sAQ=
@@ -609,3 +611,5 @@ storj.io/storj v0.12.1-0.20200227100201-b0d2cf0e4d5d h1:Rl7q8V0cjTUsFTVV8oDupOwX
 storj.io/storj v0.12.1-0.20200227100201-b0d2cf0e4d5d/go.mod h1:y7+bYLGV4ybMOVuGyemr0by/TEo3rZf88TvrdxYY3CY=
 storj.io/storj v0.12.1-0.20200310115300-16878a22ead5 h1:o8d9i/sngVzLumFbnxBjFQCn+DZYEj/KbdMPmN0j49M=
 storj.io/storj v0.12.1-0.20200310115300-16878a22ead5/go.mod h1:uH4rYV9R5vQEYXWQ3KuVy6vEdT/EMjAYwSes6zIsy1I=
+storj.io/storj v0.12.1-0.20200317163617-80acf33abc6c h1:JfB/jfrMJUhuNuHGjaKkfcD9RgwJPgicP7o4KiwEEig=
+storj.io/storj v0.12.1-0.20200317163617-80acf33abc6c/go.mod h1:+9Gae0pSewXtWq0u2SUjs8v+8LXv5VkJfjk+8tS/H4k=

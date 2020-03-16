@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spacemonkeygo/errors"
 	"github.com/spacemonkeygo/monkit/v3"
@@ -12,6 +13,7 @@ import (
 
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
+	"storj.io/common/storj"
 )
 
 var mon = monkit.Package()
@@ -28,11 +30,18 @@ var ErrBandwidthLimitExceeded = errors.New("bandwidth limit exceeded")
 func convertKnownErrors(err error) error {
 	if errs2.IsRPC(err, rpcstatus.ResourceExhausted) {
 		// TODO is a better way to do this?
-		reErr := errs.Unwrap(err)
-		if reErr.Error() == "Exceeded Usage Limit" {
+		message := errs.Unwrap(err).Error()
+		if message == "Exceeded Usage Limit" {
 			return packageError.Wrap(ErrBandwidthLimitExceeded)
-		} else if reErr.Error() == "Too Many Requests" {
+		} else if message == "Too Many Requests" {
 			return packageError.Wrap(ErrTooManyRequests)
+		}
+	} else if errs2.IsRPC(err, rpcstatus.NotFound) {
+		message := errs.Unwrap(err).Error()
+		if strings.HasPrefix(message, storj.ErrBucketNotFound.New("").Error()) {
+			return packageError.Wrap(ErrBucketNotFound)
+		} else if strings.HasPrefix(message, storj.ErrObjectNotFound.New("").Error()) {
+			return packageError.Wrap(ErrObjectNotFound)
 		}
 	}
 
