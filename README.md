@@ -19,6 +19,15 @@ encrypted, broken into little pieces and stored in a global decentralized
 network of computers. Luckily, we also support allowing you (and only you) to
 retrieve those files!
 
+# Documentation
+
+- [Go Doc](https://pkg.go.dev/storj.io/uplink)
+- [Libuplink Walkthrough](https://github.com/storj/storj/wiki/Libuplink-Walkthrough)
+
+# Language bindings
+
+- [Uplink-C](https://github.com/storj/uplink-c)
+
 # License
 
 This library is distributed under the
