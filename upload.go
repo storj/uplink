@@ -31,6 +31,13 @@ type UploadOptions struct {
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (upload *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if bucket == "" {
+		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
+	}
+	if key == "" {
+		return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
+	}
+
 	if options == nil {
 		options = &UploadOptions{}
 	}

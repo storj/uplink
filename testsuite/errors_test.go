@@ -85,3 +85,30 @@ func TestErrResourceExhausted(t *testing.T) {
 		require.True(t, errors.Is(err, uplink.ErrBandwidthLimitExceeded))
 	})
 }
+
+func TestUploadDownloadParamsValidation(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		ctx.Check(project.Close)
+
+		_, err := project.UploadObject(ctx, "", "", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+
+		_, err = project.UploadObject(ctx, "testbucket", "", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
+
+		_, err = project.DownloadObject(ctx, "", "", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+
+		_, err = project.DownloadObject(ctx, "testbucket", "", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
+	})
+}

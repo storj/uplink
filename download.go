@@ -21,6 +21,13 @@ type DownloadOptions struct {
 func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (download *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if bucket == "" {
+		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
+	}
+	if key == "" {
+		return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
+	}
+
 	if options == nil {
 		options = &DownloadOptions{
 			Offset: 0,
