@@ -85,7 +85,7 @@ func (db *Project) DeleteBucket(ctx context.Context, bucketName string) (err err
 	if bucketName == "" {
 		return storj.ErrNoBucket.New("")
 	}
-	err = db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
+	_, err = db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
 		Name: []byte(bucketName),
 	})
 	if err != nil {
@@ -93,6 +93,26 @@ func (db *Project) DeleteBucket(ctx context.Context, bucketName string) (err err
 	}
 
 	return nil
+}
+
+// DeleteBucketReturnDeleted deletes bucket and returns the deleted bucket.
+// TODO: This is a temporary method due to the cycle dependency in test
+// between storj/storj and storj/uplink repos. It will be removed after it is
+// possible to make the original DeleteBucket method return the deleted bucket.
+func (db *Project) DeleteBucketReturnDeleted(ctx context.Context, bucketName string) (_ storj.Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return storj.Bucket{}, storj.ErrNoBucket.New("")
+	}
+	bucket, err := db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
+		Name: []byte(bucketName),
+	})
+	if err != nil {
+		return storj.Bucket{}, storj.ErrBucket.Wrap(err)
+	}
+
+	return bucket, nil
 }
 
 // GetBucket gets bucket information

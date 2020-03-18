@@ -38,11 +38,11 @@ func (o *prefixedObjStore) Put(ctx context.Context, path storj.Path, data io.Rea
 	return o.store.Put(ctx, storj.JoinPaths(o.prefix, path), data, metadata, expiration)
 }
 
-func (o *prefixedObjStore) Delete(ctx context.Context, path storj.Path) (err error) {
+func (o *prefixedObjStore) Delete(ctx context.Context, path storj.Path) (_ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(path) == 0 {
-		return storj.ErrNoPath.New("")
+		return storj.ObjectInfo{}, storj.ErrNoPath.New("")
 	}
 
 	return o.store.Delete(ctx, storj.JoinPaths(o.prefix, path))

@@ -136,7 +136,38 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		store:  objects.NewStore(db.streams),
 		prefix: bucket.Name,
 	}
-	return prefixed.Delete(ctx, path)
+	_, err = prefixed.Delete(ctx, path)
+	return err
+}
+
+// DeleteObjectReturnDeleted deletes an object from database and returns the deleted object.
+// TODO: This is a temporary method due to the cycle dependency in test
+// between storj/storj and storj/uplink repos. It will be removed after it is
+// possible to make the original DeleteObject method return the deleted object.
+func (db *DB) DeleteObjectReturnDeleted(ctx context.Context, bucket storj.Bucket, path storj.Path) (_ storj.Object, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket.Name == "" {
+		return storj.Object{}, storj.ErrNoBucket.New("")
+	}
+
+	prefixed := prefixedObjStore{
+		store:  objects.NewStore(db.streams),
+		prefix: bucket.Name,
+	}
+
+	info, err := prefixed.Delete(ctx, path)
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	_, obj, err := objectFromInfo(ctx, bucket, path, encPath, info, db.encStore)
+	return obj, err
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object
@@ -436,8 +467,6 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 		return object{}, storj.Object{}, storj.ErrNoPath.New("")
 	}
 
-	fullpath := streams.CreatePath(bucket.Name, paths.NewUnencrypted(path))
-
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
 	if err != nil {
 		return object{}, storj.Object{}, err
@@ -451,8 +480,15 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 		return object{}, storj.Object{}, err
 	}
 
-	redundancyScheme := objectInfo.Stream.RedundancyScheme
+	return objectFromInfo(ctx, bucket, path, encPath, objectInfo, db.encStore)
+}
 
+func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, encPath paths.Encrypted, objectInfo storj.ObjectInfo, encStore *encryption.Store) (object, storj.Object, error) {
+	if objectInfo.Bucket == "" { // zero objectInfo
+		return object{}, storj.Object{}, nil
+	}
+
+	fullpath := streams.CreatePath(bucket.Name, paths.NewUnencrypted(path))
 	lastSegmentMeta := segments.Meta{
 		Modified:   objectInfo.Created,
 		Expiration: objectInfo.Expires,
@@ -460,12 +496,12 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 		Data:       objectInfo.Metadata,
 	}
 
-	streamInfo, streamMeta, err := streams.TypedDecryptStreamInfo(ctx, lastSegmentMeta.Data, fullpath, db.encStore)
+	streamInfo, streamMeta, err := streams.TypedDecryptStreamInfo(ctx, lastSegmentMeta.Data, fullpath, encStore)
 	if err != nil {
 		return object{}, storj.Object{}, err
 	}
 
-	info, err = objectStreamFromMeta(bucket, path, objectInfo.StreamID, lastSegmentMeta, streamInfo, streamMeta, redundancyScheme)
+	info, err := objectStreamFromMeta(bucket, path, objectInfo.StreamID, lastSegmentMeta, streamInfo, streamMeta, objectInfo.Stream.RedundancyScheme)
 	if err != nil {
 		return object{}, storj.Object{}, err
 	}

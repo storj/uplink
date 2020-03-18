@@ -271,16 +271,21 @@ func (params *DeleteBucketParams) BatchItem() *pb.BatchRequestItem {
 }
 
 // DeleteBucket deletes a bucket.
-func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (err error) {
+func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ storj.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
-	_, err = client.client.DeleteBucket(ctx, params.toRequest(client.header()))
+	resp, err := client.client.DeleteBucket(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.ErrBucketNotFound.Wrap(err)
+			return storj.Bucket{}, storj.ErrBucketNotFound.Wrap(err)
 		}
-		return Error.Wrap(err)
+		return storj.Bucket{}, Error.Wrap(err)
 	}
-	return nil
+
+	respBucket, err := convertProtoToBucket(resp.Bucket)
+	if err != nil {
+		return storj.Bucket{}, Error.Wrap(err)
+	}
+	return respBucket, nil
 }
 
 // ListBucketsParams parmaters for ListBucketsParams method.
@@ -349,13 +354,19 @@ func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams)
 }
 
 func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) {
+	if pbBucket == nil {
+		return storj.Bucket{}, nil
+	}
+
 	defaultRS := pbBucket.GetDefaultRedundancyScheme()
 	defaultEP := pbBucket.GetDefaultEncryptionParameters()
+
 	var partnerID uuid.UUID
 	err = partnerID.UnmarshalJSON(pbBucket.GetPartnerId())
 	if err != nil && !partnerID.IsZero() {
 		return bucket, errs.New("Invalid uuid")
 	}
+
 	return storj.Bucket{
 		Name:                string(pbBucket.GetName()),
 		PartnerID:           partnerID,
@@ -564,28 +575,38 @@ type GetObjectResponse struct {
 }
 
 func newGetObjectResponse(response *pb.ObjectGetResponse) GetObjectResponse {
-	object := storj.ObjectInfo{
-		Bucket: string(response.Object.Bucket),
-		Path:   storj.Path(response.Object.EncryptedPath),
+	return GetObjectResponse{
+		Info: newObjectInfo(response.Object),
+	}
+}
 
-		StreamID: response.Object.StreamId,
+func newObjectInfo(object *pb.Object) storj.ObjectInfo {
+	if object == nil {
+		return storj.ObjectInfo{}
+	}
 
-		Created:  response.Object.CreatedAt,
-		Modified: response.Object.CreatedAt,
-		Expires:  response.Object.ExpiresAt,
-		Metadata: response.Object.EncryptedMetadata,
+	info := storj.ObjectInfo{
+		Bucket: string(object.Bucket),
+		Path:   storj.Path(object.EncryptedPath),
+
+		StreamID: object.StreamId,
+
+		Created:  object.CreatedAt,
+		Modified: object.CreatedAt,
+		Expires:  object.ExpiresAt,
+		Metadata: object.EncryptedMetadata,
 		Stream: storj.Stream{
-			Size: response.Object.TotalSize,
+			Size: object.TotalSize,
 			EncryptionParameters: storj.EncryptionParameters{
-				CipherSuite: storj.CipherSuite(response.Object.EncryptionParameters.CipherSuite),
-				BlockSize:   int32(response.Object.EncryptionParameters.BlockSize),
+				CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),
+				BlockSize:   int32(object.EncryptionParameters.BlockSize),
 			},
 		},
 	}
 
-	pbRS := response.Object.RedundancyScheme
+	pbRS := object.RedundancyScheme
 	if pbRS != nil {
-		object.Stream.RedundancyScheme = storj.RedundancyScheme{
+		info.Stream.RedundancyScheme = storj.RedundancyScheme{
 			Algorithm:      storj.RedundancyAlgorithm(pbRS.Type),
 			ShareSize:      pbRS.ErasureShareSize,
 			RequiredShares: int16(pbRS.MinReq),
@@ -594,9 +615,7 @@ func newGetObjectResponse(response *pb.ObjectGetResponse) GetObjectResponse {
 			TotalShares:    int16(pbRS.Total),
 		}
 	}
-	return GetObjectResponse{
-		Info: object,
-	}
+	return info
 }
 
 // GetObject gets single object.
@@ -665,6 +684,21 @@ func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteO
 	}
 
 	return response.StreamId, nil
+}
+
+// BeginDeleteObjectReturnDeleted begins object deletion process.
+func (client *Client) BeginDeleteObjectReturnDeleted(ctx context.Context, params BeginDeleteObjectParams) (_ storj.StreamID, _ storj.ObjectInfo, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return storj.StreamID{}, storj.ObjectInfo{}, storj.ErrObjectNotFound.Wrap(err)
+		}
+		return storj.StreamID{}, storj.ObjectInfo{}, Error.Wrap(err)
+	}
+
+	return response.StreamId, newObjectInfo(response.Object), nil
 }
 
 // FinishDeleteObjectParams parameters for FinishDeleteObject method.

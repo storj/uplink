@@ -38,7 +38,7 @@ type Metadata interface {
 type Store interface {
 	Get(ctx context.Context, path storj.Path, object storj.Object) (rr ranger.Ranger, err error)
 	Put(ctx context.Context, path storj.Path, data io.Reader, metadata Metadata, expiration time.Time) (meta Meta, err error)
-	Delete(ctx context.Context, path storj.Path) (err error)
+	Delete(ctx context.Context, path storj.Path) (_ storj.ObjectInfo, err error)
 }
 
 type objStore struct {
@@ -73,11 +73,11 @@ func (o *objStore) Put(ctx context.Context, path storj.Path, data io.Reader, met
 	return convertMeta(m), err
 }
 
-func (o *objStore) Delete(ctx context.Context, path storj.Path) (err error) {
+func (o *objStore) Delete(ctx context.Context, path storj.Path) (_ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(path) == 0 {
-		return storj.ErrNoPath.New("")
+		return storj.ObjectInfo{}, storj.ErrNoPath.New("")
 	}
 
 	return o.store.Delete(ctx, path)

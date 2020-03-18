@@ -38,7 +38,7 @@ type Meta struct {
 type typedStore interface {
 	Get(ctx context.Context, path Path, object storj.Object) (ranger.Ranger, error)
 	Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (Meta, error)
-	Delete(ctx context.Context, path Path) error
+	Delete(ctx context.Context, path Path) (storj.ObjectInfo, error)
 }
 
 // streamStore is a store for streams. It implements typedStore as part of an ongoing migration
@@ -416,19 +416,19 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 }
 
 // Delete all the segments, with the last one last
-func (s *streamStore) Delete(ctx context.Context, path Path) (err error) {
+func (s *streamStore) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
-		return err
+		return storj.ObjectInfo{}, err
 	}
 
-	_, err = s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+	_, object, err := s.metainfo.BeginDeleteObjectReturnDeleted(ctx, metainfo.BeginDeleteObjectParams{
 		Bucket:        []byte(path.Bucket()),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
-	return err
+	return object, err
 }
 
 // ListItem is a single item in a listing
@@ -528,7 +528,7 @@ func (s *streamStore) cancelHandler(ctx context.Context, path Path) {
 	defer mon.Task()(&ctx)(nil)
 
 	// satellite deletes now from 0 to l so we can just use BeginDeleteObject
-	err := s.Delete(ctx, path)
+	_, err := s.Delete(ctx, path)
 	if err != nil {
 		zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
 	}
