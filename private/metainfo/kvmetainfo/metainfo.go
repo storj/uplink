@@ -75,7 +75,7 @@ func (db *DB) CreateBucket(ctx context.Context, bucketName string, info *storj.B
 }
 
 // DeleteBucket deletes bucket
-func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (err error) {
+func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (_ storj.Bucket, err error) {
 	return db.project.DeleteBucket(ctx, bucketName)
 }
 

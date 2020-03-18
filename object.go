@@ -100,25 +100,23 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	// TODO: Ideally, this should be done on the satellite
-	object, err := project.StatObject(ctx, bucket, key)
-	if err != nil {
-		return nil, err
-	}
-
 	b := storj.Bucket{Name: bucket}
-	err = project.db.DeleteObject(ctx, b, key)
+	obj, err := project.db.DeleteObject(ctx, b, key)
 	if err != nil {
 		if storj.ErrObjectNotFound.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 		return nil, convertKnownErrors(err)
 	}
-	return object, nil
+	return convertObject(&obj), nil
 }
 
 // convertObject converts storj.Object to uplink.Object.
 func convertObject(obj *storj.Object) *Object {
+	if obj.Bucket.Name == "" { // zero object
+		return nil
+	}
+
 	return &Object{
 		Key: obj.Path,
 		System: SystemMetadata{

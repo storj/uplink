@@ -25,10 +25,10 @@ import (
 	privateAccess "storj.io/uplink/private/access"
 )
 
-func TestSharePermisions(t *testing.T) {
+func TestSharePermissions(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
-		StorageNodeCount: 4,
+		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
@@ -54,7 +54,7 @@ func TestSharePermisions(t *testing.T) {
 			// TODO generate all combinations automatically
 		}
 
-		expectedData := testrand.Bytes(10 * memory.KiB)
+		expectedData := testrand.Bytes(1 * memory.KiB)
 		{
 			project := openProject(t, ctx, planet)
 			require.NoError(t, err)
@@ -145,23 +145,60 @@ func TestSharePermisions(t *testing.T) {
 
 					source := bytes.NewBuffer(expectedData)
 					_, err = io.Copy(upload, source)
-					if item.AllowUpload {
-						require.NoError(t, err)
+					require.NoError(t, err)
 
-						err = upload.Commit()
+					err = upload.Commit()
+					if item.AllowUpload {
 						require.NoError(t, err)
 					} else {
 						require.Error(t, err)
 					}
 				}
 				{ // deleting
-					// TODO test removing object
-					// _, err := project.DeleteBucket(ctx, bucketName)
-					// if item.AllowDelete {
-					// 	require.NoError(t, err)
-					// } else {
-					// 	require.Error(t, err)
-					// }
+					deletedObject, err := project.DeleteObject(ctx, bucketName, "test.dat")
+					if item.AllowDelete {
+						require.NoError(t, err)
+						if item.AllowDownload || item.AllowList {
+							require.NotNil(t, deletedObject)
+							require.Equal(t, "test.dat", deletedObject.Key)
+						} else {
+							require.Nil(t, deletedObject)
+						}
+					} else {
+						require.Error(t, err)
+					}
+
+					if item.AllowUpload {
+						deletedObject, err = project.DeleteObject(ctx, bucketName, "new-test.dat")
+						if item.AllowDelete {
+							require.NoError(t, err)
+							if item.AllowDownload || item.AllowList {
+								require.NotNil(t, deletedObject)
+								require.Equal(t, "new-test.dat", deletedObject.Key)
+							} else {
+								require.Nil(t, deletedObject)
+							}
+						} else {
+							require.Error(t, err)
+						}
+					}
+
+					deletedBucket, err := project.DeleteBucket(ctx, bucketName)
+					if item.AllowDelete {
+						require.NoError(t, err)
+						// TODO: The commented logic does not work because of
+						// issue with checking permissions for buckets -
+						// buckets are currently automatically granted with Read permission.
+
+						// if item.AllowDownload || item.AllowList {
+						require.NotNil(t, deletedBucket)
+						require.Equal(t, bucketName, deletedBucket.Name)
+						// } else {
+						// 	require.Nil(t, deletedBucket)
+						// }
+					} else {
+						require.Error(t, err)
+					}
 				}
 
 				// TODO test listing buckets and objects

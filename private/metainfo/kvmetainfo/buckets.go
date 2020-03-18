@@ -79,20 +79,20 @@ func validateBlockSize(redundancyScheme storj.RedundancyScheme, blockSize int32)
 }
 
 // DeleteBucket deletes bucket
-func (db *Project) DeleteBucket(ctx context.Context, bucketName string) (err error) {
+func (db *Project) DeleteBucket(ctx context.Context, bucketName string) (_ storj.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
-		return storj.ErrNoBucket.New("")
+		return storj.Bucket{}, storj.ErrNoBucket.New("")
 	}
-	_, err = db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
+	bucket, err := db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
 		Name: []byte(bucketName),
 	})
 	if err != nil {
-		return storj.ErrBucket.Wrap(err)
+		return storj.Bucket{}, storj.ErrBucket.Wrap(err)
 	}
 
-	return nil
+	return bucket, nil
 }
 
 // DeleteBucketReturnDeleted deletes bucket and returns the deleted bucket.

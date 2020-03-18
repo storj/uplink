@@ -125,19 +125,30 @@ func (db *DB) ModifyObject(ctx context.Context, bucket storj.Bucket, path storj.
 }
 
 // DeleteObject deletes an object from database
-func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (err error) {
+func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (_ storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
-		return storj.ErrNoBucket.New("")
+		return storj.Object{}, storj.ErrNoBucket.New("")
 	}
 
 	prefixed := prefixedObjStore{
 		store:  objects.NewStore(db.streams),
 		prefix: bucket.Name,
 	}
-	_, err = prefixed.Delete(ctx, path)
-	return err
+
+	info, err := prefixed.Delete(ctx, path)
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	_, obj, err := objectFromInfo(ctx, bucket, path, encPath, info, db.encStore)
+	return obj, err
 }
 
 // DeleteObjectReturnDeleted deletes an object from database and returns the deleted object.

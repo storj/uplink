@@ -114,13 +114,7 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	// TODO: Ideally, this should be done on the satellite
-	existing, err := project.StatBucket(ctx, bucket)
-	if err != nil {
-		return nil, err
-	}
-
-	err = project.project.DeleteBucket(ctx, bucket)
+	existing, err := project.project.DeleteBucket(ctx, bucket)
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
 			return nil, errwrapf("%w (%q)", ErrBucketNotEmpty, bucket)
@@ -130,5 +124,13 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 		}
 		return nil, convertKnownErrors(err)
 	}
-	return existing, nil
+
+	if existing == (storj.Bucket{}) {
+		return nil, nil
+	}
+
+	return &Bucket{
+		Name:    existing.Name,
+		Created: existing.Created,
+	}, nil
 }
