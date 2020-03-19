@@ -672,22 +672,7 @@ func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginD
 }
 
 // BeginDeleteObject begins object deletion process.
-func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ storj.StreamID, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
-	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.StreamID{}, storj.ErrObjectNotFound.Wrap(err)
-		}
-		return storj.StreamID{}, Error.Wrap(err)
-	}
-
-	return response.StreamId, nil
-}
-
-// BeginDeleteObjectReturnDeleted begins object deletion process.
-func (client *Client) BeginDeleteObjectReturnDeleted(ctx context.Context, params BeginDeleteObjectParams) (_ storj.StreamID, _ storj.ObjectInfo, err error) {
+func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ storj.StreamID, _ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))

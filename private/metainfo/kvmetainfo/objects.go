@@ -151,36 +151,6 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 	return obj, err
 }
 
-// DeleteObjectReturnDeleted deletes an object from database and returns the deleted object.
-// TODO: This is a temporary method due to the cycle dependency in test
-// between storj/storj and storj/uplink repos. It will be removed after it is
-// possible to make the original DeleteObject method return the deleted object.
-func (db *DB) DeleteObjectReturnDeleted(ctx context.Context, bucket storj.Bucket, path storj.Path) (_ storj.Object, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if bucket.Name == "" {
-		return storj.Object{}, storj.ErrNoBucket.New("")
-	}
-
-	prefixed := prefixedObjStore{
-		store:  objects.NewStore(db.streams),
-		prefix: bucket.Name,
-	}
-
-	info, err := prefixed.Delete(ctx, path)
-	if err != nil {
-		return storj.Object{}, err
-	}
-
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
-	if err != nil {
-		return storj.Object{}, err
-	}
-
-	_, obj, err := objectFromInfo(ctx, bucket, path, encPath, info, db.encStore)
-	return obj, err
-}
-
 // ModifyPendingObject creates an interface for updating a partially uploaded object
 func (db *DB) ModifyPendingObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
