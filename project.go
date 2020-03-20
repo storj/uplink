@@ -14,13 +14,12 @@ import (
 	"storj.io/common/memory"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	comtelem "storj.io/common/telemetry"
+	"storj.io/uplink/internal/telemetryclient"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/metainfo/kvmetainfo"
 	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
-	"storj.io/uplink/telemetry"
 )
 
 // Project provides access to managing buckets and objects.
@@ -33,8 +32,8 @@ type Project struct {
 	db       *kvmetainfo.DB
 	streams  streams.Store
 
-	eg          *errgroup.Group
-	telemClient *comtelem.Client
+	eg        *errgroup.Group
+	telemetry telemetryclient.Client
 }
 
 // OpenProject opens a project with the specific access grant.
@@ -50,12 +49,9 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.New("access grant is nil")
 	}
 
-	var telemClient *comtelem.Client
-	if options := telemetry.ExtractOptions(ctx); options != nil {
-		telemClient, err = comtelem.NewClient(zap.L(), options.Endpoint, comtelem.ClientOpts{
-			Application: options.Application,
-			Headers:     map[string]string{"sat": access.satelliteAddress},
-		})
+	var telemetry telemetryclient.Client
+	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
+		telemetry, err = ctor(zap.L(), access.satelliteAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -63,11 +59,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	metainfo, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
 	if err != nil {
+		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
 	proj, err := kvmetainfo.SetupProject(metainfo)
 	if err != nil {
+		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
@@ -95,44 +93,46 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(segmentsSize, encryptionParameters)
 	if err != nil {
+		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
 	streamStore, err := streams.NewStreamStore(metainfo, segmentStore, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
+		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
 	db := kvmetainfo.New(proj, metainfo, streamStore, segmentStore, access.encAccess.Store())
 
 	var eg errgroup.Group
-	if telemClient != nil {
+	if telemetry != nil {
 		eg.Go(func() error {
-			telemClient.Run(ctx)
+			telemetry.Run(ctx)
 			return nil
 		})
 	}
 
 	return &Project{
-		config:      config,
-		access:      access,
-		dialer:      dialer,
-		metainfo:    metainfo,
-		project:     proj,
-		db:          db,
-		streams:     streamStore,
-		eg:          &eg,
-		telemClient: telemClient,
+		config:    config,
+		access:    access,
+		dialer:    dialer,
+		metainfo:  metainfo,
+		project:   proj,
+		db:        db,
+		streams:   streamStore,
+		eg:        &eg,
+		telemetry: telemetry,
 	}, nil
 }
 
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
-	if project.telemClient != nil {
-		project.telemClient.Stop()
+	if project.telemetry != nil {
+		project.telemetry.Stop()
 		err = errs.Combine(
 			project.eg.Wait(),
-			project.telemClient.Report(context.Background()),
+			project.telemetry.Report(context.Background()),
 		)
 	}
 	return packageError.Wrap(errs.Combine(err, project.metainfo.Close()))
