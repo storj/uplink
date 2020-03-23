@@ -103,7 +103,9 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.DeleteObject(ctx, b, key)
 	if err != nil {
-		if storj.ErrObjectNotFound.Has(err) {
+		if storj.ErrNoPath.Has(err) {
+			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
+		} else if storj.ErrObjectNotFound.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 		return nil, convertKnownErrors(err)

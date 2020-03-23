@@ -118,9 +118,10 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
 			return nil, errwrapf("%w (%q)", ErrBucketNotEmpty, bucket)
-		}
-		if storj.ErrBucketNotFound.Has(err) {
+		} else if storj.ErrBucketNotFound.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrBucketNotFound, bucket)
+		} else if storj.ErrNoBucket.Has(err) {
+			return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
 		}
 		return nil, convertKnownErrors(err)
 	}
