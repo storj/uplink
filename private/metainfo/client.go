@@ -63,7 +63,7 @@ func Dial(ctx context.Context, dialer rpc.Dialer, address string, apiKey *macaro
 
 	return &Client{
 		conn:      conn,
-		client:    pb.NewDRPCMetainfoClient(conn.Raw()),
+		client:    pb.NewDRPCMetainfoClient(conn),
 		apiKeyRaw: apiKey.SerializeRaw(),
 		userAgent: userAgent,
 	}, nil
@@ -87,7 +87,7 @@ func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey 
 
 	return &Client{
 		conn:      conn,
-		client:    pb.NewDRPCMetainfoClient(conn.Raw()),
+		client:    pb.NewDRPCMetainfoClient(conn),
 		apiKeyRaw: apiKey.SerializeRaw(),
 		userAgent: userAgent,
 	}, nil
