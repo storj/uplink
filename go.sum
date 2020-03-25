@@ -55,6 +55,8 @@ github.com/spacemonkeygo/errors v0.0.0-20171212215202-9064522e9fd1/go.mod h1:7NL
 github.com/spacemonkeygo/monkit/v3 v3.0.0-20191108235033-eacca33b3037/go.mod h1:JcK1pCbReQsOsMKF/POFSZCq7drXFybgGmbc27tuwes=
 github.com/spacemonkeygo/monkit/v3 v3.0.4 h1:Ay+PZirv+qfd4sqcT+X/U3BnC7AcIaqp/IXh0oV36k8=
 github.com/spacemonkeygo/monkit/v3 v3.0.4/go.mod h1:JcK1pCbReQsOsMKF/POFSZCq7drXFybgGmbc27tuwes=
+github.com/spacemonkeygo/monkit/v3 v3.0.5 h1:vMW8Ne6WAUU/OMYaSv7KGW9h/sRNgeh6TyBapOSuMhM=
+github.com/spacemonkeygo/monkit/v3 v3.0.5/go.mod h1:JcK1pCbReQsOsMKF/POFSZCq7drXFybgGmbc27tuwes=
 github.com/spacemonkeygo/monotime v0.0.0-20180824235756-e3f48a95f98a h1:8+cCjxhToanKmxLIbuyBNe2EnpgwhiivsIaRJstDRFA=
 github.com/spacemonkeygo/monotime v0.0.0-20180824235756-e3f48a95f98a/go.mod h1:ul4bvvnCOPZgq8w0nTkSmWVg/hauVpFS97Am1YM1XXo=
 github.com/stretchr/objx v0.1.0 h1:4G4v2dO3VZwixGIRoQ5Lfboy6nUhCyYzaqnIAPPhYs4=
@@ -67,8 +69,8 @@ github.com/zeebo/admission/v2 v2.0.0 h1:220NPZzKmyfklysKFO95L7E2Gt5NwlxTWGE14VP8
 github.com/zeebo/admission/v2 v2.0.0/go.mod h1:gSeHGelDHW7Vq6UyJo2boeSt/6Dsnqpisv0i4YZSOyM=
 github.com/zeebo/admission/v3 v3.0.1 h1:/IWg2jLhfjBOUhhdKcbweSzcY3QlbbE57sqvU72EpqA=
 github.com/zeebo/admission/v3 v3.0.1/go.mod h1:BP3isIv9qa2A7ugEratNq1dnl2oZRXaQUGdU7WXKtbw=
-github.com/zeebo/assert v1.0.0 h1:qw3LXzO7lbptWIQ6DsemJIUOoaqyKbgY3M8b8yvlaaY=
-github.com/zeebo/assert v1.0.0/go.mod h1:yssERNPivllc1yU3BvpjYI5BUW+zglcz6QWqeVRL5t0=
+github.com/zeebo/assert v1.1.0 h1:hU1L1vLTHsnO8x8c9KAR5GmM5QscxHg5RNU5z5qbUWY=
+github.com/zeebo/assert v1.1.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/errs v1.2.2 h1:5NFypMTuSdoySVTqlNs1dEoU21QVamMQJxW/Fii5O7g=
 github.com/zeebo/errs v1.2.2/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
 github.com/zeebo/float16 v0.1.0 h1:kRqxv5og6z1emEyz5FpW0/BVHe5VfxEAw6b1ljCZlUc=
@@ -133,10 +135,7 @@ gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7/go.mod h1:dt/ZhP58zS4L8KSrWD
 gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-storj.io/common v0.0.0-20200310192634-b730fe7e2fd5 h1:xrZpp2TpXmHcgtdG4rSlX0U7iyO9flCAfDbS0+wqUdY=
-storj.io/common v0.0.0-20200310192634-b730fe7e2fd5/go.mod h1:I0QTs7z1rI+ZEN95GGY2LKMzP5OZqu0Udga3WhyQfO0=
-storj.io/common v0.0.0-20200318103328-b7e942ff9304 h1:KQ1ITzbT32bAyBx5gPYQFkMs86iUGA1Sl+QvsMQuJZc=
-storj.io/common v0.0.0-20200318103328-b7e942ff9304/go.mod h1:I0QTs7z1rI+ZEN95GGY2LKMzP5OZqu0Udga3WhyQfO0=
-storj.io/common v0.0.0-20200320083002-07faa8a64ad8 h1:DgWXFCldvyu1drZKKL0D3vlHSkjmBsvBqr8nXg59SFs=
-storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2 h1:8SgLYEhe99R8QlAD1EAOBPRyIR+cn2hqkXtWlAUPf/c=
-storj.io/drpc v0.0.7-0.20191115031725-2171c57838d2/go.mod h1:/ascUDbzNAv0A3Jj7wUIKFBH2JdJ2uJIBO/b9+2yHgQ=
+storj.io/common v0.0.0-20200324171116-bad40c947e25 h1:AU4vRaFLkATRaCN6cZY0MiyNdl1n3aRkkEn/1mEo3Sc=
+storj.io/common v0.0.0-20200324171116-bad40c947e25/go.mod h1:RBaNRmk/lqyZ7h1MAH4N9zld0z+tO4M9sLOFT30K+cE=
+storj.io/drpc v0.0.11 h1:6vLxfpSbwCLtqzAoXzXx/SxBqBtbzbmquXPqfcWKqfw=
+storj.io/drpc v0.0.11/go.mod h1:TiFc2obNjL9/3isMW1Rpxjy8V9uE0B2HMeMFGiiI7Iw=
