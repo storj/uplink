@@ -100,6 +100,9 @@ func (objects *ObjectIterator) loadNext() bool {
 		return false
 	}
 	objects.list = &list
+	if list.More {
+		objects.options = objects.options.NextPage(list)
+	}
 	objects.position = 0
 	return len(list.Items) > 0
 }

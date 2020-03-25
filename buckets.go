@@ -81,6 +81,9 @@ func (buckets *BucketIterator) loadNext() bool {
 		return false
 	}
 	buckets.list = &list
+	if list.More {
+		buckets.options = buckets.options.NextPage(list)
+	}
 	buckets.position = 0
 	return len(list.Items) > 0
 }

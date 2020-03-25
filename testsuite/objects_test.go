@@ -6,14 +6,17 @@ package testsuite_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite/metainfo"
 	"storj.io/uplink"
 )
 
@@ -260,6 +263,67 @@ func TestListObjects_Cursor(t *testing.T) {
 
 		require.Empty(t, expectedObjects)
 		assertNoNextObject(t, list)
+	})
+}
+
+type pointerDBWithLookupLimit struct {
+	limit int
+	metainfo.PointerDB
+}
+
+func (db *pointerDBWithLookupLimit) LookupLimit() int { return db.limit }
+
+func TestListObjects_AutoPaging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			SatellitePointerDB: func(log *zap.Logger, index int, pointerdb metainfo.PointerDB) (metainfo.PointerDB, error) {
+				return &pointerDBWithLookupLimit{2, pointerdb}, nil
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}()
+
+		totalObjects := 5 // 3 pages
+		expectedObjects := map[string]bool{}
+
+		for i := 0; i < totalObjects; i++ {
+			key := fmt.Sprintf("%d.dat", i)
+			expectedObjects[key] = true
+			uploadObject(t, ctx, project, "testbucket", key, 1)
+
+			defer func(key string) {
+				_, err := project.DeleteObject(ctx, "testbucket", key)
+				require.NoError(t, err)
+			}(key)
+		}
+
+		list := listObjects(t, ctx, project, "testbucket", &uplink.ListObjectsOptions{
+			Recursive: true,
+		})
+
+		var ok bool
+		for list.Next() {
+			object := list.Item()
+
+			_, ok = expectedObjects[object.Key]
+			require.True(t, ok)
+
+			delete(expectedObjects, object.Key)
+		}
+
+		require.NoError(t, list.Err())
+		require.Equal(t, 0, len(expectedObjects))
 	})
 }
 
