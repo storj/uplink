@@ -16,7 +16,6 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/objects"
 	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
 )
@@ -132,12 +131,11 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		return storj.Object{}, storj.ErrNoBucket.New("")
 	}
 
-	prefixed := prefixedObjStore{
-		store:  objects.NewStore(db.streams),
-		prefix: bucket.Name,
+	if len(path) == 0 {
+		return storj.Object{}, storj.ErrNoPath.New("")
 	}
 
-	info, err := prefixed.Delete(ctx, path)
+	info, err := db.streams.Delete(ctx, storj.JoinPaths(bucket.Name, path))
 	if err != nil {
 		return storj.Object{}, err
 	}
