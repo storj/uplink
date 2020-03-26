@@ -19,6 +19,14 @@ encrypted, broken into little pieces and stored in a global decentralized
 network of computers. Luckily, we also support allowing you (and only you) to
 retrieve those files!
 
+### A Note about Versioning
+
+Our versioning in this repo is intended to primarily support the expectations of the
+[Go modules](https://blog.golang.org/using-go-modules) system, so you can expect that
+within a major version release, backwards-incompatible changes will be avoided at high
+cost. This is not the case with our downstream repo, 
+[storj/storj](https://github.com/storj/storj/).
+
 # Documentation
 
 - [Go Doc](https://pkg.go.dev/storj.io/uplink)
