@@ -10,7 +10,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
-	"storj.io/common/memory"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/segments"
@@ -44,29 +43,6 @@ func New(project *Project, metainfo *metainfo.Client, streams streams.Store, seg
 		segments: segments,
 		encStore: encStore,
 	}
-}
-
-const defaultLookupLimit = 1000
-
-// Limits returns limits for this metainfo database
-func (db *DB) Limits() (MetainfoLimits, error) {
-	// TODO: fetch this information from satellite
-	return MetainfoLimits{
-		ListLimit:                defaultLookupLimit,
-		MinimumRemoteSegmentSize: memory.KiB.Int64(), // TODO: is this needed here?
-		MaximumInlineSegmentSize: memory.MiB.Int64(),
-	}, nil
-}
-
-// MetainfoLimits lists limits specified for the Metainfo database
-type MetainfoLimits struct {
-	// ListLimit specifies the maximum amount of items that can be listed at a time.
-	ListLimit int64
-
-	// MinimumRemoteSegmentSize specifies the minimum remote segment that is allowed to be stored.
-	MinimumRemoteSegmentSize int64
-	// MaximumInlineSegmentSize specifies the maximum inline segment that is allowed to be stored.
-	MaximumInlineSegmentSize int64
 }
 
 // CreateBucket creates a new bucket with the specified information
