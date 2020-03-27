@@ -195,7 +195,11 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// metaFlags |= meta.UserDefined
 	// }
 
-	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, options.Prefix))
+	// Remove the trailing slash from list prefix.
+	// Otherwise, if we the list prefix is `/bob/`, the encrypted list
+	// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
+	// encrypted prefix, what we really want is `enc("")/enc("bob")`.
+	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, strings.TrimSuffix(options.Prefix, "/")))
 	prefixKey, err := encryption.DerivePathKey(prefix.Bucket(), streams.PathForKey(prefix.UnencryptedPath().Raw()), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
@@ -204,15 +208,6 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket(), prefix.UnencryptedPath(), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
-	}
-
-	// If the raw unencrypted path ends in a `/` we need to remove the final
-	// section of the encrypted path. For example, if we are listing the path
-	// `/bob/`, the encrypted path results in `enc("")/enc("bob")/enc("")`. This
-	// is an incorrect list prefix, what we really want is `enc("")/enc("bob")`
-	if strings.HasSuffix(prefix.UnencryptedPath().Raw(), "/") {
-		lastSlashIdx := strings.LastIndex(encPrefix.Raw(), "/")
-		encPrefix = paths.NewEncrypted(encPrefix.Raw()[:lastSlashIdx])
 	}
 
 	// We have to encrypt startAfter but only if it doesn't contain a bucket.
@@ -326,7 +321,11 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 	// metaFlags |= meta.UserDefined
 	// }
 
-	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, options.Prefix))
+	// Remove the trailing slash from list prefix.
+	// Otherwise, if we the list prefix is `/bob/`, the encrypted list
+	// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
+	// encrypted prefix, what we really want is `enc("")/enc("bob")`.
+	prefix := streams.ParsePath(storj.JoinPaths(bucket.Name, strings.TrimSuffix(options.Prefix, "/")))
 	prefixKey, err := encryption.DerivePathKey(prefix.Bucket(), streams.PathForKey(prefix.UnencryptedPath().Raw()), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
@@ -335,15 +334,6 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket(), prefix.UnencryptedPath(), db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
-	}
-
-	// If the raw unencrypted path ends in a `/` we need to remove the final
-	// section of the encrypted path. For example, if we are listing the path
-	// `/bob/`, the encrypted path results in `enc("")/enc("bob")/enc("")`. This
-	// is an incorrect list prefix, what we really want is `enc("")/enc("bob")`
-	if strings.HasSuffix(prefix.UnencryptedPath().Raw(), "/") {
-		lastSlashIdx := strings.LastIndex(encPrefix.Raw(), "/")
-		encPrefix = paths.NewEncrypted(encPrefix.Raw()[:lastSlashIdx])
 	}
 
 	// We have to encrypt startAfter but only if it doesn't contain a bucket.

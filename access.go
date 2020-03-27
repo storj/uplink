@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcutil/base58"
@@ -210,7 +211,11 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	for _, prefix := range prefixes {
-		unencPath := paths.NewUnencrypted(prefix.Prefix)
+		// If the share prefix ends in a `/` we need to remove this final slash.
+		// Otherwise, if we the shared prefix is `/bob/`, the encrypted shared
+		// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
+		// encrypted prefix, what we really want is `enc("")/enc("bob")`.
+		unencPath := paths.NewUnencrypted(strings.TrimSuffix(prefix.Prefix, "/"))
 
 		encPath, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket, unencPath, access.encAccess.store)
 		if err != nil {

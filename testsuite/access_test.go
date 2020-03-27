@@ -8,12 +8,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
@@ -56,7 +58,7 @@ func TestSharePermissions(t *testing.T) {
 
 		expectedData := testrand.Bytes(1 * memory.KiB)
 		{
-			project := openProject(t, ctx, planet)
+			project, err := uplinkConfig.OpenProject(ctx, access)
 			require.NoError(t, err)
 
 			// prepare bucket and object for all test cases
@@ -235,10 +237,229 @@ func TestSharePermisionsNotAfterNotBefore(t *testing.T) {
 
 			project, err := uplink.OpenProject(ctx, sharedAccess)
 			require.NoError(t, err)
+			defer ctx.Check(project.Close)
 
 			bucket, err := project.EnsureBucket(ctx, "test-bucket")
 			require.Error(t, err)
 			require.Nil(t, bucket)
+		}
+	})
+}
+
+func TestSharePrefix_List(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		expectedData := testrand.Bytes(1 * memory.KiB)
+		{
+			project, err := uplinkConfig.OpenProject(ctx, access)
+			require.NoError(t, err)
+
+			bucket, err := project.EnsureBucket(ctx, "testbucket")
+			require.NoError(t, err)
+			require.NotNil(t, bucket)
+			require.Equal(t, "testbucket", bucket.Name)
+
+			upload, err := project.UploadObject(ctx, "testbucket", "a/b/c/test.dat", nil)
+			require.NoError(t, err)
+
+			source := bytes.NewBuffer(expectedData)
+			_, err = io.Copy(upload, source)
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+
+			ctx.Check(project.Close)
+		}
+
+		for _, tt := range []struct {
+			sharePrefix, listPrefix string
+		}{
+			{sharePrefix: "", listPrefix: ""},
+			{sharePrefix: "", listPrefix: "a/"},
+			{sharePrefix: "", listPrefix: "a/b/"},
+			{sharePrefix: "a", listPrefix: "a/"},
+			{sharePrefix: "a", listPrefix: "a/b/"},
+			{sharePrefix: "a", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/", listPrefix: "a/"},
+			{sharePrefix: "a/", listPrefix: "a/b/"},
+			{sharePrefix: "a/", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/b", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/b", listPrefix: "a/b/"},
+			{sharePrefix: "a/b", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/b/", listPrefix: "a/b/"},
+			{sharePrefix: "a/b/", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/b/c", listPrefix: "a/b/c/"},
+			{sharePrefix: "a/b/c/", listPrefix: "a/b/c/"},
+		} {
+			t.Run("sharePrefix: "+tt.sharePrefix+", listPrefix: "+tt.listPrefix, func(t *testing.T) {
+				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
+					Bucket: "testbucket",
+					Prefix: tt.sharePrefix,
+				})
+				require.NoError(t, err)
+
+				project, err := uplinkConfig.OpenProject(ctx, sharedAccess)
+				require.NoError(t, err)
+				defer ctx.Check(project.Close)
+
+				list := project.ListObjects(ctx, "testbucket", &uplink.ListObjectsOptions{
+					Prefix:    tt.listPrefix,
+					Recursive: true,
+				})
+				assert.True(t, list.Next())
+				require.NoError(t, list.Err())
+				require.NotNil(t, list.Item())
+				require.False(t, list.Item().IsPrefix)
+				require.Equal(t, "a/b/c/test.dat", list.Item().Key)
+			})
+		}
+	})
+}
+
+func TestSharePrefix_Download(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		expectedData := testrand.Bytes(1 * memory.KiB)
+		{
+			project, err := uplinkConfig.OpenProject(ctx, access)
+			require.NoError(t, err)
+
+			bucket, err := project.EnsureBucket(ctx, "testbucket")
+			require.NoError(t, err)
+			require.NotNil(t, bucket)
+			require.Equal(t, "testbucket", bucket.Name)
+
+			upload, err := project.UploadObject(ctx, "testbucket", "a/b/c/test.dat", nil)
+			require.NoError(t, err)
+
+			source := bytes.NewBuffer(expectedData)
+			_, err = io.Copy(upload, source)
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+
+			ctx.Check(project.Close)
+		}
+
+		for _, prefix := range []string{
+			"",
+			"a",
+			"a/",
+			"a/b",
+			"a/b/",
+			"a/b/c",
+			"a/b/c/",
+			"a/b/c/test.dat",
+		} {
+			t.Run("prefix: "+prefix, func(t *testing.T) {
+				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
+					Bucket: "testbucket",
+					Prefix: prefix,
+				})
+				require.NoError(t, err)
+
+				project, err := uplinkConfig.OpenProject(ctx, sharedAccess)
+				require.NoError(t, err)
+				defer ctx.Check(project.Close)
+
+				download, err := project.DownloadObject(ctx, "testbucket", "a/b/c/test.dat", nil)
+				require.NoError(t, err)
+
+				downloaded, err := ioutil.ReadAll(download)
+				require.NoError(t, err)
+				require.Equal(t, expectedData, downloaded)
+
+				err = download.Close()
+				require.NoError(t, err)
+			})
+		}
+	})
+}
+
+func TestSharePrefix_UploadDownload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		require.NoError(t, err)
+
+		expectedData := testrand.Bytes(1 * memory.KiB)
+		{
+			sharedAccess, err := access.Share(
+				uplink.Permission{
+					AllowUpload: true,
+				},
+				uplink.SharePrefix{
+					Bucket: "testbucket",
+				})
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, sharedAccess)
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			_, err = project.CreateBucket(ctx, "testbucket")
+			require.NoError(t, err)
+
+			upload, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+			require.NoError(t, err)
+
+			source := bytes.NewBuffer(expectedData)
+			_, err = io.Copy(upload, source)
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+		}
+
+		{
+			sharedAccess, err := access.Share(
+				uplink.Permission{
+					AllowDownload: true,
+				},
+				uplink.SharePrefix{
+					Bucket: "testbucket",
+					Prefix: "test.dat",
+				})
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, sharedAccess)
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			download, err := project.DownloadObject(ctx, "testbucket", "test.dat", nil)
+			require.NoError(t, err)
+
+			downloaded, err := ioutil.ReadAll(download)
+			require.NoError(t, err)
+
+			err = download.Close()
+			require.NoError(t, err)
+			require.Equal(t, expectedData, downloaded)
 		}
 	})
 }
