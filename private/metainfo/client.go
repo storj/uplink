@@ -8,7 +8,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/skyrings/skyring-common/tools/uuid"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
@@ -18,6 +17,7 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
+	"storj.io/common/uuid"
 	"storj.io/uplink/private/eestream"
 )
 
@@ -369,7 +369,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) 
 
 	return storj.Bucket{
 		Name:                string(pbBucket.GetName()),
-		PartnerID:           partnerID,
+		PartnerID:           storj.DeprecatedUUID(partnerID),
 		PathCipher:          storj.CipherSuite(pbBucket.GetPathCipher()),
 		Created:             pbBucket.GetCreatedAt(),
 		DefaultSegmentsSize: pbBucket.GetDefaultSegmentSize(),
@@ -391,7 +391,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) 
 // SetBucketAttributionParams parameters for SetBucketAttribution method.
 type SetBucketAttributionParams struct {
 	Bucket    string
-	PartnerID uuid.UUID
+	PartnerID storj.DeprecatedUUID
 }
 
 func (params *SetBucketAttributionParams) toRequest(header *pb.RequestHeader) *pb.BucketSetAttributionRequest {

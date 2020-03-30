@@ -7,8 +7,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/skyrings/skyring-common/tools/uuid"
-
 	"storj.io/common/errs2"
 	"storj.io/common/pb"
 	"storj.io/common/rpc/rpcstatus"
@@ -163,7 +161,7 @@ func (client *Client) ListSegmentsOld(ctx context.Context, bucket string, prefix
 }
 
 // SetAttributionOld tries to set the attribution information on the bucket.
-func (client *Client) SetAttributionOld(ctx context.Context, bucket string, partnerID uuid.UUID) (err error) {
+func (client *Client) SetAttributionOld(ctx context.Context, bucket string, partnerID storj.DeprecatedUUID) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	_, err = client.client.SetAttributionOld(ctx, &pb.SetAttributionRequestOld{

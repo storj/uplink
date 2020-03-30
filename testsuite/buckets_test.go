@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/skyrings/skyring-common/tools/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -170,7 +169,7 @@ func (db *satelliteDBWithBucketsListLimit) Buckets() metainfo.BucketsDB {
 	return &bucketsDBWithListLimit{db.limit, db.DB.Buckets()}
 }
 
-func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID uuid.UUID, listOpts storj.BucketListOptions, allowedBuckets macaroon.AllowedBuckets) (bucketList storj.BucketList, err error) {
+func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID storj.DeprecatedUUID, listOpts storj.BucketListOptions, allowedBuckets macaroon.AllowedBuckets) (bucketList storj.BucketList, err error) {
 	if listOpts.Limit < 1 {
 		listOpts.Limit = db.limit
 	}
