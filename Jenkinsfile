@@ -82,7 +82,6 @@ pipeline {
                     steps {
                         sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
                         sh 'psql -U postgres -c \'create database teststorj;\''
-                        sh 'use-ports -from 1024 -to 10000 &'
                         dir('testsuite'){
                             sh 'go vet ./...'
                             sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
@@ -96,6 +95,27 @@ pipeline {
                             sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
                             archiveArtifacts artifacts: '.build/testsuite.json'
                             junit '.build/testsuite.xml'
+                        }
+                    }
+                }
+
+                stage('Integration [storj/storj]') {
+                    environment {
+                        STORJ_POSTGRES_TEST = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
+                    }
+                    steps {
+                        sh 'psql -U postgres -c \'create database teststorj2;\''
+                        dir('testsuite'){
+                            sh 'go vet storj.io/storj/...'
+                            sh 'go test -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                        }
+                    }
+
+                    post {
+                        always {
+                            sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite-storj.json'
+                            junit '.build/testsuite-storj.xml'
                         }
                     }
                 }
