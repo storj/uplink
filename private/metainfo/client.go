@@ -369,7 +369,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) 
 
 	return storj.Bucket{
 		Name:                string(pbBucket.GetName()),
-		PartnerID:           storj.DeprecatedUUID(partnerID),
+		PartnerID:           partnerID,
 		PathCipher:          storj.CipherSuite(pbBucket.GetPathCipher()),
 		Created:             pbBucket.GetCreatedAt(),
 		DefaultSegmentsSize: pbBucket.GetDefaultSegmentSize(),
@@ -391,7 +391,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) 
 // SetBucketAttributionParams parameters for SetBucketAttribution method.
 type SetBucketAttributionParams struct {
 	Bucket    string
-	PartnerID storj.DeprecatedUUID
+	PartnerID uuid.UUID
 }
 
 func (params *SetBucketAttributionParams) toRequest(header *pb.RequestHeader) *pb.BucketSetAttributionRequest {

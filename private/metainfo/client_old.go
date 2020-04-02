@@ -11,6 +11,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
+	"storj.io/common/uuid"
 )
 
 // CreateSegmentOld requests the order limits for creating a new segment
@@ -161,7 +162,7 @@ func (client *Client) ListSegmentsOld(ctx context.Context, bucket string, prefix
 }
 
 // SetAttributionOld tries to set the attribution information on the bucket.
-func (client *Client) SetAttributionOld(ctx context.Context, bucket string, partnerID storj.DeprecatedUUID) (err error) {
+func (client *Client) SetAttributionOld(ctx context.Context, bucket string, partnerID uuid.UUID) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	_, err = client.client.SetAttributionOld(ctx, &pb.SetAttributionRequestOld{

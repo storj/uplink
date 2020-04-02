@@ -16,6 +16,7 @@ import (
 	"storj.io/common/macaroon"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
+	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/metainfo"
@@ -169,7 +170,7 @@ func (db *satelliteDBWithBucketsListLimit) Buckets() metainfo.BucketsDB {
 	return &bucketsDBWithListLimit{db.limit, db.DB.Buckets()}
 }
 
-func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID storj.DeprecatedUUID, listOpts storj.BucketListOptions, allowedBuckets macaroon.AllowedBuckets) (bucketList storj.BucketList, err error) {
+func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID uuid.UUID, listOpts storj.BucketListOptions, allowedBuckets macaroon.AllowedBuckets) (bucketList storj.BucketList, err error) {
 	if listOpts.Limit < 1 {
 		listOpts.Limit = db.limit
 	}
