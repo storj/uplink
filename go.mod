@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/btcsuite/btcutil v1.0.1
 	github.com/gogo/protobuf v1.2.1
-	github.com/skyrings/skyring-common v0.0.0-20160929130248-d1c0bb1cbd5e
 	github.com/spacemonkeygo/errors v0.0.0-20171212215202-9064522e9fd1
 	github.com/spacemonkeygo/monkit/v3 v3.0.5
 	github.com/stretchr/testify v1.4.0

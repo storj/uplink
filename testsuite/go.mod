@@ -5,7 +5,6 @@ go 1.13
 replace storj.io/uplink => ../
 
 require (
-	github.com/skyrings/skyring-common v0.0.0-20160929130248-d1c0bb1cbd5e
 	github.com/stretchr/testify v1.5.1
 	go.uber.org/zap v1.14.1
 	storj.io/common v0.0.0-20200331124657-a4f8265946f2
