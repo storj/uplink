@@ -4,7 +4,7 @@
 
 New version should be released when we are ready to make changes generally available.
 
-New version should not be released if we want to test our latest changes or to make them available to a limited number of users. This can be achieved without releasing a new version. Go modules allow to point to latest master or specific Git commit.
+New version should not be released if we want to test our latest changes or to make them available to a limited number of users. This can be achieved without releasing a new version. Go modules allow to point to latest master or specific Git commit. However, commits from master are not suitable for use in production unless they are a release tag. Do not use non-release commits in downstream projects in production.
 
 Consider releasing a new Release Candidate version to make changes available to a larger group of users, if we are not ready to make them available to everyone yet.
 
@@ -36,7 +36,7 @@ Examples of Release Candidates:
 5. Wait for the build to finish. If the build fails for any of the Git repositories, abort the release process. Investigate the issue, fix it, and start over the release process.
 6. If all builds are successful, do not merge the changes yet.
 7. If you haven't done this yet, announce your intention to make a new release to the #libuplink Slack channel.
-8. Wait for a confirmation by at least one of the main maintainers of the project before proceeding with the next step.
+8. Wait for a confirmation by at least one maintainer of this project (storj/uplink) before proceeding with the next step.
 9. Create a new release from the Github web interface:
   - Go to https://github.com/storj/uplink/releases.
   - Click the `Draft a new release` button.
