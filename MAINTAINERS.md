@@ -8,7 +8,7 @@ New version should not be released if we want to test our latest changes or to m
 
 Consider releasing a new Release Candidate version to make changes available to a larger group of users, if we are not ready to make them available to everyone yet.
 
-Under no circumstances, official releases must be done during the weekend or during the wee hours of the night.
+Under no circumstances may releases be done during the weekend or the wee hours of the night.
 
 ## Version numbers
 
@@ -36,7 +36,7 @@ Examples of Release Candidates:
 5. Wait for the build to finish. If the build fails for any of the Git repositories, abort the release process. Investigate the issue, fix it, and start over the release process.
 6. If all builds are successful, do not merge the changes yet.
 7. If you haven't done this yet, announce your intention to make a new release to the #libuplink Slack channel.
-8. Wait for a confirmation by at least one of the main maintainers of the project.
+8. Wait for a confirmation by at least one of the main maintainers of the project before proceeding with the next step.
 9. Create a new release from the Github web interface:
   - Go to https://github.com/storj/uplink/releases.
   - Click the `Draft a new release` button.
