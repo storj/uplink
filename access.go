@@ -5,6 +5,7 @@ package uplink
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -331,4 +332,26 @@ func FullPermission() Permission {
 		AllowList:     true,
 		AllowDelete:   true,
 	}
+}
+
+// OverrideEncryptionKey overrides the root encryption key for the prefix in
+// bucket with encryptionKey.
+//
+// This function is useful for overriding the encryption key in user-specific
+// access grants when implementing multitenancy in a single app bucket.
+// See the relevant section in the package documentation.
+func (access *Access) OverrideEncryptionKey(bucket, prefix string, encryptionKey *EncryptionKey) error {
+	if !strings.HasSuffix(prefix, "/") {
+		return errors.New("prefix must end with slash")
+	}
+
+	store := access.encAccess.Store()
+
+	unencPath := paths.NewUnencrypted(prefix)
+	encPath, err := encryption.EncryptPrefixWithStoreCipher(bucket, unencPath, store)
+	if err != nil {
+		return err
+	}
+
+	return store.Add(bucket, unencPath, encPath, *encryptionKey.key)
 }

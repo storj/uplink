@@ -37,14 +37,14 @@ subcommand (after setting up the Uplink CLI tool), or you can make one as follow
     }
 
     // create an access grant for reading bucket "logs"
-    permissions := uplink.ReadOnlyPermission()
+    permission := uplink.ReadOnlyPermission()
     shared := uplink.SharePrefix{Bucket: "logs"}
-    restrictedAccess, err := access.Share(permissions, shared)
+    restrictedAccess, err := access.Share(permission, shared)
     if err != nil {
         return err
     }
 
-    // serialize the restricted access
+    // serialize the restricted access grant
     serializedAccess, err := restrictedAccess.Serialize()
     if err != nil {
         return err
@@ -56,6 +56,83 @@ bucket thanks to hierarchical deterministic key derivation.
 
 Note: RequestAccessWithPassphrase is CPU-intensive, and your application's normal
 lifecycle should avoid it and use ParseAccess where possible instead.
+
+Multitenancy in a Single Application Bucket
+
+A common architecture for building applications is to have a single bucket for the
+entire application to store the objects of all users. In such architecture, it is
+of utmost importance to guarantee that users can access only their objects but not
+the objects of other users.
+
+This can be achieved by implementing an app-specific authentication service that
+generates an access grant for each user by restricting the main access grant of the
+application. This user-specific access grant is restricted to access the objects
+only within a specific key prefix defined for the user.
+
+When initialized, the authentication server creates the main application access
+grant with an empty passphrase as follows.
+
+    appAccess, err := uplink.RequestAccessWithPassphrase(ctx, satellite, appAPIKey, "")
+
+The authentication service does not hold any encryption information about users, so
+the passphrase used to request the main application access grant does not matter.
+The encryption keys related to user objects will be overridden in a next step on
+the client-side. It is important that once set to a specific value, this passphrase
+never changes in the future. Therefore, the best practice is to use an empty
+passphrase.
+
+Whenever a user is authenticated, the authentication service generates the
+user-specific access grant as follows:
+
+    // create a user access grant for accessing their files, limited for the next 8 hours
+    now := time.Now()
+    permission := uplink.FullPermission()
+    // 2 minutes leeway to avoid time sync issues with the satellite
+    permission.NotBefore = now.Add(-2 * time.Minute)
+    permission.NotAfter = now.Add(8 * time.Hour)
+    userPrefix := uplink.SharePrefix{
+        Bucket: appBucket,
+        Prefix: userID + "/",
+    }
+    userAccess, err := appAccess.Share(permission, userPrefix)
+    if err != nil {
+        return err
+    }
+
+    // serialize the user access grant
+    serializedAccess, err := userAccess.Serialize()
+    if err != nil {
+        return err
+    }
+
+The userID is something that uniquely identifies the users in the application
+and must never change.
+
+Along with the user access grant, the authentication service should return a
+user-specific salt. The salt must be always the same for this user. The salt size
+is 16-byte or 32-byte.
+
+Once the application receives the user-specific access grant and the user-specific
+salt from the authentication service, it has to override the encryption key in the
+access grant, so users can encrypt and decrypt their files with encryption keys
+derived from their passphrase.
+
+    userAccess, err = uplink.ParseAccess(serializedUserAccess)
+    if err != nil {
+        return nil, err
+    }
+
+    saltedUserKey, err := uplink.DeriveEncryptionKey(userPassphrase, userSalt)
+    if err != nil {
+        return nil, err
+    }
+
+    err = userAccess.OverrideEncryptionKey(appBucket, userID+"/", saltedUserKey)
+    if err != nil {
+        return nil, err
+    }
+
+The user-specific access grant is now ready to use by the application.
 
 Projects
 
