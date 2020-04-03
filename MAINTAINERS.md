@@ -12,7 +12,7 @@ Under no circumstances may releases be done during the weekend or the wee hours 
 
 ## Version numbers
 
-We follow the rules for semantic versioning, but prefix with the letter `v`.
+We follow the rules for semantic versioning, but prefixed with the letter `v`.
 
 Examples of official releases:
 - `v1.0.0`
@@ -44,7 +44,7 @@ Examples of Release Candidates:
   - Enter the same value as `Release title`, e.g. `v1.2.3`.
   - If there are new commits in master since you executed step 1, do not include them in the release. Change the `Target` from `master` to the specific Git commit used in step 1.
   - Describe the changes since the previous release in a human-readable way. Only those changes that affect users. No need to describe refactorings, etc.
-  - If you are releasing a new Release Candidate, select the `This is a pre-release` button.
+  - If you are releasing a new Release Candidate, select the `This is a pre-release` checkbox.
   - Click the `Publish release` button.
 10. Update the Gerrit changes from step 1 with the new official version number.
 11. Wait for the build to finish again and merge them.
