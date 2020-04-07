@@ -22,6 +22,10 @@ import (
 	"storj.io/uplink/private/storage/streams"
 )
 
+// maxSegmentSize can be used to override max segment size with ldflags build parameter.
+// Example: go build -ldflags "-X 'storj.io/uplink.maxSegmentSize=1MiB'" storj.io/storj/cmd/uplink
+var maxSegmentSize string
+
 // Project provides access to managing buckets and objects.
 type Project struct {
 	config   Config
@@ -76,6 +80,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		segmentsSize  = 64 * memory.MiB.Int64()
 		maxInlineSize = 4 * memory.KiB.Int()
 	)
+
+	if maxSegmentSize != "" {
+		segmentsSize, err = memory.ParseString(maxSegmentSize)
+		if err != nil {
+			return nil, packageError.Wrap(err)
+		}
+	}
 
 	// TODO: This should come from the EncryptionAccess. For now it's hardcoded to twice the
 	// stripe size of the default redundancy scheme on the satellite.
