@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
@@ -278,7 +277,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		return Meta{}, err
 	}
 
-	streamInfo, err := proto.Marshal(&pb.StreamInfo{
+	streamInfo, err := pb.Marshal(&pb.StreamInfo{
 		DeprecatedNumberOfSegments: totalSegments,
 		SegmentsSize:               s.segmentSize,
 		LastSegmentSize:            lastSegmentSize,
@@ -308,7 +307,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		}
 	}
 
-	objectMetadata, err := proto.Marshal(&streamMeta)
+	objectMetadata, err := pb.Marshal(&streamMeta)
 	if err != nil {
 		return Meta{}, err
 	}
@@ -327,7 +326,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 	}
 
 	satStreamID := &pb.SatStreamID{}
-	err = proto.Unmarshal(streamID, satStreamID)
+	err = pb.Unmarshal(streamID, satStreamID)
 	if err != nil {
 		return Meta{}, err
 	}
@@ -550,7 +549,7 @@ func TypedDecryptStreamInfo(ctx context.Context, streamMetaBytes []byte, path Pa
 	_ *pb.StreamInfo, streamMeta pb.StreamMeta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	err = proto.Unmarshal(streamMetaBytes, &streamMeta)
+	err = pb.Unmarshal(streamMetaBytes, &streamMeta)
 	if err != nil {
 		return nil, pb.StreamMeta{}, err
 	}
@@ -578,7 +577,7 @@ func TypedDecryptStreamInfo(ctx context.Context, streamMetaBytes []byte, path Pa
 	}
 
 	var stream pb.StreamInfo
-	if err := proto.Unmarshal(streamInfo, &stream); err != nil {
+	if err := pb.Unmarshal(streamInfo, &stream); err != nil {
 		return nil, pb.StreamMeta{}, err
 	}
 

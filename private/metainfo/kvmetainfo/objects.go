@@ -8,8 +8,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
-
 	"storj.io/common/encryption"
 	"storj.io/common/memory"
 	"storj.io/common/paths"
@@ -557,7 +555,7 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 	}
 
 	serializableMeta := pb.SerializableMeta{}
-	err := proto.Unmarshal(stream.Metadata, &serializableMeta)
+	err := pb.Unmarshal(stream.Metadata, &serializableMeta)
 	if err != nil {
 		return err
 	}

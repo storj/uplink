@@ -8,8 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
 	"storj.io/common/pb"
@@ -141,7 +139,7 @@ func (stream *mutableStream) Metadata() ([]byte, error) {
 	if stream.info.Metadata == nil {
 		return []byte{}, nil
 	}
-	return proto.Marshal(&pb.SerializableMeta{
+	return pb.Marshal(&pb.SerializableMeta{
 		UserDefined: stream.info.Metadata,
 	})
 }

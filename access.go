@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil/base58"
-	"github.com/gogo/protobuf/proto"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
@@ -64,7 +63,7 @@ func ParseAccess(access string) (*Access, error) {
 	}
 
 	p := new(pb.Scope)
-	if err := proto.Unmarshal(data, p); err != nil {
+	if err := pb.Unmarshal(data, p); err != nil {
 		return nil, packageError.New("unable to unmarshal access grant: %v", err)
 	}
 
@@ -105,7 +104,7 @@ func (access *Access) Serialize() (string, error) {
 		return "", packageError.Wrap(err)
 	}
 
-	data, err := proto.Marshal(&pb.Scope{
+	data, err := pb.Marshal(&pb.Scope{
 		SatelliteAddr:    access.satelliteAddress,
 		ApiKey:           access.apiKey.SerializeRaw(),
 		EncryptionAccess: enc,

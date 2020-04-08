@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
@@ -155,7 +154,7 @@ type dynamicMetadata struct {
 }
 
 func (meta dynamicMetadata) Metadata() ([]byte, error) {
-	return proto.Marshal(&pb.SerializableMeta{
+	return pb.Marshal(&pb.SerializableMeta{
 		UserDefined: meta.object.Custom.Clone(),
 	})
 }
