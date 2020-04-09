@@ -189,7 +189,7 @@ func (er *encodedReader) fillBuffer(ctx context.Context, r io.Reader, w sync2.Pi
 	_, err = sync2.Copy(ctx, w, r)
 	err = w.CloseWithError(err)
 	if err != nil {
-		er.log.Sugar().Error(err)
+		er.log.Error("Error closing buffer pipe", zap.Error(err))
 	}
 }
 
