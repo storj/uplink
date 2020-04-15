@@ -369,16 +369,20 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 		Bucket: bucket.Name,
 		Prefix: options.Prefix,
 		More:   more,
-		Items:  make([]storj.Object, len(items)),
+		Items:  make([]storj.Object, 0, len(items)),
 	}
 
-	for i, item := range items {
+	for _, item := range items {
 		var path streams.Path
 		var itemPath string
 
 		if needsEncryption {
 			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.pathCipher(base.PathCipher), prefixKey)
 			if err != nil {
+				// skip items that cannot be decrypted
+				if encryption.ErrDecryptFailed.Has(err) {
+					continue
+				}
 				return storj.ObjectList{}, errClass.Wrap(err)
 			}
 
@@ -398,6 +402,10 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 
 		stream, streamMeta, err := streams.TypedDecryptStreamInfo(ctx, item.EncryptedMetadata, path, db.encStore)
 		if err != nil {
+			// skip items that cannot be decrypted
+			if encryption.ErrDecryptFailed.Has(err) {
+				continue
+			}
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
@@ -406,7 +414,7 @@ func (db *DB) ListObjectsExtended(ctx context.Context, bucket storj.Bucket, opti
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		list.Items[i] = object
+		list.Items = append(list.Items, object)
 	}
 
 	return list, nil

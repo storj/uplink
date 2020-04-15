@@ -53,7 +53,11 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		require.True(t, objects.Next())
 		require.NoError(t, objects.Err())
 
-		// try to use access with default concurrency to list objects in a bucket, should fail
+		download, err := project.DownloadObject(ctx, bucket.Name, "test.dat", nil)
+		require.NoError(t, err)
+		defer ctx.Check(download.Close)
+
+		// try to use access with default concurrency to download object in a bucket, should fail
 		standardAccess, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
 		require.NoError(t, err)
 
@@ -61,8 +65,7 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(differentProject.Close)
 
-		objects = differentProject.ListObjects(ctx, bucket.Name, nil)
-		require.False(t, objects.Next())
-		require.Error(t, objects.Err())
+		_, err = differentProject.DownloadObject(ctx, bucket.Name, "test.dat", nil)
+		require.Error(t, err)
 	})
 }

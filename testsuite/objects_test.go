@@ -327,6 +327,48 @@ func TestListObjects_AutoPaging(t *testing.T) {
 	})
 }
 
+func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+
+		bucket := "test-bucket"
+		items := []string{"first-object", "second-object"}
+		accesses := make([]*uplink.Access, 2)
+		var err error
+
+		// upload two objects with different encryption passphrases
+		for i, item := range items {
+			accesses[i], err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), item)
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, accesses[i])
+			require.NoError(t, err)
+
+			createBucket(t, ctx, project, bucket)
+
+			uploadObject(t, ctx, project, bucket, item, 1)
+		}
+
+		// listing should return one object per access
+		for i, access := range accesses {
+			project, err := uplink.OpenProject(ctx, access)
+			require.NoError(t, err)
+
+			objects := project.ListObjects(ctx, bucket, nil)
+
+			require.True(t, objects.Next())
+			require.NoError(t, objects.Err())
+			require.Equal(t, items[i], objects.Item().Key)
+			require.False(t, objects.Next())
+		}
+	})
+}
+
 func listObjects(t *testing.T, ctx context.Context, project *uplink.Project, bucket string, options *uplink.ListObjectsOptions) *uplink.ObjectIterator {
 	list := project.ListObjects(ctx, bucket, options)
 	require.NoError(t, list.Err())
