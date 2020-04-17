@@ -24,12 +24,12 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		projectInfo := planet.Uplinks[0].Projects[0]
+
 		uplinkConfig := uplink.Config{}
 
 		// create access with custom concurrency, create a bucket, upload a file, check listing
-		customAccess, err := backcomp.RequestAccessWithPassphraseAndConcurrency(ctx, uplinkConfig, satellite.URL().String(), apiKey.Serialize(), "mypassphrase", 4)
+		customAccess, err := backcomp.RequestAccessWithPassphraseAndConcurrency(ctx, uplinkConfig, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase", 4)
 		require.NoError(t, err)
 
 		project, err := uplinkConfig.OpenProject(ctx, customAccess)
@@ -58,7 +58,7 @@ func TestRequestAccessWithPassphraseAndConcurrency(t *testing.T) {
 		defer ctx.Check(download.Close)
 
 		// try to use access with default concurrency to download object in a bucket, should fail
-		standardAccess, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		standardAccess, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		differentProject, err := uplinkConfig.OpenProject(ctx, standardAccess)

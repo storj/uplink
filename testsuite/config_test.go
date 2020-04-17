@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
@@ -25,21 +24,18 @@ func TestRequestAccess(t *testing.T) {
 
 		t.Run("satellite url without id", func(t *testing.T) {
 			// try connecting without a proper satellite url
-			satellite := planet.Satellites[0]
-			satelliteurl := satellite.URL()
-			apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-			satelliteurl.ID = storj.NodeID{}
-			_, err := uplink.RequestAccessWithPassphrase(ctx, satelliteurl.String(), apiKey.Serialize(), "mypassphrase")
+			projectInfo := planet.Uplinks[0].Projects[0]
+			_, err := uplink.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.Addr(), projectInfo.APIKey, "mypassphrase")
 			require.Error(t, err)
 		})
 	})
 }
 
 func openProject(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) *uplink.Project {
-	satellite := planet.Satellites[0]
-	apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+	projectInfo := planet.Uplinks[0].Projects[0]
+
 	uplinkConfig := uplink.Config{}
-	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 	require.NoError(t, err)
 
 	project, err := uplinkConfig.OpenProject(ctx, access)

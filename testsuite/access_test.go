@@ -33,10 +33,10 @@ func TestSharePermissions(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		uplinkConfig := uplink.Config{}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		items := []struct {
@@ -216,10 +216,10 @@ func TestSharePermisionsNotAfterNotBefore(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		uplinkConfig := uplink.Config{}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		{ // error when Before is earlier then After
@@ -252,10 +252,10 @@ func TestSharePrefix_List(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		uplinkConfig := uplink.Config{}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		expectedData := testrand.Bytes(1 * memory.KiB)
@@ -332,10 +332,10 @@ func TestSharePrefix_Download(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
 		uplinkConfig := uplink.Config{}
-		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		expectedData := testrand.Bytes(1 * memory.KiB)
@@ -402,9 +402,10 @@ func TestSharePrefix_UploadDownload(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		uplinkConfig := uplink.Config{}
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		expectedData := testrand.Bytes(1 * memory.KiB)
@@ -471,9 +472,9 @@ func TestAccessSerialization(t *testing.T) {
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
 
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.NoError(t, err)
 
 		// try to serialize and deserialize access and use it for upload/download
@@ -521,8 +522,9 @@ func TestUploadNotAllowedPath(t *testing.T) {
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.NoError(t, err)
 
 		err = planet.Uplinks[0].CreateBucket(ctx, satellite, "testbucket")
@@ -565,8 +567,9 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.NoError(t, err)
 
 		bucketName := "testbucket"
@@ -619,8 +622,9 @@ func TestDeleteObject_EncryptionBypass(t *testing.T) {
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.NoError(t, err)
 
 		bucketName := "testbucket"

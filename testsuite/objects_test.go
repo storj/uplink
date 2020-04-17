@@ -334,7 +334,7 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
 
 		bucket := "test-bucket"
 		items := []string{"first-object", "second-object"}
@@ -343,7 +343,7 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 
 		// upload two objects with different encryption passphrases
 		for i, item := range items {
-			accesses[i], err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), item)
+			accesses[i], err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, item)
 			require.NoError(t, err)
 
 			project, err := uplink.OpenProject(ctx, accesses[i])

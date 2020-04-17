@@ -33,8 +33,8 @@ func TestErrRateLimitExceeded(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
 
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		_, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		_, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrTooManyRequests))
 
@@ -62,8 +62,8 @@ func TestErrResourceExhausted(t *testing.T) {
 		err = satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, allProjects[0].ID, 0)
 		require.NoError(t, err)
 
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
 		require.NoError(t, err)
 
 		project, err := uplink.OpenProject(ctx, access)

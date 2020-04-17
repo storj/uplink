@@ -27,9 +27,8 @@ func TestWithServer(t *testing.T) {
 		defer ctx.Check(server.Close)
 
 		// create acccess
-		satellite := planet.Satellites[0]
-		apiKey := planet.Uplinks[0].APIKey[satellite.ID()]
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL().String(), apiKey.Serialize(), "mypassphrase")
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplink.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
 		require.NoError(t, err)
 
 		// open project with telemetry enabled.
