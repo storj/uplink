@@ -26,7 +26,7 @@ type Config struct {
 
 func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
-		Difficulty:  9,
+		Difficulty:  0,
 		Concurrency: 1,
 	})
 	if err != nil {
