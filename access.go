@@ -19,7 +19,10 @@ import (
 	"storj.io/uplink/internal/expose"
 )
 
-// Access grant contains everything to access a project and specific buckets.
+// An Access Grant contains everything to access a project and specific buckets.
+// It includes a potentially-restricted API Key, a potentially-restricted set
+// of encryption information, and information about the Satellite responsible
+// for the project's metadata.
 type Access struct {
 	satelliteAddress string
 	apiKey           *macaroon.APIKey
@@ -30,12 +33,17 @@ type Access struct {
 type SharePrefix struct {
 	Bucket string
 	// Prefix is the prefix of the shared object keys.
+	//
+	// Note: that within a bucket, the hierarchical key derivation scheme is
+	// delineated by forward slashes (/), so encryption information will be
+	// included in the resulting access grant to decrypt any key that shares
+	// the same prefix up until the last slash.
 	Prefix string
 }
 
 // Permission defines what actions can be used to share.
 type Permission struct {
-	// AllowDownaload gives permission to download the object's content. It
+	// AllowDownload gives permission to download the object's content. It
 	// allows getting object metadata, but it does not allow listing buckets.
 	AllowDownload bool
 	// AllowUpload gives permission to create buckets and upload new objects.
@@ -49,13 +57,22 @@ type Permission struct {
 	// either AllowDownload or AllowList is granted too, no object metadata and
 	// no error info will be returned for deleted objects.
 	AllowDelete bool
-	// NotBefore if set should be always before NotAfter.
+	// NotBefore restricts when the resulting access grant is valid for.
+	// If set, the resulting access grant will not work if the Satellite
+	// believes the time is before NotBefore.
+	// If set, this value should always be before NotAfter.
 	NotBefore time.Time
-	// NotAfter if set should be always after NotBefore.
+	// NotAfter restricts when the resulting access grant is valid for.
+	// If set, the resulting access grant will not work if the Satellite
+	// believes the time is after NotAfter.
+	// If set, this value should always be after NotBefore.
 	NotAfter time.Time
 }
 
-// ParseAccess parses serialized access grant string.
+// ParseAccess parses a serialized access grant string.
+//
+// This should be the main way to instantiate an access grant for opening a project.
+// See the note on RequestAccessWithPassphrase.
 func ParseAccess(access string) (*Access, error) {
 	data, version, err := base58.CheckDecode(access)
 	if err != nil || version != 0 {
@@ -88,7 +105,8 @@ func ParseAccess(access string) (*Access, error) {
 	}, nil
 }
 
-// Serialize serializes access grant such that it can be used with ParseAccess.
+// Serialize serializes an access grant such that it can be used later with
+// ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
 	switch {
 	case len(access.satelliteAddress) == 0:
@@ -116,12 +134,24 @@ func (access *Access) Serialize() (string, error) {
 	return base58.CheckEncode(data, 0), nil
 }
 
-// RequestAccessWithPassphrase requests satellite for a new access grant using a passhprase.
+// RequestAccessWithPassphrase generates a new access grant using a passhprase.
+// It must talk to the Satellite provided to get a project-based salt for
+// deterministic key derivation.
+//
+// Note: this is a CPU-heavy function that uses a password-based key derivation function
+// (Argon2). This should be a setup-only step. Most common interactions with the library
+// should be using a serialized access grant through ParseAccess directly.
 func RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
 	return (Config{}).RequestAccessWithPassphrase(ctx, satelliteAddress, apiKey, passphrase)
 }
 
-// RequestAccessWithPassphrase requests satellite for a new access grant using a passphrase.
+// RequestAccessWithPassphrase generates a new access grant using a passhprase.
+// It must talk to the Satellite provided to get a project-based salt for
+// deterministic key derivation.
+//
+// Note: this is a CPU-heavy function that uses a password-based key derivation function
+// (Argon2). This should be a setup-only step. Most common interactions with the library
+// should be using a serialized access grant through ParseAccess directly.
 func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
 	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteAddress, apiKey, passphrase, 8)
 }
@@ -176,7 +206,14 @@ func enablePathEncryptionBypass(access *Access) error {
 	return nil
 }
 
-// Share creates new access grant with specific permission. Permission will be applied to prefixes when defined.
+// Share creates a new access grant with specific permissions.
+//
+// Access grants can only have their existing permissions restricted,
+// and the resulting access grant will only allow for the intersection of all previous
+// Share calls in the access grant construction chain.
+//
+// Prefixes, if provided, restrict the access grant (and internal encryption information)
+// to only contain enough information to allow access to just those prefixes.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
 	if permission == (Permission{}) {
 		return nil, packageError.New("permission is empty")
@@ -247,7 +284,8 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	return restrictedAccess, nil
 }
 
-// ReadOnlyPermission returns permission that allows reading and listing.
+// ReadOnlyPermission returns a Permission that allows reading and listing
+// (if the parent access grant already allows those things).
 func ReadOnlyPermission() Permission {
 	return Permission{
 		AllowDownload: true,
@@ -255,7 +293,8 @@ func ReadOnlyPermission() Permission {
 	}
 }
 
-// WriteOnlyPermission returns permission that allows writing and deleting.
+// WriteOnlyPermission returns a Permission that allows writing and deleting
+// (if the parent access grant already allows those things).
 func WriteOnlyPermission() Permission {
 	return Permission{
 		AllowUpload: true,
@@ -263,7 +302,8 @@ func WriteOnlyPermission() Permission {
 	}
 }
 
-// FullPermission returns permission that allows all actions.
+// FullPermission returns a Permission that allows all actions that the
+// parent access grant already allows.
 func FullPermission() Permission {
 	return Permission{
 		AllowDownload: true,
