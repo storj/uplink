@@ -16,6 +16,7 @@ import (
 	"storj.io/common/pkcrypto"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
+	"storj.io/common/sync2"
 )
 
 var mon = monkit.Package()
@@ -55,7 +56,28 @@ type uploadStream interface {
 	CloseAndRecv() (*pb.PieceUploadResponse, error)
 }
 
-// Upload initiates an upload to the storage node.
+// UploadReader uploads a reader to the storage node.
+func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, data io.Reader) (hash *pb.PieceHash, err error) {
+	// UploadReader is implemented using deprecated Upload until we can get everything
+	// to switch to UploadReader directly.
+
+	upload, err := client.Upload(ctx, limit, piecePrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			err = errs.Combine(err, upload.Cancel(ctx))
+			return
+		}
+		hash, err = upload.Commit(ctx)
+	}()
+
+	_, err = sync2.Copy(ctx, upload, data)
+	return nil, err
+}
+
+// Upload is deprecated and will be removed. Please use UploadReader.
 func (client *Client) Upload(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey) (_ Uploader, err error) {
 	defer mon.Task()(&ctx, "node: "+limit.StorageNodeId.String()[0:8])(&err)
 

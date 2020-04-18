@@ -23,7 +23,6 @@ import (
 	"storj.io/common/ranger"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/common/sync2"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/piecestore"
 )
@@ -218,35 +217,21 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 		return nil, nil, err
 	}
 
-	upload, err := ps.Upload(ctx, limit.GetLimit(), privateKey)
+	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
 	if err != nil {
-		ec.log.Debug("Failed requesting upload of pieces to node",
-			zap.Stringer("Piece ID", pieceID),
-			zap.Stringer("Node ID", storageNodeID),
-			zap.Error(err),
-		)
-		return nil, nil, err
-	}
-
-	defer func() {
-		if err != nil {
-			err = errs.Combine(err, upload.Cancel(ctx))
-			return
-		}
-
-		hash, err = upload.Commit(ctx)
-	}()
-
-	_, err = sync2.Copy(ctx, upload, data)
-	// Canceled context means the piece upload was interrupted by user or due
-	// to slow connection. No error logging for this case.
-	if err != nil {
-		if errs2.IsCanceled(err) {
+		if ctx.Err() == context.Canceled {
+			// Canceled context means the piece upload was interrupted by user or due
+			// to slow connection. No error logging for this case.
 			if parent.Err() == context.Canceled {
 				ec.log.Info("Upload to node canceled by user", zap.Stringer("Node ID", storageNodeID))
 			} else {
 				ec.log.Debug("Node cut from upload due to slow connection", zap.Stringer("Node ID", storageNodeID))
 			}
+
+			// make sure context.Canceled is the primary error in the error chain
+			// for later errors.Is/errs2.IsCanceled checking
+			err = errs.Combine(context.Canceled, err)
+
 		} else {
 			nodeAddress := ""
 			if limit.GetStorageNodeAddress() != nil {
@@ -264,7 +249,7 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 		return nil, nil, err
 	}
 
-	return nil, peerID, nil
+	return hash, peerID, nil
 }
 
 func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (rr ranger.Ranger, err error) {
