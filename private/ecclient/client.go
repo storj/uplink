@@ -17,7 +17,6 @@ import (
 
 	"storj.io/common/encryption"
 	"storj.io/common/errs2"
-	"storj.io/common/groupcancel"
 	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
@@ -33,7 +32,6 @@ var mon = monkit.Package()
 type Client interface {
 	Put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error)
 	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (ranger.Ranger, error)
-	Delete(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey) error
 	WithForceErrorDetection(force bool) Client
 	// PutPiece is not intended to be used by normal uplinks directly, but is exported to support storagenode graceful exit transfers.
 	PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, id *identity.PeerIdentity, err error)
@@ -156,8 +154,6 @@ func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		select {
 		case <-ctx.Done():
 			err = Error.New("upload cancelled by user")
-			// TODO: clean up the partially uploaded segment's pieces
-			// ec.Delete(context.Background(), nodes, pieceID, pba.SatelliteId),
 		default:
 		}
 	}()
@@ -287,71 +283,6 @@ func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 
 	ranger, err := encryption.Unpad(rr, int(paddedSize-size))
 	return ranger, Error.Wrap(err)
-}
-
-func (ec *ecClient) Delete(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	setLimits := 0
-	for _, addressedLimit := range limits {
-		if addressedLimit != nil {
-			setLimits++
-		}
-	}
-
-	gctx, cancel := groupcancel.NewContext(ctx, setLimits, .75, 2)
-	defer cancel()
-
-	errch := make(chan error, setLimits)
-	for _, addressedLimit := range limits {
-		if addressedLimit == nil {
-			continue
-		}
-
-		go func(addressedLimit *pb.AddressedOrderLimit) {
-			limit := addressedLimit.GetLimit()
-			ps, err := ec.dialPiecestore(gctx, &pb.Node{
-				Id:      limit.StorageNodeId,
-				Address: addressedLimit.GetStorageNodeAddress(),
-			})
-			if err != nil {
-				ec.log.Debug("Failed dialing for deleting piece from node",
-					zap.Stringer("Piece ID", limit.PieceId),
-					zap.Stringer("Node ID", limit.StorageNodeId),
-					zap.Error(err),
-				)
-				errch <- err
-				return
-			}
-
-			err = ps.Delete(gctx, limit, privateKey)
-			err = errs.Combine(err, ps.Close())
-			if err != nil {
-				ec.log.Debug("Failed deleting piece from node",
-					zap.Stringer("Piece ID", limit.PieceId),
-					zap.Stringer("Node ID", limit.StorageNodeId),
-					zap.Error(err),
-				)
-			}
-			errch <- err
-		}(addressedLimit)
-	}
-
-	var anySuccess bool
-	var lastErr error
-	for i := 0; i < setLimits; i++ {
-		if err := <-errch; err == nil {
-			gctx.Success()
-			anySuccess = true
-		} else {
-			gctx.Failure()
-			lastErr = err
-		}
-	}
-	if anySuccess {
-		return nil
-	}
-	return lastErr
 }
 
 func unique(limits []*pb.AddressedOrderLimit) bool {
