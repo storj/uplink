@@ -59,17 +59,21 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		if err != nil {
 			return nil, err
 		}
+
+		defer func() {
+			if err != nil {
+				telemetry.Stop()
+			}
+		}()
 	}
 
 	metainfo, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
 	if err != nil {
-		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
 	proj, err := kvmetainfo.SetupProject(metainfo)
 	if err != nil {
-		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
@@ -104,13 +108,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(segmentsSize, encryptionParameters)
 	if err != nil {
-		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
 	streamStore, err := streams.NewStreamStore(metainfo, segmentStore, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
-		telemetry.Stop()
 		return nil, packageError.Wrap(err)
 	}
 
