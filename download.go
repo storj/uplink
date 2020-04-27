@@ -44,7 +44,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		} else if storj.ErrObjectNotFound.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
-		return nil, convertKnownErrors(err)
+		return nil, convertKnownErrors(err, bucket)
 	}
 
 	objectStream, err := project.db.GetObjectStream(ctx, b, obj)

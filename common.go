@@ -27,7 +27,7 @@ var ErrTooManyRequests = errors.New("too many requests")
 // ErrBandwidthLimitExceeded is returned when project will exceeded bandwidth limit.
 var ErrBandwidthLimitExceeded = errors.New("bandwidth limit exceeded")
 
-func convertKnownErrors(err error) error {
+func convertKnownErrors(err error, bucket string) error {
 	if errs2.IsRPC(err, rpcstatus.ResourceExhausted) {
 		// TODO is a better way to do this?
 		message := errs.Unwrap(err).Error()
@@ -39,7 +39,7 @@ func convertKnownErrors(err error) error {
 	} else if errs2.IsRPC(err, rpcstatus.NotFound) {
 		message := errs.Unwrap(err).Error()
 		if strings.HasPrefix(message, storj.ErrBucketNotFound.New("").Error()) {
-			return packageError.Wrap(ErrBucketNotFound)
+			return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
 		} else if strings.HasPrefix(message, storj.ErrObjectNotFound.New("").Error()) {
 			return packageError.Wrap(ErrObjectNotFound)
 		}

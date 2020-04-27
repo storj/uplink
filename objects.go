@@ -96,7 +96,7 @@ func (objects *ObjectIterator) Next() bool {
 func (objects *ObjectIterator) loadNext() bool {
 	list, err := objects.project.db.ListObjectsExtended(objects.ctx, objects.bucket, objects.options)
 	if err != nil {
-		objects.err = convertKnownErrors(err)
+		objects.err = convertKnownErrors(err, objects.bucket.Name)
 		return false
 	}
 	objects.list = &list

@@ -47,7 +47,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		if storj.ErrNoPath.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 		}
-		return nil, convertKnownErrors(err)
+		return nil, convertKnownErrors(err, bucket)
 	}
 
 	info := obj.Info()
@@ -60,6 +60,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 
 	upload = &Upload{
 		cancel: cancel,
+		bucket: bucket,
 		object: convertObject(&info),
 	}
 	upload.upload = stream.NewUpload(ctx, dynamicMetadata{
@@ -75,6 +76,7 @@ type Upload struct {
 	aborted int32
 	cancel  context.CancelFunc
 	upload  *stream.Upload
+	bucket  string
 	object  *Object
 }
 
@@ -108,7 +110,7 @@ func (upload *Upload) Commit() error {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
-	return convertKnownErrors(err)
+	return convertKnownErrors(err, upload.bucket)
 }
 
 // Abort aborts the upload.
