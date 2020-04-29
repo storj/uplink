@@ -44,10 +44,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.CreateObject(ctx, b, key, nil)
 	if err != nil {
-		if storj.ErrNoPath.Has(err) {
-			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-		}
-		return nil, convertKnownErrors(err, bucket)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	info := obj.Info()
@@ -110,7 +107,7 @@ func (upload *Upload) Commit() error {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
-	return convertKnownErrors(err, upload.bucket)
+	return convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
 
 // Abort aborts the upload.

@@ -85,12 +85,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.GetObject(ctx, b, key)
 	if err != nil {
-		if storj.ErrNoPath.Has(err) {
-			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-		} else if storj.ErrObjectNotFound.Has(err) {
-			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
-		}
-		return nil, convertKnownErrors(err, bucket)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	return convertObject(&obj), nil
@@ -103,12 +98,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	b := storj.Bucket{Name: bucket}
 	obj, err := project.db.DeleteObject(ctx, b, key)
 	if err != nil {
-		if storj.ErrNoPath.Has(err) {
-			return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-		} else if storj.ErrObjectNotFound.Has(err) {
-			return nil, errwrapf("%w (%q)", ErrObjectNotFound, key)
-		}
-		return nil, convertKnownErrors(err, bucket)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 	return convertObject(&obj), nil
 }

@@ -79,7 +79,7 @@ func (buckets *BucketIterator) Next() bool {
 func (buckets *BucketIterator) loadNext() bool {
 	list, err := buckets.project.db.ListBuckets(buckets.ctx, buckets.options)
 	if err != nil {
-		buckets.err = err
+		buckets.err = convertKnownErrors(err, "", "")
 		return false
 	}
 	buckets.list = &list
