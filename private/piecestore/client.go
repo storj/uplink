@@ -14,7 +14,6 @@ import (
 	"storj.io/common/memory"
 	"storj.io/common/pb"
 	"storj.io/common/rpc"
-	"storj.io/common/storj"
 )
 
 // Error is the default error class for piecestore client.
@@ -59,30 +58,6 @@ func Dial(ctx context.Context, dialer rpc.Dialer, target *pb.Node, log *zap.Logg
 		conn:   conn,
 		config: config,
 	}, nil
-}
-
-// Delete uses delete order limit to delete a piece on piece store.
-//
-// DEPRECATED in favor of DeletePieces.
-func (client *Client) Delete(ctx context.Context, limit *pb.OrderLimit, privateKey storj.PiecePrivateKey) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	_, err = client.client.Delete(ctx, &pb.PieceDeleteRequest{
-		Limit: limit,
-	})
-	return Error.Wrap(err)
-}
-
-// DeletePieces deletes a set of pieces.
-func (client *Client) DeletePieces(ctx context.Context, ids ...storj.PieceID) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	if len(ids) == 0 {
-		// Avoid RPC calls if no pieces to delete.
-		return nil
-	}
-	_, err = client.client.DeletePieces(ctx, &pb.DeletePiecesRequest{
-		PieceIds: ids,
-	})
-	return Error.Wrap(err)
 }
 
 // Retain uses a bloom filter to tell the piece store which pieces to keep.
