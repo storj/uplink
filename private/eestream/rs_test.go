@@ -342,7 +342,7 @@ func TestRSRandomData(t *testing.T) {
 	}
 }
 
-// Some pieces will read slowly
+// Some pieces will read slowly.
 func TestRSSlow(t *testing.T) {
 	for i, tt := range []testCase{
 		{4 * 1024, 1024, 1, 1, 0, false},

@@ -25,7 +25,7 @@ var (
 	mon = monkit.Package()
 )
 
-// Meta info about a segment
+// Meta info about a segment.
 type Meta struct {
 	Modified   time.Time
 	Expiration time.Time
@@ -33,7 +33,7 @@ type Meta struct {
 	Data       []byte
 }
 
-// Store for segments
+// Store for segments.
 type Store interface {
 	// Ranger creates a ranger for downloading erasure codes from piece store nodes.
 	Ranger(ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme) (ranger.Ranger, error)
@@ -47,7 +47,7 @@ type segmentStore struct {
 	rng      *rand.Rand
 }
 
-// NewSegmentStore creates a new instance of segmentStore
+// NewSegmentStore creates a new instance of segmentStore.
 func NewSegmentStore(metainfo *metainfo.Client, ec ecclient.Client) Store {
 	return &segmentStore{
 		metainfo: metainfo,
@@ -56,7 +56,7 @@ func NewSegmentStore(metainfo *metainfo.Client, ec ecclient.Client) Store {
 	}
 }
 
-// Put uploads a segment to an erasure code client
+// Put uploads a segment to an erasure code client.
 func (s *segmentStore) Put(ctx context.Context, data io.Reader, expiration time.Time, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy) (_ []*pb.SegmentPieceUploadResult, size int64, err error) {
 	defer mon.Task()(&ctx)(&err)
 

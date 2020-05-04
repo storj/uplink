@@ -457,7 +457,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 	}
 }
 
-// BatchItem returns single item for batch request....
+// BatchItem returns single item for batch request.
 func (params *BeginObjectParams) BatchItem() *pb.BatchRequestItem {
 	return &pb.BatchRequestItem{
 		Request: &pb.BatchRequestItem_ObjectBegin{

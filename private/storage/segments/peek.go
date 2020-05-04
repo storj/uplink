@@ -14,7 +14,7 @@ type PeekThresholdReader struct {
 	readCalled     bool
 }
 
-// NewPeekThresholdReader creates a new instance of PeekThresholdReader
+// NewPeekThresholdReader creates a new instance of PeekThresholdReader.
 func NewPeekThresholdReader(r io.Reader) (pt *PeekThresholdReader) {
 	return &PeekThresholdReader{r: r}
 }

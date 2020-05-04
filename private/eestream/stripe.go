@@ -20,7 +20,7 @@ var (
 	mon = monkit.Package()
 )
 
-// StripeReader can read and decodes stripes from a set of readers
+// StripeReader can read and decodes stripes from a set of readers.
 type StripeReader struct {
 	scheme              ErasureScheme
 	cond                *sync.Cond

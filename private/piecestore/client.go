@@ -72,7 +72,7 @@ func (client *Client) Close() error {
 	return client.conn.Close()
 }
 
-// GetPeerIdentity gets the connection's peer identity
+// GetPeerIdentity gets the connection's peer identity.
 func (client *Client) GetPeerIdentity() (*identity.PeerIdentity, error) {
 	return client.conn.PeerIdentity()
 }

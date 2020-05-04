@@ -28,7 +28,7 @@ import (
 
 var mon = monkit.Package()
 
-// Client defines an interface for storing erasure coded data to piece store nodes
+// Client defines an interface for storing erasure coded data to piece store nodes.
 type Client interface {
 	Put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error)
 	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (ranger.Ranger, error)
@@ -46,7 +46,7 @@ type ecClient struct {
 	forceErrorDetection bool
 }
 
-// NewClient from the given identity and max buffer memory
+// NewClient from the given identity and max buffer memory.
 func NewClient(log *zap.Logger, dialer rpc.Dialer, memoryLimit int) Client {
 	return &ecClient{
 		log:         log,
@@ -323,12 +323,12 @@ type lazyPieceRanger struct {
 	size           int64
 }
 
-// Size implements Ranger.Size
+// Size implements Ranger.Size.
 func (lr *lazyPieceRanger) Size() int64 {
 	return lr.size
 }
 
-// Range implements Ranger.Range to be lazily connected
+// Range implements Ranger.Range to be lazily connected.
 func (lr *lazyPieceRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
 

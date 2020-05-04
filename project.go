@@ -23,7 +23,7 @@ import (
 )
 
 // maxSegmentSize can be used to override max segment size with ldflags build parameter.
-// Example: go build -ldflags "-X 'storj.io/uplink.maxSegmentSize=1MiB'" storj.io/storj/cmd/uplink
+// Example: go build -ldflags "-X 'storj.io/uplink.maxSegmentSize=1MiB'" storj.io/storj/cmd/uplink.
 var maxSegmentSize string
 
 // Project provides access to managing buckets and objects.
