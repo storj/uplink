@@ -298,7 +298,7 @@ func TestListObjects_AutoPaging(t *testing.T) {
 		expectedObjects := map[string]bool{}
 
 		for i := 0; i < totalObjects; i++ {
-			key := fmt.Sprintf("%d.dat", i)
+			key := fmt.Sprintf("%d/%d.dat", i, i)
 			expectedObjects[key] = true
 			uploadObject(t, ctx, project, "testbucket", key, 1)
 
