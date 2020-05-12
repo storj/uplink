@@ -157,7 +157,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 
 		sizeReader := NewSizeReader(eofReader)
 		segmentReader := io.LimitReader(sizeReader, s.segmentSize)
-		peekReader := segments.NewPeekThresholdReader(segmentReader)
+		peekReader := NewPeekThresholdReader(segmentReader)
 		// If the data is larger than the inline threshold size, then it will be a remote segment
 		isRemote, err := peekReader.IsLargerThan(s.inlineThreshold)
 		if err != nil {

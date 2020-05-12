@@ -1,7 +1,7 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package segments
+package streams_test
 
 import (
 	"bytes"
@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"storj.io/uplink/private/storage/streams"
 )
 
 func TestThresholdBufAndRead(t *testing.T) {
@@ -27,7 +29,7 @@ func TestThresholdBufAndRead(t *testing.T) {
 		{"Test threshold size == len(file): ", []byte("abcdefghijklmnopqrstuvwxyz"), 26, false, 26, true},
 	} {
 		ioReader := bytes.NewReader(tt.file)
-		p := NewPeekThresholdReader(ioReader)
+		p := streams.NewPeekThresholdReader(ioReader)
 
 		isRemote, err := p.IsLargerThan(tt.thresholdSize)
 		assert.Equal(t, tt.expectedIsRemote, isRemote, tt.name)
@@ -55,7 +57,7 @@ func TestThresholdBufAndRead(t *testing.T) {
 func TestMultipleIsLargerCall(t *testing.T) {
 	file := []byte("abcdefghijklmnopqrstuvwxyz")
 	ioReader := bytes.NewReader(file)
-	p := NewPeekThresholdReader(ioReader)
+	p := streams.NewPeekThresholdReader(ioReader)
 
 	_, err := p.IsLargerThan(20)
 	assert.NoError(t, err)
@@ -69,7 +71,7 @@ func TestMultipleIsLargerCall(t *testing.T) {
 func TestIsLargerThanCalledAfterRead(t *testing.T) {
 	file := []byte("abcdefghijklmnopqrstuvwxyz")
 	ioReader := bytes.NewReader(file)
-	p := NewPeekThresholdReader(ioReader)
+	p := streams.NewPeekThresholdReader(ioReader)
 
 	outputBuf := make([]byte, 10)
 	_, err := p.Read(outputBuf)
