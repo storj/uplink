@@ -4,6 +4,9 @@
 package testsuite_test
 
 import (
+	"context"
+	"errors"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,4 +92,28 @@ func TestUserAgent(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, partnerID, attribution.PartnerID)
 	})
+}
+
+func TestCustomDialContext(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		config := uplink.Config{
+			DialContext: badDialContext,
+		}
+		_, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.Error(t, err)
+
+		config = uplink.Config{
+			DialContext: (new(net.Dialer)).DialContext,
+		}
+		_, err = config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+	})
+}
+
+func badDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return nil, errors.New("dial error")
 }
