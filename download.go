@@ -71,8 +71,8 @@ func (download *Download) Info() *Object {
 
 // Read downloads up to len(p) bytes into p from the object's data stream.
 // It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
-func (download *Download) Read(data []byte) (n int, err error) {
-	return download.download.Read(data)
+func (download *Download) Read(p []byte) (n int, err error) {
+	return download.download.Read(p)
 }
 
 // Close closes the reader of the download.
