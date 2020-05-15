@@ -47,7 +47,7 @@ func OpenProject(ctx context.Context, access *Access) (*Project, error) {
 
 // OpenProject opens a project with the specific access grant.
 func (config Config) OpenProject(ctx context.Context, access *Access) (project *Project, err error) {
-	defer mon.Func().ResetTrace(&ctx)(&err)
+	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	if access == nil {
 		return nil, packageError.New("access grant is nil")

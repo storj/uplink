@@ -17,7 +17,7 @@ type ListBucketsOptions struct {
 
 // ListBuckets returns an iterator over the buckets.
 func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOptions) *BucketIterator {
-	defer mon.Func().ResetTrace(&ctx)(nil)
+	defer mon.Func().RestartTrace(&ctx)(nil)
 
 	opts := storj.BucketListOptions{
 		Direction: storj.After,

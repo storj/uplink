@@ -36,7 +36,7 @@ type Bucket struct {
 
 // StatBucket returns information about a bucket.
 func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bucket, err error) {
-	defer mon.Func().ResetTrace(&ctx)(&err)
+	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	b, err := project.project.GetBucket(ctx, bucket)
 	if err != nil {
@@ -58,7 +58,7 @@ func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bu
 //
 // When bucket already exists it returns a valid Bucket and ErrBucketExists.
 func (project *Project) CreateBucket(ctx context.Context, bucket string) (created *Bucket, err error) {
-	defer mon.Func().ResetTrace(&ctx)(&err)
+	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	// TODO remove bucket configuration when proper fix will be deployed on satellite
 	b, err := project.project.CreateBucket(ctx, bucket, &storj.Bucket{
@@ -98,7 +98,7 @@ func (project *Project) CreateBucket(ctx context.Context, bucket string) (create
 //
 // When bucket already exists it returns a valid Bucket and no error.
 func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensured *Bucket, err error) {
-	defer mon.Func().ResetTrace(&ctx)(&err)
+	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	ensured, err = project.CreateBucket(ctx, bucket)
 	if err != nil && !errors.Is(err, ErrBucketAlreadyExists) {
@@ -112,7 +112,7 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 //
 // When bucket is not empty it returns ErrBucketNotEmpty.
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
-	defer mon.Func().ResetTrace(&ctx)(&err)
+	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	existing, err := project.project.DeleteBucket(ctx, bucket)
 	if err != nil {
