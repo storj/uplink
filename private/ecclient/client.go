@@ -38,7 +38,7 @@ type Client interface {
 	PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, id *identity.PeerIdentity, err error)
 }
 
-type dialPiecestoreFunc func(context.Context, *pb.Node) (*piecestore.Client, error)
+type dialPiecestoreFunc func(context.Context, storj.NodeURL) (*piecestore.Client, error)
 
 type ecClient struct {
 	log                 *zap.Logger
@@ -61,9 +61,9 @@ func (ec *ecClient) WithForceErrorDetection(force bool) Client {
 	return ec
 }
 
-func (ec *ecClient) dialPiecestore(ctx context.Context, n *pb.Node) (*piecestore.Client, error) {
-	logger := ec.log.Named(n.Id.String())
-	return piecestore.Dial(ctx, ec.dialer, n, logger, piecestore.DefaultConfig)
+func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piecestore.Client, error) {
+	logger := ec.log.Named(n.ID.String())
+	return piecestore.DialNodeURL(ctx, ec.dialer, n, logger, piecestore.DefaultConfig)
 }
 
 func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
@@ -217,9 +217,9 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 
 	storageNodeID := limit.GetLimit().StorageNodeId
 	pieceID := limit.GetLimit().PieceId
-	ps, err := ec.dialPiecestore(ctx, &pb.Node{
-		Id:      storageNodeID,
-		Address: limit.GetStorageNodeAddress(),
+	ps, err := ec.dialPiecestore(ctx, storj.NodeURL{
+		ID:      storageNodeID,
+		Address: limit.GetStorageNodeAddress().Address,
 	})
 	if err != nil {
 		ec.log.Debug("Failed dialing for putting piece to node",
@@ -401,9 +401,9 @@ func (lr *lazyPieceReader) Read(data []byte) (_ int, err error) {
 
 func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *piecestore.Client, _ piecestore.Downloader, err error) {
 	defer mon.Task()(&ctx)(&err)
-	ps, err := lr.dialPiecestore(ctx, &pb.Node{
-		Id:      lr.limit.GetLimit().StorageNodeId,
-		Address: lr.limit.GetStorageNodeAddress(),
+	ps, err := lr.dialPiecestore(ctx, storj.NodeURL{
+		ID:      lr.limit.GetLimit().StorageNodeId,
+		Address: lr.limit.GetStorageNodeAddress().Address,
 	})
 	if err != nil {
 		return nil, nil, err
