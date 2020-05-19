@@ -94,6 +94,8 @@ var backcompatMon = monkit.ScopeNamed("storj.io/storj/uplink/eestream")
 // ReadStripe reads and decodes the num-th stripe and concatenates it to p. The
 // return value is the updated byte slice.
 func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ []byte, err error) {
+	defer mon.Task()(&ctx, num)(&err)
+
 	for i := range r.inmap {
 		delete(r.inmap, i)
 	}
