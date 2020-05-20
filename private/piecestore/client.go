@@ -46,21 +46,6 @@ type Client struct {
 	config Config
 }
 
-// Dial dials the target piecestore endpoint.
-func Dial(ctx context.Context, dialer rpc.Dialer, target *pb.Node, log *zap.Logger, config Config) (*Client, error) {
-	conn, err := dialer.DialNode(ctx, target)
-	if err != nil {
-		return nil, Error.Wrap(err)
-	}
-
-	return &Client{
-		log:    log,
-		client: pb.NewDRPCPiecestoreClient(conn),
-		conn:   conn,
-		config: config,
-	}, nil
-}
-
 // DialNodeURL dials the target piecestore endpoint.
 func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, log *zap.Logger, config Config) (*Client, error) {
 	conn, err := dialer.DialNodeURL(ctx, nodeURL)
