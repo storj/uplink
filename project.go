@@ -20,6 +20,7 @@ import (
 	"storj.io/uplink/private/metainfo/kvmetainfo"
 	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
+	"storj.io/uplink/private/testuplink"
 )
 
 // maxSegmentSize can be used to override max segment size with ldflags build parameter.
@@ -89,6 +90,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		segmentsSize, err = memory.ParseString(maxSegmentSize)
 		if err != nil {
 			return nil, packageError.Wrap(err)
+		}
+	} else {
+		s, ok := testuplink.GetMaxSegmentSize(ctx)
+		if ok {
+			segmentsSize = s.Int64()
 		}
 	}
 
