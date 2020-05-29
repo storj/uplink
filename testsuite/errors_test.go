@@ -8,7 +8,9 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -27,16 +29,27 @@ func TestErrRateLimitExceeded(t *testing.T) {
 		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Metainfo.RateLimiter.Rate = 0
+				config.Metainfo.RateLimiter.CacheExpiration = 500 * time.Millisecond
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
+		project := planet.Uplinks[0].Projects[0]
 
-		apiKey := planet.Uplinks[0].Projects[0].APIKey
-		_, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
-		require.Error(t, err)
-		require.True(t, errors.Is(err, uplink.ErrTooManyRequests))
+		// TODO find a way to reset limiter before test is executed, currently
+		// testplanet is doing one additional request to get access
+		time.Sleep(1 * time.Second)
+
+		err := satellite.DB.Console().Projects().UpdateRateLimit(ctx, project.ID, 1)
+		require.NoError(t, err)
+
+		apiKey := project.APIKey
+		_, err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
+		assert.NoError(t, err)
+
+		_, err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, uplink.ErrTooManyRequests))
 
 		// TODO add check for other methods but currently we are not able to manipulate
 		// rate limit when test planet is started
@@ -56,11 +69,10 @@ func TestErrResourceExhausted(t *testing.T) {
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
+		projectInfo := planet.Uplinks[0].Projects[0]
 
 		// set project limit to 0
-		allProjects, err := satellite.DB.Console().Projects().GetAll(ctx)
-		require.NoError(t, err)
-		err = satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, allProjects[0].ID, 0)
+		err := satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, projectInfo.ID, 0)
 		require.NoError(t, err)
 
 		apiKey := planet.Uplinks[0].Projects[0].APIKey
