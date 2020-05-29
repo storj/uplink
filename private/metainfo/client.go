@@ -54,21 +54,6 @@ func New(client pb.DRPCMetainfoClient, apiKey *macaroon.APIKey, userAgent string
 	}
 }
 
-// Dial dials to metainfo endpoint with the specified api key.
-func Dial(ctx context.Context, dialer rpc.Dialer, address string, apiKey *macaroon.APIKey, userAgent string) (*Client, error) {
-	conn, err := dialer.DialAddressInsecureBestEffort(ctx, address)
-	if err != nil {
-		return nil, Error.Wrap(err)
-	}
-
-	return &Client{
-		conn:      conn,
-		client:    pb.NewDRPCMetainfoClient(conn),
-		apiKeyRaw: apiKey.SerializeRaw(),
-		userAgent: userAgent,
-	}, nil
-}
-
 // DialNodeURL dials to metainfo endpoint with the specified api key.
 func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey *macaroon.APIKey, userAgent string) (*Client, error) {
 	url, err := storj.ParseNodeURL(nodeURL)
