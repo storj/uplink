@@ -618,3 +618,5 @@ storj.io/private v0.0.0-20200504130741-565a173f6d33 h1:IX88Sr6q32yrmt94aNgiwem4U
 storj.io/private v0.0.0-20200504130741-565a173f6d33/go.mod h1:fU2XXdFHiWincQagQjvIfE2+ge9JMAcQAeYqiEXb7ZM=
 storj.io/storj v0.12.1-0.20200529133420-d6c90b7ab583 h1:2EyhklmGjWOq8ffoL4ccP2wsW/zrFktIWvxB4/ICi3Q=
 storj.io/storj v0.12.1-0.20200529133420-d6c90b7ab583/go.mod h1:NpBeBSMnDTve7CQvqlWWzY2AqGSd1xQ/Lo3DKZahnIo=
+storj.io/storj v0.12.1-0.20200601214333-2b3545c0c35c h1:3kELCCOrIvVL/EhrUiJYdZrY9FhHy9LPBVpmZx91Noc=
+storj.io/storj v0.12.1-0.20200601214333-2b3545c0c35c/go.mod h1:NpBeBSMnDTve7CQvqlWWzY2AqGSd1xQ/Lo3DKZahnIo=

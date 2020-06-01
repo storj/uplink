@@ -30,49 +30,18 @@ import (
 const TestFile = "test-file"
 
 func TestCreateObject(t *testing.T) {
-	customRS := storj.RedundancyScheme{
-		Algorithm:      storj.ReedSolomon,
-		RequiredShares: 29,
-		RepairShares:   35,
-		OptimalShares:  80,
-		TotalShares:    95,
-		ShareSize:      2 * memory.KiB.Int32(),
-	}
-
-	const stripesPerBlock = 2
-	customEP := storj.EncryptionParameters{
-		CipherSuite: storj.EncNull,
-		BlockSize:   stripesPerBlock * customRS.StripeSize(),
-	}
-
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		for i, tt := range []struct {
-			create     *kvmetainfo.CreateObject
-			expectedRS storj.RedundancyScheme
-			expectedEP storj.EncryptionParameters
+			create *kvmetainfo.CreateObject
 		}{
 			{
-				create:     nil,
-				expectedRS: kvmetainfo.DefaultRS,
-				expectedEP: kvmetainfo.DefaultES,
+				create: nil,
 			},
 			{
-				create:     &kvmetainfo.CreateObject{RedundancyScheme: customRS, EncryptionParameters: customEP},
-				expectedRS: customRS,
-				expectedEP: customEP,
-			},
-			{
-				create:     &kvmetainfo.CreateObject{RedundancyScheme: customRS},
-				expectedRS: customRS,
-				expectedEP: storj.EncryptionParameters{CipherSuite: kvmetainfo.DefaultES.CipherSuite, BlockSize: kvmetainfo.DefaultES.BlockSize},
-			},
-			{
-				create:     &kvmetainfo.CreateObject{EncryptionParameters: customEP},
-				expectedRS: kvmetainfo.DefaultRS,
-				expectedEP: storj.EncryptionParameters{CipherSuite: customEP.CipherSuite, BlockSize: kvmetainfo.DefaultES.BlockSize},
+				create: &kvmetainfo.CreateObject{},
 			},
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
@@ -83,18 +52,15 @@ func TestCreateObject(t *testing.T) {
 			info := obj.Info()
 
 			assert.Equal(t, TestBucket, info.Bucket.Name, errTag)
-			assert.Equal(t, storj.EncAESGCM, info.Bucket.PathCipher, errTag)
 			assert.Equal(t, TestFile, info.Path, errTag)
 			assert.EqualValues(t, 0, info.Size, errTag)
-			assert.Equal(t, tt.expectedRS, info.RedundancyScheme, errTag)
-			assert.Equal(t, tt.expectedEP, info.EncryptionParameters, errTag)
 		}
 	})
 }
 
 func TestGetObject(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket, TestFile, nil)
 
@@ -127,7 +93,7 @@ func TestGetObjectStream(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
 		data := testrand.Bytes(32 * memory.KiB)
 
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		emptyFile := upload(ctx, t, db, streams, bucket, "empty-file", nil)
@@ -272,7 +238,7 @@ func TestDeleteObject(t *testing.T) {
 		db, streams, err := newMetainfoParts(planet, encStore)
 		require.NoError(t, err)
 
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -317,7 +283,7 @@ func TestDeleteObject(t *testing.T) {
 
 func TestListObjectsEmpty(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		testBucketInfo, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		_, err = db.ListObjects(ctx, storj.Bucket{}, storj.ListOptions{})
@@ -349,7 +315,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		db, streams, err := newMetainfoParts(planet, encStore)
 		require.NoError(t, err)
 
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		filePaths := []string{
@@ -407,11 +373,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 
 func TestListObjects(t *testing.T) {
 	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		bucket, err := db.CreateBucket(ctx, TestBucket, &storj.Bucket{
-			PathCipher:                  storj.EncNull,
-			DefaultRedundancyScheme:     defaultRS,
-			DefaultEncryptionParameters: defaultEP,
-		})
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		filePaths := []string{
@@ -424,7 +386,7 @@ func TestListObjects(t *testing.T) {
 			upload(ctx, t, db, streams, bucket, path, nil)
 		}
 
-		otherBucket, err := db.CreateBucket(ctx, "otherbucket", &defaultBucket)
+		otherBucket, err := db.CreateBucket(ctx, "otherbucket")
 		require.NoError(t, err)
 
 		upload(ctx, t, db, streams, otherBucket, "file-in-other-bucket", nil)
@@ -437,7 +399,8 @@ func TestListObjects(t *testing.T) {
 			{
 				options: options("", "", 0),
 				result:  []string{"a", "a/", "aa", "b", "b/", "bb", "c"},
-			}, {
+			},
+			{
 				options: options("", "`", 0),
 				result:  []string{"a", "a/", "aa", "b", "b/", "bb", "c"},
 			}, {
@@ -492,9 +455,6 @@ func TestListObjects(t *testing.T) {
 				options: optionsRecursive("", "", 0),
 				result:  []string{"a", "a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc", "aa", "b", "b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc", "bb", "c"},
 			}, {
-				options: options("a", "", 0),
-				result:  []string{"xa", "xaa", "xb", "xbb", "xc"},
-			}, {
 				options: options("a/", "", 0),
 				result:  []string{"xa", "xaa", "xb", "xbb", "xc"},
 			}, {
@@ -519,7 +479,6 @@ func TestListObjects(t *testing.T) {
 				for i, item := range list.Items {
 					assert.Equal(t, tt.result[i], item.Path, errTag)
 					assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
-					assert.Equal(t, storj.EncNull, item.Bucket.PathCipher, errTag)
 				}
 			}
 		}

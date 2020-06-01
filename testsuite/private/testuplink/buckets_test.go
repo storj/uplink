@@ -31,31 +31,10 @@ const (
 	TestBucket = "test-bucket"
 )
 
-var (
-	defaultRS = storj.RedundancyScheme{
-		RequiredShares: 2,
-		RepairShares:   2,
-		OptimalShares:  3,
-		TotalShares:    4,
-		ShareSize:      256 * memory.B.Int32(),
-	}
-
-	defaultEP = storj.EncryptionParameters{
-		CipherSuite: storj.EncAESGCM,
-		BlockSize:   defaultRS.StripeSize(),
-	}
-
-	defaultBucket = storj.Bucket{
-		PathCipher:                  storj.EncAESGCM,
-		DefaultRedundancyScheme:     defaultRS,
-		DefaultEncryptionParameters: defaultEP,
-	}
-)
-
 func TestBucketsBasic(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
 		// Create new bucket
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
 		}
@@ -98,7 +77,7 @@ func TestBucketsBasic(t *testing.T) {
 func TestBucketsReadWrite(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
 		// Create new bucket
-		bucket, err := db.CreateBucket(ctx, TestBucket, &defaultBucket)
+		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
 		}
@@ -140,7 +119,7 @@ func TestBucketsReadWrite(t *testing.T) {
 
 func TestErrNoBucket(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		_, err := db.CreateBucket(ctx, "", nil)
+		_, err := db.CreateBucket(ctx, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
 		_, err = db.GetBucket(ctx, "")
@@ -148,31 +127,6 @@ func TestErrNoBucket(t *testing.T) {
 
 		_, err = db.DeleteBucket(ctx, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
-	})
-}
-
-func TestBucketCreateCipher(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
-		forAllCiphers(func(cipher storj.CipherSuite) {
-			bucket, err := db.CreateBucket(ctx, "test", &storj.Bucket{
-				PathCipher:                  cipher,
-				DefaultRedundancyScheme:     defaultRS,
-				DefaultEncryptionParameters: defaultEP,
-			})
-			if assert.NoError(t, err) {
-				assert.Equal(t, cipher, bucket.PathCipher)
-			}
-
-			bucket, err = db.GetBucket(ctx, "test")
-			if assert.NoError(t, err) {
-				assert.Equal(t, cipher, bucket.PathCipher)
-			}
-
-			bucket, err = db.DeleteBucket(ctx, "test")
-			if assert.NoError(t, err) {
-				assert.Equal(t, cipher, bucket.PathCipher)
-			}
-		})
 	})
 }
 
@@ -191,7 +145,7 @@ func TestListBuckets(t *testing.T) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
 		for _, name := range bucketNames {
-			_, err := db.CreateBucket(ctx, name, &defaultBucket)
+			_, err := db.CreateBucket(ctx, name)
 			require.NoError(t, err)
 		}
 
