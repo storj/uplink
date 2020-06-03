@@ -133,7 +133,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	}
 
 	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") {
-		return storj.ObjectList{}, Error.New("prefix should end with slash")
+		return storj.ObjectList{}, errClass.New("prefix should end with slash")
 	}
 
 	var startAfter string
