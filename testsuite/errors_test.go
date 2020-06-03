@@ -125,3 +125,38 @@ func TestUploadDownloadParamsValidation(t *testing.T) {
 		require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 	})
 }
+
+func TestBucketNotFoundError(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+
+		_, err = project.StatBucket(ctx, "non-existing-bucket")
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+
+		_, err = project.DeleteBucket(ctx, "non-existing-bucket")
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+
+		// TODO this is still not implemented on satellite side
+		// _, err = project.StatObject(ctx, "non-existing-bucket", "key")
+		// require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+		// _, err = project.DownloadObject(ctx, "non-existing-bucket", "key", nil)
+		// require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+
+		upload, err := project.UploadObject(ctx, "non-existing-bucket", "key", nil)
+		require.NoError(t, err)
+
+		_, err = io.Copy(upload, bytes.NewBuffer(testrand.Bytes(1*memory.KiB)))
+		require.NoError(t, err)
+
+		err = upload.Commit()
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound), err.Error())
+	})
+}
