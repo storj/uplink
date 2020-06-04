@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -ueo pipefail
+
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+# setup tmpdir for testfiles and cleanup
+TMP=$(mktemp -d -t tmp.XXXXXXXXXX)
+cleanup(){
+	rm -rf "$TMP"
+}
+trap cleanup EXIT
+
+cd $TMP; git clone https://github.com/rclone/rclone
+RCLONE=$TMP/rclone
+
+pushd $RCLONE
+    go mod edit -replace storj.io/uplink=$SCRIPTDIR/../../
+    go mod vendor
+
+    go build ./fstest/test_all
+    go build
+
+    ./rclone config create TestTardigrade tardigrade access_grant $GATEWAY_0_ACCESS
+
+    ./test_all -backends tardigrade
+popd

@@ -121,6 +121,16 @@ pipeline {
                         }
                     }
                 }
+
+                stage('Integration [tools]') {
+                    environment {
+                        STORJ_SIM_POSTGRES = 'postgres://postgres@localhost/teststorj3?sslmode=disable'
+                    }
+                    steps {
+                        sh 'psql -U postgres -c \'create database teststorj3;\''
+                        sh './testsuite/scripts/test-sim.sh'
+                    }
+                }
             }
         }
     }
