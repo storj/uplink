@@ -43,6 +43,4 @@ This library is distributed under the
 
 # Support
 
-If you have any questions or suggestions please reach out to us on
-[our community forum](https://forum.storj.io/) or
-email us at support@tardigrade.io.
+If you have any questions or suggestions please reach out to us on [our community forum](https://forum.storj.io/) or file a support ticket at https://support.tardigrade.io.
