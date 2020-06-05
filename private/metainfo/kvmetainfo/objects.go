@@ -7,17 +7,25 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
 )
 
 var contentTypeKey = "content-type"
+
+// Meta info about a segment.
+type Meta struct {
+	Modified   time.Time
+	Expiration time.Time
+	Size       int64
+	Data       []byte
+}
 
 // GetObject returns information about an object.
 func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
@@ -269,7 +277,7 @@ type object struct {
 	fullpath        streams.Path
 	bucket          string
 	encPath         paths.Encrypted
-	lastSegmentMeta segments.Meta
+	lastSegmentMeta Meta
 	streamInfo      *pb.StreamInfo
 	streamMeta      pb.StreamMeta
 }
@@ -307,7 +315,7 @@ func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, e
 	}
 
 	fullpath := streams.CreatePath(bucket.Name, paths.NewUnencrypted(path))
-	lastSegmentMeta := segments.Meta{
+	lastSegmentMeta := Meta{
 		Modified:   objectInfo.Created,
 		Expiration: objectInfo.Expires,
 		Size:       objectInfo.Size,
@@ -354,7 +362,7 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 	return object, nil
 }
 
-func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.StreamID, lastSegment segments.Meta, stream *pb.StreamInfo, streamMeta pb.StreamMeta, redundancyScheme storj.RedundancyScheme) (storj.Object, error) {
+func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.StreamID, lastSegment Meta, stream *pb.StreamInfo, streamMeta pb.StreamMeta, redundancyScheme storj.RedundancyScheme) (storj.Object, error) {
 	var nonce storj.Nonce
 	var encryptedKey storj.EncryptedPrivateKey
 	if streamMeta.LastSegmentMeta != nil {

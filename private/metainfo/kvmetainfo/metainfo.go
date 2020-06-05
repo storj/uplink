@@ -24,8 +24,6 @@ const defaultSegmentLimit = 8 // TODO
 
 // DB implements metainfo database.
 type DB struct {
-	project *Project
-
 	metainfo *metainfo.Client
 
 	streams  streams.Store
@@ -35,9 +33,8 @@ type DB struct {
 }
 
 // New creates a new metainfo database.
-func New(project *Project, metainfo *metainfo.Client, streams streams.Store, segments segments.Store, encStore *encryption.Store) *DB {
+func New(metainfo *metainfo.Client, streams streams.Store, segments segments.Store, encStore *encryption.Store) *DB {
 	return &DB{
-		project:  project,
 		metainfo: metainfo,
 		streams:  streams,
 		segments: segments,
@@ -46,21 +43,53 @@ func New(project *Project, metainfo *metainfo.Client, streams streams.Store, seg
 }
 
 // CreateBucket creates a new bucket with the specified information.
-func (db *DB) CreateBucket(ctx context.Context, bucketName string) (bucketInfo storj.Bucket, err error) {
-	return db.project.CreateBucket(ctx, bucketName)
+func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket storj.Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return storj.Bucket{}, storj.ErrNoBucket.New("")
+	}
+
+	newBucket, err = db.metainfo.CreateBucket(ctx, metainfo.CreateBucketParams{
+		Name: []byte(bucketName),
+	})
+	return newBucket, storj.ErrBucket.Wrap(err)
 }
 
 // DeleteBucket deletes bucket.
-func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (_ storj.Bucket, err error) {
-	return db.project.DeleteBucket(ctx, bucketName)
+func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (bucket storj.Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return storj.Bucket{}, storj.ErrNoBucket.New("")
+	}
+
+	bucket, err = db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
+		Name: []byte(bucketName),
+	})
+	return bucket, storj.ErrBucket.Wrap(err)
 }
 
 // GetBucket gets bucket information.
-func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucketInfo storj.Bucket, err error) {
-	return db.project.GetBucket(ctx, bucketName)
+func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket storj.Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return storj.Bucket{}, storj.ErrNoBucket.New("")
+	}
+
+	bucket, err = db.metainfo.GetBucket(ctx, metainfo.GetBucketParams{
+		Name: []byte(bucketName),
+	})
+	return bucket, storj.ErrBucket.Wrap(err)
 }
 
 // ListBuckets lists buckets.
-func (db *DB) ListBuckets(ctx context.Context, options storj.BucketListOptions) (list storj.BucketList, err error) {
-	return db.project.ListBuckets(ctx, options)
+func (db *DB) ListBuckets(ctx context.Context, options storj.BucketListOptions) (bucketList storj.BucketList, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	bucketList, err = db.metainfo.ListBuckets(ctx, metainfo.ListBucketsParams{
+		ListOpts: options,
+	})
+	return bucketList, storj.ErrBucket.Wrap(err)
 }

@@ -33,7 +33,6 @@ type Project struct {
 	access   *Access
 	dialer   rpc.Dialer
 	metainfo *metainfo.Client
-	project  *kvmetainfo.Project
 	db       *kvmetainfo.DB
 	streams  streams.Store
 
@@ -117,8 +116,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	proj := kvmetainfo.NewProject(streamStore, encBlockSize, segmentsSize, *metainfo)
-	db := kvmetainfo.New(proj, metainfo, streamStore, segmentStore, access.encAccess.Store())
+	db := kvmetainfo.New(metainfo, streamStore, segmentStore, access.encAccess.Store())
 
 	var eg errgroup.Group
 	if telemetry != nil {
@@ -133,7 +131,6 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		access:    access,
 		dialer:    dialer,
 		metainfo:  metainfo,
-		project:   proj,
 		db:        db,
 		streams:   streamStore,
 		eg:        &eg,
