@@ -35,8 +35,12 @@ func NewDownload(ctx context.Context, stream kvmetainfo.ReadOnlyStream, streams 
 
 // NewDownloadRange creates new stream range download with range from offset to offset+limit.
 func NewDownloadRange(ctx context.Context, stream kvmetainfo.ReadOnlyStream, streams streams.Store, offset, limit int64) *Download {
-	if limit < 0 {
-		limit = stream.Info().Size - offset
+	size := stream.Info().Size
+	if offset > size {
+		offset = size
+	}
+	if limit < 0 || limit+offset > size {
+		limit = size - offset
 	}
 	return &Download{
 		ctx:     ctx,
