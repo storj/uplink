@@ -102,12 +102,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		allocationStep: client.config.InitialStep,
 	}
 
-	if client.config.DownloadBufferSize <= 0 {
-		return &LockingDownload{download: download}, nil
-	}
-	return &LockingDownload{
-		download: NewBufferedDownload(download, int(client.config.DownloadBufferSize)),
-	}, nil
+	return &LockingDownload{download: download}, nil
 }
 
 // Read downloads data from the storage node allocating as necessary.
