@@ -116,7 +116,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	db := kvmetainfo.New(metainfo, streamStore, segmentStore, access.encAccess.Store())
+	db := kvmetainfo.New(metainfo, access.encAccess.Store())
 
 	var eg errgroup.Group
 	if telemetry != nil {

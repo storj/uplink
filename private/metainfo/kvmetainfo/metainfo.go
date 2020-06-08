@@ -12,8 +12,6 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
-	"storj.io/uplink/private/storage/streams"
 )
 
 var mon = monkit.Package()
@@ -26,18 +24,13 @@ const defaultSegmentLimit = 8 // TODO
 type DB struct {
 	metainfo *metainfo.Client
 
-	streams  streams.Store
-	segments segments.Store
-
 	encStore *encryption.Store
 }
 
 // New creates a new metainfo database.
-func New(metainfo *metainfo.Client, streams streams.Store, segments segments.Store, encStore *encryption.Store) *DB {
+func New(metainfo *metainfo.Client, encStore *encryption.Store) *DB {
 	return &DB{
 		metainfo: metainfo,
-		streams:  streams,
-		segments: segments,
 		encStore: encStore,
 	}
 }
