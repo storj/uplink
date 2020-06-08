@@ -1,7 +1,7 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package kvmetainfo
+package metainfo
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
 )
 
 var contentTypeKey = "content-type"
@@ -110,7 +109,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		return storj.Object{}, err
 	}
 
-	_, object, err := db.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+	_, object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
 		Bucket:        []byte(bucket.Name),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
@@ -202,7 +201,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 		}
 	}
 
-	items, more, err := db.metainfo.ListObjects(ctx, metainfo.ListObjectsParams{
+	items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
 		Bucket:          []byte(bucket.Name),
 		EncryptedPrefix: []byte(encPrefix.Raw()),
 		EncryptedCursor: []byte(startAfter),
@@ -300,7 +299,7 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 		return object{}, storj.Object{}, err
 	}
 
-	objectInfo, err := db.metainfo.GetObject(ctx, metainfo.GetObjectParams{
+	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
 		Bucket:        []byte(bucket.Name),
 		EncryptedPath: []byte(encPath.Raw()),
 	})

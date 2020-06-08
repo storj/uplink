@@ -21,7 +21,7 @@ import (
 	"storj.io/storj/satellite/console"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
-	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
 )
@@ -32,7 +32,7 @@ const (
 )
 
 func TestBucketsBasic(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -75,7 +75,7 @@ func TestBucketsBasic(t *testing.T) {
 }
 
 func TestBucketsReadWrite(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -118,7 +118,7 @@ func TestBucketsReadWrite(t *testing.T) {
 }
 
 func TestErrNoBucket(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
@@ -131,7 +131,7 @@ func TestErrNoBucket(t *testing.T) {
 }
 
 func TestListBucketsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.Forward})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
@@ -141,7 +141,7 @@ func TestListBucketsEmpty(t *testing.T) {
 }
 
 func TestListBuckets(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
 		for _, name := range bucketNames {
@@ -199,11 +199,11 @@ func getBucketNames(bucketList storj.BucketList) []string {
 	return names
 }
 
-func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *kvmetainfo.DB, streams.Store)) {
+func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, streams.Store)) {
 	runTestWithPathCipher(t, storj.EncAESGCM, test)
 }
 
-func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *kvmetainfo.DB, streams.Store)) {
+func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, streams.Store)) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -226,7 +226,7 @@ func newTestEncStore(keyStr string) *encryption.Store {
 	return store
 }
 
-func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*kvmetainfo.DB, streams.Store, error) {
+func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*metainfo.DB, streams.Store, error) {
 	// TODO(kaloyan): We should have a better way for configuring the Satellite's API Key
 	// add project to satisfy constraint
 	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{
@@ -253,7 +253,7 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*k
 		return nil, nil, err
 	}
 
-	metainfo, err := planet.Uplinks[0].DialMetainfo(context.Background(), planet.Satellites[0], apiKey)
+	metainfoClient, err := planet.Uplinks[0].DialMetainfo(context.Background(), planet.Satellites[0], apiKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -270,16 +270,16 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*k
 		return nil, nil, err
 	}
 
-	segments := segments.NewSegmentStore(metainfo, ec)
+	segments := segments.NewSegmentStore(metainfoClient, ec)
 
 	const stripesPerBlock = 2
 	blockSize := stripesPerBlock * rs.StripeSize()
 	inlineThreshold := 8 * memory.KiB.Int()
-	streams, err := streams.NewStreamStore(metainfo, segments, 64*memory.MiB.Int64(), encStore, blockSize, storj.EncAESGCM, inlineThreshold, 8*memory.MiB.Int64())
+	streams, err := streams.NewStreamStore(metainfoClient, segments, 64*memory.MiB.Int64(), encStore, blockSize, storj.EncAESGCM, inlineThreshold, 8*memory.MiB.Int64())
 	if err != nil {
 		return nil, nil, err
 	}
-	return kvmetainfo.New(metainfo, encStore), streams, nil
+	return metainfo.New(metainfoClient, encStore), streams, nil
 }
 
 func forAllCiphers(test func(cipher storj.CipherSuite)) {

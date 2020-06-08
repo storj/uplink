@@ -1,34 +1,30 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package kvmetainfo
+package metainfo
 
 import (
 	"context"
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
 )
 
-var mon = monkit.Package()
-
-var errClass = errs.Class("kvmetainfo")
+var errClass = errs.Class("metainfo")
 
 const defaultSegmentLimit = 8 // TODO
 
 // DB implements metainfo database.
 type DB struct {
-	metainfo *metainfo.Client
+	metainfo *Client
 
 	encStore *encryption.Store
 }
 
 // New creates a new metainfo database.
-func New(metainfo *metainfo.Client, encStore *encryption.Store) *DB {
+func New(metainfo *Client, encStore *encryption.Store) *DB {
 	return &DB{
 		metainfo: metainfo,
 		encStore: encStore,
@@ -43,7 +39,7 @@ func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket st
 		return storj.Bucket{}, storj.ErrNoBucket.New("")
 	}
 
-	newBucket, err = db.metainfo.CreateBucket(ctx, metainfo.CreateBucketParams{
+	newBucket, err = db.metainfo.CreateBucket(ctx, CreateBucketParams{
 		Name: []byte(bucketName),
 	})
 	return newBucket, storj.ErrBucket.Wrap(err)
@@ -57,7 +53,7 @@ func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (bucket storj
 		return storj.Bucket{}, storj.ErrNoBucket.New("")
 	}
 
-	bucket, err = db.metainfo.DeleteBucket(ctx, metainfo.DeleteBucketParams{
+	bucket, err = db.metainfo.DeleteBucket(ctx, DeleteBucketParams{
 		Name: []byte(bucketName),
 	})
 	return bucket, storj.ErrBucket.Wrap(err)
@@ -71,7 +67,7 @@ func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket storj.Bu
 		return storj.Bucket{}, storj.ErrNoBucket.New("")
 	}
 
-	bucket, err = db.metainfo.GetBucket(ctx, metainfo.GetBucketParams{
+	bucket, err = db.metainfo.GetBucket(ctx, GetBucketParams{
 		Name: []byte(bucketName),
 	})
 	return bucket, storj.ErrBucket.Wrap(err)
@@ -81,7 +77,7 @@ func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket storj.Bu
 func (db *DB) ListBuckets(ctx context.Context, options storj.BucketListOptions) (bucketList storj.BucketList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	bucketList, err = db.metainfo.ListBuckets(ctx, metainfo.ListBucketsParams{
+	bucketList, err = db.metainfo.ListBuckets(ctx, ListBucketsParams{
 		ListOpts: options,
 	})
 	return bucketList, storj.ErrBucket.Wrap(err)

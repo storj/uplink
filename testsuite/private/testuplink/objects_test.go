@@ -22,7 +22,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/uplink/private/metainfo/kvmetainfo"
+	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -30,18 +30,18 @@ import (
 const TestFile = "test-file"
 
 func TestCreateObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		for i, tt := range []struct {
-			create *kvmetainfo.CreateObject
+			create *metainfo.CreateObject
 		}{
 			{
 				create: nil,
 			},
 			{
-				create: &kvmetainfo.CreateObject{},
+				create: &metainfo.CreateObject{},
 			},
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
@@ -59,7 +59,7 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestGetObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket, TestFile, nil)
@@ -90,7 +90,7 @@ func TestGetObject(t *testing.T) {
 }
 
 func TestGetObjectStream(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		data := testrand.Bytes(32 * memory.KiB)
 
 		bucket, err := db.CreateBucket(ctx, TestBucket)
@@ -143,7 +143,7 @@ func TestGetObjectStream(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *kvmetainfo.DB, streams streams.Store, bucket storj.Bucket, path storj.Path, data []byte) storj.Object {
+func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams streams.Store, bucket storj.Bucket, path storj.Path, data []byte) storj.Object {
 	obj, err := db.CreateObject(ctx, bucket, path, nil)
 	require.NoError(t, err)
 
@@ -164,7 +164,7 @@ func upload(ctx context.Context, t *testing.T, db *kvmetainfo.DB, streams stream
 	return obj.Info()
 }
 
-func assertStream(ctx context.Context, t *testing.T, db *kvmetainfo.DB, streams streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
+func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
 	readOnly, err := db.GetObjectStream(ctx, bucket, object)
 	require.NoError(t, err)
 
@@ -282,7 +282,7 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestListObjectsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
@@ -290,7 +290,7 @@ func TestListObjectsEmpty(t *testing.T) {
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
 		_, err = db.ListObjects(ctx, testBucketInfo, storj.ListOptions{})
-		assert.EqualError(t, err, "kvmetainfo: invalid direction 0")
+		assert.EqualError(t, err, "metainfo: invalid direction 0")
 
 		// TODO for now we are supporting only storj.After
 		for _, direction := range []storj.ListDirection{
@@ -372,7 +372,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 }
 
 func TestListObjects(t *testing.T) {
-	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *kvmetainfo.DB, streams streams.Store) {
+	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
