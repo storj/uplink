@@ -130,15 +130,17 @@ func (client *Download) Read(data []byte) (read int, err error) {
 		}
 
 		// do we need to send a new order to storagenode
-		if client.allocated-client.downloaded < client.allocationStep {
+		notYetReceived := client.allocated - client.downloaded
+		if notYetReceived < client.allocationStep {
 			newAllocation := client.allocationStep
 
-			// have we downloaded more than we have allocated due to a generous storagenode?
-			if client.allocated-client.downloaded < 0 {
-				newAllocation += client.downloaded - client.allocated
+			// If we have downloaded more than we have allocated
+			// due to a generous storagenode include this in the next allocation.
+			if notYetReceived < 0 {
+				newAllocation += -notYetReceived
 			}
 
-			// ensure we don't allocate more than we intend to read
+			// Ensure we don't allocate more than we intend to read.
 			if client.allocated+newAllocation > client.downloadSize {
 				newAllocation = client.downloadSize - client.allocated
 			}
@@ -147,7 +149,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 			if newAllocation > 0 {
 				order, err := signing.SignUplinkOrder(ctx, client.privateKey, &pb.Order{
 					SerialNumber: client.limit.SerialNumber,
-					Amount:       newAllocation,
+					Amount:       client.allocated + newAllocation,
 				})
 				if err != nil {
 					// we are signing so we shouldn't propagate this into close,
@@ -174,6 +176,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 				}
 
 				// update our allocation step
+				client.allocated += newAllocation
 				client.allocationStep = client.client.nextAllocationStep(client.allocationStep)
 			}
 		}
