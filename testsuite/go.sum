@@ -348,6 +348,8 @@ github.com/stretchr/testify v1.5.1 h1:nOGnQDM7FYENwehXlg/kFVnos3rEvtKTjRvOWSzb6H
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
 github.com/stripe/stripe-go v63.1.1+incompatible h1:OpGp55VzHcnu5O/MtVVU42xS2xeAWosx3xELvuoMMMw=
 github.com/stripe/stripe-go v63.1.1+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8axYZkSN/uA/T/A64pfKdBAMiY=
+github.com/stripe/stripe-go v70.15.0+incompatible h1:hNML7M1zx8RgtepEMlxyu/FpVPrP7KZm1gPFQquJQvM=
+github.com/stripe/stripe-go v70.15.0+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8axYZkSN/uA/T/A64pfKdBAMiY=
 github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
@@ -606,6 +608,9 @@ storj.io/common v0.0.0-20200529121635-ef4a5bc8ec88 h1:8Gy0vjF4Kj1n94n6mQrDU8T50W
 storj.io/common v0.0.0-20200529121635-ef4a5bc8ec88/go.mod h1:6S6Ub92/BB+ofU7hbyPcm96b4Q1ayyN0HLog+3u+wGc=
 storj.io/common v0.0.0-20200601223809-7af8b7ee5d6c h1:Qq+20xjNcJfGIbErbMV9ndsHH179LtA9m6LA4fFTrvM=
 storj.io/common v0.0.0-20200601223809-7af8b7ee5d6c/go.mod h1:6S6Ub92/BB+ofU7hbyPcm96b4Q1ayyN0HLog+3u+wGc=
+storj.io/common v0.0.0-20200610120518-23c66ad8b617 h1:7Mo4JvcCvT8BQyGWTMmsI+BYRKCKrXEadXSfdVXifE8=
+storj.io/common v0.0.0-20200610120518-23c66ad8b617/go.mod h1:6S6Ub92/BB+ofU7hbyPcm96b4Q1ayyN0HLog+3u+wGc=
+storj.io/common v0.0.0-20200611114417-9a3d012fdb62/go.mod h1:6S6Ub92/BB+ofU7hbyPcm96b4Q1ayyN0HLog+3u+wGc=
 storj.io/drpc v0.0.11 h1:6vLxfpSbwCLtqzAoXzXx/SxBqBtbzbmquXPqfcWKqfw=
 storj.io/drpc v0.0.11/go.mod h1:TiFc2obNjL9/3isMW1Rpxjy8V9uE0B2HMeMFGiiI7Iw=
 storj.io/drpc v0.0.12 h1:4ei1M4cnWlYxcQheX0Dg4+c12zCD+oJqfweVQVWarsA=
@@ -614,5 +619,11 @@ storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b h1:Bbg9JCtY6l3HrDxs3BX
 storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
 storj.io/private v0.0.0-20200527091855-082647005cf3 h1:niVMosczB5dcenexg5gIvbn5hfFeFweGIB5vykRHHPQ=
 storj.io/private v0.0.0-20200527091855-082647005cf3/go.mod h1:iDgIudPntDcHt5vyOecd2KS7YEx3E5CD0/sxjtM7fG0=
+storj.io/private v0.0.0-20200605221229-3236fe879ab3 h1:kUn1+iJmBwBTJopuNlN3daKAXLNe1u3F/cGDq0o3sak=
+storj.io/private v0.0.0-20200605221229-3236fe879ab3/go.mod h1:iDgIudPntDcHt5vyOecd2KS7YEx3E5CD0/sxjtM7fG0=
 storj.io/storj v0.12.1-0.20200605163905-943eb872d31b h1:nQ24CAJzskw/9hP5UiKN0j/oJi+wgCd7y2nTGJD2Ido=
 storj.io/storj v0.12.1-0.20200605163905-943eb872d31b/go.mod h1:Sp8Plj26m1Khpd59L9bPgozKO9Wnn2HdtqXrJ7L/Sp8=
+storj.io/storj v0.12.1-0.20200611084737-be597277904b h1:P0MRAiWx2LAKPAcjDPlAxkiLS9aLEDy69uzej6Yq5VE=
+storj.io/storj v0.12.1-0.20200611084737-be597277904b/go.mod h1:otUSlZ9yane4Iq4id0AFRmg50FPSAiq81R1AxRNXfC4=
+storj.io/storj v0.12.1-0.20200611132816-1ed5a1bac5e6 h1:85gzW1v/DCDIz9Rz4EJ/9cNrlCbWYu23xvh70ht8ptY=
+storj.io/storj v0.12.1-0.20200611132816-1ed5a1bac5e6/go.mod h1:QehV61ypEV/ToE4y8Iks+PjLIVkln5zYW5VMZjRP7bA=
