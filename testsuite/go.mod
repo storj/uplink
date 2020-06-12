@@ -10,6 +10,6 @@ require (
 	go.uber.org/zap v1.15.0
 	google.golang.org/grpc v1.28.0 // indirect
 	storj.io/common v0.0.0-20200611114417-9a3d012fdb62
-	storj.io/storj v0.12.1-0.20200611132816-1ed5a1bac5e6
-	storj.io/uplink v1.0.7
+	storj.io/storj v0.12.1-0.20200612064134-410d897840a0
+	storj.io/uplink v1.1.1-0.20200611134807-597d486ee816
 )
