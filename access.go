@@ -17,6 +17,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/private/metainfo"
 )
 
 // An Access Grant contains everything to access a project and specific buckets.
@@ -282,6 +283,19 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		encAccess:        sharedAccess,
 	}
 	return restrictedAccess, nil
+}
+
+// RevokeAccess will tell the satellite to revoke the provided API key embedded
+// in the provided access.
+//
+// There may be a delay between a successful revocation request and actual
+// revocation, depending on the satellite's access caching policies.
+func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err error) {
+	defer mon.Func().RestartTrace(&ctx)(&err)
+
+	return project.metainfo.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
+		APIKey: access.apiKey.SerializeRaw(),
+	})
 }
 
 // ReadOnlyPermission returns a Permission that allows reading and listing
