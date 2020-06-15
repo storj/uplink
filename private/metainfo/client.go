@@ -163,6 +163,41 @@ func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketRes
 	}, nil
 }
 
+// TODO(isaac): Probably shouldn't return *pb.LocationCoordinates because I
+// think this client tries to translate to/from protobuf definitions
+
+// GetObjectLocation gets the object location
+func (client *Client) GetObjectLocation(ctx context.Context, params GetObjectLocationParams) (respLoc []*storj.Location, err error) {
+	resp, err := client.client.GetObjectLocation(ctx, params.toRequest(client.header()))
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	locations := resp.GetLocationCoordinates()
+	respLoc = make([]*storj.Location, 0, len(locations))
+	for _, loc := range locations {
+		respLoc = append(respLoc, &storj.Location{
+			Latitude:  float64(loc.GetLatitude()),
+			Longitude: float64(loc.GetLongitude()),
+		})
+	}
+	return respLoc, nil
+}
+
+// GetObjectLocationParams are params to get object location
+type GetObjectLocationParams struct {
+	Bucket        []byte
+	EncryptedPath []byte
+}
+
+func (params GetObjectLocationParams) toRequest(header *pb.RequestHeader) *pb.ObjectLocationRequest {
+	return &pb.ObjectLocationRequest{
+		Header:        header,
+		Bucket:        params.Bucket,
+		EncryptedPath: params.EncryptedPath,
+	}
+}
+
 // CreateBucket creates a new bucket.
 func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParams) (respBucket storj.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)

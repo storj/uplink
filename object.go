@@ -78,6 +78,13 @@ func (meta CustomMetadata) Verify() error {
 	return nil
 }
 
+func (project *Project) GetObjectLocation(ctx context.Context, bucket, path string) (loc []*storj.Location, err error) {
+	// TODO(isaac): Make this get the data from satellite
+	// Encrypts path
+	// Calls into the metainfo client to send request to satellite
+	return nil, nil
+}
+
 // StatObject returns information about an object at the specific key.
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (info *Object, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
