@@ -351,8 +351,6 @@ github.com/stripe/stripe-go v70.15.0+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8ax
 github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
-github.com/vivint/infectious v0.0.0-20190108171102-2455b059135b h1:dLkqBELopfQNhe8S9ucnSf+HhiUCgK/hPIjVG0f9GlY=
-github.com/vivint/infectious v0.0.0-20190108171102-2455b059135b/go.mod h1:5oyMAv4hrBEKqBwORFsiqIrCNCmL2qcZLQTdJLYeYIc=
 github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3 h1:zMsHhfK9+Wdl1F7sIKLyx3wrOFofpb3rWFbA4HgcK5k=
 github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3/go.mod h1:R0Gbuw7ElaGSLOZUSwBm/GgVwMd30jWxBDdAyMOeTuc=
 github.com/xanzy/go-gitlab v0.15.0/go.mod h1:8zdQa/ri1dfn8eS3Ir1SyfvOKlw7WBJ8DVThkpGiXrs=
@@ -612,5 +610,5 @@ storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b h1:Bbg9JCtY6l3HrDxs3BX
 storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
 storj.io/private v0.0.0-20200605221229-3236fe879ab3 h1:kUn1+iJmBwBTJopuNlN3daKAXLNe1u3F/cGDq0o3sak=
 storj.io/private v0.0.0-20200605221229-3236fe879ab3/go.mod h1:iDgIudPntDcHt5vyOecd2KS7YEx3E5CD0/sxjtM7fG0=
-storj.io/storj v0.12.1-0.20200612064134-410d897840a0 h1:AWLdisw8uTpNGparatBoFcSX8kC6YsApF04CnP/ytxw=
-storj.io/storj v0.12.1-0.20200612064134-410d897840a0/go.mod h1:QehV61ypEV/ToE4y8Iks+PjLIVkln5zYW5VMZjRP7bA=
+storj.io/storj v0.12.1-0.20200616113141-6673125c035f h1:W4FvhJjdy+PbfduDFyHDpoA5FiB1EbDg0D2rD0h2cl8=
+storj.io/storj v0.12.1-0.20200616113141-6673125c035f/go.mod h1:5HZanEKWfEfGeGXf4woaWRP8/ragUWBR0FhqmyZ2Xmw=
