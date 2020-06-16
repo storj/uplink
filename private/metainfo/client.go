@@ -163,9 +163,6 @@ func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketRes
 	}, nil
 }
 
-// TODO(isaac): Probably shouldn't return *pb.LocationCoordinates because I
-// think this client tries to translate to/from protobuf definitions
-
 // GetObjectLocation gets the object location
 func (client *Client) GetObjectLocation(ctx context.Context, params GetObjectLocationParams) (respLoc []*storj.Location, err error) {
 	resp, err := client.client.GetObjectLocation(ctx, params.toRequest(client.header()))

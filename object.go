@@ -78,11 +78,12 @@ func (meta CustomMetadata) Verify() error {
 	return nil
 }
 
+// GetObjectLocation returns a list of geolocations for nodes in the object
 func (project *Project) GetObjectLocation(ctx context.Context, bucket, path string) (loc []*storj.Location, err error) {
 	// TODO(isaac): Make this get the data from satellite
 	// Encrypts path
 	// Calls into the metainfo client to send request to satellite
-	return nil, nil
+	return project.db.GetObjectLocation(ctx, bucket, path)
 }
 
 // StatObject returns information about an object at the specific key.

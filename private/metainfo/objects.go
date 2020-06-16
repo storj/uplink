@@ -270,6 +270,20 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	return list, nil
 }
 
+// GetObjectLocation returns a list of geolocations for nodes in the object
+func (db *DB) GetObjectLocation(ctx context.Context, bucket, path string) (loc []*storj.Location, err error) {
+	// TODO(cam): This is probably not where we want to do this, but this is where we have access to the enc store
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(path), db.encStore)
+	if err != nil {
+		// TODO(cam): wrap this error
+		return nil, err
+	}
+	return db.metainfo.GetObjectLocation(ctx, GetObjectLocationParams{
+		Bucket:        []byte(bucket),
+		EncryptedPath: []byte(encPath.Raw()),
+	})
+}
+
 func (db *DB) pathCipher(pathCipher storj.CipherSuite) storj.CipherSuite {
 	if db.encStore.EncryptionBypass {
 		return storj.EncNullBase64URL
