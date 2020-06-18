@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"io"
 	"io/ioutil"
+	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+	"sync"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -18,9 +20,9 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
+	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
 )
 
 var mon = monkit.Package()
@@ -44,17 +46,20 @@ type typedStore interface {
 // to use typed paths. See the shim for the store that the rest of the world interacts with.
 type streamStore struct {
 	metainfo                *metainfo.Client
-	segments                segments.Store
+	ec                      ecclient.Client
 	segmentSize             int64
 	encStore                *encryption.Store
 	encBlockSize            int
 	cipher                  storj.CipherSuite
 	inlineThreshold         int
 	maxEncryptedSegmentSize int64
+
+	rngMu sync.Mutex
+	rng   *mathrand.Rand
 }
 
 // newTypedStreamStore constructs a typedStore backed by a streamStore.
-func newTypedStreamStore(metainfo *metainfo.Client, segments segments.Store, segmentSize int64, encStore *encryption.Store, encBlockSize int, cipher storj.CipherSuite, inlineThreshold int, maxEncryptedSegmentSize int64) (typedStore, error) {
+func newTypedStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encBlockSize int, cipher storj.CipherSuite, inlineThreshold int, maxEncryptedSegmentSize int64) (typedStore, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
@@ -64,13 +69,14 @@ func newTypedStreamStore(metainfo *metainfo.Client, segments segments.Store, seg
 
 	return &streamStore{
 		metainfo:                metainfo,
-		segments:                segments,
+		ec:                      ec,
 		segmentSize:             segmentSize,
 		encStore:                encStore,
 		encBlockSize:            encBlockSize,
 		cipher:                  cipher,
 		inlineThreshold:         inlineThreshold,
 		maxEncryptedSegmentSize: maxEncryptedSegmentSize,
+		rng:                     mathrand.New(mathrand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -155,7 +161,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 			return Meta{}, err
 		}
 
-		sizeReader := segments.SizeReader(eofReader)
+		sizeReader := SizeReader(eofReader)
 		segmentReader := io.LimitReader(sizeReader, s.segmentSize)
 		peekReader := NewPeekThresholdReader(segmentReader)
 		// If the data is larger than the inline threshold size, then it will be a remote segment
@@ -217,14 +223,15 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 			limits := segResponse.Limits
 			piecePrivateKey := segResponse.PiecePrivateKey
 
-			uploadResults, size, err := s.segments.Put(ctx, transformedReader, expiration, limits, piecePrivateKey, rs)
+			encSizedReader := SizeReader(transformedReader)
+			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, rs, encSizedReader, expiration)
 			if err != nil {
 				return Meta{}, err
 			}
 
 			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
 				SegmentID:         segmentID,
-				SizeEncryptedData: size,
+				SizeEncryptedData: encSizedReader.Size(),
 				Encryption:        segmentEncryption,
 				UploadResult:      uploadResults,
 			})
@@ -357,7 +364,7 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 		return nil, err
 	}
 
-	lastSegmentRanger, err := s.segments.Ranger(ctx, info, limits, object.RedundancyScheme)
+	lastSegmentRanger, err := s.Ranger(ctx, info, limits, object.RedundancyScheme)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +384,7 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 
 		rangers = append(rangers, &lazySegmentRanger{
 			metainfo:      s.metainfo,
-			segments:      s.segments,
+			streams:       s,
 			streamID:      object.ID,
 			segmentIndex:  int32(i),
 			rs:            object.RedundancyScheme,
@@ -440,7 +447,7 @@ type ListItem struct {
 type lazySegmentRanger struct {
 	ranger        ranger.Ranger
 	metainfo      *metainfo.Client
-	segments      segments.Store
+	streams       *streamStore
 	streamID      storj.StreamID
 	segmentIndex  int32
 	rs            storj.RedundancyScheme
@@ -470,7 +477,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 			return nil, err
 		}
 
-		rr, err := lr.segments.Ranger(ctx, info, limits, lr.rs)
+		rr, err := lr.streams.Ranger(ctx, info, limits, lr.rs)
 		if err != nil {
 			return nil, err
 		}
@@ -531,4 +538,44 @@ func (s *streamStore) cancelHandler(ctx context.Context, path Path) {
 	if err != nil {
 		zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
 	}
+}
+
+// Ranger creates a ranger for downloading erasure codes from piece store nodes.
+func (s *streamStore) Ranger(
+	ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme,
+) (rr ranger.Ranger, err error) {
+	defer mon.Task()(&ctx, info, limits, objectRS)(&err)
+
+	// no order limits also means its inline segment
+	if len(info.EncryptedInlineData) != 0 || len(limits) == 0 {
+		return ranger.ByteRanger(info.EncryptedInlineData), nil
+	}
+
+	needed := objectRS.DownloadNodes()
+	selected := make([]*pb.AddressedOrderLimit, len(limits))
+	s.rngMu.Lock()
+	perm := s.rng.Perm(len(limits))
+	s.rngMu.Unlock()
+
+	for _, i := range perm {
+		limit := limits[i]
+		if limit == nil {
+			continue
+		}
+
+		selected[i] = limit
+
+		needed--
+		if needed <= 0 {
+			break
+		}
+	}
+
+	redundancy, err := eestream.NewRedundancyStrategyFromStorj(objectRS)
+	if err != nil {
+		return nil, err
+	}
+
+	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.Size)
+	return rr, err
 }

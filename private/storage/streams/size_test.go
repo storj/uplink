@@ -1,7 +1,7 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package segments
+package streams_test
 
 import (
 	"bytes"
@@ -10,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"storj.io/uplink/private/storage/streams"
 )
 
 func TestSizeReader(t *testing.T) {
 	data := "abcdefgh"
 	r := bytes.NewReader([]byte(data))
-	sr := SizeReader(r)
+	sr := streams.SizeReader(r)
 
 	// Nothing has been read yet - size is 0
 	assert.EqualValues(t, 0, sr.Size())

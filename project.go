@@ -17,7 +17,6 @@ import (
 	"storj.io/uplink/internal/telemetryclient"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/testuplink"
 )
@@ -97,7 +96,6 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
 	ec := ecclient.NewClient(zap.L().Named("ecclient"), dialer, 0)
-	segmentStore := segments.NewSegmentStore(metainfoClient, ec)
 
 	encryptionParameters := storj.EncryptionParameters{
 		// TODO: the cipher should be provided by the Access, but we don't store it there yet.
@@ -110,7 +108,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	streamStore, err := streams.NewStreamStore(metainfoClient, segmentStore, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
+	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

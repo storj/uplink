@@ -22,7 +22,6 @@ import (
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
 	"storj.io/uplink/private/storage/streams"
 )
 
@@ -270,12 +269,10 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*m
 		return nil, nil, err
 	}
 
-	segments := segments.NewSegmentStore(metainfoClient, ec)
-
 	const stripesPerBlock = 2
 	blockSize := stripesPerBlock * rs.StripeSize()
 	inlineThreshold := 8 * memory.KiB.Int()
-	streams, err := streams.NewStreamStore(metainfoClient, segments, 64*memory.MiB.Int64(), encStore, blockSize, storj.EncAESGCM, inlineThreshold, 8*memory.MiB.Int64())
+	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, blockSize, storj.EncAESGCM, inlineThreshold, 8*memory.MiB.Int64())
 	if err != nil {
 		return nil, nil, err
 	}

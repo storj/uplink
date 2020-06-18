@@ -11,8 +11,8 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
+	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metainfo"
-	"storj.io/uplink/private/storage/segments"
 )
 
 // Metadata interface returns the latest metadata for an object.
@@ -31,8 +31,8 @@ type shimStore struct {
 }
 
 // NewStreamStore constructs a Store.
-func NewStreamStore(metainfo *metainfo.Client, segments segments.Store, segmentSize int64, encStore *encryption.Store, encBlockSize int, cipher storj.CipherSuite, inlineThreshold int, maxEncryptedSegmentSize int64) (Store, error) {
-	typedStore, err := newTypedStreamStore(metainfo, segments, segmentSize, encStore, encBlockSize, cipher, inlineThreshold, maxEncryptedSegmentSize)
+func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encBlockSize int, cipher storj.CipherSuite, inlineThreshold int, maxEncryptedSegmentSize int64) (Store, error) {
+	typedStore, err := newTypedStreamStore(metainfo, ec, segmentSize, encStore, encBlockSize, cipher, inlineThreshold, maxEncryptedSegmentSize)
 	if err != nil {
 		return nil, err
 	}
