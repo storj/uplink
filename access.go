@@ -285,8 +285,14 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	return restrictedAccess, nil
 }
 
-// RevokeAccess will tell the satellite to revoke the provided API key embedded
-// in the provided access.
+// RevokeAccess revokes the API key embedded in the provided access grant.
+//
+// When an access grant is revoked, it will also revoke any further-restricted
+// access grants created (via the Share method) from the revoked access grant.
+//
+// An access grant is authorized to revoke any further-restricted access grant
+// created from it. An access grant cannot revoke itself. An unauthorized
+// request will return an rpcstatus.PermissionDenied error.
 //
 // There may be a delay between a successful revocation request and actual
 // revocation, depending on the satellite's access caching policies.
