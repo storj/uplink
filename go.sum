@@ -9,8 +9,8 @@ github.com/btcsuite/goleveldb v0.0.0-20160330041536-7834afc9e8cd/go.mod h1:F+uVa
 github.com/btcsuite/snappy-go v0.0.0-20151229074030-0bdef8d06723/go.mod h1:8woku9dyThutzjeg+3xrA5iCpBRH8XEEg3lh6TiUghc=
 github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792/go.mod h1:ghJtEyQwv5/p4Mg4C0fgbePVuGr935/5ddU9Z3TmDRY=
 github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46fmI40EZs=
-github.com/calebcase/tmpfile v1.0.1 h1:vD8FSrbsbexhep39/6mvtbIHS3GzIRqiprDNCF6QqSk=
-github.com/calebcase/tmpfile v1.0.1/go.mod h1:iErLeG/iqJr8LaQ/gYRv4GXdqssi3jg4iSzvrA06/lw=
+github.com/calebcase/tmpfile v1.0.2-0.20200602150926-3af473ef8439 h1:fqGdSbbWVbQqNCQXd/dyZ7Bl+u8R2X7QCiNzwgyUa/M=
+github.com/calebcase/tmpfile v1.0.2-0.20200602150926-3af473ef8439/go.mod h1:iErLeG/iqJr8LaQ/gYRv4GXdqssi3jg4iSzvrA06/lw=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -95,7 +95,7 @@ gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7/go.mod h1:dt/ZhP58zS4L8KSrWD
 gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.2 h1:ZCJp+EgiOT7lHqUV2J862kp8Qj64Jo6az82+3Td9dZw=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
-storj.io/common v0.0.0-20200622152042-376f8bec9266 h1:Pmvy8chvf8NsGw91nlrPq/yym1WMranq0SBLh23rhts=
-storj.io/common v0.0.0-20200622152042-376f8bec9266/go.mod h1:ZSjZI9XJNevOP527K+PL1c68j8w5M4vbHha3V2tYWdQ=
-storj.io/drpc v0.0.12 h1:4ei1M4cnWlYxcQheX0Dg4+c12zCD+oJqfweVQVWarsA=
-storj.io/drpc v0.0.12/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
+storj.io/common v0.0.0-20200628040133-cc1132d33ee6 h1:6ur2t+03Ah0NdhEWk8c2YpMA321I/+OS2rrTaVKyfv4=
+storj.io/common v0.0.0-20200628040133-cc1132d33ee6/go.mod h1:vMAnlNbkgW6i+w/OT1h4X8w6TajOHWAT+SvFHUFCpq0=
+storj.io/drpc v0.0.13 h1:EDR3WiwVcIHtg+8M5vqBFmUAuJvmM2erVHIfqPPSAoc=
+storj.io/drpc v0.0.13/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
