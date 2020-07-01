@@ -216,6 +216,8 @@ func enablePathEncryptionBypass(access *Access) error {
 //
 // Prefixes, if provided, restrict the access grant (and internal encryption information)
 // to only contain enough information to allow access to just those prefixes.
+//
+// To revoke an access grant see the Project.RevokeAccess method.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
 	if permission == (Permission{}) {
 		return nil, packageError.New("permission is empty")
@@ -289,11 +291,12 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 // RevokeAccess revokes the API key embedded in the provided access grant.
 //
 // When an access grant is revoked, it will also revoke any further-restricted
-// access grants created (via the Share method) from the revoked access grant.
+// access grants created (via the Access.Share method) from the revoked access
+// grant.
 //
 // An access grant is authorized to revoke any further-restricted access grant
 // created from it. An access grant cannot revoke itself. An unauthorized
-// request will return an rpcstatus.PermissionDenied error.
+// request will return an error.
 //
 // There may be a delay between a successful revocation request and actual
 // revocation, depending on the satellite's access caching policies.

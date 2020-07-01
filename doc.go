@@ -57,6 +57,8 @@ bucket thanks to hierarchical deterministic key derivation.
 Note: RequestAccessWithPassphrase is CPU-intensive, and your application's normal
 lifecycle should avoid it and use ParseAccess where possible instead.
 
+To revoke an access grant see the Project.RevokeAccess method.
+
 Multitenancy in a Single Application Bucket
 
 A common architecture for building applications is to have a single bucket for the
