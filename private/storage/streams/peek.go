@@ -4,6 +4,7 @@
 package streams
 
 import (
+	"errors"
 	"io"
 
 	"github.com/zeebo/errs"
@@ -51,7 +52,7 @@ func (pt *PeekThresholdReader) IsLargerThan(thresholdSize int) (bool, error) {
 	buf := make([]byte, thresholdSize+1)
 	n, err := io.ReadFull(pt.r, buf)
 	pt.thresholdBuf = buf[:n]
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return false, nil
 	}
 	if err != nil {

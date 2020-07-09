@@ -1110,14 +1110,14 @@ func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParam
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 
-// RevokeAPIKey revokes the APIKey provided in the params
+// RevokeAPIKey revokes the APIKey provided in the params.
 func (client *Client) RevokeAPIKey(ctx context.Context, params RevokeAPIKeyParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
 	_, err = client.client.RevokeAPIKey(ctx, params.toRequest(client.header()))
 	return Error.Wrap(err)
 }
 
-// RevokeAPIKeyParams contain params for a RevokeAPIKey request
+// RevokeAPIKeyParams contain params for a RevokeAPIKey request.
 type RevokeAPIKeyParams struct {
 	APIKey []byte
 }

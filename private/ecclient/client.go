@@ -242,10 +242,10 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 
 	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
 	if err != nil {
-		if ctx.Err() == context.Canceled {
+		if ctx.Err() == context.Canceled { //nolint: goerr113
 			// Canceled context means the piece upload was interrupted by user or due
 			// to slow connection. No error logging for this case.
-			if parent.Err() == context.Canceled {
+			if parent.Err() == context.Canceled { //nolint: goerr113
 				ec.log.Info("Upload to node canceled by user", zap.Stringer("Node ID", storageNodeID))
 			} else {
 				ec.log.Debug("Node cut from upload due to slow connection", zap.Stringer("Node ID", storageNodeID))

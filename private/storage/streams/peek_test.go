@@ -5,6 +5,7 @@ package streams_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestThresholdBufAndRead(t *testing.T) {
 
 		outputBuf := make([]byte, tt.outputBufLen)
 		n, err := io.ReadFull(p, outputBuf)
-		if tt.readsToEnd && err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		if tt.readsToEnd && err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf(tt.name, "unexpected err from ReadFull:\n%s", err.Error())
 		} else if !tt.readsToEnd && err != nil {
 			t.Fatalf(tt.name, "unexpected err from ReadFull:\n%s", err.Error())
