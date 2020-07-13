@@ -76,8 +76,8 @@ pipeline {
 
                 stage('Testsuite') {
                     environment {
-                        STORJ_COCKROACH_TEST = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
-                        STORJ_POSTGRES_TEST = 'postgres://postgres@localhost/teststorj?sslmode=disable'
+                        STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
+                        STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
                         COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
                     }
                     steps {
@@ -102,8 +102,8 @@ pipeline {
 
                 stage('Integration [storj/storj]') {
                     environment {
-                        STORJ_POSTGRES_TEST = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
-                        STORJ_COCKROACH_TEST = 'omit'
+                        STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
+                        STORJ_TEST_COCKROACH = 'omit'
                     }
                     steps {
                         sh 'psql -U postgres -c \'create database teststorj2;\''
