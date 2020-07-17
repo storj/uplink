@@ -610,28 +610,26 @@ func (params *BeginDeleteObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // BeginDeleteObjectResponse response for BeginDeleteObject request.
 type BeginDeleteObjectResponse struct {
-	StreamID storj.StreamID
 }
 
 func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginDeleteObjectResponse {
-	return BeginDeleteObjectResponse{
-		StreamID: response.StreamId,
-	}
+	return BeginDeleteObjectResponse{}
 }
 
 // BeginDeleteObject begins object deletion process.
-func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ storj.StreamID, _ storj.ObjectInfo, err error) {
+func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	// response.StreamID is not processed because satellite will always return nil
 	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.StreamID{}, storj.ObjectInfo{}, storj.ErrObjectNotFound.Wrap(err)
+			return storj.ObjectInfo{}, storj.ErrObjectNotFound.Wrap(err)
 		}
-		return storj.StreamID{}, storj.ObjectInfo{}, Error.Wrap(err)
+		return storj.ObjectInfo{}, Error.Wrap(err)
 	}
 
-	return response.StreamId, newObjectInfo(response.Object), nil
+	return newObjectInfo(response.Object), nil
 }
 
 // FinishDeleteObjectParams parameters for FinishDeleteObject method.

@@ -63,8 +63,8 @@ func TestErrResourceExhausted(t *testing.T) {
 		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Rollup.DefaultMaxUsage = 0
-				config.Rollup.DefaultMaxBandwidth = 0
+				config.Metainfo.ProjectLimits.DefaultMaxUsage = 0
+				config.Metainfo.ProjectLimits.DefaultMaxBandwidth = 0
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {

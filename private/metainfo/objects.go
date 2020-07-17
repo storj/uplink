@@ -109,7 +109,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		return storj.Object{}, err
 	}
 
-	_, object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
+	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
 		Bucket:        []byte(bucket.Name),
 		EncryptedPath: []byte(encPath.Raw()),
 	})

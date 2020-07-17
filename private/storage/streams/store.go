@@ -430,7 +430,7 @@ func (s *streamStore) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo
 		return storj.ObjectInfo{}, err
 	}
 
-	_, object, err := s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+	object, err := s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
 		Bucket:        []byte(path.Bucket()),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
