@@ -5,6 +5,7 @@ package ecclient
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"sort"
@@ -109,6 +110,13 @@ func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	for i, addressedLimit := range limits {
 		go func(i int, addressedLimit *pb.AddressedOrderLimit) {
 			hash, _, err := ec.PutPiece(psCtx, ctx, addressedLimit, privateKey, readers[i])
+
+			if err != nil {
+				fmt.Printf("%s\tFAILED\t\t%s\n", addressedLimit.StorageNodeAddress.Address, err)
+			} else {
+				fmt.Printf("%s\tCOMPLETE\n", addressedLimit.StorageNodeAddress.Address)
+			}
+
 			infos <- info{i: i, err: err, hash: hash}
 		}(i, addressedLimit)
 	}
@@ -147,6 +155,7 @@ func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 			ec.log.Debug("Success threshold reached. Cancelling remaining uploads.",
 				zap.Int("Optimal Threshold", rs.OptimalThreshold()),
 			)
+			fmt.Printf("==================== LONG TAIL CANCELLATION ====================\n")
 			cancel()
 		}
 	}
