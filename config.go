@@ -12,6 +12,7 @@ import (
 	"storj.io/common/macaroon"
 	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
+	"storj.io/common/socket"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
 )
@@ -25,7 +26,7 @@ type Config struct {
 	DialTimeout time.Duration
 
 	// DialContext is how sockets are opened and is called to establish
-	// a connection. If unset, net.Dialer is used.
+	// a connection. If unset, storj.io/common/socket.BackgroundDialer is used.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
@@ -56,9 +57,11 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	dialer := rpc.NewDefaultDialer(tlsOptions)
 	dialer.DialTimeout = config.DialTimeout
-	if config.DialContext != nil {
-		dialer.Transport = dialContextFunc(config.DialContext)
+	dialContext := config.DialContext
+	if dialContext == nil {
+		dialContext = socket.BackgroundDialer().DialContext
 	}
+	dialer.Transport = dialContextFunc(dialContext)
 
 	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
 	if err != nil {
