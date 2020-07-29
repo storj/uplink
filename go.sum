@@ -95,7 +95,7 @@ gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7/go.mod h1:dt/ZhP58zS4L8KSrWD
 gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.2 h1:ZCJp+EgiOT7lHqUV2J862kp8Qj64Jo6az82+3Td9dZw=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
-storj.io/common v0.0.0-20200727180312-4725191b192d h1:yLi9qj9+9fPx3LCHor07NjXgVWeBvVkj3dUae3loJq4=
-storj.io/common v0.0.0-20200727180312-4725191b192d/go.mod h1:vMAnlNbkgW6i+w/OT1h4X8w6TajOHWAT+SvFHUFCpq0=
-storj.io/drpc v0.0.13 h1:EDR3WiwVcIHtg+8M5vqBFmUAuJvmM2erVHIfqPPSAoc=
-storj.io/drpc v0.0.13/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
+storj.io/common v0.0.0-20200729140050-4c1ddac6fa63 h1:BkRvlginTJGi0yAkpN+4ZKm2YpG63bDSDFLQtXYxxdg=
+storj.io/common v0.0.0-20200729140050-4c1ddac6fa63/go.mod h1:ILr54ISCqCQ6MmIwT7eaR/fEGrBfgfxiPt8nmpWqnUM=
+storj.io/drpc v0.0.14 h1:GCBdymTt1BRw4oHmmUZZlxYXLVRxxYj6x3Ivide2J+I=
+storj.io/drpc v0.0.14/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
