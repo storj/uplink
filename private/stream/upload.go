@@ -21,13 +21,16 @@ type Upload struct {
 	ctx      context.Context
 	stream   metainfo.MutableStream
 	streams  streams.Store
-	writer   io.WriteCloser
-	closed   bool
+	writer   *io.PipeWriter
 	errgroup errgroup.Group
 
-	// mu protects meta
-	mu   sync.RWMutex
-	meta *streams.Meta
+	// mu protects closed
+	mu     sync.Mutex
+	closed bool
+
+	// metamu protects meta
+	metamu sync.RWMutex
+	meta   *streams.Meta
 }
 
 // NewUpload creates new stream upload.
@@ -47,9 +50,9 @@ func NewUpload(ctx context.Context, stream metainfo.MutableStream, streams strea
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
 
-		upload.mu.Lock()
+		upload.metamu.Lock()
 		upload.meta = &m
-		upload.mu.Unlock()
+		upload.metamu.Unlock()
 
 		return nil
 	})
@@ -57,37 +60,73 @@ func NewUpload(ctx context.Context, stream metainfo.MutableStream, streams strea
 	return &upload
 }
 
-// Write writes len(data) bytes from data to the underlying data stream.
-//
-// See io.Writer for more details.
-func (upload *Upload) Write(data []byte) (n int, err error) {
-	if upload.closed {
-		return 0, Error.New("already closed")
-	}
+// close transitions the upload to being closed and returns an error
+// if it is already closed.
+func (upload *Upload) close() error {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
 
-	return upload.writer.Write(data)
-}
-
-// Close closes the stream and releases the underlying resources.
-func (upload *Upload) Close() error {
 	if upload.closed {
 		return Error.New("already closed")
 	}
 
 	upload.closed = true
+	return nil
+}
 
-	err := upload.writer.Close()
+// isClosed returns true if the upload is already closed.
+func (upload *Upload) isClosed() bool {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
 
-	// Wait for streams.Put to commit the upload to the PointerDB
-	return errs.Combine(err, upload.errgroup.Wait())
+	return upload.closed
+}
+
+// Write writes len(data) bytes from data to the underlying data stream.
+//
+// See io.Writer for more details.
+func (upload *Upload) Write(data []byte) (n int, err error) {
+	if upload.isClosed() {
+		return 0, Error.New("already closed")
+	}
+	return upload.writer.Write(data)
+}
+
+// Close closes the stream and releases the underlying resources.
+func (upload *Upload) Close() error {
+	if err := upload.close(); err != nil {
+		return err
+	}
+
+	// Wait for our launched goroutine to return.
+	return errs.Combine(
+		upload.writer.Close(),
+		upload.errgroup.Wait(),
+	)
+}
+
+// Abort closes the stream with an error so that it does not successfully commit and
+// releases the underlying resources.
+func (upload *Upload) Abort() error {
+	if err := upload.close(); err != nil {
+		return err
+	}
+
+	// Wait for our launched goroutine to return. We do not need any of the
+	// errors from the abort because they will just be things stating that
+	// it was aborted.
+	_ = upload.writer.CloseWithError(Error.New("aborted"))
+	_ = upload.errgroup.Wait()
+
+	return nil
 }
 
 // Meta returns the metadata of the uploaded object.
 //
 // Will return nil if the upload is still in progress.
 func (upload *Upload) Meta() *streams.Meta {
-	upload.mu.RLock()
-	defer upload.mu.RUnlock()
+	upload.metamu.RLock()
+	defer upload.metamu.RUnlock()
 
 	// we can safely return the pointer because it doesn't change after the
 	// upload finishes

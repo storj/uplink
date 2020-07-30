@@ -6,7 +6,7 @@ package uplink
 import (
 	"context"
 	"errors"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -70,7 +70,8 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 
 // Upload is an upload to Storj Network.
 type Upload struct {
-	aborted int32
+	mu      sync.Mutex
+	aborted bool
 	cancel  context.CancelFunc
 	upload  *stream.Upload
 	bucket  string
@@ -98,7 +99,10 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Commit() error {
-	if atomic.LoadInt32(&upload.aborted) == 1 {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+
+	if upload.aborted {
 		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
 
@@ -114,22 +118,29 @@ func (upload *Upload) Commit() error {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Abort() error {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+
 	if upload.upload.Meta() != nil {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
-	if !atomic.CompareAndSwapInt32(&upload.aborted, 0, 1) {
+	if upload.aborted {
 		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
 
+	upload.aborted = true
 	upload.cancel()
-	return nil
+	return upload.upload.Abort()
 }
 
 // SetCustomMetadata updates custom metadata to be included with the object.
 // If it is nil, it won't be modified.
 func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetadata) error {
-	if atomic.LoadInt32(&upload.aborted) == 1 {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+
+	if upload.aborted {
 		return errwrapf("%w: upload aborted", ErrUploadDone)
 	}
 	if upload.upload.Meta() != nil {
