@@ -101,7 +101,7 @@ func TestObject(t *testing.T) {
 
 		// delete missing object
 		deleted, err = project.DeleteObject(ctx, "testbucket", "test.dat")
-		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
+		assert.Nil(t, err)
 		require.Nil(t, deleted)
 	})
 }

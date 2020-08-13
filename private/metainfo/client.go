@@ -6,6 +6,7 @@ package metainfo
 import (
 	"bytes"
 	"context"
+	"net"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -581,6 +582,41 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 
 	getResponse := newGetObjectResponse(response)
 	return getResponse.Info, nil
+}
+
+// GetObjectIPParams are params for the GetObectIPs request.
+type GetObjectIPParams struct {
+	Bucket        []byte
+	EncryptedPath []byte
+	Version       int32
+}
+
+func (params *GetObjectIPParams) toRequest(header *pb.RequestHeader) *pb.ObjectGetIPsRequest {
+	return &pb.ObjectGetIPsRequest{
+		Header:        header,
+		Bucket:        params.Bucket,
+		EncryptedPath: params.EncryptedPath,
+		Version:       params.Version,
+	}
+}
+
+// GetObjectIPs returns the IP addresses of the nodes which hold the object.
+func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPParams) (ips []net.IP, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.GetObjectIPs(ctx, params.toRequest(client.header()))
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return nil, storj.ErrObjectNotFound.Wrap(err)
+		}
+		return nil, Error.Wrap(err)
+	}
+
+	ips = make([]net.IP, 0, len(response.Ips))
+	for _, ip := range response.Ips {
+		ips = append(ips, net.IP(ip))
+	}
+	return ips, nil
 }
 
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.

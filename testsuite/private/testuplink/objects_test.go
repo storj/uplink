@@ -267,11 +267,11 @@ func TestDeleteObject(t *testing.T) {
 					PathCipher: bucket.PathCipher,
 				}
 				_, err = db.DeleteObject(ctx, unexistingBucket, TestFile)
-				assert.True(t, storj.ErrObjectNotFound.Has(err))
+				assert.Nil(t, err)
 			}
 
 			_, err = db.DeleteObject(ctx, bucket, "non-existing-file")
-			assert.True(t, storj.ErrObjectNotFound.Has(err))
+			assert.Nil(t, err)
 
 			object, err := db.DeleteObject(ctx, bucket, path)
 			if assert.NoError(t, err) {

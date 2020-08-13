@@ -6,6 +6,7 @@ package metainfo
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 	"time"
 
@@ -50,6 +51,29 @@ func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object s
 		db:   db,
 		info: object,
 	}, nil
+}
+
+// GetObjectIPs returns the IP addresses of the nodes which hold the object.
+func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.Path) (ips []net.IP, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket.Name == "" {
+		return nil, storj.ErrNoBucket.New("")
+	}
+
+	if path == "" {
+		return nil, storj.ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.metainfo.GetObjectIPs(ctx, GetObjectIPParams{
+		Bucket:        []byte(bucket.Name),
+		EncryptedPath: []byte(encPath.Raw()),
+	})
 }
 
 // CreateObject creates an uploading object and returns an interface for uploading Object information.
