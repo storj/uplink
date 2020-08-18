@@ -12,3 +12,8 @@ var RequestAccessWithPassphraseAndConcurrency interface{}
 //
 // func EnablePathEncryptionBypass(access *Access) error.
 var EnablePathEncryptionBypass interface{}
+
+// GetObjectIPs exposes uplink.getObjectIPs.
+//
+// func GetObjectIPs(ctx context.Context, config Config, access *Access, bucket, key string) (ips [][]byte, err error).
+var GetObjectIPs interface{}

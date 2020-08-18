@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,7 +15,14 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/private/metainfo"
 )
+
+func init() {
+	// expose this method for linksharing service
+	expose.GetObjectIPs = getObjectIPs
+}
 
 // ErrObjectKeyInvalid is returned when the object key is invalid.
 var ErrObjectKeyInvalid = errors.New("object key invalid")
@@ -118,4 +126,16 @@ func convertObject(obj *storj.Object) *Object {
 		},
 		Custom: obj.Metadata,
 	}
+}
+
+func getObjectIPs(ctx context.Context, config Config, access *Access, bucket, key string) (ips []net.IP, err error) {
+	client, _, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	defer func() { err = errs.Combine(err, client.Close()) }()
+
+	db := metainfo.New(client, access.encAccess.Store())
+
+	return db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
 }
