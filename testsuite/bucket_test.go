@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
@@ -71,6 +72,44 @@ func TestBucket(t *testing.T) {
 			require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 			require.Nil(t, deleted)
 		}
+	})
+}
+
+func TestBucket_DeleteWithObjects(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		testbucket := "testbucket"
+		bucket := createBucket(t, ctx, project, testbucket)
+
+		// making sure the bucket exists
+		statBucket, err := project.StatBucket(ctx, testbucket)
+		require.NoError(t, err)
+		require.Equal(t, bucket.Name, statBucket.Name)
+		require.Equal(t, bucket.Created, statBucket.Created)
+
+		// uploading an object to the bucket
+		uploadObject(t, ctx, project, testbucket, "testobject", 1*memory.KiB)
+
+		// try to delete the bucket
+		_, err = project.DeleteBucket(ctx, testbucket)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotEmpty))
+
+		// delete bucket with objects
+		bucket, err = project.DeleteBucketWithObjects(ctx, testbucket)
+		require.NoError(t, err)
+		require.Equal(t, testbucket, bucket.Name)
+
+		// making sure the bucket doesn't exist anymore
+		statBucket, err = project.StatBucket(ctx, testbucket)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+		require.Nil(t, statBucket)
 	})
 }
 

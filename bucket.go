@@ -97,11 +97,30 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	existing, err := project.db.DeleteBucket(ctx, bucket)
+	existing, err := project.db.DeleteBucket(ctx, bucket, false)
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
 			return nil, errwrapf("%w (%q)", ErrBucketNotEmpty, bucket)
 		}
+		return nil, convertKnownErrors(err, bucket, "")
+	}
+
+	if existing == (storj.Bucket{}) {
+		return nil, nil
+	}
+
+	return &Bucket{
+		Name:    existing.Name,
+		Created: existing.Created,
+	}, nil
+}
+
+// DeleteBucketWithObjects deletes a bucket and all objects within that bucket.
+func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket string) (deleted *Bucket, err error) {
+	defer mon.Func().RestartTrace(&ctx)(&err)
+
+	existing, err := project.db.DeleteBucket(ctx, bucket, true)
+	if err != nil {
 		return nil, convertKnownErrors(err, bucket, "")
 	}
 

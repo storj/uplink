@@ -237,13 +237,15 @@ func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (re
 
 // DeleteBucketParams parmaters for DeleteBucket method.
 type DeleteBucketParams struct {
-	Name []byte
+	Name      []byte
+	DeleteAll bool
 }
 
 func (params *DeleteBucketParams) toRequest(header *pb.RequestHeader) *pb.BucketDeleteRequest {
 	return &pb.BucketDeleteRequest{
-		Header: header,
-		Name:   params.Name,
+		Header:    header,
+		Name:      params.Name,
+		DeleteAll: params.DeleteAll,
 	}
 }
 

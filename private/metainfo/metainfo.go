@@ -46,7 +46,7 @@ func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket st
 }
 
 // DeleteBucket deletes bucket.
-func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (bucket storj.Bucket, err error) {
+func (db *DB) DeleteBucket(ctx context.Context, bucketName string, deleteAll bool) (bucket storj.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
@@ -54,7 +54,8 @@ func (db *DB) DeleteBucket(ctx context.Context, bucketName string) (bucket storj
 	}
 
 	bucket, err = db.metainfo.DeleteBucket(ctx, DeleteBucketParams{
-		Name: []byte(bucketName),
+		Name:      []byte(bucketName),
+		DeleteAll: deleteAll,
 	})
 	return bucket, storj.ErrBucket.Wrap(err)
 }

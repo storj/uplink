@@ -54,7 +54,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Delete the bucket
-		bucket, err = db.DeleteBucket(ctx, TestBucket)
+		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
 			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
@@ -97,7 +97,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Delete the bucket
-		bucket, err = db.DeleteBucket(ctx, TestBucket)
+		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
 			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
@@ -124,8 +124,34 @@ func TestErrNoBucket(t *testing.T) {
 		_, err = db.GetBucket(ctx, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
-		_, err = db.DeleteBucket(ctx, "")
+		_, err = db.DeleteBucket(ctx, "", false)
 		assert.True(t, storj.ErrNoBucket.Has(err))
+	})
+}
+
+func TestBucketDeleteAll(t *testing.T) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+		bucket, err := db.CreateBucket(ctx, TestBucket)
+		if assert.NoError(t, err) {
+			assert.Equal(t, TestBucket, bucket.Name)
+		}
+
+		// Check that we can get the new bucket explicitly
+		bucket, err = db.GetBucket(ctx, TestBucket)
+		if assert.NoError(t, err) {
+			assert.Equal(t, TestBucket, bucket.Name)
+			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
+		}
+
+		// Upload an object to the bucket
+		upload(ctx, t, db, streams, bucket, "small-file", []byte("test"))
+
+		// Force delete the bucket
+		bucket, err = db.DeleteBucket(ctx, TestBucket, true)
+		if assert.NoError(t, err) {
+			assert.Equal(t, TestBucket, bucket.Name)
+			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
+		}
 	})
 }
 
