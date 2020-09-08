@@ -36,6 +36,7 @@ pipeline {
                         sh 'storj-protobuf --protoc=$HOME/protoc/bin/protoc lint'
                         sh 'storj-protobuf --protoc=$HOME/protoc/bin/protoc check-lock'
                         sh 'check-atomic-align ./...'
+                        sh 'check-monkit ./...'
                         sh 'check-errs ./...'
                         sh './scripts/check-dependencies.sh'
                         sh 'staticcheck ./...'
