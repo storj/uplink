@@ -14,6 +14,10 @@ cd $TMP; git clone https://github.com/rclone/rclone
 RCLONE=$TMP/rclone
 
 pushd $RCLONE
+    git fetch --tags
+    latest_version=$(git tag -l --sort -version:refname | head -1)
+    git checkout $latest_version
+
     go mod edit -replace storj.io/uplink=$SCRIPTDIR/../../
     go mod vendor
 
