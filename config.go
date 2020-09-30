@@ -30,12 +30,6 @@ type Config struct {
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-type dialContextFunc func(ctx context.Context, network, address string) (net.Conn, error)
-
-func (f dialContextFunc) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	return f(ctx, network, address)
-}
-
 func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
 		Difficulty:  0,
@@ -61,7 +55,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 	if dialContext == nil {
 		dialContext = socket.BackgroundDialer().DialContext
 	}
-	dialer.Transport = dialContextFunc(dialContext)
+	dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
 
 	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
 	if err != nil {
