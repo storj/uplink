@@ -13,7 +13,7 @@ require (
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/tools v0.0.0-20200428211428-0c9eba77bc32 // indirect
 	google.golang.org/grpc v1.28.0 // indirect
-	storj.io/common v0.0.0-20201001161806-f737e062f9cd
-	storj.io/storj v0.12.1-0.20201001193909-f13084983d81
-	storj.io/uplink v1.3.1-0.20201001145520-fc00bf95f7a0
+	storj.io/common v0.0.0-20201006183456-4f16ac657da9
+	storj.io/storj v0.12.1-0.20201010194050-4cbd4d52a9e5
+	storj.io/uplink v1.3.1-0.20201008224638-1a9a5783048f
 )
