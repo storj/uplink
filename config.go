@@ -26,7 +26,7 @@ type Config struct {
 	DialTimeout time.Duration
 
 	// DialContext is how sockets are opened and is called to establish
-	// a connection. If unset, storj.io/common/socket.BackgroundDialer is used.
+	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
