@@ -35,11 +35,15 @@ type Meta struct {
 	Data       []byte
 }
 
+// Metadata interface returns the latest metadata for an object.
+type Metadata interface {
+	Metadata() ([]byte, error)
+}
+
 // Store interface methods for streams to satisfy to be a store.
-type typedStore interface {
+type Store interface {
 	Get(ctx context.Context, path Path, object storj.Object) (ranger.Ranger, error)
 	Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (Meta, error)
-	Delete(ctx context.Context, path Path) (storj.ObjectInfo, error)
 }
 
 // streamStore is a store for streams. It implements typedStore as part of an ongoing migration
@@ -49,8 +53,7 @@ type streamStore struct {
 	ec                      ecclient.Client
 	segmentSize             int64
 	encStore                *encryption.Store
-	encBlockSize            int
-	cipher                  storj.CipherSuite
+	encryptionParameters    storj.EncryptionParameters
 	inlineThreshold         int
 	maxEncryptedSegmentSize int64
 
@@ -58,12 +61,12 @@ type streamStore struct {
 	rng   *mathrand.Rand
 }
 
-// newTypedStreamStore constructs a typedStore backed by a streamStore.
-func newTypedStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encBlockSize int, cipher storj.CipherSuite, inlineThreshold int, maxEncryptedSegmentSize int64) (typedStore, error) {
+// NewStreamStore constructs a stream store.
+func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int, maxEncryptedSegmentSize int64) (Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
-	if encBlockSize <= 0 {
+	if encryptionParameters.BlockSize <= 0 {
 		return nil, errs.New("encryption block size must be larger than 0")
 	}
 
@@ -72,8 +75,7 @@ func newTypedStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentS
 		ec:                      ec,
 		segmentSize:             segmentSize,
 		encStore:                encStore,
-		encBlockSize:            encBlockSize,
-		cipher:                  cipher,
+		encryptionParameters:    encryptionParameters,
 		inlineThreshold:         inlineThreshold,
 		maxEncryptedSegmentSize: maxEncryptedSegmentSize,
 		rng:                     mathrand.New(mathrand.NewSource(time.Now().UnixNano())),
@@ -156,7 +158,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 			return Meta{}, err
 		}
 
-		encryptedKey, err = encryption.EncryptKey(&contentKey, s.cipher, derivedKey, &keyNonce)
+		encryptedKey, err = encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &keyNonce)
 		if err != nil {
 			return Meta{}, err
 		}
@@ -171,7 +173,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		}
 
 		segmentEncryption := storj.SegmentEncryption{}
-		if s.cipher != storj.EncNull {
+		if s.encryptionParameters.CipherSuite != storj.EncNull {
 			segmentEncryption = storj.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: keyNonce,
@@ -179,7 +181,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 		}
 
 		if isRemote {
-			encrypter, err := encryption.NewEncrypter(s.cipher, &contentKey, &contentNonce, s.encBlockSize)
+			encrypter, err := encryption.NewEncrypter(s.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(s.encryptionParameters.BlockSize))
 			if err != nil {
 				return Meta{}, err
 			}
@@ -240,7 +242,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 			if err != nil {
 				return Meta{}, err
 			}
-			cipherData, err := encryption.Encrypt(data, s.cipher, &contentKey, &contentNonce)
+			cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 			if err != nil {
 				return Meta{}, err
 			}
@@ -295,7 +297,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
-	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, s.cipher, &contentKey, &storj.Nonce{})
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, s.encryptionParameters.CipherSuite, &contentKey, &storj.Nonce{})
 	if err != nil {
 		return Meta{}, err
 	}
@@ -303,11 +305,11 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 	streamMeta := pb.StreamMeta{
 		NumberOfSegments:    totalSegments,
 		EncryptedStreamInfo: encryptedStreamInfo,
-		EncryptionType:      int32(s.cipher),
-		EncryptionBlockSize: int32(s.encBlockSize),
+		EncryptionType:      int32(s.encryptionParameters.CipherSuite),
+		EncryptionBlockSize: s.encryptionParameters.BlockSize,
 	}
 
-	if s.cipher != storj.EncNull {
+	if s.encryptionParameters.CipherSuite != storj.EncNull {
 		streamMeta.LastSegmentMeta = &pb.SegmentMeta{
 			EncryptedKey: encryptedKey,
 			KeyNonce:     keyNonce[:],

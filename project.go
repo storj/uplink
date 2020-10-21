@@ -108,7 +108,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store(), int(encryptionParameters.BlockSize), encryptionParameters.CipherSuite, maxInlineSize, maxEncryptedSegmentSize)
+	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store(), encryptionParameters, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

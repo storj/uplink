@@ -296,9 +296,13 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*m
 	}
 
 	const stripesPerBlock = 2
-	blockSize := stripesPerBlock * rs.StripeSize()
+
+	encryptionParameters := storj.EncryptionParameters{
+		BlockSize:   int32(stripesPerBlock * rs.StripeSize()),
+		CipherSuite: storj.EncAESGCM,
+	}
 	inlineThreshold := 8 * memory.KiB.Int()
-	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, blockSize, storj.EncAESGCM, inlineThreshold, 8*memory.MiB.Int64())
+	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, encryptionParameters, inlineThreshold, 8*memory.MiB.Int64())
 	if err != nil {
 		return nil, nil, err
 	}

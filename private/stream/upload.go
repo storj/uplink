@@ -34,18 +34,18 @@ type Upload struct {
 }
 
 // NewUpload creates new stream upload.
-func NewUpload(ctx context.Context, stream metainfo.MutableStream, streams streams.Store) *Upload {
+func NewUpload(ctx context.Context, stream metainfo.MutableStream, streamsStore streams.Store) *Upload {
 	reader, writer := io.Pipe()
 
 	upload := Upload{
 		ctx:     ctx,
 		stream:  stream,
-		streams: streams,
+		streams: streamsStore,
 		writer:  writer,
 	}
 
 	upload.errgroup.Go(func() error {
-		m, err := streams.Put(ctx, storj.JoinPaths(stream.BucketName(), stream.Path()), reader, stream, stream.Expires())
+		m, err := streamsStore.Put(ctx, streams.ParsePath(storj.JoinPaths(stream.BucketName(), stream.Path())), reader, stream, stream.Expires())
 		if err != nil {
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
