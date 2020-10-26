@@ -385,16 +385,15 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 		}
 
 		rangers = append(rangers, &lazySegmentRanger{
-			metainfo:      s.metainfo,
-			streams:       s,
-			streamID:      object.ID,
-			segmentIndex:  int32(i),
-			rs:            object.RedundancyScheme,
-			size:          object.FixedSegmentSize,
-			derivedKey:    derivedKey,
-			startingNonce: &contentNonce,
-			encBlockSize:  int(object.EncryptionParameters.BlockSize),
-			cipher:        object.CipherSuite,
+			metainfo:             s.metainfo,
+			streams:              s,
+			streamID:             object.ID,
+			segmentIndex:         int32(i),
+			rs:                   object.RedundancyScheme,
+			size:                 object.FixedSegmentSize,
+			derivedKey:           derivedKey,
+			startingNonce:        &contentNonce,
+			encryptionParameters: object.EncryptionParameters,
 		})
 	}
 
@@ -408,12 +407,11 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 		ctx,
 		lastSegmentRanger,
 		object.LastSegment.Size,
-		object.CipherSuite,
+		object.EncryptionParameters,
 		derivedKey,
 		info.SegmentEncryption.EncryptedKey,
 		&info.SegmentEncryption.EncryptedKeyNonce,
 		&contentNonce,
-		int(object.EncryptionParameters.BlockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -439,25 +437,17 @@ func (s *streamStore) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo
 	return object, err
 }
 
-// ListItem is a single item in a listing.
-type ListItem struct {
-	Path     string
-	Meta     Meta
-	IsPrefix bool
-}
-
 type lazySegmentRanger struct {
-	ranger        ranger.Ranger
-	metainfo      *metainfo.Client
-	streams       *streamStore
-	streamID      storj.StreamID
-	segmentIndex  int32
-	rs            storj.RedundancyScheme
-	size          int64
-	derivedKey    *storj.Key
-	startingNonce *storj.Nonce
-	encBlockSize  int
-	cipher        storj.CipherSuite
+	ranger               ranger.Ranger
+	metainfo             *metainfo.Client
+	streams              *streamStore
+	streamID             storj.StreamID
+	segmentIndex         int32
+	rs                   storj.RedundancyScheme
+	size                 int64
+	derivedKey           *storj.Key
+	startingNonce        *storj.Nonce
+	encryptionParameters storj.EncryptionParameters
 }
 
 // Size implements Ranger.Size.
@@ -485,7 +475,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 		}
 
 		encryptedKey, keyNonce := info.SegmentEncryption.EncryptedKey, info.SegmentEncryption.EncryptedKeyNonce
-		lr.ranger, err = decryptRanger(ctx, rr, lr.size, lr.cipher, lr.derivedKey, encryptedKey, &keyNonce, lr.startingNonce, lr.encBlockSize)
+		lr.ranger, err = decryptRanger(ctx, rr, lr.size, lr.encryptionParameters, lr.derivedKey, encryptedKey, &keyNonce, lr.startingNonce)
 		if err != nil {
 			return nil, err
 		}
@@ -494,14 +484,14 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 }
 
 // decryptRanger returns a decrypted ranger of the given rr ranger.
-func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, cipher storj.CipherSuite, derivedKey *storj.Key, encryptedKey storj.EncryptedPrivateKey, encryptedKeyNonce, startingNonce *storj.Nonce, encBlockSize int) (decrypted ranger.Ranger, err error) {
+func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, encryptionParameters storj.EncryptionParameters, derivedKey *storj.Key, encryptedKey storj.EncryptedPrivateKey, encryptedKeyNonce, startingNonce *storj.Nonce) (decrypted ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
-	contentKey, err := encryption.DecryptKey(encryptedKey, cipher, derivedKey, encryptedKeyNonce)
+	contentKey, err := encryption.DecryptKey(encryptedKey, encryptionParameters.CipherSuite, derivedKey, encryptedKeyNonce)
 	if err != nil {
 		return nil, err
 	}
 
-	decrypter, err := encryption.NewDecrypter(cipher, contentKey, startingNonce, encBlockSize)
+	decrypter, err := encryption.NewDecrypter(encryptionParameters.CipherSuite, contentKey, startingNonce, int(encryptionParameters.BlockSize))
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +507,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, c
 		if err != nil {
 			return nil, err
 		}
-		data, err := encryption.Decrypt(cipherData, cipher, contentKey, startingNonce)
+		data, err := encryption.Decrypt(cipherData, encryptionParameters.CipherSuite, contentKey, startingNonce)
 		if err != nil {
 			return nil, err
 		}
