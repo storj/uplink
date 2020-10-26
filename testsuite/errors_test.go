@@ -106,7 +106,7 @@ func TestUploadDownloadParamsValidation(t *testing.T) {
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
-		ctx.Check(project.Close)
+		defer ctx.Check(project.Close)
 
 		_, err := project.UploadObject(ctx, "", "", nil)
 		require.Error(t, err)

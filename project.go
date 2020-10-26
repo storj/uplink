@@ -53,7 +53,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	var telemetry telemetryclient.Client
 	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
-		telemetry, err = ctor(zap.L(), access.satelliteAddress)
+		telemetry, err = ctor(access.satelliteAddress)
 		if err != nil {
 			return nil, err
 		}

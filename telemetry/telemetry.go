@@ -6,8 +6,6 @@ package telemetry
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	"storj.io/common/telemetry"
 	"storj.io/uplink/internal/telemetryclient"
 )
@@ -23,8 +21,8 @@ type Options struct {
 }
 
 // createClient creates a new client using the options.
-func (options *Options) createClient(log *zap.Logger, satelliteAddress string) (telemetryclient.Client, error) {
-	client, err := telemetry.NewClient(zap.L(), options.Endpoint, telemetry.ClientOpts{
+func (options *Options) createClient(satelliteAddress string) (telemetryclient.Client, error) {
+	client, err := telemetry.NewClient(options.Endpoint, telemetry.ClientOpts{
 		Application: options.Application,
 		Headers: map[string]string{
 			"sat": satelliteAddress,

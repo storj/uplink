@@ -28,7 +28,7 @@ func TestParallelUploadDownload(t *testing.T) {
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
-		ctx.Check(project.Close)
+		defer ctx.Check(project.Close)
 
 		_, err := project.EnsureBucket(ctx, "test")
 		require.NoError(t, err)
