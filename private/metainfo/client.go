@@ -670,36 +670,6 @@ func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteO
 	return newObjectInfo(response.Object), nil
 }
 
-// FinishDeleteObjectParams parameters for FinishDeleteObject method.
-type FinishDeleteObjectParams struct {
-	StreamID storj.StreamID
-}
-
-func (params *FinishDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectFinishDeleteRequest {
-	return &pb.ObjectFinishDeleteRequest{
-		Header:   header,
-		StreamId: params.StreamID,
-	}
-}
-
-// BatchItem returns single item for batch request.
-func (params *FinishDeleteObjectParams) BatchItem() *pb.BatchRequestItem {
-	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_ObjectFinishDelete{
-			ObjectFinishDelete: params.toRequest(nil),
-		},
-	}
-}
-
-// FinishDeleteObject finishes object deletion process.
-func (client *Client) FinishDeleteObject(ctx context.Context, params FinishDeleteObjectParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	_, err = client.client.FinishDeleteObject(ctx, params.toRequest(client.header()))
-
-	return Error.Wrap(err)
-}
-
 // ListObjectsParams parameters for ListObjects method.
 type ListObjectsParams struct {
 	Bucket          []byte
@@ -915,92 +885,6 @@ func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSe
 	return Error.Wrap(err)
 }
 
-// BeginDeleteSegmentParams parameters for BeginDeleteSegment method.
-type BeginDeleteSegmentParams struct {
-	StreamID storj.StreamID
-	Position storj.SegmentPosition
-}
-
-func (params *BeginDeleteSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentBeginDeleteRequest {
-	return &pb.SegmentBeginDeleteRequest{
-		Header:   header,
-		StreamId: params.StreamID,
-		Position: &pb.SegmentPosition{
-			PartNumber: params.Position.PartNumber,
-			Index:      params.Position.Index,
-		},
-	}
-}
-
-// BatchItem returns single item for batch request.
-func (params *BeginDeleteSegmentParams) BatchItem() *pb.BatchRequestItem {
-	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_SegmentBeginDelete{
-			SegmentBeginDelete: params.toRequest(nil),
-		},
-	}
-}
-
-// BeginDeleteSegmentResponse response for BeginDeleteSegment request.
-type BeginDeleteSegmentResponse struct {
-	SegmentID       storj.SegmentID
-	Limits          []*pb.AddressedOrderLimit
-	PiecePrivateKey storj.PiecePrivateKey
-}
-
-func newBeginDeleteSegmentResponse(response *pb.SegmentBeginDeleteResponse) BeginDeleteSegmentResponse {
-	return BeginDeleteSegmentResponse{
-		SegmentID:       response.SegmentId,
-		Limits:          response.AddressedLimits,
-		PiecePrivateKey: response.PrivateKey,
-	}
-}
-
-// BeginDeleteSegment begins segment deletion process.
-func (client *Client) BeginDeleteSegment(ctx context.Context, params BeginDeleteSegmentParams) (_ storj.SegmentID, limits []*pb.AddressedOrderLimit, _ storj.PiecePrivateKey, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	response, err := client.client.BeginDeleteSegment(ctx, params.toRequest(client.header()))
-	if err != nil {
-		return storj.SegmentID{}, nil, storj.PiecePrivateKey{}, Error.Wrap(err)
-	}
-
-	return response.SegmentId, response.AddressedLimits, response.PrivateKey, nil
-}
-
-// FinishDeleteSegmentParams parameters for FinishDeleteSegment method.
-type FinishDeleteSegmentParams struct {
-	SegmentID storj.SegmentID
-
-	DeleteResults []*pb.SegmentPieceDeleteResult
-}
-
-func (params *FinishDeleteSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentFinishDeleteRequest {
-	return &pb.SegmentFinishDeleteRequest{
-		Header:    header,
-		SegmentId: params.SegmentID,
-		Results:   params.DeleteResults,
-	}
-}
-
-// BatchItem returns single item for batch request.
-func (params *FinishDeleteSegmentParams) BatchItem() *pb.BatchRequestItem {
-	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_SegmentFinishDelete{
-			SegmentFinishDelete: params.toRequest(nil),
-		},
-	}
-}
-
-// FinishDeleteSegment finishes segment upload process.
-func (client *Client) FinishDeleteSegment(ctx context.Context, params FinishDeleteSegmentParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	_, err = client.client.FinishDeleteSegment(ctx, params.toRequest(client.header()))
-
-	return Error.Wrap(err)
-}
-
 // DownloadSegmentParams parameters for DownloadSegment method.
 type DownloadSegmentParams struct {
 	StreamID storj.StreamID
@@ -1078,72 +962,6 @@ func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmen
 
 	downloadResponse := newDownloadSegmentResponse(response)
 	return downloadResponse.Info, downloadResponse.Limits, nil
-}
-
-// ListSegmentsParams parameters for ListSegment method.
-type ListSegmentsParams struct {
-	StreamID       storj.StreamID
-	CursorPosition storj.SegmentPosition
-	Limit          int32
-}
-
-// ListSegmentsResponse response for ListSegments request.
-type ListSegmentsResponse struct {
-	Items []storj.SegmentListItem
-	More  bool
-}
-
-func (params *ListSegmentsParams) toRequest(header *pb.RequestHeader) *pb.SegmentListRequest {
-	return &pb.SegmentListRequest{
-		Header:   header,
-		StreamId: params.StreamID,
-		CursorPosition: &pb.SegmentPosition{
-			PartNumber: params.CursorPosition.PartNumber,
-			Index:      params.CursorPosition.Index,
-		},
-		Limit: params.Limit,
-	}
-}
-
-// BatchItem returns single item for batch request.
-func (params *ListSegmentsParams) BatchItem() *pb.BatchRequestItem {
-	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_SegmentList{
-			SegmentList: params.toRequest(nil),
-		},
-	}
-}
-
-func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsResponse {
-	items := make([]storj.SegmentListItem, len(response.Items))
-	for i, responseItem := range response.Items {
-		items[i] = storj.SegmentListItem{
-			Position: storj.SegmentPosition{
-				PartNumber: responseItem.Position.PartNumber,
-				Index:      responseItem.Position.Index,
-			},
-		}
-	}
-	return ListSegmentsResponse{
-		Items: items,
-		More:  response.More,
-	}
-}
-
-// ListSegments lists object segments.
-func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParams) (_ []storj.SegmentListItem, more bool, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	response, err := client.client.ListSegments(ctx, params.toRequest(client.header()))
-	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return []storj.SegmentListItem{}, false, storj.ErrObjectNotFound.Wrap(err)
-		}
-		return []storj.SegmentListItem{}, false, Error.Wrap(err)
-	}
-
-	listResponse := newListSegmentsResponse(response)
-	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 
 // RevokeAPIKey revokes the APIKey provided in the params.

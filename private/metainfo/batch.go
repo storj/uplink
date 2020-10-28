@@ -120,25 +120,6 @@ func (resp *BatchResponse) BeginSegment() (BeginSegmentResponse, error) {
 	return newBeginSegmentResponse(item.SegmentBegin), nil
 }
 
-// BeginDeleteSegment returns response for BeginDeleteSegment request.
-func (resp *BatchResponse) BeginDeleteSegment() (BeginDeleteSegmentResponse, error) {
-	item, ok := resp.pbResponse.(*pb.BatchResponseItem_SegmentBeginDelete)
-	if !ok {
-		return BeginDeleteSegmentResponse{}, ErrInvalidType
-	}
-
-	return newBeginDeleteSegmentResponse(item.SegmentBeginDelete), nil
-}
-
-// ListSegment returns response for ListSegment request.
-func (resp *BatchResponse) ListSegment() (ListSegmentsResponse, error) {
-	item, ok := resp.pbResponse.(*pb.BatchResponseItem_SegmentList)
-	if !ok {
-		return ListSegmentsResponse{}, ErrInvalidType
-	}
-	return newListSegmentsResponse(item.SegmentList), nil
-}
-
 // DownloadSegment returns response for DownloadSegment request.
 func (resp *BatchResponse) DownloadSegment() (DownloadSegmentResponse, error) {
 	item, ok := resp.pbResponse.(*pb.BatchResponseItem_SegmentDownload)
