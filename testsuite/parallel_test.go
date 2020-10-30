@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 
+	"storj.io/common/errs2"
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -39,11 +39,11 @@ func TestParallelUploadDownload(t *testing.T) {
 			expectedData[i] = testrand.Bytes(10 * memory.KiB)
 		}
 
-		group, gctx := errgroup.WithContext(ctx)
+		group := errs2.Group{}
 		for p := 0; p < concurrency; p++ {
 			p := p
 			group.Go(func() error {
-				upload, err := project.UploadObject(gctx, "test", strconv.Itoa(p), nil)
+				upload, err := project.UploadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
 					return fmt.Errorf("starting upload failed %d: %w", p, err)
 				}
@@ -61,16 +61,16 @@ func TestParallelUploadDownload(t *testing.T) {
 				return nil
 			})
 		}
-		require.NoError(t, group.Wait())
+		require.Empty(t, group.Wait())
 
 		// download multiple objects concurrently
 
-		group, gctx = errgroup.WithContext(ctx)
+		group = errs2.Group{}
 		downloadedData := make([][]byte, concurrency)
 		for p := 0; p < concurrency; p++ {
 			p := p
 			group.Go(func() error {
-				download, err := project.DownloadObject(gctx, "test", strconv.Itoa(p), nil)
+				download, err := project.DownloadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
 					return fmt.Errorf("starting download failed %d: %w", p, err)
 				}
@@ -89,7 +89,7 @@ func TestParallelUploadDownload(t *testing.T) {
 				return nil
 			})
 		}
-		require.NoError(t, group.Wait())
+		require.Empty(t, group.Wait())
 
 		for i, expected := range expectedData {
 			require.Equal(t, expected, downloadedData[i])
