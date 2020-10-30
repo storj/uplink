@@ -131,7 +131,6 @@ func (rs *RedundancyStrategy) OptimalThreshold() int {
 }
 
 type encodedReader struct {
-	log    *zap.Logger
 	ctx    context.Context
 	rs     RedundancyStrategy
 	pieces map[int]*encodedPiece
@@ -143,7 +142,6 @@ func EncodeReader(ctx context.Context, log *zap.Logger, r io.Reader, rs Redundan
 	defer mon.Task()(&ctx)(&err)
 
 	er := &encodedReader{
-		log:    log,
 		ctx:    ctx,
 		rs:     rs,
 		pieces: make(map[int]*encodedPiece, rs.TotalCount()),
@@ -187,10 +185,10 @@ func (er *encodedReader) fillBuffer(ctx context.Context, r io.Reader, w sync2.Pi
 	var err error
 	defer mon.Task()(&ctx)(&err)
 	_, err = sync2.Copy(ctx, w, r)
-	err = w.CloseWithError(err)
-	if err != nil {
-		er.log.Error("Error closing buffer pipe", zap.Error(err))
-	}
+
+	// We probably cannot do anything reasonable with the error here.
+	// This would indicate failure to close a temporary file, which doesn't need to be persisted.
+	_ = w.CloseWithError(err)
 }
 
 type encodedPiece struct {
@@ -254,8 +252,7 @@ type EncodedRanger struct {
 // comments for EncodeReader about the repair and success thresholds.
 func NewEncodedRanger(log *zap.Logger, rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
 	if rr.Size()%int64(rs.StripeSize()) != 0 {
-		return nil, Error.New("invalid erasure encoder and range reader combo. " +
-			"range reader size must be a multiple of erasure encoder block size")
+		return nil, Error.New("invalid erasure encoder and range reader combo. range reader size must be a multiple of erasure encoder block size")
 	}
 	return &EncodedRanger{
 		log: log,

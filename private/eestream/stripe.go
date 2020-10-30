@@ -14,7 +14,6 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/vivint/infectious"
-	"go.uber.org/zap"
 )
 
 var (
@@ -35,7 +34,7 @@ type StripeReader struct {
 
 // NewStripeReader creates a new StripeReader from the given readers, erasure
 // scheme and max buffer memory.
-func NewStripeReader(log *zap.Logger, rs map[int]io.ReadCloser, es ErasureScheme, mbm int, forceErrorDetection bool) *StripeReader {
+func NewStripeReader(rs map[int]io.ReadCloser, es ErasureScheme, mbm int, forceErrorDetection bool) *StripeReader {
 	readerCount := len(rs)
 
 	r := &StripeReader{
@@ -57,7 +56,7 @@ func NewStripeReader(log *zap.Logger, rs map[int]io.ReadCloser, es ErasureScheme
 
 	for i := range rs {
 		r.inbufs[i] = make([]byte, es.ErasureShareSize())
-		r.bufs[i] = NewPieceBuffer(log, make([]byte, bufSize), es.ErasureShareSize(), r.cond)
+		r.bufs[i] = NewPieceBuffer(make([]byte, bufSize), es.ErasureShareSize(), r.cond)
 		// Kick off a goroutine each reader to be copied into a PieceBuffer.
 		go func(r io.Reader, buf *PieceBuffer) {
 			_, err := io.Copy(buf, r)
@@ -132,7 +131,13 @@ func (r *StripeReader) readAvailableShares(ctx context.Context, num int64) (n in
 		if r.inmap[i] != nil || r.errmap[i] != nil {
 			continue
 		}
-		if buf.HasShare(num) {
+
+		hasShare, err := buf.HasShare(num)
+		if err != nil {
+			r.errmap[i] = err
+			continue
+		}
+		if hasShare {
 			err := buf.ReadShare(num, r.inbufs[i])
 			if err != nil {
 				r.errmap[i] = err

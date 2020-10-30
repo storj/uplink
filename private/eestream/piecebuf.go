@@ -6,13 +6,10 @@ package eestream
 import (
 	"io"
 	"sync"
-
-	"go.uber.org/zap"
 )
 
 // PieceBuffer is a synchronized buffer for storing erasure shares for a piece.
 type PieceBuffer struct {
-	log          *zap.Logger
 	buf          []byte
 	shareSize    int
 	cond         *sync.Cond
@@ -28,9 +25,8 @@ type PieceBuffer struct {
 // NewPieceBuffer creates and initializes a new PieceBuffer using buf as its
 // internal content. If new data is written to the buffer, newDataCond will be
 // notified.
-func NewPieceBuffer(log *zap.Logger, buf []byte, shareSize int, newDataCond *sync.Cond) *PieceBuffer {
+func NewPieceBuffer(buf []byte, shareSize int, newDataCond *sync.Cond) *PieceBuffer {
 	return &PieceBuffer{
-		log:         log,
 		buf:         buf,
 		shareSize:   shareSize,
 		cond:        sync.NewCond(&sync.Mutex{}),
@@ -229,17 +225,13 @@ func (b *PieceBuffer) buffered() int {
 // HasShare checks if the num-th share can be read from the buffer without
 // blocking. If there are older erasure shares in the buffer, they will be
 // discarded to leave room for the newer erasure shares to be written.
-func (b *PieceBuffer) HasShare(num int64) bool {
+func (b *PieceBuffer) HasShare(num int64) (bool, error) {
 	if num < b.currentShare {
-		// we should never get here!
-		b.log.Fatal("Requested erasure share was already read",
-			zap.Int64("Requested Erasure Share", num),
-			zap.Int64("Current Erasure Share", b.currentShare),
-		)
+		return true, Error.New("requested erasure share was already read")
 	}
 
 	if b.getError() != nil {
-		return true
+		return true, nil
 	}
 
 	bufShares := int64(b.buffered() / b.shareSize)
@@ -253,18 +245,14 @@ func (b *PieceBuffer) HasShare(num int64) bool {
 		bufShares = int64(b.buffered() / b.shareSize)
 	}
 
-	return bufShares > num-b.currentShare
+	return bufShares > num-b.currentShare, nil
 }
 
 // ReadShare reads the num-th erasure share from the buffer into p. Any shares
 // before num will be discarded from the buffer.
 func (b *PieceBuffer) ReadShare(num int64, p []byte) error {
 	if num < b.currentShare {
-		// we should never get here!
-		b.log.Fatal("Requested erasure share was already read",
-			zap.Int64("Requested Erasure Share", num),
-			zap.Int64("Current Erasure Share", b.currentShare),
-		)
+		return Error.New("requested erasure share was already read")
 	}
 
 	err := b.discardUntil(num)
