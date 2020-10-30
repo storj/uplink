@@ -100,9 +100,10 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 	}
 
 	beginObjectReq := &metainfo.BeginObjectParams{
-		Bucket:        []byte(path.Bucket()),
-		EncryptedPath: []byte(encPath.Raw()),
-		ExpiresAt:     expiration,
+		Bucket:               []byte(path.Bucket()),
+		EncryptedPath:        []byte(encPath.Raw()),
+		ExpiresAt:            expiration,
+		EncryptionParameters: s.encryptionParameters,
 	}
 
 	var (
