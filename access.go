@@ -9,15 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcutil/base58"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/macaroon"
 	"storj.io/common/paths"
-	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/private/access2"
 	"storj.io/uplink/private/metainfo"
 )
 
@@ -28,7 +27,7 @@ import (
 type Access struct {
 	satelliteAddress string
 	apiKey           *macaroon.APIKey
-	encAccess        *encryptionAccess
+	encAccess        *access2.EncryptionAccess
 }
 
 // SharePrefix defines a prefix that will be shared.
@@ -76,64 +75,27 @@ type Permission struct {
 // This should be the main way to instantiate an access grant for opening a project.
 // See the note on RequestAccessWithPassphrase.
 func ParseAccess(access string) (*Access, error) {
-	data, version, err := base58.CheckDecode(access)
-	if err != nil || version != 0 {
-		return nil, packageError.New("invalid access grant format")
-	}
-
-	p := new(pb.Scope)
-	if err := pb.Unmarshal(data, p); err != nil {
-		return nil, packageError.New("unable to unmarshal access grant: %v", err)
-	}
-
-	if len(p.SatelliteAddr) == 0 {
-		return nil, packageError.New("access grant is missing satellite address")
-	}
-
-	apiKey, err := macaroon.ParseRawAPIKey(p.ApiKey)
+	inner, err := access2.ParseAccess(access)
 	if err != nil {
-		return nil, packageError.New("access grant has malformed api key: %v", err)
-	}
-
-	encAccess, err := parseEncryptionAccessFromProto(p.EncryptionAccess)
-	if err != nil {
-		return nil, packageError.New("access grant has malformed encryption access: %v", err)
+		return nil, packageError.Wrap(err)
 	}
 
 	return &Access{
-		satelliteAddress: p.SatelliteAddr,
-		apiKey:           apiKey,
-		encAccess:        encAccess,
+		satelliteAddress: inner.SatelliteAddress,
+		apiKey:           inner.APIKey,
+		encAccess:        inner.EncAccess,
 	}, nil
 }
 
 // Serialize serializes an access grant such that it can be used later with
 // ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
-	switch {
-	case len(access.satelliteAddress) == 0:
-		return "", packageError.New("access grant is missing satellite address")
-	case access.apiKey == nil:
-		return "", packageError.New("access grant is missing api key")
-	case access.encAccess == nil:
-		return "", packageError.New("access grant is missing encryption access")
+	inner := access2.Access{
+		SatelliteAddress: access.satelliteAddress,
+		APIKey:           access.apiKey,
+		EncAccess:        access.encAccess,
 	}
-
-	enc, err := access.encAccess.toProto()
-	if err != nil {
-		return "", packageError.Wrap(err)
-	}
-
-	data, err := pb.Marshal(&pb.Scope{
-		SatelliteAddr:    access.satelliteAddress,
-		ApiKey:           access.apiKey.SerializeRaw(),
-		EncryptionAccess: enc,
-	})
-	if err != nil {
-		return "", packageError.New("unable to marshal access grant: %v", err)
-	}
-
-	return base58.CheckEncode(data, 0), nil
+	return inner.Serialize()
 }
 
 // RequestAccessWithPassphrase generates a new access grant using a passhprase.
@@ -191,8 +153,8 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 		return nil, packageError.Wrap(err)
 	}
 
-	encAccess := newEncryptionAccessWithDefaultKey(key)
-	encAccess.setDefaultPathCipher(storj.EncAESGCM)
+	encAccess := access2.NewEncryptionAccessWithDefaultKey(key)
+	encAccess.SetDefaultPathCipher(storj.EncAESGCM)
 	return &Access{
 		satelliteAddress: fullNodeURL,
 		apiKey:           parsedAPIKey,
@@ -204,7 +166,7 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 //
 // NB: when modifying the signature of this func, also update private/access and internal/expose packages.
 func enablePathEncryptionBypass(access *Access) error {
-	access.encAccess.Store().EncryptionBypass = true
+	access.encAccess.Store.EncryptionBypass = true
 	return nil
 }
 
@@ -244,10 +206,10 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		NotAfter:        notAfter,
 	}
 
-	sharedAccess := newEncryptionAccess()
-	sharedAccess.setDefaultPathCipher(access.encAccess.Store().GetDefaultPathCipher())
+	sharedAccess := access2.NewEncryptionAccess()
+	sharedAccess.SetDefaultPathCipher(access.encAccess.Store.GetDefaultPathCipher())
 	if len(prefixes) == 0 {
-		sharedAccess.setDefaultKey(access.encAccess.Store().GetDefaultKey())
+		sharedAccess.SetDefaultKey(access.encAccess.Store.GetDefaultKey())
 	}
 
 	for _, prefix := range prefixes {
@@ -257,16 +219,16 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		// encrypted prefix, what we really want is `enc("")/enc("bob")`.
 		unencPath := paths.NewUnencrypted(strings.TrimSuffix(prefix.Prefix, "/"))
 
-		encPath, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket, unencPath, access.encAccess.store)
+		encPath, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket, unencPath, access.encAccess.Store)
 		if err != nil {
 			return nil, err
 		}
-		derivedKey, err := encryption.DerivePathKey(prefix.Bucket, unencPath, access.encAccess.store)
+		derivedKey, err := encryption.DerivePathKey(prefix.Bucket, unencPath, access.encAccess.Store)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := sharedAccess.store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
+		if err := sharedAccess.Store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
 			return nil, err
 		}
 		caveat.AllowedPaths = append(caveat.AllowedPaths, &macaroon.Caveat_Path{
@@ -348,7 +310,7 @@ func (access *Access) OverrideEncryptionKey(bucket, prefix string, encryptionKey
 		return errors.New("prefix must end with slash")
 	}
 
-	store := access.encAccess.Store()
+	store := access.encAccess.Store
 
 	unencPath := paths.NewUnencrypted(prefix)
 	encPath, err := encryption.EncryptPrefixWithStoreCipher(bucket, unencPath, store)

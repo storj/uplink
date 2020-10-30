@@ -135,7 +135,7 @@ func getObjectIPs(ctx context.Context, config Config, access *Access, bucket, ke
 	}
 	defer func() { err = errs.Combine(err, client.Close()) }()
 
-	db := metainfo.New(client, access.encAccess.Store())
+	db := metainfo.New(client, access.encAccess.Store)
 
 	return db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
 }

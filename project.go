@@ -108,12 +108,12 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store(), encryptionParameters, maxInlineSize, maxEncryptedSegmentSize)
+	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store, encryptionParameters, maxInlineSize, maxEncryptedSegmentSize)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
-	db := metainfo.New(metainfoClient, access.encAccess.Store())
+	db := metainfo.New(metainfoClient, access.encAccess.Store)
 
 	var eg errgroup.Group
 	if telemetry != nil {
