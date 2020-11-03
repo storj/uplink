@@ -71,8 +71,7 @@ func TestGetObject(t *testing.T) {
 		assert.True(t, storj.ErrNoPath.Has(err))
 
 		nonExistingBucket := storj.Bucket{
-			Name:       "non-existing-bucket",
-			PathCipher: storj.EncNull,
+			Name: "non-existing-bucket",
 		}
 		_, err = db.GetObject(ctx, nonExistingBucket, TestFile)
 		assert.True(t, storj.ErrObjectNotFound.Has(err))
@@ -84,7 +83,6 @@ func TestGetObject(t *testing.T) {
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestFile, object.Path)
 			assert.Equal(t, TestBucket, object.Bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, object.Bucket.PathCipher)
 		}
 	})
 }
@@ -170,7 +168,6 @@ func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams *s
 
 	assert.Equal(t, object.Path, readOnly.Info().Path)
 	assert.Equal(t, TestBucket, readOnly.Info().Bucket.Name)
-	assert.Equal(t, storj.EncAESGCM, readOnly.Info().Bucket.PathCipher)
 
 	segments, more, err := readOnly.Segments(ctx, 0, 0)
 	require.NoError(t, err)

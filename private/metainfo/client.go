@@ -18,7 +18,6 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
-	"storj.io/common/uuid"
 	"storj.io/uplink/private/eestream"
 )
 
@@ -105,7 +104,9 @@ func (client *Client) GetProjectInfo(ctx context.Context) (resp *pb.ProjectInfoR
 
 // CreateBucketParams parameters for CreateBucket method.
 type CreateBucketParams struct {
-	Name                        []byte
+	Name []byte
+
+	// TODO remove those values when satellite will be adjusted
 	PathCipher                  storj.CipherSuite
 	PartnerID                   []byte
 	DefaultSegmentsSize         int64
@@ -146,8 +147,6 @@ func (params *CreateBucketParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
-
-// TODO potential names *Response/*Out/*Result
 
 // CreateBucketResponse response for CreateBucket request.
 type CreateBucketResponse struct {
@@ -346,33 +345,9 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) 
 		return storj.Bucket{}, nil
 	}
 
-	defaultRS := pbBucket.GetDefaultRedundancyScheme()
-	defaultEP := pbBucket.GetDefaultEncryptionParameters()
-
-	var partnerID uuid.UUID
-	err = partnerID.UnmarshalJSON(pbBucket.GetPartnerId())
-	if err != nil && !partnerID.IsZero() {
-		return bucket, errs.New("Invalid uuid")
-	}
-
 	return storj.Bucket{
-		Name:                string(pbBucket.GetName()),
-		PartnerID:           partnerID,
-		PathCipher:          storj.CipherSuite(pbBucket.GetPathCipher()),
-		Created:             pbBucket.GetCreatedAt(),
-		DefaultSegmentsSize: pbBucket.GetDefaultSegmentSize(),
-		DefaultRedundancyScheme: storj.RedundancyScheme{
-			Algorithm:      storj.RedundancyAlgorithm(defaultRS.GetType()),
-			ShareSize:      defaultRS.GetErasureShareSize(),
-			RequiredShares: int16(defaultRS.GetMinReq()),
-			RepairShares:   int16(defaultRS.GetRepairThreshold()),
-			OptimalShares:  int16(defaultRS.GetSuccessThreshold()),
-			TotalShares:    int16(defaultRS.GetTotal()),
-		},
-		DefaultEncryptionParameters: storj.EncryptionParameters{
-			CipherSuite: storj.CipherSuite(defaultEP.CipherSuite),
-			BlockSize:   int32(defaultEP.BlockSize),
-		},
+		Name:    string(pbBucket.GetName()),
+		Created: pbBucket.GetCreatedAt(),
 	}, nil
 }
 

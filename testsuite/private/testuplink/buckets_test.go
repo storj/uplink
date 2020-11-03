@@ -50,14 +50,12 @@ func TestBucketsBasic(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Delete the bucket
 		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Check that the bucket list is empty
@@ -93,14 +91,12 @@ func TestBucketsReadWrite(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Delete the bucket
 		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Check that the bucket list is empty
@@ -140,7 +136,6 @@ func TestBucketDeleteAll(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Upload an object to the bucket
@@ -150,7 +145,6 @@ func TestBucketDeleteAll(t *testing.T) {
 		bucket, err = db.DeleteBucket(ctx, TestBucket, true)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 	})
 }
