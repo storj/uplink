@@ -30,9 +30,7 @@ type Meta struct {
 func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	_, info, err = db.getInfo(ctx, bucket, path)
-
-	return info, err
+	return db.getObjectInfo(ctx, bucket, path)
 }
 
 // GetObjectStream returns interface for reading the object stream.
@@ -141,8 +139,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		return storj.Object{}, err
 	}
 
-	_, obj, err := objectFromInfo(ctx, bucket, path, encPath, object, db.encStore)
-	return obj, err
+	return objectFromInfo(ctx, bucket, path, encPath, object, db.encStore)
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
@@ -301,28 +298,20 @@ func (db *DB) pathCipher(pathCipher storj.CipherSuite) storj.CipherSuite {
 	return pathCipher
 }
 
-type object struct {
-	bucket          string
-	encPath         paths.Encrypted
-	lastSegmentMeta Meta
-	streamInfo      *pb.StreamInfo
-	streamMeta      pb.StreamMeta
-}
-
-func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path) (obj object, info storj.Object, err error) {
+func (db *DB) getObjectInfo(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
-		return object{}, storj.Object{}, storj.ErrNoBucket.New("")
+		return storj.Object{}, storj.ErrNoBucket.New("")
 	}
 
 	if path == "" {
-		return object{}, storj.Object{}, storj.ErrNoPath.New("")
+		return storj.Object{}, storj.ErrNoPath.New("")
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
 	if err != nil {
-		return object{}, storj.Object{}, err
+		return storj.Object{}, err
 	}
 
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
@@ -330,41 +319,23 @@ func (db *DB) getInfo(ctx context.Context, bucket storj.Bucket, path storj.Path)
 		EncryptedPath: []byte(encPath.Raw()),
 	})
 	if err != nil {
-		return object{}, storj.Object{}, err
+		return storj.Object{}, err
 	}
 
 	return objectFromInfo(ctx, bucket, path, encPath, objectInfo, db.encStore)
 }
 
-func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, encPath paths.Encrypted, objectInfo storj.ObjectInfo, encStore *encryption.Store) (object, storj.Object, error) {
+func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, encPath paths.Encrypted, objectInfo storj.ObjectInfo, encStore *encryption.Store) (storj.Object, error) {
 	if objectInfo.Bucket == "" { // zero objectInfo
-		return object{}, storj.Object{}, nil
+		return storj.Object{}, nil
 	}
 
-	lastSegmentMeta := Meta{
-		Modified:   objectInfo.Created,
-		Expiration: objectInfo.Expires,
-		Size:       objectInfo.Size,
-		Data:       objectInfo.Metadata,
-	}
-
-	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket.Name, paths.NewUnencrypted(path), lastSegmentMeta.Data, encStore)
+	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket.Name, paths.NewUnencrypted(path), objectInfo.Metadata, encStore)
 	if err != nil {
-		return object{}, storj.Object{}, err
+		return storj.Object{}, err
 	}
 
-	info, err := objectStreamFromMeta(bucket, path, objectInfo.StreamID, lastSegmentMeta, streamInfo, streamMeta, objectInfo.Stream.RedundancyScheme)
-	if err != nil {
-		return object{}, storj.Object{}, err
-	}
-
-	return object{
-		bucket:          bucket.Name,
-		encPath:         encPath,
-		lastSegmentMeta: lastSegmentMeta,
-		streamInfo:      streamInfo,
-		streamMeta:      streamMeta,
-	}, info, nil
+	return objectStreamFromMeta(bucket, path, objectInfo, streamInfo, streamMeta)
 }
 
 func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
@@ -387,7 +358,7 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 	return object, nil
 }
 
-func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.StreamID, lastSegment Meta, stream *pb.StreamInfo, streamMeta pb.StreamMeta, redundancyScheme storj.RedundancyScheme) (storj.Object, error) {
+func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, objectInfo storj.ObjectInfo, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
 	var nonce storj.Nonce
 	var encryptedKey storj.EncryptedPrivateKey
 	if streamMeta.LastSegmentMeta != nil {
@@ -401,14 +372,14 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, streamID storj.S
 		Path:     path,
 		IsPrefix: false,
 
-		Created:  lastSegment.Modified,   // TODO: use correct field
-		Modified: lastSegment.Modified,   // TODO: use correct field
-		Expires:  lastSegment.Expiration, // TODO: use correct field
+		Created:  objectInfo.Modified, // TODO: use correct field
+		Modified: objectInfo.Modified, // TODO: use correct field
+		Expires:  objectInfo.Expires,  // TODO: use correct field
 
 		Stream: storj.Stream{
-			ID: streamID,
+			ID: objectInfo.StreamID,
 
-			RedundancyScheme: redundancyScheme,
+			RedundancyScheme: objectInfo.Stream.RedundancyScheme,
 			EncryptionParameters: storj.EncryptionParameters{
 				CipherSuite: storj.CipherSuite(streamMeta.EncryptionType),
 				BlockSize:   streamMeta.EncryptionBlockSize,
@@ -486,7 +457,7 @@ func (object *mutableObject) DeleteStream(ctx context.Context) (err error) {
 
 func (object *mutableObject) Commit(ctx context.Context) (err error) {
 	defer mon.Task()(&ctx)(&err)
-	_, info, err := object.db.getInfo(ctx, object.info.Bucket, object.info.Path)
+	info, err := object.db.getObjectInfo(ctx, object.info.Bucket, object.info.Path)
 	object.info = info
 	return err
 }
