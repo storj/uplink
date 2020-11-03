@@ -15,6 +15,7 @@ import (
 type PeekThresholdReader struct {
 	r              io.Reader
 	thresholdBuf   []byte
+	thresholdErr   error
 	isLargerCalled bool
 	readCalled     bool
 }
@@ -30,13 +31,18 @@ func NewPeekThresholdReader(r io.Reader) (pt *PeekThresholdReader) {
 func (pt *PeekThresholdReader) Read(p []byte) (n int, err error) {
 	pt.readCalled = true
 
-	if len(pt.thresholdBuf) == 0 {
-		return pt.r.Read(p)
+	if len(pt.thresholdBuf) > 0 || pt.thresholdErr != nil {
+		n = copy(p, pt.thresholdBuf)
+		pt.thresholdBuf = pt.thresholdBuf[n:]
+		if len(pt.thresholdBuf) == 0 {
+			err := pt.thresholdErr
+			pt.thresholdErr = nil
+			return n, err
+		}
+		return n, nil
 	}
 
-	n = copy(p, pt.thresholdBuf)
-	pt.thresholdBuf = pt.thresholdBuf[n:]
-	return n, nil
+	return pt.r.Read(p)
 }
 
 // IsLargerThan returns a bool to determine whether a reader's size
@@ -52,7 +58,11 @@ func (pt *PeekThresholdReader) IsLargerThan(thresholdSize int) (bool, error) {
 	buf := make([]byte, thresholdSize+1)
 	n, err := io.ReadFull(pt.r, buf)
 	pt.thresholdBuf = buf[:n]
+	pt.thresholdErr = err
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			pt.thresholdErr = io.EOF
+		}
 		return false, nil
 	}
 	if err != nil {

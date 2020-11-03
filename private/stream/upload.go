@@ -47,6 +47,7 @@ func NewUpload(ctx context.Context, stream *metainfo.MutableStream, streamsStore
 	upload.errgroup.Go(func() error {
 		m, err := streamsStore.Put(ctx, streams.ParsePath(storj.JoinPaths(stream.BucketName(), stream.Path())), reader, stream, stream.Expires())
 		if err != nil {
+			err = Error.Wrap(err)
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
 
