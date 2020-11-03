@@ -45,17 +45,17 @@ func TestParallelUploadDownload(t *testing.T) {
 			group.Go(func() error {
 				upload, err := project.UploadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
-					return fmt.Errorf("starting upload failed %d: %w", p, err)
+					return fmt.Errorf("starting upload failed %d: %+v", p, err)
 				}
 
 				_, err = upload.Write(expectedData[p])
 				if err != nil {
-					return fmt.Errorf("writing data failed %d: %w", p, err)
+					return fmt.Errorf("writing data failed %d: %+v", p, err)
 				}
 
 				err = upload.Commit()
 				if err != nil {
-					return fmt.Errorf("committing data failed %d: %w", p, err)
+					return fmt.Errorf("committing data failed %d: %+v", p, err)
 				}
 
 				return nil
@@ -72,17 +72,17 @@ func TestParallelUploadDownload(t *testing.T) {
 			group.Go(func() error {
 				download, err := project.DownloadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
-					return fmt.Errorf("starting download failed %d: %w", p, err)
+					return fmt.Errorf("starting download failed %d: %+v", p, err)
 				}
 
 				data, err := ioutil.ReadAll(download)
 				if err != nil {
-					return fmt.Errorf("downloading data failed %d: %w", p, err)
+					return fmt.Errorf("downloading data failed %d: %+v", p, err)
 				}
 
 				err = download.Close()
 				if err != nil {
-					return fmt.Errorf("closing download failed %d: %w", p, err)
+					return fmt.Errorf("closing download failed %d: %+v", p, err)
 				}
 
 				downloadedData[p] = data
