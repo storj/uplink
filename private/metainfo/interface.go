@@ -52,22 +52,6 @@ type ReadOnlyStream interface {
 	Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error)
 }
 
-// MutableObject is an interface for manipulating creating/deleting object stream.
-type MutableObject interface {
-	// Info gets the current information about the object.
-	Info() storj.Object
-
-	// CreateStream creates a new stream for the object.
-	CreateStream(ctx context.Context) (MutableStream, error)
-	// ContinueStream starts to continue a partially uploaded stream.
-	ContinueStream(ctx context.Context) (MutableStream, error)
-	// DeleteStream deletes any information about this objects stream.
-	DeleteStream(ctx context.Context) error
-
-	// Commit commits the changes to the database.
-	Commit(ctx context.Context) error
-}
-
 // MutableStream is an interface for manipulating stream information.
 type MutableStream interface {
 	BucketName() string
