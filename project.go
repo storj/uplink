@@ -32,7 +32,7 @@ type Project struct {
 	dialer   rpc.Dialer
 	metainfo *metainfo.Client
 	db       *metainfo.DB
-	streams  streams.Store
+	streams  *streams.Store
 
 	eg        *errgroup.Group
 	telemetry telemetryclient.Client
