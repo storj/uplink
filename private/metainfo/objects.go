@@ -34,7 +34,7 @@ func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Pat
 }
 
 // GetObjectStream returns interface for reading the object stream.
-func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream ReadOnlyStream, err error) {
+func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream *ReadOnlyStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
@@ -45,7 +45,7 @@ func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object s
 		return nil, storj.ErrNoPath.New("")
 	}
 
-	return &readonlyStream{
+	return &ReadOnlyStream{
 		db:   db,
 		info: object,
 	}, nil

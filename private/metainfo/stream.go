@@ -14,17 +14,19 @@ import (
 	"storj.io/common/storj"
 )
 
-var _ ReadOnlyStream = (*readonlyStream)(nil)
-
-type readonlyStream struct {
+// ReadOnlyStream is for reading segment information.
+type ReadOnlyStream struct {
 	db *DB
 
 	info storj.Object
 }
 
-func (stream *readonlyStream) Info() storj.Object { return stream.info }
+// Info returns information about the object.
+func (stream *ReadOnlyStream) Info() storj.Object { return stream.info }
 
-func (stream *readonlyStream) SegmentsAt(ctx context.Context, byteOffset int64, limit int64) (infos []storj.Segment, more bool, err error) {
+// SegmentsAt returns the segment that contains the byteOffset and following segments.
+// Limit specifies how much to return at most.
+func (stream *ReadOnlyStream) SegmentsAt(ctx context.Context, byteOffset int64, limit int64) (infos []storj.Segment, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if stream.info.FixedSegmentSize <= 0 {
@@ -35,7 +37,7 @@ func (stream *readonlyStream) SegmentsAt(ctx context.Context, byteOffset int64, 
 	return stream.Segments(ctx, index, limit)
 }
 
-func (stream *readonlyStream) segment(ctx context.Context, index int64) (segment storj.Segment, err error) {
+func (stream *ReadOnlyStream) segment(ctx context.Context, index int64) (segment storj.Segment, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	segment = storj.Segment{
@@ -87,7 +89,9 @@ func (stream *readonlyStream) segment(ctx context.Context, index int64) (segment
 	return segment, nil
 }
 
-func (stream *readonlyStream) Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error) {
+// Segments returns the segment at index.
+// Limit specifies how much to return at most.
+func (stream *ReadOnlyStream) Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if index < 0 {
