@@ -440,11 +440,24 @@ type MutableObject struct {
 func (object *MutableObject) Info() storj.Object { return object.info }
 
 // CreateStream creates a new stream for the object.
-func (object *MutableObject) CreateStream(ctx context.Context) (_ MutableStream, err error) {
+func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
-	return &mutableStream{
+	return &MutableStream{
 		db:   object.db,
 		info: object.info,
+	}, nil
+}
+
+// CreateDynamicStream creates a new dynamic stream for the object.
+func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
+	defer mon.Task()(&ctx)(&err)
+	return &MutableStream{
+		db:   object.db,
+		info: object.info,
+
+		dynamic:         true,
+		dynamicMetadata: metadata,
+		dynamicExpires:  expires,
 	}, nil
 }
 

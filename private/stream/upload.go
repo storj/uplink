@@ -19,7 +19,7 @@ import (
 // Upload implements Writer and Closer for writing to stream.
 type Upload struct {
 	ctx      context.Context
-	stream   metainfo.MutableStream
+	stream   *metainfo.MutableStream
 	streams  streams.Store
 	writer   *io.PipeWriter
 	errgroup errgroup.Group
@@ -34,7 +34,7 @@ type Upload struct {
 }
 
 // NewUpload creates new stream upload.
-func NewUpload(ctx context.Context, stream metainfo.MutableStream, streamsStore streams.Store) *Upload {
+func NewUpload(ctx context.Context, stream *metainfo.MutableStream, streamsStore streams.Store) *Upload {
 	reader, writer := io.Pipe()
 
 	upload := Upload{

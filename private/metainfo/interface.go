@@ -51,17 +51,3 @@ type ReadOnlyStream interface {
 	// Limit specifies how much to return at most.
 	Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error)
 }
-
-// MutableStream is an interface for manipulating stream information.
-type MutableStream interface {
-	BucketName() string
-	Path() string
-
-	Expires() time.Time
-	Metadata() ([]byte, error)
-
-	// AddSegments adds segments to the stream.
-	AddSegments(ctx context.Context, segments ...storj.Segment) error
-	// UpdateSegments updates information about segments.
-	UpdateSegments(ctx context.Context, segments ...storj.Segment) error
-}

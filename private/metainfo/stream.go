@@ -114,19 +114,44 @@ func (stream *readonlyStream) Segments(ctx context.Context, index int64, limit i
 	return infos, more, nil
 }
 
-type mutableStream struct {
+// MutableStream is for manipulating stream information.
+type MutableStream struct {
 	db   *DB
 	info storj.Object
+
+	dynamic         bool
+	dynamicMetadata SerializableMeta
+	dynamicExpires  time.Time
 }
 
-func (stream *mutableStream) BucketName() string { return stream.info.Bucket.Name }
-func (stream *mutableStream) Path() string       { return stream.info.Path }
+// SerializableMeta is an interface for getting pb.SerializableMeta.
+type SerializableMeta interface {
+	Metadata() ([]byte, error)
+}
 
-func (stream *mutableStream) Info() storj.Object { return stream.info }
+// BucketName returns streams bucket name.
+func (stream *MutableStream) BucketName() string { return stream.info.Bucket.Name }
 
-func (stream *mutableStream) Expires() time.Time { return stream.info.Expires }
+// Path returns streams path.
+func (stream *MutableStream) Path() string { return stream.info.Path }
 
-func (stream *mutableStream) Metadata() ([]byte, error) {
+// Info returns object info about the stream.
+func (stream *MutableStream) Info() storj.Object { return stream.info }
+
+// Expires returns stream expiration time.
+func (stream *MutableStream) Expires() time.Time {
+	if stream.dynamic {
+		return stream.dynamicExpires
+	}
+	return stream.info.Expires
+}
+
+// Metadata returns metadata associated with the stream.
+func (stream *MutableStream) Metadata() ([]byte, error) {
+	if stream.dynamic {
+		return stream.dynamicMetadata.Metadata()
+	}
+
 	if stream.info.ContentType != "" {
 		if stream.info.Metadata == nil {
 			stream.info.Metadata = make(map[string]string)
@@ -141,14 +166,4 @@ func (stream *mutableStream) Metadata() ([]byte, error) {
 	return pb.Marshal(&pb.SerializableMeta{
 		UserDefined: stream.info.Metadata,
 	})
-}
-
-func (stream *mutableStream) AddSegments(ctx context.Context, segments ...storj.Segment) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	return errors.New("not implemented")
-}
-
-func (stream *mutableStream) UpdateSegments(ctx context.Context, segments ...storj.Segment) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	return errors.New("not implemented")
 }

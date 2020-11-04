@@ -13,7 +13,6 @@ import (
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/stream"
 )
 
@@ -48,10 +47,6 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	}
 
 	info := obj.Info()
-	mutableStream, err := obj.CreateStream(ctx)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -60,12 +55,23 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		bucket: bucket,
 		object: convertObject(&info),
 	}
-	upload.upload = stream.NewUpload(ctx, dynamicMetadata{
-		MutableStream: mutableStream,
-		object:        upload.object,
-		expires:       options.Expires,
-	}, project.streams)
+
+	meta := dynamicMetadata{upload.object}
+	mutableStream, err := obj.CreateDynamicStream(ctx, meta, options.Expires)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	upload.upload = stream.NewUpload(ctx, mutableStream, project.streams)
 	return upload, nil
+}
+
+type dynamicMetadata struct{ *Object }
+
+func (dyn dynamicMetadata) Metadata() ([]byte, error) {
+	return pb.Marshal(&pb.SerializableMeta{
+		UserDefined: dyn.Object.Custom.Clone(),
+	})
 }
 
 // Upload is an upload to Storj Network.
@@ -155,20 +161,4 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 	}
 
 	return nil
-}
-
-type dynamicMetadata struct {
-	metainfo.MutableStream
-	object  *Object
-	expires time.Time
-}
-
-func (meta dynamicMetadata) Metadata() ([]byte, error) {
-	return pb.Marshal(&pb.SerializableMeta{
-		UserDefined: meta.object.Custom.Clone(),
-	})
-}
-
-func (meta dynamicMetadata) Expires() time.Time {
-	return meta.expires
 }
