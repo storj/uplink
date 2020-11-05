@@ -27,12 +27,13 @@ var maxSegmentSize string
 
 // Project provides access to managing buckets and objects.
 type Project struct {
-	config   Config
-	access   *Access
-	dialer   rpc.Dialer
-	metainfo *metainfo.Client
-	db       *metainfo.DB
-	streams  *streams.Store
+	config     Config
+	access     *Access
+	dialer     rpc.Dialer
+	metainfo   *metainfo.Client
+	db         *metainfo.DB
+	streams    *streams.Store
+	encryption storj.EncryptionParameters
 
 	eg        *errgroup.Group
 	telemetry telemetryclient.Client
@@ -124,14 +125,15 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	}
 
 	return &Project{
-		config:    config,
-		access:    access,
-		dialer:    dialer,
-		metainfo:  metainfoClient,
-		db:        db,
-		streams:   streamStore,
-		eg:        &eg,
-		telemetry: telemetry,
+		config:     config,
+		access:     access,
+		dialer:     dialer,
+		metainfo:   metainfoClient,
+		db:         db,
+		streams:    streamStore,
+		encryption: encryptionParameters,
+		eg:         &eg,
+		telemetry:  telemetry,
 	}, nil
 }
 
