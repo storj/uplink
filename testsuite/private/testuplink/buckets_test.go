@@ -31,7 +31,7 @@ const (
 )
 
 func TestBucketsBasic(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -50,14 +50,12 @@ func TestBucketsBasic(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Delete the bucket
 		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Check that the bucket list is empty
@@ -74,7 +72,7 @@ func TestBucketsBasic(t *testing.T) {
 }
 
 func TestBucketsReadWrite(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -93,14 +91,12 @@ func TestBucketsReadWrite(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Delete the bucket
 		bucket, err = db.DeleteBucket(ctx, TestBucket, false)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Check that the bucket list is empty
@@ -117,7 +113,7 @@ func TestBucketsReadWrite(t *testing.T) {
 }
 
 func TestErrNoBucket(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
@@ -130,7 +126,7 @@ func TestErrNoBucket(t *testing.T) {
 }
 
 func TestBucketDeleteAll(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
@@ -140,7 +136,6 @@ func TestBucketDeleteAll(t *testing.T) {
 		bucket, err = db.GetBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 
 		// Upload an object to the bucket
@@ -150,13 +145,12 @@ func TestBucketDeleteAll(t *testing.T) {
 		bucket, err = db.DeleteBucket(ctx, TestBucket, true)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
-			assert.Equal(t, storj.EncAESGCM, bucket.PathCipher)
 		}
 	})
 }
 
 func TestListBucketsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.Forward})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
@@ -166,7 +160,7 @@ func TestListBucketsEmpty(t *testing.T) {
 }
 
 func TestListBuckets(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
 		for _, name := range bucketNames {
@@ -224,11 +218,11 @@ func getBucketNames(bucketList storj.BucketList) []string {
 	return names
 }
 
-func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, streams.Store)) {
+func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, *streams.Store)) {
 	runTestWithPathCipher(t, storj.EncAESGCM, test)
 }
 
-func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, streams.Store)) {
+func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, *streams.Store)) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -251,7 +245,7 @@ func newTestEncStore(keyStr string) *encryption.Store {
 	return store
 }
 
-func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*metainfo.DB, streams.Store, error) {
+func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*metainfo.DB, *streams.Store, error) {
 	// TODO(kaloyan): We should have a better way for configuring the Satellite's API Key
 	// add project to satisfy constraint
 	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{

@@ -40,15 +40,9 @@ type Metadata interface {
 	Metadata() ([]byte, error)
 }
 
-// Store interface methods for streams to satisfy to be a store.
-type Store interface {
-	Get(ctx context.Context, path Path, object storj.Object) (ranger.Ranger, error)
-	Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (Meta, error)
-}
-
-// streamStore is a store for streams. It implements typedStore as part of an ongoing migration
+// Store is a store for streams. It implements typedStore as part of an ongoing migration
 // to use typed paths. See the shim for the store that the rest of the world interacts with.
-type streamStore struct {
+type Store struct {
 	metainfo                *metainfo.Client
 	ec                      ecclient.Client
 	segmentSize             int64
@@ -62,7 +56,7 @@ type streamStore struct {
 }
 
 // NewStreamStore constructs a stream store.
-func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int, maxEncryptedSegmentSize int64) (Store, error) {
+func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int, maxEncryptedSegmentSize int64) (*Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
@@ -70,7 +64,7 @@ func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize i
 		return nil, errs.New("encryption block size must be larger than 0")
 	}
 
-	return &streamStore{
+	return &Store{
 		metainfo:                metainfo,
 		ec:                      ec,
 		segmentSize:             segmentSize,
@@ -88,7 +82,7 @@ func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize i
 // of segments, in a new protobuf, in the metadata of l/<path>.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
+func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
@@ -354,7 +348,7 @@ func (s *streamStore) Put(ctx context.Context, path Path, data io.Reader, metada
 // Get returns a ranger that knows what the overall size is (from l/<path>)
 // and then returns the appropriate data from segments s0/<path>, s1/<path>,
 // ..., l/<path>.
-func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
@@ -423,7 +417,7 @@ func (s *streamStore) Get(ctx context.Context, path Path, object storj.Object) (
 }
 
 // Delete all the segments, with the last one last.
-func (s *streamStore) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo, err error) {
+func (s *Store) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
@@ -441,7 +435,7 @@ func (s *streamStore) Delete(ctx context.Context, path Path) (_ storj.ObjectInfo
 type lazySegmentRanger struct {
 	ranger               ranger.Ranger
 	metainfo             *metainfo.Client
-	streams              *streamStore
+	streams              *Store
 	streamID             storj.StreamID
 	segmentIndex         int32
 	rs                   storj.RedundancyScheme
@@ -523,7 +517,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, e
 }
 
 // CancelHandler handles clean up of segments on receiving CTRL+C.
-func (s *streamStore) cancelHandler(ctx context.Context, path Path) {
+func (s *Store) cancelHandler(ctx context.Context, path Path) {
 	defer mon.Task()(&ctx)(nil)
 
 	// satellite deletes now from 0 to l so we can just use BeginDeleteObject
@@ -534,7 +528,7 @@ func (s *streamStore) cancelHandler(ctx context.Context, path Path) {
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
-func (s *streamStore) Ranger(
+func (s *Store) Ranger(
 	ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme,
 ) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx, info, limits, objectRS)(&err)

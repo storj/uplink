@@ -14,17 +14,19 @@ import (
 	"storj.io/common/storj"
 )
 
-var _ ReadOnlyStream = (*readonlyStream)(nil)
-
-type readonlyStream struct {
+// ReadOnlyStream is for reading segment information.
+type ReadOnlyStream struct {
 	db *DB
 
 	info storj.Object
 }
 
-func (stream *readonlyStream) Info() storj.Object { return stream.info }
+// Info returns information about the object.
+func (stream *ReadOnlyStream) Info() storj.Object { return stream.info }
 
-func (stream *readonlyStream) SegmentsAt(ctx context.Context, byteOffset int64, limit int64) (infos []storj.Segment, more bool, err error) {
+// SegmentsAt returns the segment that contains the byteOffset and following segments.
+// Limit specifies how much to return at most.
+func (stream *ReadOnlyStream) SegmentsAt(ctx context.Context, byteOffset int64, limit int64) (infos []storj.Segment, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if stream.info.FixedSegmentSize <= 0 {
@@ -35,7 +37,7 @@ func (stream *readonlyStream) SegmentsAt(ctx context.Context, byteOffset int64, 
 	return stream.Segments(ctx, index, limit)
 }
 
-func (stream *readonlyStream) segment(ctx context.Context, index int64) (segment storj.Segment, err error) {
+func (stream *ReadOnlyStream) segment(ctx context.Context, index int64) (segment storj.Segment, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	segment = storj.Segment{
@@ -87,7 +89,9 @@ func (stream *readonlyStream) segment(ctx context.Context, index int64) (segment
 	return segment, nil
 }
 
-func (stream *readonlyStream) Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error) {
+// Segments returns the segment at index.
+// Limit specifies how much to return at most.
+func (stream *ReadOnlyStream) Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if index < 0 {
@@ -114,19 +118,44 @@ func (stream *readonlyStream) Segments(ctx context.Context, index int64, limit i
 	return infos, more, nil
 }
 
-type mutableStream struct {
+// MutableStream is for manipulating stream information.
+type MutableStream struct {
 	db   *DB
 	info storj.Object
+
+	dynamic         bool
+	dynamicMetadata SerializableMeta
+	dynamicExpires  time.Time
 }
 
-func (stream *mutableStream) BucketName() string { return stream.info.Bucket.Name }
-func (stream *mutableStream) Path() string       { return stream.info.Path }
+// SerializableMeta is an interface for getting pb.SerializableMeta.
+type SerializableMeta interface {
+	Metadata() ([]byte, error)
+}
 
-func (stream *mutableStream) Info() storj.Object { return stream.info }
+// BucketName returns streams bucket name.
+func (stream *MutableStream) BucketName() string { return stream.info.Bucket.Name }
 
-func (stream *mutableStream) Expires() time.Time { return stream.info.Expires }
+// Path returns streams path.
+func (stream *MutableStream) Path() string { return stream.info.Path }
 
-func (stream *mutableStream) Metadata() ([]byte, error) {
+// Info returns object info about the stream.
+func (stream *MutableStream) Info() storj.Object { return stream.info }
+
+// Expires returns stream expiration time.
+func (stream *MutableStream) Expires() time.Time {
+	if stream.dynamic {
+		return stream.dynamicExpires
+	}
+	return stream.info.Expires
+}
+
+// Metadata returns metadata associated with the stream.
+func (stream *MutableStream) Metadata() ([]byte, error) {
+	if stream.dynamic {
+		return stream.dynamicMetadata.Metadata()
+	}
+
 	if stream.info.ContentType != "" {
 		if stream.info.Metadata == nil {
 			stream.info.Metadata = make(map[string]string)
@@ -141,14 +170,4 @@ func (stream *mutableStream) Metadata() ([]byte, error) {
 	return pb.Marshal(&pb.SerializableMeta{
 		UserDefined: stream.info.Metadata,
 	})
-}
-
-func (stream *mutableStream) AddSegments(ctx context.Context, segments ...storj.Segment) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	return errors.New("not implemented")
-}
-
-func (stream *mutableStream) UpdateSegments(ctx context.Context, segments ...storj.Segment) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	return errors.New("not implemented")
 }

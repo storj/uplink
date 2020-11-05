@@ -34,7 +34,7 @@ func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Pat
 }
 
 // GetObjectStream returns interface for reading the object stream.
-func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream ReadOnlyStream, err error) {
+func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream *ReadOnlyStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
@@ -45,7 +45,7 @@ func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object s
 		return nil, storj.ErrNoPath.New("")
 	}
 
-	return &readonlyStream{
+	return &ReadOnlyStream{
 		db:   db,
 		info: object,
 	}, nil
@@ -75,7 +75,7 @@ func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.
 }
 
 // CreateObject creates an uploading object and returns an interface for uploading Object information.
-func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.Path, createInfo *CreateObject) (object MutableObject, err error) {
+func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.Path, createInfo *CreateObject) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
@@ -102,14 +102,14 @@ func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.
 	// TODO: autodetect content type from the path extension
 	// if info.ContentType == "" {}
 
-	return &mutableObject{
+	return &MutableObject{
 		db:   db,
 		info: info,
 	}, nil
 }
 
 // ModifyObject modifies a committed object.
-func (db *DB) ModifyObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object MutableObject, err error) {
+func (db *DB) ModifyObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return nil, errors.New("not implemented")
 }
@@ -143,7 +143,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
-func (db *DB) ModifyPendingObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object MutableObject, err error) {
+func (db *DB) ModifyPendingObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return nil, errors.New("not implemented")
 }
@@ -430,32 +430,39 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 	return nil
 }
 
-type mutableObject struct {
+// MutableObject is for creating an object stream.
+type MutableObject struct {
 	db   *DB
 	info storj.Object
 }
 
-func (object *mutableObject) Info() storj.Object { return object.info }
+// Info gets the current information about the object.
+func (object *MutableObject) Info() storj.Object { return object.info }
 
-func (object *mutableObject) CreateStream(ctx context.Context) (_ MutableStream, err error) {
+// CreateStream creates a new stream for the object.
+func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
-	return &mutableStream{
+	return &MutableStream{
 		db:   object.db,
 		info: object.info,
 	}, nil
 }
 
-func (object *mutableObject) ContinueStream(ctx context.Context) (_ MutableStream, err error) {
+// CreateDynamicStream creates a new dynamic stream for the object.
+func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
-	return nil, errors.New("not implemented")
+	return &MutableStream{
+		db:   object.db,
+		info: object.info,
+
+		dynamic:         true,
+		dynamicMetadata: metadata,
+		dynamicExpires:  expires,
+	}, nil
 }
 
-func (object *mutableObject) DeleteStream(ctx context.Context) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	return errors.New("not implemented")
-}
-
-func (object *mutableObject) Commit(ctx context.Context) (err error) {
+// Commit updates info object.
+func (object *MutableObject) Commit(ctx context.Context) (err error) {
 	defer mon.Task()(&ctx)(&err)
 	info, err := object.db.getObjectInfo(ctx, object.info.Bucket, object.info.Path)
 	object.info = info
