@@ -19,6 +19,7 @@ import (
 )
 
 func TestParallelUploadDownload(t *testing.T) {
+	t.Skip("drpc does not handle concurrent method invocations")
 	const concurrency = 3
 
 	testplanet.Run(t, testplanet.Config{
