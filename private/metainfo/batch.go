@@ -117,7 +117,7 @@ func (resp *BatchResponse) BeginSegment() (BeginSegmentResponse, error) {
 		return BeginSegmentResponse{}, ErrInvalidType
 	}
 
-	return newBeginSegmentResponse(item.SegmentBegin), nil
+	return newBeginSegmentResponse(item.SegmentBegin)
 }
 
 // DownloadSegment returns response for DownloadSegment request.

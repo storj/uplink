@@ -4,15 +4,20 @@
 package testsuite_test
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"storj.io/common/memory"
 	"storj.io/common/testcontext"
+	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestProject_NewMultipartUpload(t *testing.T) {
@@ -154,5 +159,89 @@ func TestProject_AbortMultipartUpload(t *testing.T) {
 		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID)
 		require.NoError(t, err)
 		// TODO: once we get listing of on-going multipart uploads, it's not there anymore
+	})
+}
+
+func TestProject_PutObjectPart(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 50*memory.KiB)
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
+		require.NoError(t, err)
+
+		project, err := uplinkConfig.OpenProject(newCtx, access)
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}()
+
+		// bucket not exists
+		_, err = project.NewMultipartUpload(newCtx, "non-existing-testbucket", "multipart-object", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+
+		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
+		firstPartLen := int(float32(len(randData)) * 0.3)
+		source1 := bytes.NewBuffer(randData[:firstPartLen])
+		source2 := bytes.NewBuffer(randData[firstPartLen:])
+
+		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.StreamID)
+
+		{
+			_, err = project.PutObjectPart(newCtx, "", "multipart-object", info.StreamID, 1, source2)
+			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+
+			_, err = project.PutObjectPart(newCtx, "testbucket", "", info.StreamID, 1, source2)
+			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
+
+			// empty streamID
+			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", "", 1, source2)
+			require.Error(t, err)
+
+			// negative partID
+			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 0, source2)
+			require.Error(t, err)
+
+			// empty input data reader
+			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer([]byte{}))
+			require.Error(t, err)
+		}
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 2, source2)
+		require.NoError(t, err)
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source1)
+		require.NoError(t, err)
+
+		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
+		require.NoError(t, err)
+
+		download, err := project.DownloadObject(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+
+		defer ctx.Check(download.Close)
+		var downloaded bytes.Buffer
+		_, err = io.Copy(&downloaded, download)
+		require.NoError(t, err)
+		require.Equal(t, len(randData), len(downloaded.Bytes()))
+		require.Equal(t, randData, downloaded.Bytes())
+
+		// create part for committed object
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source2)
+		require.Error(t, err)
 	})
 }

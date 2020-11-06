@@ -7,6 +7,9 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"io"
+	"io/ioutil"
+	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 
@@ -15,6 +18,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/storage/streams"
 )
 
 // ErrStreamIDInvalid is returned when the stream ID is invalid.
@@ -32,6 +36,12 @@ type MultipartUploadOptions UploadOptions
 // MultipartObjectOptions options for committing object.
 type MultipartObjectOptions struct {
 	CustomMetadata CustomMetadata
+}
+
+// PartInfo contains information about uploaded part.
+type PartInfo struct {
+	PartNumber int
+	Size       int64
 }
 
 // NewMultipartUpload begins new multipart upload.
@@ -53,7 +63,7 @@ func (project *Project) NewMultipartUpload(ctx context.Context, bucket, key stri
 	encStore := project.access.encAccess.Store
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), encStore)
 	if err != nil {
-		return MultipartInfo{}, err
+		return MultipartInfo{}, packageError.Wrap(err)
 	}
 
 	response, err := project.metainfo.BeginObject(ctx, metainfo.BeginObjectParams{
@@ -69,6 +79,148 @@ func (project *Project) NewMultipartUpload(ctx context.Context, bucket, key stri
 	encodedStreamID := base58.CheckEncode(response.StreamID[:], 1)
 	return MultipartInfo{
 		StreamID: encodedStreamID,
+	}, nil
+}
+
+// PutObjectPart uploads a part.
+func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, streamID string, partNumber int, data io.Reader) (info PartInfo, err error) {
+	defer mon.Func().RestartTrace(&ctx)(&err)
+
+	// TODO
+	// * use Batch to combine requests
+	// * how pass expiration time
+	// * most probably we need to adjust content nonce generation
+
+	switch {
+	case bucket == "":
+		return PartInfo{}, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
+	case key == "":
+		return PartInfo{}, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
+	case streamID == "":
+		return PartInfo{}, ErrStreamIDInvalid
+	case partNumber < 1:
+		return PartInfo{}, packageError.New("partNumber should be larger than 0")
+	}
+
+	decodedStreamID, version, err := base58.CheckDecode(streamID)
+	if err != nil || version != 1 {
+		return PartInfo{}, packageError.New("invalid streamID format")
+	}
+
+	var (
+		currentSegment int64
+		streamSize     int64
+		contentKey     storj.Key
+		encryptedKey   []byte
+		keyNonce       storj.Nonce
+	)
+
+	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(project.segmentSize, project.encryption)
+	if err != nil {
+		return PartInfo{}, packageError.Wrap(err)
+	}
+
+	encStore := project.access.encAccess.Store
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), encStore)
+	if err != nil {
+		return PartInfo{}, packageError.Wrap(err)
+	}
+
+	eofReader := streams.NewEOFReader(data)
+	for !eofReader.IsEOF() && !eofReader.HasError() {
+		// generate random key for encrypting the segment's content
+		_, err := rand.Read(contentKey[:])
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		// Initialize the content nonce with the current total segment incremented
+		// by 1 because at this moment the next segment has not been already
+		// uploaded.
+		// The increment by 1 is to avoid nonce reuse with the metadata encryption,
+		// which is encrypted with the zero nonce.
+		contentNonce := storj.Nonce{}
+		_, err = encryption.Increment(&contentNonce, currentSegment+1)
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		// generate random nonce for encrypting the content key
+		_, err = rand.Read(keyNonce[:])
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		encryptedKey, err = encryption.EncryptKey(&contentKey, project.encryption.CipherSuite, derivedKey, &keyNonce)
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		sizeReader := streams.SizeReader(eofReader)
+		segmentReader := io.LimitReader(sizeReader, project.segmentSize)
+		segmentEncryption := storj.SegmentEncryption{}
+		if project.encryption.CipherSuite != storj.EncNull {
+			segmentEncryption = storj.SegmentEncryption{
+				EncryptedKey:      encryptedKey,
+				EncryptedKeyNonce: keyNonce,
+			}
+		}
+
+		encrypter, err := encryption.NewEncrypter(project.encryption.CipherSuite, &contentKey, &contentNonce, int(project.encryption.BlockSize))
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		paddedReader := encryption.PadReader(ioutil.NopCloser(segmentReader), encrypter.InBlockSize())
+		transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
+
+		response, err := project.metainfo.BeginSegment(ctx, metainfo.BeginSegmentParams{
+			StreamID:      decodedStreamID,
+			MaxOrderLimit: maxEncryptedSegmentSize,
+			Position: storj.SegmentPosition{
+				PartNumber: int32(partNumber),
+				Index:      int32(currentSegment),
+			},
+		})
+		if err != nil {
+			return PartInfo{}, convertKnownErrors(err, bucket, key)
+		}
+
+		encSizedReader := streams.SizeReader(transformedReader)
+
+		// TODO handle expiration
+		expiration := time.Time{}
+		uploadResults, err := project.ec.PutSingleResult(ctx, response.Limits, response.PiecePrivateKey,
+			response.RedundancyStrategy, encSizedReader, expiration)
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
+		plainSegmentSize := sizeReader.Size()
+		if plainSegmentSize > 0 {
+			err = project.metainfo.CommitSegment(ctx, metainfo.CommitSegmentParams{
+				SegmentID:         response.SegmentID,
+				SizeEncryptedData: encSizedReader.Size(),
+				PlainSize:         plainSegmentSize,
+				Encryption:        segmentEncryption,
+				UploadResult:      uploadResults,
+			})
+			if err != nil {
+				return PartInfo{}, convertKnownErrors(err, bucket, key)
+			}
+		}
+
+		streamSize += plainSegmentSize
+		currentSegment++
+	}
+
+	if streamSize == 0 {
+		return PartInfo{}, packageError.New("input data reader was empty")
+	}
+
+	return PartInfo{
+		PartNumber: partNumber,
+		Size:       streamSize,
 	}, nil
 }
 

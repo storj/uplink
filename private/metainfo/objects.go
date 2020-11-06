@@ -323,7 +323,22 @@ func (db *DB) getObjectInfo(ctx context.Context, bucket storj.Bucket, path storj
 		return storj.Object{}, err
 	}
 
-	return objectFromInfo(ctx, bucket, path, encPath, objectInfo, db.encStore)
+	listResult, err := db.metainfo.ListSegments(ctx, ListSegmentsParams{
+		StreamID: objectInfo.StreamID,
+	})
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	// TODO ugly workaround for lack of plain object size
+	plainSize := int64(0)
+	for _, item := range listResult.Items {
+		plainSize += item.PlainSize
+	}
+
+	object, err := objectFromInfo(ctx, bucket, path, encPath, objectInfo, db.encStore)
+	object.Stream.Size = plainSize
+	return object, err
 }
 
 func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, encPath paths.Encrypted, objectInfo storj.ObjectInfo, encStore *encryption.Store) (storj.Object, error) {
@@ -382,11 +397,8 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, objectInfo storj
 		Stream: storj.Stream{
 			ID: objectInfo.StreamID,
 
-			RedundancyScheme: objectInfo.Stream.RedundancyScheme,
-			EncryptionParameters: storj.EncryptionParameters{
-				CipherSuite: storj.CipherSuite(streamMeta.EncryptionType),
-				BlockSize:   streamMeta.EncryptionBlockSize,
-			},
+			RedundancyScheme:     objectInfo.Stream.RedundancyScheme,
+			EncryptionParameters: objectInfo.EncryptionParameters,
 			LastSegment: storj.LastSegment{
 				EncryptedKeyNonce: nonce,
 				EncryptedKey:      encryptedKey,
@@ -394,6 +406,7 @@ func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, objectInfo storj
 		},
 	}
 
+	// TODO we need to figure out how to make it working with object with and without StreamMeta
 	err := updateObjectWithStream(&rv, stream, streamMeta)
 	if err != nil {
 		return storj.Object{}, err
@@ -425,7 +438,9 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 
 	segmentCount := numberOfSegments(stream, streamMeta)
 	object.Metadata = serializableMeta.UserDefined
-	object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+
+	// TODO we may need this code to get plain size of object uploaded with old uplink
+	// object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
 	object.Stream.SegmentCount = segmentCount
 	object.Stream.FixedSegmentSize = stream.SegmentsSize
 	object.Stream.LastSegment.Size = stream.LastSegmentSize

@@ -129,7 +129,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	)
 
 	eofReader := NewEOFReader(data)
-	for !eofReader.isEOF() && !eofReader.hasError() {
+	for !eofReader.IsEOF() && !eofReader.HasError() {
 		// generate random key for encrypting the segment's content
 		_, err := rand.Read(contentKey[:])
 		if err != nil {
@@ -274,7 +274,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 
 	totalSegments := currentSegment
 
-	if eofReader.hasError() {
+	if eofReader.HasError() {
 		return Meta{}, eofReader.err
 	}
 
@@ -353,17 +353,10 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
+	// TODO can be batched with GetObject
+	segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
 		StreamID: object.ID,
-		Position: storj.SegmentPosition{
-			Index: -1, // Request the last segment
-		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	lastSegmentRanger, err := s.Ranger(ctx, info, limits, object.RedundancyScheme)
 	if err != nil {
 		return nil, err
 	}
@@ -374,9 +367,9 @@ func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ran
 	}
 
 	var rangers []ranger.Ranger
-	for i := int64(0); i < object.SegmentCount-1; i++ {
+	for _, segment := range segmentsList.Items {
 		var contentNonce storj.Nonce
-		_, err = encryption.Increment(&contentNonce, i+1)
+		_, err = encryption.Increment(&contentNonce, int64(segment.Position.Index)+1)
 		if err != nil {
 			return nil, err
 		}
@@ -385,36 +378,15 @@ func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ran
 			metainfo:             s.metainfo,
 			streams:              s,
 			streamID:             object.ID,
-			segmentIndex:         int32(i),
+			position:             segment.Position,
 			rs:                   object.RedundancyScheme,
-			size:                 object.FixedSegmentSize,
+			size:                 segment.PlainSize,
 			derivedKey:           derivedKey,
 			startingNonce:        &contentNonce,
 			encryptionParameters: object.EncryptionParameters,
 		})
 	}
 
-	var contentNonce storj.Nonce
-	_, err = encryption.Increment(&contentNonce, object.SegmentCount)
-	if err != nil {
-		return nil, err
-	}
-
-	decryptedLastSegmentRanger, err := decryptRanger(
-		ctx,
-		lastSegmentRanger,
-		object.LastSegment.Size,
-		object.EncryptionParameters,
-		derivedKey,
-		info.SegmentEncryption.EncryptedKey,
-		&info.SegmentEncryption.EncryptedKeyNonce,
-		&contentNonce,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	rangers = append(rangers, decryptedLastSegmentRanger)
 	return ranger.Concat(rangers...), nil
 }
 
@@ -439,7 +411,7 @@ type lazySegmentRanger struct {
 	metainfo             *metainfo.Client
 	streams              *Store
 	streamID             storj.StreamID
-	segmentIndex         int32
+	position             storj.SegmentPosition
 	rs                   storj.RedundancyScheme
 	size                 int64
 	derivedKey           *storj.Key
@@ -455,11 +427,13 @@ func (lr *lazySegmentRanger) Size() int64 {
 // Range implements Ranger.Range to be lazily connected.
 func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
+
 	if lr.ranger == nil {
 		info, limits, err := lr.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
 			StreamID: lr.streamID,
 			Position: storj.SegmentPosition{
-				Index: lr.segmentIndex,
+				PartNumber: lr.position.PartNumber,
+				Index:      lr.position.Index,
 			},
 		})
 		if err != nil {

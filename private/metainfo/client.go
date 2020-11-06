@@ -734,6 +734,76 @@ func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams)
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 
+// SegmentListItem represents listed segment.
+type SegmentListItem struct {
+	Position  storj.SegmentPosition
+	PlainSize int64
+}
+
+// ListSegmentsParams parameters for ListSegments method.
+type ListSegmentsParams struct {
+	StreamID []byte
+	Cursor   storj.SegmentPosition
+	Limit    int32
+}
+
+func (params *ListSegmentsParams) toRequest(header *pb.RequestHeader) *pb.SegmentListRequest {
+	return &pb.SegmentListRequest{
+		Header:   header,
+		StreamId: params.StreamID,
+		CursorPosition: &pb.SegmentPosition{
+			PartNumber: params.Cursor.PartNumber,
+			Index:      params.Cursor.Index,
+		},
+		Limit: params.Limit,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *ListSegmentsParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_SegmentList{
+			SegmentList: params.toRequest(nil),
+		},
+	}
+}
+
+// ListSegmentsResponse response for ListSegments request.
+type ListSegmentsResponse struct {
+	Items []SegmentListItem
+	More  bool
+}
+
+func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsResponse {
+	segments := make([]SegmentListItem, len(response.Items))
+	for i, segment := range response.Items {
+		segments[i] = SegmentListItem{
+			Position: storj.SegmentPosition{
+				PartNumber: segment.Position.PartNumber,
+				Index:      segment.Position.Index,
+			},
+			PlainSize: segment.PlainSize,
+		}
+	}
+
+	return ListSegmentsResponse{
+		Items: segments,
+		More:  response.More,
+	}
+}
+
+// ListSegments lists segments according to specific parameters.
+func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParams) (_ ListSegmentsResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.ListSegments(ctx, params.toRequest(client.header()))
+	if err != nil {
+		return ListSegmentsResponse{}, Error.Wrap(err)
+	}
+
+	return newListSegmentsResponse(response), nil
+}
+
 // BeginSegmentParams parameters for BeginSegment method.
 type BeginSegmentParams struct {
 	StreamID      storj.StreamID
@@ -764,29 +834,35 @@ func (params *BeginSegmentParams) BatchItem() *pb.BatchRequestItem {
 
 // BeginSegmentResponse response for BeginSegment request.
 type BeginSegmentResponse struct {
-	SegmentID       storj.SegmentID
-	Limits          []*pb.AddressedOrderLimit
-	PiecePrivateKey storj.PiecePrivateKey
+	SegmentID          storj.SegmentID
+	Limits             []*pb.AddressedOrderLimit
+	PiecePrivateKey    storj.PiecePrivateKey
+	RedundancyStrategy eestream.RedundancyStrategy
 }
 
-func newBeginSegmentResponse(response *pb.SegmentBeginResponse) BeginSegmentResponse {
-	return BeginSegmentResponse{
-		SegmentID:       response.SegmentId,
-		Limits:          response.AddressedLimits,
-		PiecePrivateKey: response.PrivateKey,
+func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentResponse, error) {
+	rs, err := eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
+	if err != nil {
+		return BeginSegmentResponse{}, err
 	}
+	return BeginSegmentResponse{
+		SegmentID:          response.SegmentId,
+		Limits:             response.AddressedLimits,
+		PiecePrivateKey:    response.PrivateKey,
+		RedundancyStrategy: rs,
+	}, nil
 }
 
 // BeginSegment begins a segment upload.
-func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ storj.SegmentID, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, err error) {
+func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ BeginSegmentResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.BeginSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return storj.SegmentID{}, nil, storj.PiecePrivateKey{}, Error.Wrap(err)
+		return BeginSegmentResponse{}, Error.Wrap(err)
 	}
 
-	return response.SegmentId, response.AddressedLimits, response.PrivateKey, nil
+	return newBeginSegmentResponse(response)
 }
 
 // CommitSegmentParams parameters for CommitSegment method.
