@@ -54,7 +54,7 @@ func TestListObjects_EmptyBucket(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", nil)
+		list := listObjects(ctx, t, project, "testbucket", nil)
 
 		assertNoNextObject(t, list)
 	})
@@ -81,7 +81,7 @@ func TestListObjects_SingleObject(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", nil)
+		list := listObjects(ctx, t, project, "testbucket", nil)
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
@@ -122,7 +122,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 			}()
 		}
 
-		list := listObjects(t, ctx, project, "testbucket", nil)
+		list := listObjects(ctx, t, project, "testbucket", nil)
 
 		more := list.Next()
 		require.True(t, more)
@@ -164,7 +164,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ListObjectsOptions{
+		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
 			Prefix:    "a/b/",
 			Recursive: true,
 		})
@@ -200,7 +200,7 @@ func TestListObjects_PrefixNonRecursive(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ListObjectsOptions{Prefix: "a/b/"})
+		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{Prefix: "a/b/"})
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
@@ -241,7 +241,7 @@ func TestListObjects_Cursor(t *testing.T) {
 			}()
 		}
 
-		list := listObjects(t, ctx, project, "testbucket", nil)
+		list := listObjects(ctx, t, project, "testbucket", nil)
 
 		// get the first list item and make it a cursor for the next list request
 		more := list.Next()
@@ -251,7 +251,7 @@ func TestListObjects_Cursor(t *testing.T) {
 		cursor := list.Item().Key
 
 		// list again with cursor set to the first item from previous list request
-		list = listObjects(t, ctx, project, "testbucket", &uplink.ListObjectsOptions{Cursor: cursor})
+		list = listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{Cursor: cursor})
 
 		// expect the second item as the first item in this new list request
 		more = list.Next()
@@ -308,7 +308,7 @@ func TestListObjects_AutoPaging(t *testing.T) {
 			}(key)
 		}
 
-		list := listObjects(t, ctx, project, "testbucket", &uplink.ListObjectsOptions{
+		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
 			Recursive: true,
 		})
 
@@ -369,7 +369,7 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 	})
 }
 
-func listObjects(t *testing.T, ctx context.Context, project *uplink.Project, bucket string, options *uplink.ListObjectsOptions) *uplink.ObjectIterator {
+func listObjects(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListObjectsOptions) *uplink.ObjectIterator {
 	list := project.ListObjects(ctx, bucket, options)
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())

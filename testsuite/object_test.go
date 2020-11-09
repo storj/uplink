@@ -166,7 +166,7 @@ func TestUploadError(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
-		planet.StopPeer(planet.Satellites[0])
+		require.NoError(t, planet.StopPeer(planet.Satellites[0]))
 
 		err = upload.Commit()
 		require.Error(t, err)

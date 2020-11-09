@@ -43,6 +43,15 @@ pipeline {
                         sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
                         sh 'go-licenses check ./...'
                         sh './scripts/check-libuplink-size.sh'
+
+                        dir("testsuite") {
+                            sh 'check-imports ./...'
+                            sh 'check-atomic-align ./...'
+                            sh 'check-monkit ./...'
+                            sh 'check-errs ./...'
+                            sh 'staticcheck ./...'
+                            sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
+                        }
                     }
                 }
 
