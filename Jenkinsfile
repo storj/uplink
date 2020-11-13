@@ -11,6 +11,7 @@ pipeline {
     }
     environment {
         NPM_CONFIG_CACHE = '/tmp/npm/cache'
+        COCKROACH_MEMPROF_INTERVAL=0
     }
     stages {
         stage('Build') {
@@ -21,7 +22,9 @@ pipeline {
 
                 sh 'service postgresql start'
 
-                sh 'cockroach start-single-node --insecure --store=\'/tmp/crdb\' --listen-addr=localhost:26257 --http-addr=localhost:8080 --cache 512MiB --max-sql-memory 512MiB --background'
+                dir(".build") {
+                    sh 'cockroach start-single-node --insecure --store=\'/tmp/crdb\' --listen-addr=localhost:26257 --http-addr=localhost:8080 --cache 512MiB --max-sql-memory 512MiB --background'
+                }
             }
         }
 
