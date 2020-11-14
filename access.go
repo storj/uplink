@@ -87,6 +87,11 @@ func ParseAccess(access string) (*Access, error) {
 	}, nil
 }
 
+// SatelliteAddress returns the satellite node URL for this access grant.
+func (access *Access) SatelliteAddress() string {
+	return access.satelliteAddress
+}
+
 // Serialize serializes an access grant such that it can be used later with
 // ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
