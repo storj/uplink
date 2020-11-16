@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -62,10 +63,7 @@ func TestMultiTenant(t *testing.T) {
 			serializedUserAccess, userSalt, err := authenticate(ctx, planet, cheaterID, appBucket)
 			require.NoError(t, err)
 
-			userAccess, err := addPassphraseToAccess(serializedUserAccess, userID, passphrase, appBucket, userSalt)
-			require.Error(t, err)
-
-			userAccess, err = addPassphraseToAccess(serializedUserAccess, cheaterID, passphrase, appBucket, userSalt)
+			userAccess, err := addPassphraseToAccess(serializedUserAccess, cheaterID, passphrase, appBucket, userSalt)
 			require.NoError(t, err)
 
 			_, err = downloadFile(ctx, userAccess, userID, appBucket, fileName)

@@ -302,13 +302,3 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*m
 	}
 	return metainfo.New(metainfoClient, encStore), streams, nil
 }
-
-func forAllCiphers(test func(cipher storj.CipherSuite)) {
-	for _, cipher := range []storj.CipherSuite{
-		storj.EncNull,
-		storj.EncAESGCM,
-		storj.EncSecretBox,
-	} {
-		test(cipher)
-	}
-}

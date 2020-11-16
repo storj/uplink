@@ -21,7 +21,7 @@ cd $SCRIPTDIR && go install \
 
 mkdir -p $TMP/gateway-tmp
 cd $TMP/gateway-tmp && go mod init gatewaybuild
-cd $TMP/gateway-tmp && go mod edit -replace github.com/minio/minio=github.com/storj/minio@storj && GO111MODULE=on go get storj.io/gateway@master
+cd $TMP/gateway-tmp && GO111MODULE=on go get storj.io/gateway@latest
 
 export STORJ_NETWORK_DIR=$TMP
 

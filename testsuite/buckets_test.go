@@ -32,7 +32,7 @@ func TestListBuckets_EmptyProject(t *testing.T) {
 		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
-		list := listBuckets(t, ctx, project, nil)
+		list := listBuckets(ctx, t, project, nil)
 		assertNoNextBucket(t, list)
 	})
 }
@@ -52,7 +52,7 @@ func TestListBuckets_SingleBucket(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		list := listBuckets(t, ctx, project, nil)
+		list := listBuckets(ctx, t, project, nil)
 
 		assert.True(t, list.Next())
 		require.NoError(t, list.Err())
@@ -87,7 +87,7 @@ func TestListBuckets_TwoBuckets(t *testing.T) {
 			}()
 		}
 
-		list := listBuckets(t, ctx, project, nil)
+		list := listBuckets(ctx, t, project, nil)
 
 		more := list.Next()
 		require.True(t, more)
@@ -131,7 +131,7 @@ func TestListBuckets_Cursor(t *testing.T) {
 			}()
 		}
 
-		list := listBuckets(t, ctx, project, nil)
+		list := listBuckets(ctx, t, project, nil)
 
 		// get the first list item and make it a cursor for the next list request
 		more := list.Next()
@@ -141,7 +141,7 @@ func TestListBuckets_Cursor(t *testing.T) {
 		cursor := list.Item().Name
 
 		// list again with cursor set to the first item from previous list request
-		list = listBuckets(t, ctx, project, &uplink.ListBucketsOptions{Cursor: cursor})
+		list = listBuckets(ctx, t, project, &uplink.ListBucketsOptions{Cursor: cursor})
 
 		// expect the second item as the first item in this new list request
 		more = list.Next()
@@ -209,7 +209,7 @@ func TestListBuckets_AutoPaging(t *testing.T) {
 			}()
 		}
 
-		list := listBuckets(t, ctx, project, nil)
+		list := listBuckets(ctx, t, project, nil)
 
 		var ok bool
 		for list.Next() {
@@ -226,7 +226,7 @@ func TestListBuckets_AutoPaging(t *testing.T) {
 	})
 }
 
-func listBuckets(t *testing.T, ctx context.Context, project *uplink.Project, options *uplink.ListBucketsOptions) *uplink.BucketIterator {
+func listBuckets(ctx context.Context, t *testing.T, project *uplink.Project, options *uplink.ListBucketsOptions) *uplink.BucketIterator {
 	list := project.ListBuckets(ctx, options)
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())

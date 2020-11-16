@@ -301,6 +301,7 @@ func TestSharePrefix_List(t *testing.T) {
 			{sharePrefix: "a/b/c", listPrefix: "a/b/c/"},
 			{sharePrefix: "a/b/c/", listPrefix: "a/b/c/"},
 		} {
+			tt := tt
 			t.Run("sharePrefix: "+tt.sharePrefix+", listPrefix: "+tt.listPrefix, func(t *testing.T) {
 				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
 					Bucket: "testbucket",
@@ -371,6 +372,7 @@ func TestSharePrefix_Download(t *testing.T) {
 			"a/b/c/",
 			"a/b/c/test.dat",
 		} {
+			prefix := prefix
 			t.Run("prefix: "+prefix, func(t *testing.T) {
 				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
 					Bucket: "testbucket",
