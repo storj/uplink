@@ -17,6 +17,9 @@ import (
 	"storj.io/uplink/private/metainfo"
 )
 
+// ErrStreamIDInvalid is returned when the stream ID is invalid.
+var ErrStreamIDInvalid = errors.New("stream ID invalid")
+
 // MultipartInfo contains information about multipart upload.
 type MultipartInfo struct {
 	// StreamID multipart upload identifier encoded with base58.
@@ -37,10 +40,10 @@ func (project *Project) NewMultipartUpload(ctx context.Context, bucket, key stri
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	if bucket == "" {
-		return MultipartInfo{}, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
+		return MultipartInfo{}, ErrBucketNameInvalid
 	}
 	if key == "" {
-		return MultipartInfo{}, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
+		return MultipartInfo{}, ErrObjectKeyInvalid
 	}
 
 	if options == nil {
@@ -164,4 +167,34 @@ func (project *Project) CompleteMultipartUpload(ctx context.Context, bucket, key
 
 	// TODO return object after committing
 	return &Object{}, nil
+}
+
+// AbortMultipartUpload aborts a multipart upload.
+// TODO: implement dedicated metainfo methods to handle aborting correctly.
+func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, streamID string) (err error) {
+	defer mon.Func().RestartTrace(&ctx)(&err)
+	if bucket == "" {
+		return ErrBucketNameInvalid
+	}
+	if key == "" {
+		return ErrObjectKeyInvalid
+	}
+	if streamID == "" {
+		return ErrStreamIDInvalid
+	}
+
+	encStore := project.access.encAccess.Store
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), encStore)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+
+	_, err = project.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+		Bucket:        []byte(bucket),
+		EncryptedPath: []byte(encPath.Raw()),
+	})
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+	return nil
 }

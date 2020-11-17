@@ -112,7 +112,47 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedMetadata, object.Custom)
 		}
-
 		// TODO add more tests
+	})
+}
+
+func TestProject_AbortMultipartUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}()
+
+		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.StreamID)
+
+		err = project.AbortMultipartUpload(ctx, "", "multipart-object", info.StreamID)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+
+		err = project.AbortMultipartUpload(ctx, "testbucket", "", info.StreamID)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
+
+		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", "")
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrStreamIDInvalid))
+
+		// TODO: testcases we cannot do now:
+		// - right streamID/wrong bucket or project ID
+		// - existing bucket/existing key/existing streamID, but not the good one
+
+		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID)
+		require.NoError(t, err)
+		// TODO: once we get listing of on-going multipart uploads, it's not there anymore
 	})
 }
