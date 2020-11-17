@@ -439,16 +439,18 @@ func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams)
 type CommitObjectParams struct {
 	StreamID storj.StreamID
 
-	EncryptedMetadataNonce storj.Nonce
-	EncryptedMetadata      []byte
+	EncryptedMetadataNonce        storj.Nonce
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
 	return &pb.ObjectCommitRequest{
-		Header:                 header,
-		StreamId:               params.StreamID,
-		EncryptedMetadataNonce: params.EncryptedMetadataNonce,
-		EncryptedMetadata:      params.EncryptedMetadata,
+		Header:                        header,
+		StreamId:                      params.StreamID,
+		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		EncryptedMetadata:             params.EncryptedMetadata,
+		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 	}
 }
 
@@ -792,6 +794,7 @@ type CommitSegmentParams struct {
 	SegmentID         storj.SegmentID
 	Encryption        storj.SegmentEncryption
 	SizeEncryptedData int64
+	PlainSize         int64
 
 	UploadResult []*pb.SegmentPieceUploadResult
 }
@@ -804,6 +807,7 @@ func (params *CommitSegmentParams) toRequest(header *pb.RequestHeader) *pb.Segme
 		EncryptedKeyNonce: params.Encryption.EncryptedKeyNonce,
 		EncryptedKey:      params.Encryption.EncryptedKey,
 		SizeEncryptedData: params.SizeEncryptedData,
+		PlainSize:         params.PlainSize,
 		UploadResult:      params.UploadResult,
 	}
 }

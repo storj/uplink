@@ -229,6 +229,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
 				SegmentID:         segmentID,
 				SizeEncryptedData: encSizedReader.Size(),
+				PlainSize:         sizeReader.Size(),
 				Encryption:        segmentEncryption,
 				UploadResult:      uploadResults,
 			})
@@ -237,6 +238,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 			if err != nil {
 				return Meta{}, err
 			}
+
 			cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 			if err != nil {
 				return Meta{}, err
