@@ -9,6 +9,6 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20201124202331-31c1d1dc486d
-	storj.io/storj v0.12.1-0.20201125133528-cfb45a785cc2
-	storj.io/uplink v1.3.2-0.20201124092040-5a7d9fd28037
+	storj.io/storj v0.12.1-0.20201201091214-46839b992a21
+	storj.io/uplink v1.3.2-0.20201130113447-f289d40efc01
 )

@@ -412,3 +412,164 @@ func (project *Project) ListParts(ctx context.Context, bucket, key, streamID str
 
 	return ListPartsResult{Items: partInfos, More: listResult.More}, nil
 }
+
+// ListMultipartUploadsOptions defines multipart uploads listing options.
+type ListMultipartUploadsOptions struct {
+	// Prefix allows to filter objects by a key prefix. If not empty, it must end with slash.
+	Prefix string
+	// Cursor sets the starting position of the iterator. The first item listed will be the one after the cursor.
+	Cursor string
+	// Recursive iterates the objects without collapsing prefixes.
+	Recursive bool
+
+	// TODO: Do we need System and Custom flags for listing pending multipart uploads?
+	// System includes SystemMetadata in the results.
+	System bool
+	// Custom includes CustomMetadata in the results.
+	Custom bool
+}
+
+// ListMultipartUploads returns an iterator over the multipart uploads.
+func (project *Project) ListMultipartUploads(ctx context.Context, bucket string, options *ListMultipartUploadsOptions) *MultipartUploadIterator {
+	defer mon.Func().RestartTrace(&ctx)(nil)
+
+	opts := storj.ListOptions{
+		Direction: storj.After,
+		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
+	}
+
+	if options != nil {
+		opts.Prefix = options.Prefix
+		opts.Cursor = options.Cursor
+		opts.Recursive = options.Recursive
+	}
+
+	objects := MultipartUploadIterator{
+		ctx:     ctx,
+		project: project,
+		bucket:  storj.Bucket{Name: bucket},
+		options: opts,
+	}
+
+	if options != nil {
+		objects.multipartOptions = *options
+	}
+
+	return &objects
+}
+
+// MultipartUploadIterator is an iterator over a collection of objects or prefixes.
+type MultipartUploadIterator struct {
+	ctx              context.Context
+	project          *Project
+	bucket           storj.Bucket
+	options          storj.ListOptions
+	multipartOptions ListMultipartUploadsOptions
+	list             *storj.ObjectList
+	position         int
+	completed        bool
+	err              error
+}
+
+// Next prepares next Object for reading.
+// It returns false if the end of the iteration is reached and there are no more uploads, or if there is an error.
+func (uploads *MultipartUploadIterator) Next() bool {
+	if uploads.err != nil {
+		uploads.completed = true
+		return false
+	}
+
+	if uploads.list == nil {
+		more := uploads.loadNext()
+		uploads.completed = !more
+		return more
+	}
+
+	if uploads.position >= len(uploads.list.Items)-1 {
+		if !uploads.list.More {
+			uploads.completed = true
+			return false
+		}
+		more := uploads.loadNext()
+		uploads.completed = !more
+		return more
+	}
+
+	uploads.position++
+
+	return true
+}
+
+func (uploads *MultipartUploadIterator) loadNext() bool {
+	list, err := uploads.project.db.ListObjects(uploads.ctx, uploads.bucket, uploads.options)
+	if err != nil {
+		uploads.err = convertKnownErrors(err, uploads.bucket.Name, "")
+		return false
+	}
+	uploads.list = &list
+	if list.More {
+		uploads.options = uploads.options.NextPage(list)
+	}
+	uploads.position = 0
+	return len(list.Items) > 0
+}
+
+// Err returns error, if one happened during iteration.
+func (uploads *MultipartUploadIterator) Err() error {
+	return packageError.Wrap(uploads.err)
+}
+
+// Item returns the current object in the iterator.
+func (uploads *MultipartUploadIterator) Item() *Object {
+	item := uploads.item()
+	if item == nil {
+		return nil
+	}
+
+	key := item.Path
+	if len(uploads.options.Prefix) > 0 {
+		key = uploads.options.Prefix + item.Path
+	}
+
+	obj := Object{
+		Key:      key,
+		IsPrefix: item.IsPrefix,
+	}
+
+	// TODO: Make this filtering on the satellite
+	if uploads.multipartOptions.System {
+		obj.System = SystemMetadata{
+			Created:       item.Created,
+			Expires:       item.Expires,
+			ContentLength: item.Size,
+			StreamID:      base58.CheckEncode(item.Stream.ID, 1),
+		}
+	}
+
+	// TODO: Make this filtering on the satellite
+	if uploads.multipartOptions.Custom {
+		obj.Custom = item.Metadata
+	}
+
+	return &obj
+}
+
+func (uploads *MultipartUploadIterator) item() *storj.Object {
+	if uploads.completed {
+		return nil
+	}
+
+	if uploads.err != nil {
+		return nil
+	}
+
+	if uploads.list == nil {
+		return nil
+	}
+
+	if len(uploads.list.Items) == 0 {
+		return nil
+	}
+
+	return &uploads.list.Items[uploads.position]
+}

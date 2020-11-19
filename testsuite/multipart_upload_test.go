@@ -5,11 +5,13 @@ package testsuite_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
@@ -20,7 +22,7 @@ import (
 	"storj.io/uplink/private/testuplink"
 )
 
-func TestProject_NewMultipartUpload(t *testing.T) {
+func TestNewMultipartUpload(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
@@ -34,14 +36,16 @@ func TestProject_NewMultipartUpload(t *testing.T) {
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
+
+		// assert there is no pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
+
+		// assert there is only one pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		// we allow to start several multipart uploads for the same key
 		// TODO check why its not possible anymore
@@ -49,15 +53,60 @@ func TestProject_NewMultipartUpload(t *testing.T) {
 		// require.NoError(t, err)
 		// require.NotNil(t, info.StreamID)
 
-		info, err = project.NewMultipartUpload(ctx, "testbucket", "multipart-object-1", &uplink.MultipartUploadOptions{
-			Expires: time.Now().Add(time.Hour),
-		})
+		info, err = project.NewMultipartUpload(ctx, "testbucket", "multipart-object-1", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
+
+		// assert there are two pending multipart uploads
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object", "multipart-object-1")
 	})
 }
 
-func TestProject_CompleteMultipartUpload(t *testing.T) {
+func TestNewMultipartUpload_Expires(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// assert there is no pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+
+		expiresAt := time.Now().Add(time.Hour)
+		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", &uplink.MultipartUploadOptions{
+			Expires: expiresAt,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, info.StreamID)
+
+		// assert there is one pending multipart upload and it has an expiration date
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
+		list := project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{
+			System: true,
+		})
+		require.NoError(t, list.Err())
+		require.True(t, list.Next())
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.False(t, list.Item().IsPrefix)
+		require.Equal(t, "multipart-object", list.Item().Key)
+		require.NotZero(t, list.Item().System.Expires)
+		require.Equal(t, expiresAt.Unix(), list.Item().System.Expires.Unix())
+		require.False(t, list.Next())
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+	})
+}
+
+func TestCompleteMultipartUpload(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
@@ -67,10 +116,6 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		{
 			_, err := project.CompleteMultipartUpload(ctx, "", "", "", nil)
@@ -88,8 +133,14 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, info.StreamID)
 
+			// assert there is only one pending multipart upload
+			assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
+
 			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID, nil)
 			require.NoError(t, err)
+
+			// assert there is no pending multipart upload
+			assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 			_, err = project.StatObject(ctx, "testbucket", "multipart-object")
 			require.NoError(t, err)
@@ -104,6 +155,9 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, info.StreamID)
 
+			// assert there is only one pending multipart upload
+			assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object-metadata")
+
 			expectedMetadata := uplink.CustomMetadata{
 				"TestField1": "TestFieldValue1",
 				"TestField2": "TestFieldValue2",
@@ -113,6 +167,9 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			// assert there is no pending multipart upload
+			assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+
 			object, err := project.StatObject(ctx, "testbucket", "multipart-object-metadata")
 			require.NoError(t, err)
 			require.Equal(t, expectedMetadata, object.Custom)
@@ -121,7 +178,7 @@ func TestProject_CompleteMultipartUpload(t *testing.T) {
 	})
 }
 
-func TestProject_AbortMultipartUpload(t *testing.T) {
+func TestAbortMultipartUpload(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
@@ -131,14 +188,13 @@ func TestProject_AbortMultipartUpload(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
+
+		// assert there is only one pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		err = project.AbortMultipartUpload(ctx, "", "multipart-object", info.StreamID)
 		require.Error(t, err)
@@ -158,11 +214,14 @@ func TestProject_AbortMultipartUpload(t *testing.T) {
 
 		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID)
 		require.NoError(t, err)
-		// TODO: once we get listing of on-going multipart uploads, it's not there anymore
+
+		// TODO: uncomment this check when we fix AbortMultipartUpload to delete the pending object
+		// assert there is no pending multipart upload
+		// assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 	})
 }
 
-func TestProject_PutObjectPart(t *testing.T) {
+func TestPutObjectPart(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 4,
@@ -182,10 +241,6 @@ func TestProject_PutObjectPart(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		// bucket not exists
 		_, err = project.NewMultipartUpload(newCtx, "non-existing-testbucket", "multipart-object", nil)
@@ -200,6 +255,9 @@ func TestProject_PutObjectPart(t *testing.T) {
 		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
+
+		// assert there is only one pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
 			_, err = project.PutObjectPart(newCtx, "", "multipart-object", info.StreamID, 1, source2)
@@ -230,6 +288,9 @@ func TestProject_PutObjectPart(t *testing.T) {
 		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
 
+		// assert there is no pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+
 		download, err := project.DownloadObject(ctx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 
@@ -246,7 +307,7 @@ func TestProject_PutObjectPart(t *testing.T) {
 	})
 }
 
-func TestProject_ListParts(t *testing.T) {
+func TestListParts(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 4,
@@ -266,10 +327,6 @@ func TestProject_ListParts(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
 		firstPartLen := int(float32(len(randData)) * 0.3)
@@ -279,6 +336,9 @@ func TestProject_ListParts(t *testing.T) {
 		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
+
+		// assert there is only one pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
 			_, err = project.ListParts(newCtx, "", "multipart-object", info.StreamID, 1, 10)
@@ -311,6 +371,9 @@ func TestProject_ListParts(t *testing.T) {
 		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
 
+		// assert there is no pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+
 		// list parts of a completed multipart upload
 		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
@@ -331,4 +394,155 @@ func TestProject_ListParts(t *testing.T) {
 		require.Equal(t, 0, len(parts.Items))
 		require.Equal(t, false, parts.More)
 	})
+}
+
+func TestListMultipartUploads_NonExistingBucket(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		list := project.ListMultipartUploads(ctx, "non-existing-bucket", nil)
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+		require.False(t, list.Next())
+		require.Error(t, list.Err())
+		require.True(t, errors.Is(list.Err(), uplink.ErrBucketNotFound))
+	})
+}
+
+func TestListMultipartUploads_EmptyBucket(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// assert the there is no pending multipart upload
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+	})
+}
+
+func TestListMultipartUploads_Prefix(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		_, err := project.NewMultipartUpload(ctx, "testbucket", "a/b/c/multipart-object", nil)
+		require.NoError(t, err)
+
+		// assert there is one pending multipart upload with prefix "a/b/"
+		assertMultipartUploadList(ctx, t, project, "testbucket", &uplink.ListMultipartUploadsOptions{
+			Prefix:    "a/b/",
+			Recursive: true,
+		}, "a/b/c/multipart-object")
+
+		// assert there is no pending multipart upload with prefix "b/"
+		assertMultipartUploadList(ctx, t, project, "testbucket", &uplink.ListMultipartUploadsOptions{
+			Prefix:    "b/",
+			Recursive: true,
+		})
+
+		// assert there is one prefix of pending multipart uploads with prefix "a/b/"
+		list := project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{
+			Prefix: "a/b/",
+		})
+		require.NoError(t, list.Err())
+		require.True(t, list.Next())
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.True(t, list.Item().IsPrefix)
+		require.Equal(t, "a/b/c/", list.Item().Key)
+		require.False(t, list.Next())
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+	})
+}
+
+func TestListMultipartUploads_Cursor(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		expectedObjects := map[string]bool{
+			"multipart-upload-1": true,
+			"multipart-upload-2": true,
+		}
+
+		for object := range expectedObjects {
+			_, err := project.NewMultipartUpload(ctx, "testbucket", object, nil)
+			require.NoError(t, err)
+		}
+
+		// get the first list item and make it a cursor for the next list request
+		list := project.ListMultipartUploads(ctx, "testbucket", nil)
+		require.NoError(t, list.Err())
+		more := list.Next()
+		require.True(t, more)
+		require.NoError(t, list.Err())
+		delete(expectedObjects, list.Item().Key)
+		cursor := list.Item().Key
+
+		// list again with cursor set to the first item from previous list request
+		list = project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{Cursor: cursor})
+		require.NoError(t, list.Err())
+
+		// expect the second item as the first item in this new list request
+		more = list.Next()
+		require.True(t, more)
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.False(t, list.Item().IsPrefix)
+		delete(expectedObjects, list.Item().Key)
+
+		require.Empty(t, expectedObjects)
+		require.False(t, list.Next())
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+	})
+}
+
+func assertMultipartUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListMultipartUploadsOptions, objectKeys ...string) {
+	list := project.ListMultipartUploads(ctx, bucket, options)
+	require.NoError(t, list.Err())
+	require.Nil(t, list.Item())
+
+	itemKeys := make(map[string]struct{})
+	for list.Next() {
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.False(t, list.Item().IsPrefix)
+		itemKeys[list.Item().Key] = struct{}{}
+	}
+
+	for _, objectKey := range objectKeys {
+		if assert.Contains(t, itemKeys, objectKey) {
+			delete(itemKeys, objectKey)
+		}
+	}
+
+	require.Empty(t, itemKeys)
+
+	require.False(t, list.Next())
+	require.NoError(t, list.Err())
+	require.Nil(t, list.Item())
 }
