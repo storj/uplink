@@ -653,6 +653,7 @@ type ListObjectsParams struct {
 	Limit           int32
 	IncludeMetadata bool
 	Recursive       bool
+	Status          int32
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -666,6 +667,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 			Metadata: params.IncludeMetadata,
 		},
 		Recursive: params.Recursive,
+		Status:    pb.Object_Status(params.Status),
 	}
 }
 

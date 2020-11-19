@@ -228,6 +228,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
 		Recursive:       options.Recursive,
+		Status:          options.Status,
 	})
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
