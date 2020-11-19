@@ -6,6 +6,8 @@ package uplink
 import (
 	"context"
 
+	"github.com/zeebo/errs"
+
 	"storj.io/common/storj"
 )
 
@@ -77,17 +79,29 @@ func (buckets *BucketIterator) Next() bool {
 }
 
 func (buckets *BucketIterator) loadNext() bool {
-	list, err := buckets.project.db.ListBuckets(buckets.ctx, buckets.options)
+	ok, err := func() (ok bool, err error) {
+		db, cleanup, err := buckets.project.getMetainfoDB(buckets.ctx)
+		if err != nil {
+			return false, err
+		}
+		defer func() { err = errs.Combine(err, cleanup()) }()
+
+		list, err := db.ListBuckets(buckets.ctx, buckets.options)
+		if err != nil {
+			return false, err
+		}
+		buckets.list = &list
+		if list.More {
+			buckets.options = buckets.options.NextPage(list)
+		}
+		buckets.position = 0
+		return len(list.Items) > 0, nil
+	}()
 	if err != nil {
 		buckets.err = convertKnownErrors(err, "", "")
 		return false
 	}
-	buckets.list = &list
-	if list.More {
-		buckets.options = buckets.options.NextPage(list)
-	}
-	buckets.position = 0
-	return len(list.Items) > 0
+	return ok
 }
 
 // Err returns error, if one happened during iteration.

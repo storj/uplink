@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vivint/infectious"
+	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/macaroon"
@@ -228,8 +229,10 @@ func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encAccess := newTestEncStore(TestEncKey)
 		encAccess.SetDefaultPathCipher(pathCipher)
-		db, streams, err := newMetainfoParts(planet, encAccess)
+
+		db, streams, cleanup, err := newMetainfoParts(planet, encAccess)
 		require.NoError(t, err)
+		defer ctx.Check(cleanup)
 
 		test(t, ctx, planet, db, streams)
 	})
@@ -245,19 +248,19 @@ func newTestEncStore(keyStr string) *encryption.Store {
 	return store
 }
 
-func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*metainfo.DB, *streams.Store, error) {
+func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ *metainfo.DB, _ *streams.Store, _ func() error, err error) {
 	// TODO(kaloyan): We should have a better way for configuring the Satellite's API Key
 	// add project to satisfy constraint
 	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{
 		Name: "testProject",
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	apiKey, err := macaroon.NewAPIKey([]byte("testSecret"))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	apiKeyInfo := console.APIKeyInfo{
@@ -269,24 +272,28 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*m
 	// add api key to db
 	_, err = planet.Satellites[0].DB.Console().APIKeys().Create(context.Background(), apiKey.Head(), apiKeyInfo)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	metainfoClient, err := planet.Uplinks[0].DialMetainfo(context.Background(), planet.Satellites[0], apiKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	// TODO(leak): call metainfo.Close somehow
+	defer func() {
+		if err != nil {
+			err = errs.Combine(err, metainfoClient.Close())
+		}
+	}()
 
 	ec := ecclient.NewClient(planet.Uplinks[0].Log.Named("ecclient"), planet.Uplinks[0].Dialer, 0)
 	fc, err := infectious.NewFEC(2, 4)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	rs, err := eestream.NewRedundancyStrategy(eestream.NewRSScheme(fc, 1*memory.KiB.Int()), 0, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	const stripesPerBlock = 2
@@ -298,7 +305,7 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (*m
 	inlineThreshold := 8 * memory.KiB.Int()
 	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, encryptionParameters, inlineThreshold, 8*memory.MiB.Int64())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return metainfo.New(metainfoClient, encStore), streams, nil
+	return metainfo.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
 }

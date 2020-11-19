@@ -40,8 +40,18 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		options = &UploadOptions{}
 	}
 
+	// N.B. we always call dbCleanup which closes the db because
+	// closing it earlier has the benefit of returning a connection to
+	// the pool, so we try to do that as early as possible.
+
+	db, dbCleanup, err := project.getMetainfoDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errs.Combine(err, dbCleanup()) }()
+
 	b := storj.Bucket{Name: bucket}
-	obj, err := project.db.CreateObject(ctx, b, key, nil)
+	obj, err := db.CreateObject(ctx, b, key, nil)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -62,7 +72,19 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		return nil, packageError.Wrap(err)
 	}
 
-	upload.upload = stream.NewUpload(ctx, mutableStream, project.streams)
+	// Return the connection to the pool as soon as we can.
+	if err := dbCleanup(); err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	streams, streamsCleanup, err := project.getStreamsStore(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	upload.cleanup = streamsCleanup
+	upload.upload = stream.NewUpload(ctx, mutableStream, streams)
+
 	return upload, nil
 }
 
@@ -82,6 +104,7 @@ type Upload struct {
 	upload  *stream.Upload
 	bucket  string
 	object  *Object
+	cleanup func() error
 }
 
 // Info returns the last information about the uploaded object.
@@ -108,6 +131,14 @@ func (upload *Upload) Commit() error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
+	// we always want to call cleanup, but only after everything has happened
+	defer func() {
+		if upload.cleanup != nil {
+			_ = upload.cleanup()
+			upload.cleanup = nil
+		}
+	}()
+
 	if upload.aborted {
 		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
@@ -126,6 +157,14 @@ func (upload *Upload) Commit() error {
 func (upload *Upload) Abort() error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
+
+	// we always want to call cleanup, but only after everything has happened
+	defer func() {
+		if upload.cleanup != nil {
+			_ = upload.cleanup()
+			upload.cleanup = nil
+		}
+	}()
 
 	if upload.upload.Meta() != nil {
 		return errwrapf("%w: already committed", ErrUploadDone)

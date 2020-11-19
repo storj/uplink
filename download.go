@@ -5,6 +5,9 @@ package uplink
 
 import (
 	"context"
+	"sync"
+
+	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
 	"storj.io/uplink/private/stream"
@@ -37,21 +40,44 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	b := storj.Bucket{Name: bucket}
 
-	obj, err := project.db.GetObject(ctx, b, key)
+	// N.B. we always call dbCleanup which closes the db because
+	// closing it earlier has the benefit of returning a connection to
+	// the pool, so we try to do that as early as possible.
+
+	db, dbCleanup, err := project.getMetainfoDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errs.Combine(err, dbCleanup()) }()
+
+	obj, err := db.GetObject(ctx, b, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
+	// Return the connection to the pool as soon as we can.
+	if err := dbCleanup(); err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	streams, streamsCleanup, err := project.getStreamsStore(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
 	return &Download{
-		download: stream.NewDownloadRange(ctx, obj, project.streams, options.Offset, options.Length),
+		cleanup:  streamsCleanup,
+		download: stream.NewDownloadRange(ctx, obj, streams, options.Offset, options.Length),
 		object:   convertObject(&obj),
 	}, nil
 }
 
 // Download is a download from Storj Network.
 type Download struct {
+	mu       sync.Mutex
 	download *stream.Download
 	object   *Object
+	cleanup  func() error
 }
 
 // Info returns the last information about the object.
@@ -67,5 +93,16 @@ func (download *Download) Read(p []byte) (n int, err error) {
 
 // Close closes the reader of the download.
 func (download *Download) Close() error {
+	download.mu.Lock()
+	defer download.mu.Unlock()
+
+	// we always want to call cleanup, but only after everything has happened
+	defer func() {
+		if download.cleanup != nil {
+			_ = download.cleanup()
+			download.cleanup = nil
+		}
+	}()
+
 	return download.download.Close()
 }

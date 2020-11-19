@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -30,6 +31,7 @@ var (
 
 // Client creates a grpcClient.
 type Client struct {
+	mu        sync.Mutex
 	conn      *rpc.Conn
 	client    pb.DRPCMetainfoClient
 	apiKeyRaw []byte
@@ -80,9 +82,15 @@ func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey 
 
 // Close closes the dialed connection.
 func (client *Client) Close() error {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
 	if client.conn != nil {
-		return Error.Wrap(client.conn.Close())
+		err := client.conn.Close()
+		client.conn = nil
+		return Error.Wrap(err)
 	}
+
 	return nil
 }
 
@@ -547,7 +555,6 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.GetObject(ctx, params.toRequest(client.header()))
-
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return RawObjectItem{}, storj.ErrObjectNotFound.Wrap(err)

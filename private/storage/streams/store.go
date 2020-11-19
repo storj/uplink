@@ -100,9 +100,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 		EncryptionParameters: s.encryptionParameters,
 	}
 
-	var (
-		streamID storj.StreamID
-	)
+	var streamID storj.StreamID
 	defer func() {
 		if err != nil {
 			s.cancelHandler(context.Background(), path)
