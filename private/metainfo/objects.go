@@ -351,6 +351,8 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 		Expires:  listItem.ExpiresAt,
 	}
 
+	object.Stream.ID = listItem.StreamID
+
 	err := updateObjectWithStream(&object, stream, streamMeta)
 	if err != nil {
 		return storj.Object{}, err

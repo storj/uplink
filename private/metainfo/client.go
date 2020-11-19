@@ -707,6 +707,10 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 
 			IsPrefix: isPrefix,
 		}
+
+		if object.StreamId != nil {
+			objects[i].StreamID = *object.StreamId
+		}
 	}
 
 	return ListObjectsResponse{
