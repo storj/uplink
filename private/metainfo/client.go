@@ -912,6 +912,7 @@ type MakeInlineSegmentParams struct {
 	Position            storj.SegmentPosition
 	Encryption          storj.SegmentEncryption
 	EncryptedInlineData []byte
+	PlainSize           int64
 }
 
 func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentMakeInlineRequest {
@@ -925,6 +926,7 @@ func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.S
 		EncryptedKeyNonce:   params.Encryption.EncryptedKeyNonce,
 		EncryptedKey:        params.Encryption.EncryptedKey,
 		EncryptedInlineData: params.EncryptedInlineData,
+		PlainSize:           params.PlainSize,
 	}
 }
 

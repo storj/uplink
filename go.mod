@@ -20,5 +20,5 @@ require (
 	golang.org/x/sys v0.0.0-20200929083018-4d22bbb62b3c // indirect
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/tools v0.0.0-20200117161641-43d50277825c // indirect
-	storj.io/common v0.0.0-20201119120404-37756b80ef3b
+	storj.io/common v0.0.0-20201119173627-1cdb53f04fad
 )

@@ -250,6 +250,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 				},
 				Encryption:          segmentEncryption,
 				EncryptedInlineData: cipherData,
+				PlainSize:           int64(len(data)),
 			}
 			if currentSegment == 0 {
 				responses, err := s.metainfo.Batch(ctx, beginObjectReq, makeInlineSegment)
