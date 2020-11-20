@@ -163,31 +163,9 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 }
 
 func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
-	readOnly, err := db.GetObjectStream(ctx, bucket, object)
-	require.NoError(t, err)
-
-	assert.Equal(t, object.Path, readOnly.Info().Path)
-	assert.Equal(t, TestBucket, readOnly.Info().Bucket.Name)
-
-	segments, more, err := readOnly.Segments(ctx, 0, 0)
-	require.NoError(t, err)
-
-	assert.False(t, more)
-	if !assert.Equal(t, 1, len(segments)) {
-		return
-	}
-
-	assert.EqualValues(t, 0, segments[0].Index)
-	assert.EqualValues(t, len(content), segments[0].Size)
-	if segments[0].Size > 4*memory.KiB.Int64() {
-		assertRemoteSegment(t, segments[0])
-	} else {
-		assertInlineSegment(t, segments[0], content)
-	}
-
-	download := stream.NewDownload(ctx, readOnly, streams)
+	download := stream.NewDownload(ctx, object, streams)
 	defer func() {
-		err = download.Close()
+		err := download.Close()
 		assert.NoError(t, err)
 	}()
 
@@ -197,33 +175,6 @@ func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams *s
 
 	assert.Equal(t, len(content), n)
 	assert.Equal(t, content, data)
-}
-
-func assertInlineSegment(t *testing.T, segment storj.Segment, content []byte) {
-	assert.Equal(t, content, segment.Inline)
-	assert.True(t, segment.PieceID.IsZero())
-	assert.Equal(t, 0, len(segment.Pieces))
-}
-
-func assertRemoteSegment(t *testing.T, segment storj.Segment) {
-	assert.Nil(t, segment.Inline)
-	assert.NotNil(t, segment.PieceID)
-
-	// check that piece numbers and nodes are unique
-	nums := make(map[byte]struct{})
-	nodes := make(map[string]struct{})
-	for _, piece := range segment.Pieces {
-		if _, ok := nums[piece.Number]; ok {
-			t.Fatalf("piece number %d is not unique", piece.Number)
-		}
-		nums[piece.Number] = struct{}{}
-
-		id := piece.Location.String()
-		if _, ok := nodes[id]; ok {
-			t.Fatalf("node id %s is not unique", id)
-		}
-		nodes[id] = struct{}{}
-	}
 }
 
 func TestDeleteObject(t *testing.T) {

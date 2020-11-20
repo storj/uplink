@@ -42,13 +42,8 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
-	objectStream, err := project.db.GetObjectStream(ctx, b, obj)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
 	return &Download{
-		download: stream.NewDownloadRange(ctx, objectStream, project.streams, options.Offset, options.Length),
+		download: stream.NewDownloadRange(ctx, obj, project.streams, options.Offset, options.Length),
 		object:   convertObject(&obj),
 	}, nil
 }

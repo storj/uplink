@@ -8,14 +8,13 @@ import (
 	"io"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 )
 
 // Download implements Reader, Seeker and Closer for reading from stream.
 type Download struct {
 	ctx     context.Context
-	stream  *metainfo.ReadOnlyStream
+	object  storj.Object
 	streams *streams.Store
 	reader  io.ReadCloser
 	offset  int64
@@ -24,18 +23,18 @@ type Download struct {
 }
 
 // NewDownload creates new stream download.
-func NewDownload(ctx context.Context, stream *metainfo.ReadOnlyStream, streams *streams.Store) *Download {
+func NewDownload(ctx context.Context, object storj.Object, streams *streams.Store) *Download {
 	return &Download{
 		ctx:     ctx,
-		stream:  stream,
+		object:  object,
 		streams: streams,
-		limit:   stream.Info().Size,
+		limit:   object.Size,
 	}
 }
 
 // NewDownloadRange creates new stream range download with range from offset to offset+limit.
-func NewDownloadRange(ctx context.Context, stream *metainfo.ReadOnlyStream, streams *streams.Store, offset, limit int64) *Download {
-	size := stream.Info().Size
+func NewDownloadRange(ctx context.Context, object storj.Object, streams *streams.Store, offset, limit int64) *Download {
+	size := object.Size
 	if offset > size {
 		offset = size
 	}
@@ -44,7 +43,7 @@ func NewDownloadRange(ctx context.Context, stream *metainfo.ReadOnlyStream, stre
 	}
 	return &Download{
 		ctx:     ctx,
-		stream:  stream,
+		object:  object,
 		streams: streams,
 		offset:  offset,
 		limit:   limit,
@@ -105,7 +104,7 @@ func (download *Download) resetReader() error {
 		}
 	}
 
-	obj := download.stream.Info()
+	obj := download.object
 
 	rr, err := download.streams.Get(download.ctx, streams.ParsePath(storj.JoinPaths(obj.Bucket.Name, obj.Path)), obj)
 	if err != nil {
