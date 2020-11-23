@@ -12,7 +12,6 @@ import (
 
 // MutableStream is for manipulating stream information.
 type MutableStream struct {
-	db   *DB
 	info storj.Object
 
 	dynamic         bool

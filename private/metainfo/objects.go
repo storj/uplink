@@ -85,7 +85,6 @@ func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.
 	// if info.ContentType == "" {}
 
 	return &MutableObject{
-		db:   db,
 		info: info,
 	}, nil
 }
@@ -414,7 +413,6 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 
 // MutableObject is for creating an object stream.
 type MutableObject struct {
-	db   *DB
 	info storj.Object
 }
 
@@ -425,7 +423,6 @@ func (object *MutableObject) Info() storj.Object { return object.info }
 func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return &MutableStream{
-		db:   object.db,
 		info: object.info,
 	}, nil
 }
@@ -434,21 +431,12 @@ func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream
 func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return &MutableStream{
-		db:   object.db,
 		info: object.info,
 
 		dynamic:         true,
 		dynamicMetadata: metadata,
 		dynamicExpires:  expires,
 	}, nil
-}
-
-// Commit updates info object.
-func (object *MutableObject) Commit(ctx context.Context) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	info, err := object.db.getObjectInfo(ctx, object.info.Bucket, object.info.Path)
-	object.info = info
-	return err
 }
 
 func numberOfSegments(stream *pb.StreamInfo, streamMeta pb.StreamMeta) int64 {

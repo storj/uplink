@@ -141,10 +141,10 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	err = upload.Close()
 	require.NoError(t, err)
 
-	err = obj.Commit(ctx)
+	info, err := db.GetObject(ctx, bucket, path)
 	require.NoError(t, err)
 
-	return obj.Info()
+	return info
 }
 
 func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
