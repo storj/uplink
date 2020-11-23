@@ -33,24 +33,6 @@ func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Pat
 	return db.getObjectInfo(ctx, bucket, path)
 }
 
-// GetObjectStream returns interface for reading the object stream.
-func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream *ReadOnlyStream, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if bucket.Name == "" {
-		return nil, storj.ErrNoBucket.New("")
-	}
-
-	if object.Path == "" {
-		return nil, storj.ErrNoPath.New("")
-	}
-
-	return &ReadOnlyStream{
-		db:   db,
-		info: object,
-	}, nil
-}
-
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
 func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.Path) (ips []net.IP, err error) {
 	defer mon.Task()(&ctx)(&err)

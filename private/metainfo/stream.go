@@ -4,119 +4,11 @@
 package metainfo
 
 import (
-	"context"
-	"errors"
 	"time"
 
-	"storj.io/common/encryption"
-	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 )
-
-// ReadOnlyStream is for reading segment information.
-type ReadOnlyStream struct {
-	db *DB
-
-	info storj.Object
-}
-
-// Info returns information about the object.
-func (stream *ReadOnlyStream) Info() storj.Object { return stream.info }
-
-// SegmentsAt returns the segment that contains the byteOffset and following segments.
-// Limit specifies how much to return at most.
-func (stream *ReadOnlyStream) SegmentsAt(ctx context.Context, byteOffset int64, limit int64) (infos []storj.Segment, more bool, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if stream.info.FixedSegmentSize <= 0 {
-		return nil, false, errors.New("not implemented")
-	}
-
-	index := byteOffset / stream.info.FixedSegmentSize
-	return stream.Segments(ctx, index, limit)
-}
-
-func (stream *ReadOnlyStream) segment(ctx context.Context, index int64) (segment storj.Segment, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	segment = storj.Segment{
-		Index: index,
-	}
-
-	isLastSegment := segment.Index+1 == stream.info.SegmentCount
-	if isLastSegment {
-		index = -1
-	}
-	info, limits, err := stream.db.metainfo.DownloadSegment(ctx, DownloadSegmentParams{
-		StreamID: stream.Info().ID,
-		Position: storj.SegmentPosition{
-			Index: int32(index),
-		},
-	})
-	if err != nil {
-		return segment, err
-	}
-
-	segment.Size = stream.info.Size
-	segment.EncryptedKeyNonce = info.SegmentEncryption.EncryptedKeyNonce
-	segment.EncryptedKey = info.SegmentEncryption.EncryptedKey
-
-	streamKey, err := encryption.DeriveContentKey(stream.info.Bucket.Name, paths.NewUnencrypted(stream.info.Path), stream.db.encStore)
-	if err != nil {
-		return segment, err
-	}
-
-	contentKey, err := encryption.DecryptKey(segment.EncryptedKey, stream.info.EncryptionParameters.CipherSuite, streamKey, &segment.EncryptedKeyNonce)
-	if err != nil {
-		return segment, err
-	}
-
-	nonce := new(storj.Nonce)
-	_, err = encryption.Increment(nonce, segment.Index+1)
-	if err != nil {
-		return segment, err
-	}
-
-	if len(info.EncryptedInlineData) != 0 || len(limits) == 0 {
-		inline, err := encryption.Decrypt(info.EncryptedInlineData, stream.info.EncryptionParameters.CipherSuite, contentKey, nonce)
-		if err != nil {
-			return segment, err
-		}
-		segment.Inline = inline
-	}
-
-	return segment, nil
-}
-
-// Segments returns the segment at index.
-// Limit specifies how much to return at most.
-func (stream *ReadOnlyStream) Segments(ctx context.Context, index int64, limit int64) (infos []storj.Segment, more bool, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if index < 0 {
-		return nil, false, errors.New("invalid argument")
-	}
-	if limit <= 0 {
-		limit = defaultSegmentLimit
-	}
-	if index >= stream.info.SegmentCount {
-		return nil, false, nil
-	}
-
-	infos = make([]storj.Segment, 0, limit)
-	for ; index < stream.info.SegmentCount && limit > 0; index++ {
-		limit--
-		segment, err := stream.segment(ctx, index)
-		if err != nil {
-			return nil, false, err
-		}
-		infos = append(infos, segment)
-	}
-
-	more = index < stream.info.SegmentCount
-	return infos, more, nil
-}
 
 // MutableStream is for manipulating stream information.
 type MutableStream struct {
