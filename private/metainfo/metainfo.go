@@ -14,8 +14,6 @@ import (
 
 var errClass = errs.Class("metainfo")
 
-const defaultSegmentLimit = 8 // TODO
-
 // DB implements metainfo database.
 type DB struct {
 	metainfo *Client

@@ -33,24 +33,6 @@ func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Pat
 	return db.getObjectInfo(ctx, bucket, path)
 }
 
-// GetObjectStream returns interface for reading the object stream.
-func (db *DB) GetObjectStream(ctx context.Context, bucket storj.Bucket, object storj.Object) (stream *ReadOnlyStream, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	if bucket.Name == "" {
-		return nil, storj.ErrNoBucket.New("")
-	}
-
-	if object.Path == "" {
-		return nil, storj.ErrNoPath.New("")
-	}
-
-	return &ReadOnlyStream{
-		db:   db,
-		info: object,
-	}, nil
-}
-
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
 func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.Path) (ips []net.IP, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -103,7 +85,6 @@ func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.
 	// if info.ContentType == "" {}
 
 	return &MutableObject{
-		db:   db,
 		info: info,
 	}, nil
 }
@@ -450,7 +431,6 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 
 // MutableObject is for creating an object stream.
 type MutableObject struct {
-	db   *DB
 	info storj.Object
 }
 
@@ -461,7 +441,6 @@ func (object *MutableObject) Info() storj.Object { return object.info }
 func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return &MutableStream{
-		db:   object.db,
 		info: object.info,
 	}, nil
 }
@@ -470,21 +449,12 @@ func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream
 func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return &MutableStream{
-		db:   object.db,
 		info: object.info,
 
 		dynamic:         true,
 		dynamicMetadata: metadata,
 		dynamicExpires:  expires,
 	}, nil
-}
-
-// Commit updates info object.
-func (object *MutableObject) Commit(ctx context.Context) (err error) {
-	defer mon.Task()(&ctx)(&err)
-	info, err := object.db.getObjectInfo(ctx, object.info.Bucket, object.info.Path)
-	object.info = info
-	return err
 }
 
 func numberOfSegments(stream *pb.StreamInfo, streamMeta pb.StreamMeta) int64 {
