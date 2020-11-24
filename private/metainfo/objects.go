@@ -401,7 +401,7 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 		serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
 	}
 
-	segmentCount := numberOfSegments(stream, streamMeta)
+	segmentCount := streamMeta.NumberOfSegments
 	object.Metadata = serializableMeta.UserDefined
 	object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
 	object.Stream.SegmentCount = segmentCount
@@ -437,13 +437,6 @@ func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata S
 		dynamicMetadata: metadata,
 		dynamicExpires:  expires,
 	}, nil
-}
-
-func numberOfSegments(stream *pb.StreamInfo, streamMeta pb.StreamMeta) int64 {
-	if streamMeta.NumberOfSegments > 0 {
-		return streamMeta.NumberOfSegments
-	}
-	return stream.DeprecatedNumberOfSegments
 }
 
 // TypedDecryptStreamInfo decrypts stream info.

@@ -282,10 +282,9 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
-		DeprecatedNumberOfSegments: totalSegments,
-		SegmentsSize:               s.segmentSize,
-		LastSegmentSize:            lastSegmentSize,
-		Metadata:                   metadataBytes,
+		SegmentsSize:    s.segmentSize,
+		LastSegmentSize: lastSegmentSize,
+		Metadata:        metadataBytes,
 	})
 	if err != nil {
 		return Meta{}, err
