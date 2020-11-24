@@ -87,7 +87,7 @@ func TestGetObject(t *testing.T) {
 	})
 }
 
-func TestGetObjectStream(t *testing.T) {
+func TestDownloadObject(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		data := testrand.Bytes(32 * memory.KiB)
 
@@ -101,30 +101,15 @@ func TestGetObjectStream(t *testing.T) {
 		emptyBucket := storj.Bucket{
 			PathCipher: storj.EncNull,
 		}
-		_, err = db.GetObjectStream(ctx, emptyBucket, storj.Object{})
+		_, err = db.GetObject(ctx, emptyBucket, "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
-		_, err = db.GetObjectStream(ctx, bucket, storj.Object{})
+		_, err = db.GetObject(ctx, bucket, "")
 		assert.True(t, storj.ErrNoPath.Has(err))
 
-		nonExistingBucket := storj.Bucket{
-			Name:       "non-existing-bucket",
-			PathCipher: storj.EncNull,
-		}
-
-		// no error because we are not doing satellite connection with this method
-		_, err = db.GetObjectStream(ctx, nonExistingBucket, smallFile)
-		assert.NoError(t, err)
-
-		// no error because we are not doing satellite connection with this method
-		_, err = db.GetObjectStream(ctx, bucket, storj.Object{
-			Path: "non-existing-file",
-		})
-		assert.NoError(t, err)
-
-		assertStream(ctx, t, db, streams, bucket, emptyFile, []byte{})
-		assertStream(ctx, t, db, streams, bucket, smallFile, []byte("test"))
-		assertStream(ctx, t, db, streams, bucket, largeFile, data)
+		assertData(ctx, t, db, streams, bucket, emptyFile, []byte{})
+		assertData(ctx, t, db, streams, bucket, smallFile, []byte("test"))
+		assertData(ctx, t, db, streams, bucket, largeFile, data)
 
 		/* TODO: Disable stopping due to flakiness.
 		// Stop randomly half of the storage nodes and remove them from satellite's overlay
@@ -156,38 +141,16 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	err = upload.Close()
 	require.NoError(t, err)
 
-	err = obj.Commit(ctx)
+	info, err := db.GetObject(ctx, bucket, path)
 	require.NoError(t, err)
 
-	return obj.Info()
+	return info
 }
 
-func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
-	readOnly, err := db.GetObjectStream(ctx, bucket, object)
-	require.NoError(t, err)
-
-	assert.Equal(t, object.Path, readOnly.Info().Path)
-	assert.Equal(t, TestBucket, readOnly.Info().Bucket.Name)
-
-	segments, more, err := readOnly.Segments(ctx, 0, 0)
-	require.NoError(t, err)
-
-	assert.False(t, more)
-	if !assert.Equal(t, 1, len(segments)) {
-		return
-	}
-
-	assert.EqualValues(t, 0, segments[0].Index)
-	assert.EqualValues(t, len(content), segments[0].Size)
-	if segments[0].Size > 4*memory.KiB.Int64() {
-		assertRemoteSegment(t, segments[0])
-	} else {
-		assertInlineSegment(t, segments[0], content)
-	}
-
-	download := stream.NewDownload(ctx, readOnly, streams)
+func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
+	download := stream.NewDownload(ctx, object, streams)
 	defer func() {
-		err = download.Close()
+		err := download.Close()
 		assert.NoError(t, err)
 	}()
 
@@ -197,33 +160,6 @@ func assertStream(ctx context.Context, t *testing.T, db *metainfo.DB, streams *s
 
 	assert.Equal(t, len(content), n)
 	assert.Equal(t, content, data)
-}
-
-func assertInlineSegment(t *testing.T, segment storj.Segment, content []byte) {
-	assert.Equal(t, content, segment.Inline)
-	assert.True(t, segment.PieceID.IsZero())
-	assert.Equal(t, 0, len(segment.Pieces))
-}
-
-func assertRemoteSegment(t *testing.T, segment storj.Segment) {
-	assert.Nil(t, segment.Inline)
-	assert.NotNil(t, segment.PieceID)
-
-	// check that piece numbers and nodes are unique
-	nums := make(map[byte]struct{})
-	nodes := make(map[string]struct{})
-	for _, piece := range segment.Pieces {
-		if _, ok := nums[piece.Number]; ok {
-			t.Fatalf("piece number %d is not unique", piece.Number)
-		}
-		nums[piece.Number] = struct{}{}
-
-		id := piece.Location.String()
-		if _, ok := nodes[id]; ok {
-			t.Fatalf("node id %s is not unique", id)
-		}
-		nodes[id] = struct{}{}
-	}
 }
 
 func TestDeleteObject(t *testing.T) {
