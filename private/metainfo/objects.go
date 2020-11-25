@@ -120,7 +120,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.
 		return storj.Object{}, err
 	}
 
-	return objectFromInfo(ctx, bucket, path, encPath, object, db.encStore)
+	return db.objectFromRawObjectItem(ctx, bucket.Name, path, object)
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
@@ -261,7 +261,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		object, err := objectFromMeta(bucket, itemPath, item, stream, streamMeta)
+		object, err := db.objectFromRawObjectListItem(bucket.Name, itemPath, item, stream, streamMeta)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -303,26 +303,65 @@ func (db *DB) getObjectInfo(ctx context.Context, bucket storj.Bucket, path storj
 		return storj.Object{}, err
 	}
 
-	return objectFromInfo(ctx, bucket, path, encPath, objectInfo, db.encStore)
+	return db.objectFromRawObjectItem(ctx, bucket.Name, path, objectInfo)
 }
 
-func objectFromInfo(ctx context.Context, bucket storj.Bucket, path storj.Path, encPath paths.Encrypted, objectInfo storj.ObjectInfo, encStore *encryption.Store) (storj.Object, error) {
+func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path storj.Path, objectInfo RawObjectItem) (storj.Object, error) {
 	if objectInfo.Bucket == "" { // zero objectInfo
 		return storj.Object{}, nil
 	}
 
-	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket.Name, paths.NewUnencrypted(path), objectInfo.Metadata, encStore)
+	object := storj.Object{
+		Version:  0, // TODO:
+		Bucket:   storj.Bucket{Name: bucket},
+		Path:     path,
+		IsPrefix: false,
+
+		Created:  objectInfo.Modified, // TODO: use correct field
+		Modified: objectInfo.Modified, // TODO: use correct field
+		Expires:  objectInfo.Expires,  // TODO: use correct field
+
+		Stream: storj.Stream{
+			ID: objectInfo.StreamID,
+
+			RedundancyScheme:     objectInfo.RedundancyScheme,
+			EncryptionParameters: objectInfo.EncryptionParameters,
+		},
+	}
+
+	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(path), objectInfo.EncryptedMetadata, db.encStore)
 	if err != nil {
 		return storj.Object{}, err
 	}
 
-	return objectStreamFromMeta(bucket, path, objectInfo, streamInfo, streamMeta)
+	if object.Stream.EncryptionParameters.CipherSuite == storj.EncUnspecified {
+		object.Stream.EncryptionParameters = storj.EncryptionParameters{
+			CipherSuite: storj.CipherSuite(streamMeta.EncryptionType),
+			BlockSize:   streamMeta.EncryptionBlockSize,
+		}
+	}
+	if streamMeta.LastSegmentMeta != nil {
+		var nonce storj.Nonce
+		copy(nonce[:], streamMeta.LastSegmentMeta.KeyNonce)
+
+		object.Stream.LastSegment = storj.LastSegment{
+			EncryptedKeyNonce: nonce,
+			EncryptedKey:      streamMeta.LastSegmentMeta.EncryptedKey,
+		}
+	}
+
+	err = updateObjectWithStream(&object, streamInfo, streamMeta)
+	if err != nil {
+		return storj.Object{}, err
+	}
+
+	return object, nil
 }
 
-func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
+func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
 	object := storj.Object{
 		Version:  0, // TODO:
-		Bucket:   bucket,
+		Bucket:   storj.Bucket{Name: bucket},
 		Path:     path,
 		IsPrefix: listItem.IsPrefix,
 
@@ -337,47 +376,6 @@ func objectFromMeta(bucket storj.Bucket, path storj.Path, listItem storj.ObjectL
 	}
 
 	return object, nil
-}
-
-func objectStreamFromMeta(bucket storj.Bucket, path storj.Path, objectInfo storj.ObjectInfo, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
-	var nonce storj.Nonce
-	var encryptedKey storj.EncryptedPrivateKey
-	if streamMeta.LastSegmentMeta != nil {
-		copy(nonce[:], streamMeta.LastSegmentMeta.KeyNonce)
-		encryptedKey = streamMeta.LastSegmentMeta.EncryptedKey
-	}
-
-	rv := storj.Object{
-		Version:  0, // TODO:
-		Bucket:   bucket,
-		Path:     path,
-		IsPrefix: false,
-
-		Created:  objectInfo.Modified, // TODO: use correct field
-		Modified: objectInfo.Modified, // TODO: use correct field
-		Expires:  objectInfo.Expires,  // TODO: use correct field
-
-		Stream: storj.Stream{
-			ID: objectInfo.StreamID,
-
-			RedundancyScheme: objectInfo.Stream.RedundancyScheme,
-			EncryptionParameters: storj.EncryptionParameters{
-				CipherSuite: storj.CipherSuite(streamMeta.EncryptionType),
-				BlockSize:   streamMeta.EncryptionBlockSize,
-			},
-			LastSegment: storj.LastSegment{
-				EncryptedKeyNonce: nonce,
-				EncryptedKey:      encryptedKey,
-			},
-		},
-	}
-
-	err := updateObjectWithStream(&rv, stream, streamMeta)
-	if err != nil {
-		return storj.Object{}, err
-	}
-
-	return rv, nil
 }
 
 func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamMeta pb.StreamMeta) error {
@@ -403,7 +401,10 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 
 	segmentCount := streamMeta.NumberOfSegments
 	object.Metadata = serializableMeta.UserDefined
-	object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+
+	if object.Stream.Size == 0 {
+		object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+	}
 	object.Stream.SegmentCount = segmentCount
 	object.Stream.FixedSegmentSize = stream.SegmentsSize
 	object.Stream.LastSegment.Size = stream.LastSegmentSize

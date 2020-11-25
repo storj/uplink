@@ -497,7 +497,7 @@ func (params *GetObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // GetObjectResponse response for GetObject request.
 type GetObjectResponse struct {
-	Info storj.ObjectInfo
+	Info RawObjectItem
 }
 
 func newGetObjectResponse(response *pb.ObjectGetResponse) GetObjectResponse {
@@ -506,33 +506,31 @@ func newGetObjectResponse(response *pb.ObjectGetResponse) GetObjectResponse {
 	}
 }
 
-func newObjectInfo(object *pb.Object) storj.ObjectInfo {
+func newObjectInfo(object *pb.Object) RawObjectItem {
 	if object == nil {
-		return storj.ObjectInfo{}
+		return RawObjectItem{}
 	}
 
-	info := storj.ObjectInfo{
-		Bucket: string(object.Bucket),
-		Path:   storj.Path(object.EncryptedPath),
+	info := RawObjectItem{
+		Bucket:        string(object.Bucket),
+		EncryptedPath: object.EncryptedPath,
 
 		StreamID: object.StreamId,
 
-		Created:  object.CreatedAt,
-		Modified: object.CreatedAt,
-		Expires:  object.ExpiresAt,
-		Metadata: object.EncryptedMetadata,
-		Stream: storj.Stream{
-			Size: object.TotalSize,
-			EncryptionParameters: storj.EncryptionParameters{
-				CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),
-				BlockSize:   int32(object.EncryptionParameters.BlockSize),
-			},
+		Created:           object.CreatedAt,
+		Modified:          object.CreatedAt,
+		Expires:           object.ExpiresAt,
+		EncryptedMetadata: object.EncryptedMetadata,
+
+		EncryptionParameters: storj.EncryptionParameters{
+			CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),
+			BlockSize:   int32(object.EncryptionParameters.BlockSize),
 		},
 	}
 
 	pbRS := object.RedundancyScheme
 	if pbRS != nil {
-		info.Stream.RedundancyScheme = storj.RedundancyScheme{
+		info.RedundancyScheme = storj.RedundancyScheme{
 			Algorithm:      storj.RedundancyAlgorithm(pbRS.Type),
 			ShareSize:      pbRS.ErasureShareSize,
 			RequiredShares: int16(pbRS.MinReq),
@@ -545,16 +543,16 @@ func newObjectInfo(object *pb.Object) storj.ObjectInfo {
 }
 
 // GetObject gets single object.
-func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ storj.ObjectInfo, err error) {
+func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.GetObject(ctx, params.toRequest(client.header()))
 
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.ObjectInfo{}, storj.ErrObjectNotFound.Wrap(err)
+			return RawObjectItem{}, storj.ErrObjectNotFound.Wrap(err)
 		}
-		return storj.ObjectInfo{}, Error.Wrap(err)
+		return RawObjectItem{}, Error.Wrap(err)
 	}
 
 	getResponse := newGetObjectResponse(response)
@@ -630,16 +628,16 @@ func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginD
 }
 
 // BeginDeleteObject begins object deletion process.
-func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ storj.ObjectInfo, err error) {
+func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	// response.StreamID is not processed because satellite will always return nil
 	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.ObjectInfo{}, storj.ErrObjectNotFound.Wrap(err)
+			return RawObjectItem{}, storj.ErrObjectNotFound.Wrap(err)
 		}
-		return storj.ObjectInfo{}, Error.Wrap(err)
+		return RawObjectItem{}, Error.Wrap(err)
 	}
 
 	return newObjectInfo(response.Object), nil
@@ -680,12 +678,12 @@ func (params *ListObjectsParams) BatchItem() *pb.BatchRequestItem {
 
 // ListObjectsResponse response for ListObjects request.
 type ListObjectsResponse struct {
-	Items []storj.ObjectListItem
+	Items []RawObjectListItem
 	More  bool
 }
 
 func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []byte, recursive bool) ListObjectsResponse {
-	objects := make([]storj.ObjectListItem, len(response.Items))
+	objects := make([]RawObjectListItem, len(response.Items))
 	for i, object := range response.Items {
 		encryptedPath := object.EncryptedPath
 		isPrefix := false
@@ -693,7 +691,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			isPrefix = true
 		}
 
-		objects[i] = storj.ObjectListItem{
+		objects[i] = RawObjectListItem{
 			EncryptedPath:          object.EncryptedPath,
 			Version:                object.Version,
 			Status:                 int32(object.Status),
@@ -714,12 +712,12 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 }
 
 // ListObjects lists objects according to specific parameters.
-func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []storj.ObjectListItem, more bool, err error) {
+func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []RawObjectListItem, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.ListObjects(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return []storj.ObjectListItem{}, false, Error.Wrap(err)
+		return []RawObjectListItem{}, false, Error.Wrap(err)
 	}
 
 	listResponse := newListObjectsResponse(response, params.EncryptedPrefix, params.Recursive)
