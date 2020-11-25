@@ -38,10 +38,17 @@ type MultipartObjectOptions struct {
 	CustomMetadata CustomMetadata
 }
 
+// ListPartsResult contains the result of a list object parts query.
+type ListPartsResult struct {
+	Items []PartInfo
+	More  bool
+}
+
 // PartInfo contains information about uploaded part.
 type PartInfo struct {
-	PartNumber int
-	Size       int64
+	PartNumber   int
+	Size         int64
+	LastModified time.Time
 }
 
 // NewMultipartUpload begins new multipart upload.
@@ -349,4 +356,59 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 		return convertKnownErrors(err, bucket, key)
 	}
 	return nil
+}
+
+// ListParts lists  the  parts  that have been uploaded for a specific multipart upload.
+// TODO: For now, maxParts is not correctly handled as the limit is applied to the number of segments we retrieve.
+func (project *Project) ListParts(ctx context.Context, bucket, key, streamID string, partCursor, maxParts int) (infos ListPartsResult, err error) {
+	defer mon.Func().RestartTrace(&ctx)(&err)
+
+	if bucket == "" {
+		return ListPartsResult{}, ErrBucketNameInvalid
+	}
+
+	if key == "" {
+		return ListPartsResult{}, ErrObjectKeyInvalid
+	}
+
+	decodedStreamID, version, err := base58.CheckDecode(streamID)
+	if err != nil || version != 1 {
+		return ListPartsResult{}, errors.New("invalid streamID format")
+	}
+
+	id, err := storj.StreamIDFromBytes(decodedStreamID)
+	if err != nil {
+		return ListPartsResult{}, packageError.Wrap(err)
+	}
+
+	listResult, err := project.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
+		StreamID: id,
+		Cursor:   storj.SegmentPosition{PartNumber: int32(partCursor), Index: 0},
+		Limit:    int32(maxParts), // TODO: handle limit correctly
+	})
+
+	if err != nil {
+		return ListPartsResult{}, convertKnownErrors(err, bucket, key)
+	}
+
+	partInfosMap := make(map[int]PartInfo)
+
+	for _, item := range listResult.Items {
+		partNumber := int(item.Position.PartNumber)
+		_, exists := partInfosMap[partNumber]
+		if !exists {
+			partInfosMap[partNumber] = PartInfo{
+				PartNumber:   partNumber,
+				LastModified: time.Now(), // TODO: handle last modified time correctly
+			}
+		}
+	}
+
+	partInfos := make([]PartInfo, 0, len(partInfosMap))
+
+	for _, partInfo := range partInfosMap {
+		partInfos = append(partInfos, partInfo)
+	}
+
+	return ListPartsResult{Items: partInfos, More: listResult.More}, nil
 }

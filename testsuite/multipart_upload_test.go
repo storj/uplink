@@ -245,3 +245,90 @@ func TestProject_PutObjectPart(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestProject_ListParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 50*memory.KiB)
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
+		require.NoError(t, err)
+
+		project, err := uplinkConfig.OpenProject(newCtx, access)
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}()
+
+		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
+		firstPartLen := int(float32(len(randData)) * 0.3)
+		source1 := bytes.NewBuffer(randData[:firstPartLen])
+		source2 := bytes.NewBuffer(randData[firstPartLen:])
+
+		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.StreamID)
+
+		{
+			_, err = project.ListParts(newCtx, "", "multipart-object", info.StreamID, 1, 10)
+			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+
+			_, err = project.ListParts(newCtx, "testbucket", "", info.StreamID, 1, 10)
+			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
+
+			// empty streamID
+			_, err = project.ListParts(newCtx, "testbucket", "multipart-object", "", 1, 10)
+			require.Error(t, err)
+		}
+
+		// list multipart upload with no uploaded parts
+		parts, err := project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(parts.Items))
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source2)
+		require.NoError(t, err)
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 5, source1)
+		require.NoError(t, err)
+
+		// list parts of on going multipart upload
+		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(parts.Items))
+
+		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
+		require.NoError(t, err)
+
+		// list parts of a completed multipart upload
+		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(parts.Items))
+		// TODO: this should pass once we correctly handle the maxParts parameter
+		// require.Equal(t, false, parts.More)
+
+		// list parts with a limit of 1
+		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(parts.Items))
+		// TODO: this should pass once we correctly handle the maxParts parameter
+		// require.Equal(t, false, parts.More)
+
+		// list parts with a cursor starting after all parts
+		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 6, 10)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(parts.Items))
+		require.Equal(t, false, parts.More)
+	})
+}
