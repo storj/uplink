@@ -13,7 +13,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/storage"
+	"storj.io/storj/satellite/metainfo/metabase"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -44,8 +44,16 @@ func TestWithMaxSegmentSize_Upload(t *testing.T) {
 		require.Equal(t, expectedData, data)
 
 		// verify we have two segments instead of one
-		keys, err := planet.Satellites[0].Metainfo.Database.List(ctx, storage.Key{}, -1)
+		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "super-bucket")
 		require.NoError(t, err)
-		require.Equal(t, 2, len(keys.Strings()))
+		require.Len(t, objects, 1)
+
+		segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+			ProjectID:  planet.Uplinks[0].Projects[0].ID,
+			BucketName: "super-bucket",
+			ObjectKey:  objects[0].ObjectKey,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 2, len(segments))
 	})
 }

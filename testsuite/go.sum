@@ -861,5 +861,7 @@ storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b h1:Bbg9JCtY6l3HrDxs3BX
 storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
 storj.io/private v0.0.0-20201026143115-bc926bfa3bca h1:ekR7vtUYC5+cDyim0ZJaSZeXidyzQqDYsnFPYXgTozc=
 storj.io/private v0.0.0-20201026143115-bc926bfa3bca/go.mod h1:EaLnIyNyqWQUJB+7+KWVez0In9czl0nHHlm2WobebuA=
-storj.io/storj v0.12.1-0.20201201091214-46839b992a21 h1:p3eDdZ+QhQ4HishKLra4JllWyZpptE6j80S8WsUCm1M=
-storj.io/storj v0.12.1-0.20201201091214-46839b992a21/go.mod h1:V9WscZLqdCqE7Qk7scftQq4G2PcinxcEJ0PgOo7nXSw=
+storj.io/storj v0.12.1-0.20201201124408-e4c4ab06ba2e h1:Bihl/W+mWApYrZ9iwVEhVX/1Fi7LpSvHhYztzfzzm5A=
+storj.io/storj v0.12.1-0.20201201124408-e4c4ab06ba2e/go.mod h1:V9WscZLqdCqE7Qk7scftQq4G2PcinxcEJ0PgOo7nXSw=
+storj.io/storj v0.12.1-0.20201201140144-f08e34f15e48 h1:/qASF9pmVySO0AQaR4DPuyQn2w2V1GWu0pSxFq6T4sg=
+storj.io/storj v0.12.1-0.20201201140144-f08e34f15e48/go.mod h1:V9WscZLqdCqE7Qk7scftQq4G2PcinxcEJ0PgOo7nXSw=

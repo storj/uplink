@@ -409,9 +409,11 @@ func TestListObjects(t *testing.T) {
 
 			if assert.NoError(t, err, errTag) {
 				assert.Equal(t, tt.more, list.More, errTag)
-				for i, item := range list.Items {
-					assert.Equal(t, tt.result[i], item.Path, errTag)
-					assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
+				if assert.Len(t, list.Items, len(tt.result), errTag) {
+					for i, item := range list.Items {
+						assert.Equal(t, tt.result[i], item.Path, errTag)
+						assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
+					}
 				}
 			}
 		}
