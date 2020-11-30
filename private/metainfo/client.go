@@ -521,6 +521,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 
 		Created:           object.CreatedAt,
 		Modified:          object.CreatedAt,
+		PlainSize:         object.PlainSize,
 		Expires:           object.ExpiresAt,
 		EncryptedMetadata: object.EncryptedMetadata,
 
@@ -702,6 +703,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			StatusAt:               object.StatusAt,
 			CreatedAt:              object.CreatedAt,
 			ExpiresAt:              object.ExpiresAt,
+			PlainSize:              object.PlainSize,
 			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
 			EncryptedMetadata:      object.EncryptedMetadata,
 

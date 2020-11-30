@@ -304,18 +304,7 @@ func (db *DB) getObjectInfo(ctx context.Context, bucket storj.Bucket, path storj
 		return storj.Object{}, err
 	}
 
-	listResult, err := db.metainfo.ListSegments(ctx, ListSegmentsParams{
-		StreamID: objectInfo.StreamID,
-	})
-	// TODO ugly workaround for lack of plain object size
-	plainSize := int64(0)
-	for _, item := range listResult.Items {
-		plainSize += item.PlainSize
-	}
-
-	object, err := db.objectFromRawObjectItem(ctx, bucket.Name, path, objectInfo)
-	object.Stream.Size = plainSize
-	return object, err
+	return db.objectFromRawObjectItem(ctx, bucket.Name, path, objectInfo)
 }
 
 func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path storj.Path, objectInfo RawObjectItem) (storj.Object, error) {
@@ -335,6 +324,8 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path s
 
 		Stream: storj.Stream{
 			ID: objectInfo.StreamID,
+
+			Size: objectInfo.PlainSize,
 
 			RedundancyScheme:     objectInfo.RedundancyScheme,
 			EncryptionParameters: objectInfo.EncryptionParameters,
@@ -380,6 +371,10 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field
 		Expires:  listItem.ExpiresAt,
+
+		Stream: storj.Stream{
+			Size: listItem.PlainSize,
+		},
 	}
 
 	object.Stream.ID = listItem.StreamID

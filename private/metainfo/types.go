@@ -21,6 +21,8 @@ type RawObjectItem struct {
 	Modified time.Time
 	Expires  time.Time
 
+	PlainSize int64
+
 	EncryptedMetadataNonce storj.Nonce
 	EncryptedMetadata      []byte
 
