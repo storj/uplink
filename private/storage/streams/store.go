@@ -43,20 +43,19 @@ type Metadata interface {
 // Store is a store for streams. It implements typedStore as part of an ongoing migration
 // to use typed paths. See the shim for the store that the rest of the world interacts with.
 type Store struct {
-	metainfo                *metainfo.Client
-	ec                      ecclient.Client
-	segmentSize             int64
-	encStore                *encryption.Store
-	encryptionParameters    storj.EncryptionParameters
-	inlineThreshold         int
-	maxEncryptedSegmentSize int64
+	metainfo             *metainfo.Client
+	ec                   ecclient.Client
+	segmentSize          int64
+	encStore             *encryption.Store
+	encryptionParameters storj.EncryptionParameters
+	inlineThreshold      int
 
 	rngMu sync.Mutex
 	rng   *mathrand.Rand
 }
 
 // NewStreamStore constructs a stream store.
-func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int, maxEncryptedSegmentSize int64) (*Store, error) {
+func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int) (*Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
@@ -65,14 +64,13 @@ func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize i
 	}
 
 	return &Store{
-		metainfo:                metainfo,
-		ec:                      ec,
-		segmentSize:             segmentSize,
-		encStore:                encStore,
-		encryptionParameters:    encryptionParameters,
-		inlineThreshold:         inlineThreshold,
-		maxEncryptedSegmentSize: maxEncryptedSegmentSize,
-		rng:                     mathrand.New(mathrand.NewSource(time.Now().UnixNano())),
+		metainfo:             metainfo,
+		ec:                   ec,
+		segmentSize:          segmentSize,
+		encStore:             encStore,
+		encryptionParameters: encryptionParameters,
+		inlineThreshold:      inlineThreshold,
+		rng:                  mathrand.New(mathrand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -125,6 +123,11 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 
 		requestsToBatch = make([]metainfo.BatchItem, 0, 2)
 	)
+
+	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
+	if err != nil {
+		return Meta{}, err
+	}
 
 	eofReader := NewEOFReader(data)
 	for !eofReader.isEOF() && !eofReader.hasError() {
@@ -183,7 +186,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
 			beginSegment := &metainfo.BeginSegmentParams{
-				MaxOrderLimit: s.maxEncryptedSegmentSize,
+				MaxOrderLimit: maxEncryptedSegmentSize,
 				Position: storj.SegmentPosition{
 					Index: int32(currentSegment),
 				},
