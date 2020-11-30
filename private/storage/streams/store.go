@@ -74,6 +74,11 @@ func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize i
 	}, nil
 }
 
+// Close closes the underlying resources passed to the metainfo DB.
+func (s *Store) Close() error {
+	return s.metainfo.Close()
+}
+
 // Put breaks up data as it comes in into s.segmentSize length pieces, then
 // store the first piece at s0/<path>, second piece at s1/<path>, and the
 // *last* piece at l/<path>. Store the given metadata, along with the number

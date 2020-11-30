@@ -98,29 +98,31 @@ func (objects *ObjectIterator) Next() bool {
 }
 
 func (objects *ObjectIterator) loadNext() bool {
-	ok, err := func() (ok bool, err error) {
-		db, cleanup, err := objects.project.getMetainfoDB(objects.ctx)
-		if err != nil {
-			return false, err
-		}
-		defer func() { err = errs.Combine(err, cleanup()) }()
-
-		list, err := db.ListObjects(objects.ctx, objects.bucket, objects.options)
-		if err != nil {
-			return false, err
-		}
-		objects.list = &list
-		if list.More {
-			objects.options = objects.options.NextPage(list)
-		}
-		objects.position = 0
-		return len(list.Items) > 0, nil
-	}()
+	ok, err := objects.tryLoadNext()
 	if err != nil {
-		objects.err = convertKnownErrors(err, objects.bucket.Name, "")
+		objects.err = err
 		return false
 	}
 	return ok
+}
+
+func (objects *ObjectIterator) tryLoadNext() (ok bool, err error) {
+	db, err := objects.project.getMetainfoDB(objects.ctx)
+	if err != nil {
+		return false, convertKnownErrors(err, objects.bucket.Name, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	list, err := db.ListObjects(objects.ctx, objects.bucket, objects.options)
+	if err != nil {
+		return false, convertKnownErrors(err, objects.bucket.Name, "")
+	}
+	objects.list = &list
+	if list.More {
+		objects.options = objects.options.NextPage(list)
+	}
+	objects.position = 0
+	return len(list.Items) > 0, nil
 }
 
 // Err returns error, if one happened during iteration.

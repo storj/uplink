@@ -13,6 +13,7 @@ import (
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
 
@@ -44,11 +45,11 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	// closing it earlier has the benefit of returning a connection to
 	// the pool, so we try to do that as early as possible.
 
-	db, dbCleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, key)
 	}
-	defer func() { err = errs.Combine(err, dbCleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	b := storj.Bucket{Name: bucket}
 	obj, err := db.CreateObject(ctx, b, key, nil)
@@ -73,16 +74,16 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	}
 
 	// Return the connection to the pool as soon as we can.
-	if err := dbCleanup(); err != nil {
+	if err := db.Close(); err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
-	streams, streamsCleanup, err := project.getStreamsStore(ctx)
+	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
-	upload.cleanup = streamsCleanup
+	upload.streams = streams
 	upload.upload = stream.NewUpload(ctx, mutableStream, streams)
 
 	return upload, nil
@@ -99,12 +100,13 @@ func (dyn dynamicMetadata) Metadata() ([]byte, error) {
 // Upload is an upload to Storj Network.
 type Upload struct {
 	mu      sync.Mutex
+	closed  bool
 	aborted bool
 	cancel  context.CancelFunc
 	upload  *stream.Upload
 	bucket  string
 	object  *Object
-	cleanup func() error
+	streams *streams.Store
 }
 
 // Info returns the last information about the uploaded object.
@@ -131,22 +133,20 @@ func (upload *Upload) Commit() error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
-	// we always want to call cleanup, but only after everything has happened
-	defer func() {
-		if upload.cleanup != nil {
-			_ = upload.cleanup()
-			upload.cleanup = nil
-		}
-	}()
-
 	if upload.aborted {
 		return errwrapf("%w: already aborted", ErrUploadDone)
 	}
 
-	err := upload.upload.Close()
-	if err != nil && errs.Unwrap(err).Error() == "already closed" {
+	if upload.closed {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
+
+	upload.closed = true
+
+	err := errs.Combine(
+		upload.upload.Close(),
+		upload.streams.Close(),
+	)
 
 	return convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
@@ -158,15 +158,7 @@ func (upload *Upload) Abort() error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
-	// we always want to call cleanup, but only after everything has happened
-	defer func() {
-		if upload.cleanup != nil {
-			_ = upload.cleanup()
-			upload.cleanup = nil
-		}
-	}()
-
-	if upload.upload.Meta() != nil {
+	if upload.closed {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
@@ -176,7 +168,13 @@ func (upload *Upload) Abort() error {
 
 	upload.aborted = true
 	upload.cancel()
-	return upload.upload.Abort()
+
+	err := errs.Combine(
+		upload.upload.Abort(),
+		upload.streams.Close(),
+	)
+
+	return convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
 
 // SetCustomMetadata updates custom metadata to be included with the object.
@@ -187,6 +185,9 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 
 	if upload.aborted {
 		return errwrapf("%w: upload aborted", ErrUploadDone)
+	}
+	if upload.closed {
+		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 	if upload.upload.Meta() != nil {
 		return errwrapf("%w: already committed", ErrUploadDone)

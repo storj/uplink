@@ -37,11 +37,11 @@ type Bucket struct {
 func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, cleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, "")
 	}
-	defer func() { err = errs.Combine(err, cleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	b, err := db.GetBucket(ctx, bucket)
 	if err != nil {
@@ -60,11 +60,11 @@ func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bu
 func (project *Project) CreateBucket(ctx context.Context, bucket string) (created *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, cleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, "")
 	}
-	defer func() { err = errs.Combine(err, cleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	b, err := db.CreateBucket(ctx, bucket)
 	if err != nil {
@@ -108,11 +108,11 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, cleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, "")
 	}
-	defer func() { err = errs.Combine(err, cleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	existing, err := db.DeleteBucket(ctx, bucket, false)
 	if err != nil {
@@ -136,11 +136,11 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, cleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, "")
 	}
-	defer func() { err = errs.Combine(err, cleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	existing, err := db.DeleteBucket(ctx, bucket, true)
 	if err != nil {

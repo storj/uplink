@@ -132,12 +132,12 @@ func (project *Project) Close() (err error) {
 	return packageError.Wrap(err)
 }
 
-func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, _ func() error, err error) {
+func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := project.getMetainfoClient(ctx)
 	if err != nil {
-		return nil, nil, packageError.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 	defer func() {
 		if err != nil {
@@ -159,21 +159,21 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		project.encryptionParameters,
 		maxInlineSize)
 	if err != nil {
-		return nil, nil, packageError.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
-	return streamStore, metainfoClient.Close, err
+	return streamStore, nil
 }
 
-func (project *Project) getMetainfoDB(ctx context.Context) (_ *metainfo.DB, _ func() error, err error) {
+func (project *Project) getMetainfoDB(ctx context.Context) (_ *metainfo.DB, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := project.getMetainfoClient(ctx)
 	if err != nil {
-		return nil, nil, packageError.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 
-	return metainfo.New(metainfoClient, project.access.encAccess.Store), metainfoClient.Close, nil
+	return metainfo.New(metainfoClient, project.access.encAccess.Store), nil
 }
 
 func (project *Project) getMetainfoClient(ctx context.Context) (_ *metainfo.Client, err error) {

@@ -5,11 +5,11 @@ package uplink
 
 import (
 	"context"
-	"sync"
 
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
 
@@ -44,11 +44,11 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	// closing it earlier has the benefit of returning a connection to
 	// the pool, so we try to do that as early as possible.
 
-	db, dbCleanup, err := project.getMetainfoDB(ctx)
+	db, err := project.getMetainfoDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, convertKnownErrors(err, bucket, key)
 	}
-	defer func() { err = errs.Combine(err, dbCleanup()) }()
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	obj, err := db.GetObject(ctx, b, key)
 	if err != nil {
@@ -56,17 +56,17 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	}
 
 	// Return the connection to the pool as soon as we can.
-	if err := dbCleanup(); err != nil {
+	if err := db.Close(); err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
-	streams, streamsCleanup, err := project.getStreamsStore(ctx)
+	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
 	return &Download{
-		cleanup:  streamsCleanup,
+		streams:  streams,
 		download: stream.NewDownloadRange(ctx, obj, streams, options.Offset, options.Length),
 		object:   convertObject(&obj),
 	}, nil
@@ -74,10 +74,9 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 // Download is a download from Storj Network.
 type Download struct {
-	mu       sync.Mutex
 	download *stream.Download
 	object   *Object
-	cleanup  func() error
+	streams  *streams.Store
 }
 
 // Info returns the last information about the object.
@@ -93,16 +92,8 @@ func (download *Download) Read(p []byte) (n int, err error) {
 
 // Close closes the reader of the download.
 func (download *Download) Close() error {
-	download.mu.Lock()
-	defer download.mu.Unlock()
-
-	// we always want to call cleanup, but only after everything has happened
-	defer func() {
-		if download.cleanup != nil {
-			_ = download.cleanup()
-			download.cleanup = nil
-		}
-	}()
-
-	return download.download.Close()
+	return errs.Combine(
+		download.download.Close(),
+		download.streams.Close(),
+	)
 }
