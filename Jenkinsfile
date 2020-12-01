@@ -98,9 +98,7 @@ pipeline {
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         dir('testsuite'){
                             sh 'go vet ./...'
-                            catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                                sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
-                            }
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
                         // TODO enable this later 
                         // sh 'check-clean-directory'
@@ -138,16 +136,15 @@ pipeline {
                 //     }
                 // }
 
-                // TODO enable when uplink tests will be passing
-                // stage('Integration [tools]') {
-                //     environment {
-                //         STORJ_SIM_POSTGRES = 'postgres://postgres@localhost/teststorj3?sslmode=disable'
-                //     }
-                //     steps {
-                //         sh 'psql -U postgres -c \'create database teststorj3;\''
-                //         sh './testsuite/scripts/test-sim.sh'
-                //     }
-                // }
+                stage('Integration [tools]') {
+                    environment {
+                        STORJ_SIM_POSTGRES = 'postgres://postgres@localhost/teststorj3?sslmode=disable'
+                    }
+                    steps {
+                        sh 'psql -U postgres -c \'create database teststorj3;\''
+                        sh './testsuite/scripts/test-sim.sh'
+                    }
+                }
             }
         }
     }

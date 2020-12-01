@@ -130,10 +130,6 @@ func TestAbortUpload(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		upload, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
 		require.NoError(t, err)
