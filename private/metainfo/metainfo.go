@@ -29,6 +29,11 @@ func New(metainfo *Client, encStore *encryption.Store) *DB {
 	}
 }
 
+// Close closes the underlying resources passed to the metainfo DB.
+func (db *DB) Close() error {
+	return db.metainfo.Close()
+}
+
 // CreateBucket creates a new bucket with the specified information.
 func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket storj.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)

@@ -14,7 +14,6 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/socket"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
 )
 
 // Config defines configuration for using uplink library.
@@ -30,13 +29,13 @@ type Config struct {
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ *metainfo.Client, _ rpc.Dialer, fullNodeURL string, err error) {
+func (config Config) getDialer(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ rpc.Dialer, fullNodeURL string, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
 		Difficulty:  0,
 		Concurrency: 1,
 	})
 	if err != nil {
-		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
 	tlsConfig := tlsopts.Config{
@@ -46,10 +45,10 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
 	if err != nil {
-		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
-	dialer := rpc.NewDefaultDialer(tlsOptions)
+	dialer := rpc.NewDefaultPooledDialer(tlsOptions)
 	dialer.DialTimeout = config.DialTimeout
 	dialContext := config.DialContext
 	if dialContext == nil {
@@ -59,7 +58,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 
 	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
 	if err != nil {
-		return nil, rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, "", packageError.Wrap(err)
 	}
 
 	// Node id is required in satelliteNodeID for all unknown (non-storj) satellites.
@@ -67,7 +66,7 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 	if nodeURL.ID.IsZero() {
 		nodeID, found := rpc.KnownNodeID(nodeURL.Address)
 		if !found {
-			return nil, rpc.Dialer{}, "", packageError.New("node id is required in satelliteNodeURL")
+			return rpc.Dialer{}, "", packageError.New("node id is required in satelliteNodeURL")
 		}
 		satelliteAddress = storj.NodeURL{
 			ID:      nodeID,
@@ -75,7 +74,5 @@ func (config Config) dial(ctx context.Context, satelliteAddress string, apiKey *
 		}.String()
 	}
 
-	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteAddress, apiKey, config.UserAgent)
-
-	return metainfo, dialer, satelliteAddress, packageError.Wrap(err)
+	return dialer, satelliteAddress, packageError.Wrap(err)
 }

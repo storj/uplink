@@ -100,17 +100,31 @@ func TestCustomDialContext(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		config := uplink.Config{
-			DialContext: badDialContext,
-		}
-		_, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
-		require.Error(t, err)
+		{
+			config := uplink.Config{
+				DialContext: badDialContext,
+			}
 
-		config = uplink.Config{
-			DialContext: (new(net.Dialer)).DialContext,
+			project, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			_, err = project.EnsureBucket(ctx, "bucket")
+			require.Error(t, err)
 		}
-		_, err = config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
-		require.NoError(t, err)
+
+		{
+			config := uplink.Config{
+				DialContext: (new(net.Dialer)).DialContext,
+			}
+
+			project, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			_, err = project.EnsureBucket(ctx, "bucket")
+			require.NoError(t, err)
+		}
 	})
 }
 

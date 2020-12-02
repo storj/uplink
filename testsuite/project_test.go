@@ -26,7 +26,11 @@ func TestProject_OpenProjectDialFail(t *testing.T) {
 		err = planet.StopPeer(planet.Satellites[0])
 		require.NoError(t, err)
 
-		_, err = uplink.OpenProject(ctx, access)
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.EnsureBucket(ctx, "bucket")
 		require.Error(t, err)
 	})
 }
