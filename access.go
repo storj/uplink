@@ -87,6 +87,11 @@ func ParseAccess(access string) (*Access, error) {
 	}, nil
 }
 
+// SatelliteAddress returns the satellite node URL for this access grant.
+func (access *Access) SatelliteAddress() string {
+	return access.satelliteAddress
+}
+
 // Serialize serializes an access grant such that it can be used later with
 // ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
@@ -137,7 +142,13 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 		return nil, packageError.Wrap(err)
 	}
 
-	metainfo, _, fullNodeURL, err := config.dial(ctx, satelliteAddress, parsedAPIKey)
+	dialer, fullNodeURL, err := config.getDialer(ctx, satelliteAddress, parsedAPIKey)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
+
+	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteAddress, parsedAPIKey, config.UserAgent)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -265,7 +276,13 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	return project.metainfo.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	return metainfoClient.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
 		APIKey: access.apiKey.SerializeRaw(),
 	})
 }

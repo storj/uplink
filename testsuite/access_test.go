@@ -27,6 +27,31 @@ import (
 	privateAccess "storj.io/uplink/private/access"
 )
 
+func TestAccessSatelliteAddress(t *testing.T) {
+	t.Run("existing access", func(t *testing.T) {
+		access, err := uplink.ParseAccess("12edqwjdy4fmoHasYrxLzmu8Ubv8Hsateq1LPYne6Jzd64qCsYgET53eJzhB4L2pWDKBpqMowxt8vqLCbYxu8Qz7BJVH1CvvptRt9omm24k5GAq1R99mgGjtmc6yFLqdEFgdevuQwH5yzXCEEtbuBYYgES8Stb1TnuSiU3sa62bd2G88RRgbTCtwYrB8HZ7CLjYWiWUphw7RNa3NfD1TW6aUJ6E5D1F9AM6sP58X3D4H7tokohs2rqCkwRT")
+		require.NoError(t, err)
+
+		require.Equal(t, "1ds2WEsr2Frv8AFcPkdHfCdUjDrnGpb6y4rpADpX32TXzxg57k@127.0.0.1:44819", access.SatelliteAddress())
+	})
+
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		t.Run("new access", func(t *testing.T) {
+			uplinkConfig := uplink.Config{}
+
+			projectInfo := planet.Uplinks[0].Projects[0]
+			access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
+			require.NoError(t, err)
+
+			require.Equal(t, projectInfo.Satellite.NodeURL().String(), access.SatelliteAddress())
+		})
+	})
+}
+
 func TestSharePermissions(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,

@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"storj.io/common/encryption"
 	"storj.io/common/memory"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
@@ -27,15 +26,12 @@ var maxSegmentSize string
 
 // Project provides access to managing buckets and objects.
 type Project struct {
-	config      Config
-	access      *Access
-	dialer      rpc.Dialer
-	metainfo    *metainfo.Client
-	db          *metainfo.DB
-	streams     *streams.Store
-	ec          ecclient.Client
-	encryption  storj.EncryptionParameters
-	segmentSize int64
+	config               Config
+	access               *Access
+	dialer               rpc.Dialer
+	ec                   ecclient.Client
+	segmentSize          int64
+	encryptionParameters storj.EncryptionParameters
 
 	eg        *errgroup.Group
 	telemetry telemetryclient.Client
@@ -68,17 +64,34 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}()
 	}
 
-	metainfoClient, dialer, _, err := config.dial(ctx, access.satelliteAddress, access.apiKey)
+	dialer, _, err := config.getDialer(ctx, access.satelliteAddress, access.apiKey)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
+	var eg errgroup.Group
+	if telemetry != nil {
+		eg.Go(func() error {
+			telemetry.Run(ctx)
+			return nil
+		})
+	}
+
+	// TODO: This should come from the EncryptionAccess. For now it's hardcoded to twice the
+	// stripe size of the default redundancy scheme on the satellite.
+	encBlockSize := 29 * 256 * memory.B.Int32()
+
+	encryptionParameters := storj.EncryptionParameters{
+		// TODO: the cipher should be provided by the Access, but we don't store it there yet.
+		CipherSuite: storj.EncAESGCM,
+		BlockSize:   encBlockSize,
+	}
+
 	// TODO: All these should be controlled by the satellite and not configured by the uplink.
 	// For now we need to have these hard coded values that match the satellite configuration
-	// to be able to create the underlying ecclient, segement store and stream store.
+	// to be able to create the underlying stream store.
 	var (
-		segmentsSize  = 64 * memory.MiB.Int64()
-		maxInlineSize = 4 * memory.KiB.Int()
+		segmentsSize = 64 * memory.MiB.Int64()
 	)
 
 	if maxSegmentSize != "" {
@@ -93,51 +106,19 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}
 	}
 
-	// TODO: This should come from the EncryptionAccess. For now it's hardcoded to twice the
-	// stripe size of the default redundancy scheme on the satellite.
-	encBlockSize := 29 * 256 * memory.B.Int32()
-
 	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
 	ec := ecclient.NewClient(zap.L().Named("ecclient"), dialer, 0)
 
-	encryptionParameters := storj.EncryptionParameters{
-		// TODO: the cipher should be provided by the Access, but we don't store it there yet.
-		CipherSuite: storj.EncAESGCM,
-		BlockSize:   encBlockSize,
-	}
-
-	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(segmentsSize, encryptionParameters)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
-	streamStore, err := streams.NewStreamStore(metainfoClient, ec, segmentsSize, access.encAccess.Store, encryptionParameters, maxInlineSize, maxEncryptedSegmentSize)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
-	db := metainfo.New(metainfoClient, access.encAccess.Store)
-
-	var eg errgroup.Group
-	if telemetry != nil {
-		eg.Go(func() error {
-			telemetry.Run(ctx)
-			return nil
-		})
-	}
-
 	return &Project{
-		config:      config,
-		access:      access,
-		dialer:      dialer,
-		metainfo:    metainfoClient,
-		db:          db,
-		streams:     streamStore,
-		ec:          ec,
-		encryption:  encryptionParameters,
-		segmentSize: segmentsSize,
-		eg:          &eg,
-		telemetry:   telemetry,
+		config:               config,
+		access:               access,
+		dialer:               dialer,
+		ec:                   ec,
+		segmentSize:          segmentsSize,
+		encryptionParameters: encryptionParameters,
+
+		eg:        &eg,
+		telemetry: telemetry,
 	}, nil
 }
 
@@ -150,5 +131,64 @@ func (project *Project) Close() (err error) {
 			project.telemetry.Report(context.Background()),
 		)
 	}
-	return packageError.Wrap(errs.Combine(err, project.metainfo.Close()))
+
+	err = errs.Combine(err, project.dialer.Pool.Close())
+
+	return packageError.Wrap(err)
+}
+
+func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	defer func() {
+		if err != nil {
+			err = errs.Combine(err, metainfoClient.Close())
+		}
+	}()
+
+	// TODO we need find a way how to pass it from satellite to client
+	maxInlineSize := 4 * memory.KiB.Int()
+
+	streamStore, err := streams.NewStreamStore(
+		metainfoClient,
+		project.ec,
+		project.segmentSize,
+		project.access.encAccess.Store,
+		project.encryptionParameters,
+		maxInlineSize)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	return streamStore, nil
+}
+
+func (project *Project) getMetainfoDB(ctx context.Context) (_ *metainfo.DB, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	return metainfo.New(metainfoClient, project.access.encAccess.Store), nil
+}
+
+func (project *Project) getMetainfoClient(ctx context.Context) (_ *metainfo.Client, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	metainfoClient, err := metainfo.DialNodeURL(ctx,
+		project.dialer,
+		project.access.satelliteAddress,
+		project.access.apiKey,
+		project.config.UserAgent)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	return metainfoClient, nil
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
@@ -73,11 +74,16 @@ func (project *Project) NewMultipartUpload(ctx context.Context, bucket, key stri
 		return MultipartInfo{}, packageError.Wrap(err)
 	}
 
-	response, err := project.metainfo.BeginObject(ctx, metainfo.BeginObjectParams{
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return MultipartInfo{}, packageError.Wrap(err)
+	}
+
+	response, err := metainfoClient.BeginObject(ctx, metainfo.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedPath:        []byte(encPath.Raw()),
 		ExpiresAt:            options.Expires,
-		EncryptionParameters: project.encryption,
+		EncryptionParameters: project.encryptionParameters,
 	})
 	if err != nil {
 		return MultipartInfo{}, convertKnownErrors(err, bucket, key)
@@ -122,13 +128,18 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 		keyNonce       storj.Nonce
 	)
 
-	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(project.segmentSize, project.encryption)
+	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(project.segmentSize, project.encryptionParameters)
 	if err != nil {
 		return PartInfo{}, packageError.Wrap(err)
 	}
 
 	encStore := project.access.encAccess.Store
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), encStore)
+	if err != nil {
+		return PartInfo{}, packageError.Wrap(err)
+	}
+
+	metainfoClient, err := project.getMetainfoClient(ctx)
 	if err != nil {
 		return PartInfo{}, packageError.Wrap(err)
 	}
@@ -158,7 +169,7 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 			return PartInfo{}, packageError.Wrap(err)
 		}
 
-		encryptedKey, err = encryption.EncryptKey(&contentKey, project.encryption.CipherSuite, derivedKey, &keyNonce)
+		encryptedKey, err = encryption.EncryptKey(&contentKey, project.encryptionParameters.CipherSuite, derivedKey, &keyNonce)
 		if err != nil {
 			return PartInfo{}, packageError.Wrap(err)
 		}
@@ -166,14 +177,14 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 		sizeReader := streams.SizeReader(eofReader)
 		segmentReader := io.LimitReader(sizeReader, project.segmentSize)
 		segmentEncryption := storj.SegmentEncryption{}
-		if project.encryption.CipherSuite != storj.EncNull {
+		if project.encryptionParameters.CipherSuite != storj.EncNull {
 			segmentEncryption = storj.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: keyNonce,
 			}
 		}
 
-		encrypter, err := encryption.NewEncrypter(project.encryption.CipherSuite, &contentKey, &contentNonce, int(project.encryption.BlockSize))
+		encrypter, err := encryption.NewEncrypter(project.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(project.encryptionParameters.BlockSize))
 		if err != nil {
 			return PartInfo{}, packageError.Wrap(err)
 		}
@@ -181,7 +192,7 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 		paddedReader := encryption.PadReader(ioutil.NopCloser(segmentReader), encrypter.InBlockSize())
 		transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
-		response, err := project.metainfo.BeginSegment(ctx, metainfo.BeginSegmentParams{
+		response, err := metainfoClient.BeginSegment(ctx, metainfo.BeginSegmentParams{
 			StreamID:      decodedStreamID,
 			MaxOrderLimit: maxEncryptedSegmentSize,
 			Position: storj.SegmentPosition{
@@ -205,7 +216,7 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 
 		plainSegmentSize := sizeReader.Size()
 		if plainSegmentSize > 0 {
-			err = project.metainfo.CommitSegment(ctx, metainfo.CommitSegmentParams{
+			err = metainfoClient.CommitSegment(ctx, metainfo.CommitSegmentParams{
 				SegmentID:         response.SegmentID,
 				SizeEncryptedData: encSizedReader.Size(),
 				PlainSize:         plainSegmentSize,
@@ -295,13 +306,13 @@ func (project *Project) CompleteMultipartUpload(ctx context.Context, bucket, key
 		return nil, packageError.Wrap(err)
 	}
 
-	encryptedKey, err := encryption.EncryptKey(&metadataKey, project.encryption.CipherSuite, derivedKey, &encryptedKeyNonce)
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, project.encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
-	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, project.encryption.CipherSuite, &metadataKey, &storj.Nonce{})
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, project.encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -314,7 +325,12 @@ func (project *Project) CompleteMultipartUpload(ctx context.Context, bucket, key
 		return nil, packageError.Wrap(err)
 	}
 
-	err = project.metainfo.CommitObject(ctx, metainfo.CommitObjectParams{
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	err = metainfoClient.CommitObject(ctx, metainfo.CommitObjectParams{
 		StreamID:                      id,
 		EncryptedMetadata:             streamMetaBytes,
 		EncryptedMetadataEncryptedKey: encryptedKey,
@@ -348,7 +364,12 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 		return convertKnownErrors(err, bucket, key)
 	}
 
-	_, err = project.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+
+	_, err = metainfoClient.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
 		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
@@ -381,7 +402,12 @@ func (project *Project) ListParts(ctx context.Context, bucket, key, streamID str
 		return ListPartsResult{}, packageError.Wrap(err)
 	}
 
-	listResult, err := project.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
+	metainfoClient, err := project.getMetainfoClient(ctx)
+	if err != nil {
+		return ListPartsResult{}, convertKnownErrors(err, bucket, key)
+	}
+
+	listResult, err := metainfoClient.ListSegments(ctx, metainfo.ListSegmentsParams{
 		StreamID: id,
 		Cursor:   storj.SegmentPosition{PartNumber: int32(partCursor), Index: 0},
 		Limit:    int32(maxParts), // TODO: handle limit correctly
@@ -501,17 +527,31 @@ func (uploads *MultipartUploadIterator) Next() bool {
 }
 
 func (uploads *MultipartUploadIterator) loadNext() bool {
-	list, err := uploads.project.db.ListObjects(uploads.ctx, uploads.bucket, uploads.options)
+	ok, err := uploads.tryLoadNext()
 	if err != nil {
-		uploads.err = convertKnownErrors(err, uploads.bucket.Name, "")
+		uploads.err = err
 		return false
+	}
+	return ok
+}
+
+func (uploads *MultipartUploadIterator) tryLoadNext() (ok bool, err error) {
+	db, err := uploads.project.getMetainfoDB(uploads.ctx)
+	if err != nil {
+		return false, convertKnownErrors(err, uploads.bucket.Name, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	list, err := db.ListObjects(uploads.ctx, uploads.bucket, uploads.options)
+	if err != nil {
+		return false, convertKnownErrors(err, uploads.bucket.Name, "")
 	}
 	uploads.list = &list
 	if list.More {
 		uploads.options = uploads.options.NextPage(list)
 	}
 	uploads.position = 0
-	return len(list.Items) > 0
+	return len(list.Items) > 0, nil
 }
 
 // Err returns error, if one happened during iteration.

@@ -168,8 +168,10 @@ func TestDeleteObject(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encStore := newTestEncStore(TestEncKey)
 		encStore.SetDefaultPathCipher(storj.EncAESGCM)
-		db, streams, err := newMetainfoParts(planet, encStore)
+
+		db, streams, cleanup, err := newMetainfoParts(planet, encStore)
 		require.NoError(t, err)
+		defer ctx.Check(cleanup)
 
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if !assert.NoError(t, err) {
@@ -245,8 +247,10 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encStore := newTestEncStore(TestEncKey)
 		encStore.SetDefaultPathCipher(storj.EncAESGCM)
-		db, streams, err := newMetainfoParts(planet, encStore)
+
+		db, streams, cleanup, err := newMetainfoParts(planet, encStore)
 		require.NoError(t, err)
+		defer ctx.Check(cleanup)
 
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
@@ -336,68 +340,87 @@ func TestListObjects(t *testing.T) {
 			{
 				options: options("", "`", 0),
 				result:  []string{"a", "a/", "aa", "b", "b/", "bb", "c"},
-			}, {
+			},
+			{
 				options: options("", "b", 0),
 				result:  []string{"b/", "bb", "c"},
-			}, {
+			},
+			{
 				options: options("", "c", 0),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: options("", "ca", 0),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: options("", "", 1),
 				more:    true,
 				result:  []string{"a"},
-			}, {
+			},
+			{
 				options: options("", "`", 1),
 				more:    true,
 				result:  []string{"a"},
-			}, {
+			},
+			{
 				options: options("", "aa", 1),
 				more:    true,
 				result:  []string{"b"},
-			}, {
+			},
+			{
 				options: options("", "c", 1),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: options("", "ca", 1),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: options("", "", 2),
 				more:    true,
 				result:  []string{"a", "a/"},
-			}, {
+			},
+			{
 				options: options("", "`", 2),
 				more:    true,
 				result:  []string{"a", "a/"},
-			}, {
+			},
+			{
 				options: options("", "aa", 2),
 				more:    true,
 				result:  []string{"b", "b/"},
-			}, {
+			},
+			{
 				options: options("", "bb", 2),
 				result:  []string{"c"},
-			}, {
+			},
+			{
 				options: options("", "c", 2),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: options("", "ca", 2),
 				result:  []string{},
-			}, {
+			},
+			{
 				options: optionsRecursive("", "", 0),
 				result:  []string{"a", "a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc", "aa", "b", "b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc", "bb", "c"},
-			}, {
+			},
+			{
 				options: options("a/", "", 0),
 				result:  []string{"xa", "xaa", "xb", "xbb", "xc"},
-			}, {
+			},
+			{
 				options: options("a/", "xb", 0),
 				result:  []string{"xbb", "xc"},
-			}, {
+			},
+			{
 				options: optionsRecursive("", "a/xbb", 5),
 				more:    true,
 				result:  []string{"a/xc", "aa", "b", "b/ya", "b/yaa"},
-			}, {
+			},
+			{
 				options: options("a/", "xaa", 2),
 				more:    true,
 				result:  []string{"xb", "xbb"},

@@ -6,7 +6,10 @@ package uplink
 import (
 	"context"
 
+	"github.com/zeebo/errs"
+
 	"storj.io/common/storj"
+	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
 
@@ -37,13 +40,34 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	b := storj.Bucket{Name: bucket}
 
-	obj, err := project.db.GetObject(ctx, b, key)
+	// N.B. we always call dbCleanup which closes the db because
+	// closing it earlier has the benefit of returning a connection to
+	// the pool, so we try to do that as early as possible.
+
+	db, err := project.getMetainfoDB(ctx)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	obj, err := db.GetObject(ctx, b, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
+	// Return the connection to the pool as soon as we can.
+	if err := db.Close(); err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	streams, err := project.getStreamsStore(ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
 	return &Download{
-		download: stream.NewDownloadRange(ctx, obj, project.streams, options.Offset, options.Length),
+		streams:  streams,
+		download: stream.NewDownloadRange(ctx, obj, streams, options.Offset, options.Length),
 		object:   convertObject(&obj),
 	}, nil
 }
@@ -52,6 +76,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 type Download struct {
 	download *stream.Download
 	object   *Object
+	streams  *streams.Store
 }
 
 // Info returns the last information about the object.
@@ -67,5 +92,8 @@ func (download *Download) Read(p []byte) (n int, err error) {
 
 // Close closes the reader of the download.
 func (download *Download) Close() error {
-	return download.download.Close()
+	return errs.Combine(
+		download.download.Close(),
+		download.streams.Close(),
+	)
 }
