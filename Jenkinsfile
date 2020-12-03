@@ -112,6 +112,30 @@ pipeline {
                         }
                     }
                 }
+
+                stage('Testsuite (against storj/storj master)') {
+                    environment {
+                        STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach_master?sslmode=disable'
+                        STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj_master?sslmode=disable'
+                        COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                    }
+                    steps {
+                        sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach_master;\''
+                        sh 'psql -U postgres -c \'create database teststorj_master;\''
+                        dir('testsuite'){
+                            sh 'go vet ./...'
+                            sh 'go test --modfile go-master.mod -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race storj.io/uplink/testsuite 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                        }
+                    }
+
+                    post {
+                        always {
+                            sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite.json'
+                            junit '.build/testsuite.xml'
+                        }
+                    }
+                }
                 
                 // TODO enable when storj/storj refactoring will be completed
                 // stage('Integration [storj/storj]') {

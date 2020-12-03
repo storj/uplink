@@ -118,13 +118,13 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	}()
 
 	var (
-		currentSegment  int64
-		contentKey      storj.Key
-		streamSize      int64
-		lastSegmentSize int64
-		encryptedKey    []byte
-		keyNonce        storj.Nonce
-		rs              eestream.RedundancyStrategy
+		currentSegment      int64
+		contentKey          storj.Key
+		streamSize          int64
+		lastSegmentSize     int64
+		encryptedKey        []byte
+		keyNonce            storj.Nonce
+		objectRS, segmentRS eestream.RedundancyStrategy
 
 		requestsToBatch = make([]metainfo.BatchItem, 0, 2)
 	)
@@ -208,7 +208,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 					return Meta{}, err
 				}
 				streamID = objResponse.StreamID
-				rs = objResponse.RedundancyStrategy
+				objectRS = objResponse.RedundancyStrategy
 			} else {
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
@@ -225,9 +225,13 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 			segmentID := segResponse.SegmentID
 			limits := segResponse.Limits
 			piecePrivateKey := segResponse.PiecePrivateKey
+			segmentRS = segResponse.RedundancyStrategy
 
+			if segmentRS == (eestream.RedundancyStrategy{}) {
+				segmentRS = objectRS
+			}
 			encSizedReader := SizeReader(transformedReader)
-			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, rs, encSizedReader, expiration)
+			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader, expiration)
 			if err != nil {
 				return Meta{}, err
 			}
@@ -353,21 +357,29 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	return resultMeta, nil
 }
 
-// Get returns a ranger that knows what the overall size is (from l/<path>)
+// Get returns a ranger that knows what the overall size is (from l/<path> or listing all segments)
 // and then returns the appropriate data from segments s0/<path>, s1/<path>,
-// ..., l/<path>.
+// ..., n/<path>.
 func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
+
+	if object.Size == 0 {
+		return ranger.ByteRanger(nil), nil
+	}
+
+	if object.FixedSegmentSize != 0 {
+		return s.getWithLastSegment(ctx, path, object)
+	}
+
+	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO can be batched with GetObject
 	segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
 		StreamID: object.ID,
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
 	if err != nil {
 		return nil, err
 	}
@@ -393,6 +405,76 @@ func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ran
 		})
 	}
 
+	return ranger.Concat(rangers...), nil
+}
+
+func (s *Store) getWithLastSegment(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
+		StreamID: object.ID,
+		Position: storj.SegmentPosition{
+			Index: -1, // Request the last segment
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	lastSegmentRanger, err := s.Ranger(ctx, info, limits, object.RedundancyScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	if err != nil {
+		return nil, err
+	}
+
+	var rangers []ranger.Ranger
+	for i := int64(0); i < object.SegmentCount-1; i++ {
+		var contentNonce storj.Nonce
+		_, err = encryption.Increment(&contentNonce, i+1)
+		if err != nil {
+			return nil, err
+		}
+
+		rangers = append(rangers, &lazySegmentRanger{
+			metainfo: s.metainfo,
+			streams:  s,
+			streamID: object.ID,
+			position: storj.SegmentPosition{
+				Index: int32(i),
+			},
+			rs:                   object.RedundancyScheme,
+			size:                 object.FixedSegmentSize,
+			derivedKey:           derivedKey,
+			startingNonce:        &contentNonce,
+			encryptionParameters: object.EncryptionParameters,
+		})
+	}
+
+	var contentNonce storj.Nonce
+	_, err = encryption.Increment(&contentNonce, object.SegmentCount)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedLastSegmentRanger, err := decryptRanger(
+		ctx,
+		lastSegmentRanger,
+		object.LastSegment.Size,
+		object.EncryptionParameters,
+		derivedKey,
+		info.SegmentEncryption.EncryptedKey,
+		&info.SegmentEncryption.EncryptedKeyNonce,
+		&contentNonce,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rangers = append(rangers, decryptedLastSegmentRanger)
 	return ranger.Concat(rangers...), nil
 }
 

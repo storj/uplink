@@ -39,6 +39,7 @@ func TestObject(t *testing.T) {
 			Name       string
 			ObjectSize memory.Size
 		}{
+			{"empty", 0},
 			{"inline", memory.KiB},
 			{"remote", 10 * memory.KiB},
 		}
@@ -85,21 +86,23 @@ func TestObject(t *testing.T) {
 				err = download.Close()
 				require.NoError(t, err)
 
-				download, err = project.DownloadObject(ctx, "testbucket", tc.Name,
-					&uplink.DownloadOptions{
-						Offset: 100,
-						Length: 500,
-					})
-				require.NoError(t, err)
-				assertObject(t, download.Info(), tc.Name)
+				if tc.ObjectSize > 600 {
+					download, err = project.DownloadObject(ctx, "testbucket", tc.Name,
+						&uplink.DownloadOptions{
+							Offset: 100,
+							Length: 500,
+						})
+					require.NoError(t, err)
+					assertObject(t, download.Info(), tc.Name)
 
-				var downloadedRange bytes.Buffer
-				_, err = io.Copy(&downloadedRange, download)
-				require.NoError(t, err)
-				assert.Equal(t, randData[100:600], downloadedRange.Bytes())
+					var downloadedRange bytes.Buffer
+					_, err = io.Copy(&downloadedRange, download)
+					require.NoError(t, err)
+					assert.Equal(t, randData[100:600], downloadedRange.Bytes())
 
-				err = download.Close()
-				require.NoError(t, err)
+					err = download.Close()
+					require.NoError(t, err)
+				}
 
 				deleted, err := project.DeleteObject(ctx, "testbucket", tc.Name)
 				require.NoError(t, err)

@@ -28,10 +28,11 @@ func TestNewMultipartUpload(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		_, err := project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
+		_, err = project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
@@ -68,10 +69,11 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		_, err := project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
+		_, err = project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
@@ -112,7 +114,8 @@ func TestCompleteMultipartUpload(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
@@ -184,7 +187,8 @@ func TestAbortMultipartUpload(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
@@ -402,7 +406,8 @@ func TestListMultipartUploads_NonExistingBucket(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		list := project.ListMultipartUploads(ctx, "non-existing-bucket", nil)
@@ -420,7 +425,8 @@ func TestListMultipartUploads_EmptyBucket(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
@@ -436,12 +442,13 @@ func TestListMultipartUploads_Prefix(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
 
-		_, err := project.NewMultipartUpload(ctx, "testbucket", "a/b/c/multipart-object", nil)
+		_, err = project.NewMultipartUpload(ctx, "testbucket", "a/b/c/multipart-object", nil)
 		require.NoError(t, err)
 
 		// assert there is one pending multipart upload with prefix "a/b/"
@@ -478,7 +485,8 @@ func TestListMultipartUploads_Cursor(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project := openProject(t, ctx, planet)
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
@@ -545,4 +553,13 @@ func assertMultipartUploadList(ctx context.Context, t *testing.T, project *uplin
 	require.False(t, list.Next())
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())
+}
+
+func createBucket(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucketName string) *uplink.Bucket {
+	bucket, err := project.EnsureBucket(ctx, bucketName)
+	require.NoError(t, err)
+	require.NotNil(t, bucket)
+	require.Equal(t, bucketName, bucket.Name)
+	require.WithinDuration(t, time.Now(), bucket.Created, 10*time.Second)
+	return bucket
 }

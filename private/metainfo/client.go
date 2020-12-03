@@ -848,9 +848,13 @@ type BeginSegmentResponse struct {
 }
 
 func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentResponse, error) {
-	rs, err := eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
-	if err != nil {
-		return BeginSegmentResponse{}, err
+	var rs eestream.RedundancyStrategy
+	var err error
+	if response.RedundancyScheme != nil {
+		rs, err = eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
+		if err != nil {
+			return BeginSegmentResponse{}, err
+		}
 	}
 	return BeginSegmentResponse{
 		SegmentID:          response.SegmentId,
