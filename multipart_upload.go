@@ -39,8 +39,8 @@ type MultipartObjectOptions struct {
 	CustomMetadata CustomMetadata
 }
 
-// ListPartsResult contains the result of a list object parts query.
-type ListPartsResult struct {
+// ListObjectPartsResult contains the result of a list object parts query.
+type ListObjectPartsResult struct {
 	Items []PartInfo
 	More  bool
 }
@@ -379,32 +379,32 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 	return nil
 }
 
-// ListParts lists  the  parts  that have been uploaded for a specific multipart upload.
+// ListObjectParts lists  the  parts  that have been uploaded for a specific multipart upload.
 // TODO: For now, maxParts is not correctly handled as the limit is applied to the number of segments we retrieve.
-func (project *Project) ListParts(ctx context.Context, bucket, key, streamID string, partCursor, maxParts int) (infos ListPartsResult, err error) {
+func (project *Project) ListObjectParts(ctx context.Context, bucket, key, streamID string, partCursor, maxParts int) (infos ListObjectPartsResult, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
 	if bucket == "" {
-		return ListPartsResult{}, ErrBucketNameInvalid
+		return ListObjectPartsResult{}, ErrBucketNameInvalid
 	}
 
 	if key == "" {
-		return ListPartsResult{}, ErrObjectKeyInvalid
+		return ListObjectPartsResult{}, ErrObjectKeyInvalid
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
 	if err != nil || version != 1 {
-		return ListPartsResult{}, errors.New("invalid streamID format")
+		return ListObjectPartsResult{}, errors.New("invalid streamID format")
 	}
 
 	id, err := storj.StreamIDFromBytes(decodedStreamID)
 	if err != nil {
-		return ListPartsResult{}, packageError.Wrap(err)
+		return ListObjectPartsResult{}, packageError.Wrap(err)
 	}
 
 	metainfoClient, err := project.getMetainfoClient(ctx)
 	if err != nil {
-		return ListPartsResult{}, convertKnownErrors(err, bucket, key)
+		return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
 	}
 
 	listResult, err := metainfoClient.ListSegments(ctx, metainfo.ListSegmentsParams{
@@ -414,7 +414,7 @@ func (project *Project) ListParts(ctx context.Context, bucket, key, streamID str
 	})
 
 	if err != nil {
-		return ListPartsResult{}, convertKnownErrors(err, bucket, key)
+		return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
 	}
 
 	partInfosMap := make(map[int]PartInfo)
@@ -436,7 +436,7 @@ func (project *Project) ListParts(ctx context.Context, bucket, key, streamID str
 		partInfos = append(partInfos, partInfo)
 	}
 
-	return ListPartsResult{Items: partInfos, More: listResult.More}, nil
+	return ListObjectPartsResult{Items: partInfos, More: listResult.More}, nil
 }
 
 // ListMultipartUploadsOptions defines multipart uploads listing options.

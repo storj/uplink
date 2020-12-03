@@ -341,19 +341,19 @@ func TestListParts(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = project.ListParts(newCtx, "", "multipart-object", info.StreamID, 1, 10)
+			_, err = project.ListObjectParts(newCtx, "", "multipart-object", info.StreamID, 1, 10)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = project.ListParts(newCtx, "testbucket", "", info.StreamID, 1, 10)
+			_, err = project.ListObjectParts(newCtx, "testbucket", "", info.StreamID, 1, 10)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
-			_, err = project.ListParts(newCtx, "testbucket", "multipart-object", "", 1, 10)
+			_, err = project.ListObjectParts(newCtx, "testbucket", "multipart-object", "", 1, 10)
 			require.Error(t, err)
 		}
 
 		// list multipart upload with no uploaded parts
-		parts, err := project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err := project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 
@@ -364,7 +364,7 @@ func TestListParts(t *testing.T) {
 		require.NoError(t, err)
 
 		// list parts of on going multipart upload
-		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 
@@ -375,21 +375,21 @@ func TestListParts(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 		// list parts of a completed multipart upload
-		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a limit of 1
-		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 1)
+		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a cursor starting after all parts
-		parts, err = project.ListParts(ctx, "testbucket", "multipart-object", info.StreamID, 6, 10)
+		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 6, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 		require.Equal(t, false, parts.More)
