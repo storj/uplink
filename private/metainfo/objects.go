@@ -26,13 +26,6 @@ type Meta struct {
 	Data       []byte
 }
 
-// GetObject returns information about an object.
-func (db *DB) GetObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	return db.getObjectInfo(ctx, bucket, path)
-}
-
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
 func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.Path) (ips []net.IP, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -57,20 +50,20 @@ func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.
 }
 
 // CreateObject creates an uploading object and returns an interface for uploading Object information.
-func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.Path, createInfo *CreateObject) (object *MutableObject, err error) {
+func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *CreateObject) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if bucket.Name == "" {
+	if bucket == "" {
 		return nil, storj.ErrNoBucket.New("")
 	}
 
-	if path == "" {
+	if key == "" {
 		return nil, storj.ErrNoPath.New("")
 	}
 
 	info := storj.Object{
-		Bucket: bucket,
-		Path:   path,
+		Bucket: storj.Bucket{Name: bucket},
+		Path:   key,
 	}
 
 	if createInfo != nil {
@@ -90,56 +83,56 @@ func (db *DB) CreateObject(ctx context.Context, bucket storj.Bucket, path storj.
 }
 
 // ModifyObject modifies a committed object.
-func (db *DB) ModifyObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object *MutableObject, err error) {
+func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return nil, errors.New("not implemented")
 }
 
 // DeleteObject deletes an object from database.
-func (db *DB) DeleteObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (_ storj.Object, err error) {
+func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if bucket.Name == "" {
+	if bucket == "" {
 		return storj.Object{}, storj.ErrNoBucket.New("")
 	}
 
-	if len(path) == 0 {
+	if len(key) == 0 {
 		return storj.Object{}, storj.ErrNoPath.New("")
 	}
 
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
 		return storj.Object{}, err
 	}
 
 	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
-		Bucket:        []byte(bucket.Name),
+		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
 	if err != nil {
 		return storj.Object{}, err
 	}
 
-	return db.objectFromRawObjectItem(ctx, bucket.Name, path, object)
+	return db.objectFromRawObjectItem(ctx, bucket, key, object)
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
-func (db *DB) ModifyPendingObject(ctx context.Context, bucket storj.Bucket, path storj.Path) (object *MutableObject, err error) {
+func (db *DB) ModifyPendingObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return nil, errors.New("not implemented")
 }
 
 // ListPendingObjects lists pending objects in bucket based on the ListOptions.
-func (db *DB) ListPendingObjects(ctx context.Context, bucket storj.Bucket, options storj.ListOptions) (list storj.ObjectList, err error) {
+func (db *DB) ListPendingObjects(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return storj.ObjectList{}, errors.New("not implemented")
 }
 
 // ListObjects lists objects in bucket based on the ListOptions.
-func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options storj.ListOptions) (list storj.ObjectList, err error) {
+func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if bucket.Name == "" {
+	if bucket == "" {
 		return storj.ObjectList{}, storj.ErrNoBucket.New("")
 	}
 
@@ -178,12 +171,12 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
 	// encrypted prefix, what we really want is `enc("")/enc("bob")`.
 	prefix := PathForKey(options.Prefix)
-	prefixKey, err := encryption.DerivePathKey(bucket.Name, prefix, db.encStore)
+	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
-	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket.Name, prefix, db.encStore)
+	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
 	}
@@ -192,10 +185,10 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	// It contains a bucket if and only if the prefix has no bucket. This is why it is a raw
 	// string instead of a typed string: it's either a bucket or an unencrypted path component
 	// and that isn't known at compile time.
-	needsEncryption := bucket.Name != ""
+	needsEncryption := bucket != ""
 	var base *encryption.Base
 	if needsEncryption {
-		_, _, base = db.encStore.LookupEncrypted(bucket.Name, encPrefix)
+		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
 
 		startAfter, err = encryption.EncryptPathRaw(startAfter, db.pathCipher(base.PathCipher), prefixKey)
 		if err != nil {
@@ -204,7 +197,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	}
 
 	items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
-		Bucket:          []byte(bucket.Name),
+		Bucket:          []byte(bucket),
 		EncryptedPrefix: []byte(encPrefix.Raw()),
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
@@ -215,7 +208,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 	}
 
 	list = storj.ObjectList{
-		Bucket: bucket.Name,
+		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   more,
 		Items:  make([]storj.Object, 0, len(items)),
@@ -244,7 +237,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			}
 			fullPath += itemPath
 
-			bucketName = bucket.Name
+			bucketName = bucket
 			unencryptedKey = paths.NewUnencrypted(fullPath)
 		} else {
 			itemPath = string(item.EncryptedPath)
@@ -261,7 +254,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket storj.Bucket, options stor
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
 
-		object, err := db.objectFromRawObjectListItem(bucket.Name, itemPath, item, stream, streamMeta)
+		object, err := db.objectFromRawObjectListItem(bucket, itemPath, item, stream, streamMeta)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -279,31 +272,32 @@ func (db *DB) pathCipher(pathCipher storj.CipherSuite) storj.CipherSuite {
 	return pathCipher
 }
 
-func (db *DB) getObjectInfo(ctx context.Context, bucket storj.Bucket, path storj.Path) (info storj.Object, err error) {
+// GetObject returns information about an object.
+func (db *DB) GetObject(ctx context.Context, bucket, key string) (info storj.Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if bucket.Name == "" {
+	if bucket == "" {
 		return storj.Object{}, storj.ErrNoBucket.New("")
 	}
 
-	if path == "" {
+	if key == "" {
 		return storj.Object{}, storj.ErrNoPath.New("")
 	}
 
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
 		return storj.Object{}, err
 	}
 
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
-		Bucket:        []byte(bucket.Name),
+		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
 	if err != nil {
 		return storj.Object{}, err
 	}
 
-	return db.objectFromRawObjectItem(ctx, bucket.Name, path, objectInfo)
+	return db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
 }
 
 func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path storj.Path, objectInfo RawObjectItem) (storj.Object, error) {

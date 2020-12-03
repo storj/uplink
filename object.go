@@ -96,8 +96,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	b := storj.Bucket{Name: bucket}
-	obj, err := db.GetObject(ctx, b, key)
+	obj, err := db.GetObject(ctx, bucket, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -115,8 +114,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	b := storj.Bucket{Name: bucket}
-	obj, err := db.DeleteObject(ctx, b, key)
+	obj, err := db.DeleteObject(ctx, bucket, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
