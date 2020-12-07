@@ -127,7 +127,10 @@ func (project *Project) Close() (err error) {
 		)
 	}
 
-	err = errs.Combine(err, project.dialer.Pool.Close())
+	// only close the connection pool if it's created through OpenProject
+	if project.config.pool == nil {
+		err = errs.Combine(err, project.dialer.Pool.Close())
+	}
 
 	return packageError.Wrap(err)
 }
