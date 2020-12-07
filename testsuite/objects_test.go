@@ -348,6 +348,7 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 
 			project, err := uplink.OpenProject(ctx, accesses[i])
 			require.NoError(t, err)
+			defer ctx.Check(project.Close)
 
 			createBucket(t, ctx, project, bucket)
 
@@ -358,6 +359,7 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 		for i, access := range accesses {
 			project, err := uplink.OpenProject(ctx, access)
 			require.NoError(t, err)
+			defer ctx.Check(project.Close)
 
 			objects := project.ListObjects(ctx, bucket, nil)
 
