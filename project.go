@@ -20,6 +20,9 @@ import (
 	"storj.io/uplink/private/testuplink"
 )
 
+// TODO we need find a way how to pass it from satellite to client.
+const maxInlineSize = 4096 // 4KiB
+
 // maxSegmentSize can be used to override max segment size with ldflags build parameter.
 // Example: go build -ldflags "-X 'storj.io/uplink.maxSegmentSize=1MiB'" storj.io/storj/cmd/uplink.
 var maxSegmentSize string
@@ -149,9 +152,6 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 			err = errs.Combine(err, metainfoClient.Close())
 		}
 	}()
-
-	// TODO we need find a way how to pass it from satellite to client
-	maxInlineSize := 4 * memory.KiB.Int()
 
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,

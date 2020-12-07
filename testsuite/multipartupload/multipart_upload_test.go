@@ -1,7 +1,7 @@
 // Copyright (C) 2020 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package testsuite_test
+package multipartupload_test
 
 import (
 	"bytes"
@@ -251,11 +251,6 @@ func TestPutObjectPart(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
-		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
-		firstPartLen := int(float32(len(randData)) * 0.3)
-		source1 := bytes.NewBuffer(randData[:firstPartLen])
-		source2 := bytes.NewBuffer(randData[firstPartLen:])
-
 		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
@@ -264,18 +259,18 @@ func TestPutObjectPart(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = project.PutObjectPart(newCtx, "", "multipart-object", info.StreamID, 1, source2)
+			_, err = project.PutObjectPart(newCtx, "", "multipart-object", info.StreamID, 1, nil)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = project.PutObjectPart(newCtx, "testbucket", "", info.StreamID, 1, source2)
+			_, err = project.PutObjectPart(newCtx, "testbucket", "", info.StreamID, 1, nil)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
-			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", "", 1, source2)
+			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", "", 1, nil)
 			require.Error(t, err)
 
 			// negative partID
-			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 0, source2)
+			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 0, nil)
 			require.Error(t, err)
 
 			// empty input data reader
@@ -283,11 +278,21 @@ func TestPutObjectPart(t *testing.T) {
 			require.Error(t, err)
 		}
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 2, source2)
+		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
+		remoteInlineSource := randData[:51*memory.KiB.Int()]
+		remoteSource1 := randData[len(remoteInlineSource) : len(remoteInlineSource)+10*memory.KiB.Int()]
+		remoteSource2 := randData[len(remoteInlineSource)+len(remoteSource1):]
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource1))
 		require.NoError(t, err)
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source1)
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 3, bytes.NewBuffer(remoteSource2))
 		require.NoError(t, err)
+
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteInlineSource))
+		require.NoError(t, err)
+
+		// TODO verify that segment (1, 1) is inline
 
 		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
@@ -306,7 +311,7 @@ func TestPutObjectPart(t *testing.T) {
 		require.Equal(t, randData, downloaded.Bytes())
 
 		// create part for committed object
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source2)
+		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(nil))
 		require.Error(t, err)
 	})
 }

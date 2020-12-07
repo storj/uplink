@@ -176,6 +176,13 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 
 		sizeReader := streams.SizeReader(eofReader)
 		segmentReader := io.LimitReader(sizeReader, project.segmentSize)
+		peekReader := streams.NewPeekThresholdReader(segmentReader)
+		// If the data is larger than the inline threshold size, then it will be a remote segment
+		isRemote, err := peekReader.IsLargerThan(maxInlineSize)
+		if err != nil {
+			return PartInfo{}, packageError.Wrap(err)
+		}
+
 		segmentEncryption := storj.SegmentEncryption{}
 		if project.encryptionParameters.CipherSuite != storj.EncNull {
 			segmentEncryption = storj.SegmentEncryption{
@@ -184,51 +191,76 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 			}
 		}
 
-		encrypter, err := encryption.NewEncrypter(project.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(project.encryptionParameters.BlockSize))
-		if err != nil {
-			return PartInfo{}, packageError.Wrap(err)
-		}
+		if isRemote {
+			encrypter, err := encryption.NewEncrypter(project.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(project.encryptionParameters.BlockSize))
+			if err != nil {
+				return PartInfo{}, packageError.Wrap(err)
+			}
 
-		paddedReader := encryption.PadReader(ioutil.NopCloser(segmentReader), encrypter.InBlockSize())
-		transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
+			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
+			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
-		response, err := metainfoClient.BeginSegment(ctx, metainfo.BeginSegmentParams{
-			StreamID:      decodedStreamID,
-			MaxOrderLimit: maxEncryptedSegmentSize,
-			Position: storj.SegmentPosition{
-				PartNumber: int32(partNumber),
-				Index:      int32(currentSegment),
-			},
-		})
-		if err != nil {
-			return PartInfo{}, convertKnownErrors(err, bucket, key)
-		}
-
-		encSizedReader := streams.SizeReader(transformedReader)
-
-		// TODO handle expiration
-		expiration := time.Time{}
-		uploadResults, err := project.ec.PutSingleResult(ctx, response.Limits, response.PiecePrivateKey,
-			response.RedundancyStrategy, encSizedReader, expiration)
-		if err != nil {
-			return PartInfo{}, packageError.Wrap(err)
-		}
-
-		plainSegmentSize := sizeReader.Size()
-		if plainSegmentSize > 0 {
-			err = metainfoClient.CommitSegment(ctx, metainfo.CommitSegmentParams{
-				SegmentID:         response.SegmentID,
-				SizeEncryptedData: encSizedReader.Size(),
-				PlainSize:         plainSegmentSize,
-				Encryption:        segmentEncryption,
-				UploadResult:      uploadResults,
+			response, err := metainfoClient.BeginSegment(ctx, metainfo.BeginSegmentParams{
+				StreamID:      decodedStreamID,
+				MaxOrderLimit: maxEncryptedSegmentSize,
+				Position: storj.SegmentPosition{
+					PartNumber: int32(partNumber),
+					Index:      int32(currentSegment),
+				},
 			})
 			if err != nil {
 				return PartInfo{}, convertKnownErrors(err, bucket, key)
 			}
-		}
 
-		streamSize += plainSegmentSize
+			encSizedReader := streams.SizeReader(transformedReader)
+
+			// TODO handle expiration
+			expiration := time.Time{}
+			uploadResults, err := project.ec.PutSingleResult(ctx, response.Limits, response.PiecePrivateKey,
+				response.RedundancyStrategy, encSizedReader, expiration)
+			if err != nil {
+				return PartInfo{}, packageError.Wrap(err)
+			}
+
+			plainSegmentSize := sizeReader.Size()
+			if plainSegmentSize > 0 {
+				err = metainfoClient.CommitSegment(ctx, metainfo.CommitSegmentParams{
+					SegmentID:         response.SegmentID,
+					SizeEncryptedData: encSizedReader.Size(),
+					PlainSize:         plainSegmentSize,
+					Encryption:        segmentEncryption,
+					UploadResult:      uploadResults,
+				})
+				if err != nil {
+					return PartInfo{}, convertKnownErrors(err, bucket, key)
+				}
+			}
+		} else {
+			data, err := ioutil.ReadAll(peekReader)
+			if err != nil {
+				return PartInfo{}, packageError.Wrap(err)
+			}
+
+			cipherData, err := encryption.Encrypt(data, project.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
+			if err != nil {
+				return PartInfo{}, packageError.Wrap(err)
+			}
+
+			err = metainfoClient.MakeInlineSegment(ctx, metainfo.MakeInlineSegmentParams{
+				StreamID: decodedStreamID,
+				Position: storj.SegmentPosition{
+					PartNumber: int32(partNumber),
+					Index:      int32(currentSegment),
+				},
+				Encryption:          segmentEncryption,
+				EncryptedInlineData: cipherData,
+				PlainSize:           int64(len(data)),
+			})
+			if err != nil {
+				return PartInfo{}, packageError.Wrap(err)
+			}
+		}
+		streamSize += sizeReader.Size()
 		currentSegment++
 	}
 
