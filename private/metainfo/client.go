@@ -609,6 +609,8 @@ type BeginDeleteObjectParams struct {
 	Bucket        []byte
 	EncryptedPath []byte
 	Version       int32
+	StreamID      storj.StreamID
+	Status        int32
 }
 
 func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginDeleteRequest {
@@ -617,6 +619,8 @@ func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.O
 		Bucket:        params.Bucket,
 		EncryptedPath: params.EncryptedPath,
 		Version:       params.Version,
+		StreamId:      &params.StreamID,
+		Status:        params.Status,
 	}
 }
 

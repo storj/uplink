@@ -219,9 +219,8 @@ func TestAbortMultipartUpload(t *testing.T) {
 		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID)
 		require.NoError(t, err)
 
-		// TODO: uncomment this check when we fix AbortMultipartUpload to delete the pending object
 		// assert there is no pending multipart upload
-		// assertMultipartUploadList(ctx, t, project, "testbucket", nil)
+		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 	})
 }
 

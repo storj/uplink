@@ -390,6 +390,16 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 		return ErrStreamIDInvalid
 	}
 
+	decodedStreamID, version, err := base58.CheckDecode(streamID)
+	if err != nil || version != 1 {
+		return errors.New("invalid streamID format")
+	}
+
+	id, err := storj.StreamIDFromBytes(decodedStreamID)
+	if err != nil {
+		return packageError.Wrap(err)
+	}
+
 	encStore := project.access.encAccess.Store
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), encStore)
 	if err != nil {
@@ -404,6 +414,9 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 	_, err = metainfoClient.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
 		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
+		Version:       1,
+		StreamID:      id,
+		Status:        int32(pb.Object_UPLOADING),
 	})
 	if err != nil {
 		return convertKnownErrors(err, bucket, key)
