@@ -113,6 +113,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 		select {
 		case <-ctx.Done():
 			s.cancelHandler(context.Background(), path)
+			err = ctx.Err()
 		default:
 		}
 	}()
