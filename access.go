@@ -14,6 +14,7 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/macaroon"
 	"storj.io/common/paths"
+	"storj.io/common/rpc"
 	"storj.io/common/storj"
 	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/access2"
@@ -25,9 +26,9 @@ import (
 // of encryption information, and information about the Satellite responsible
 // for the project's metadata.
 type Access struct {
-	satelliteAddress string
-	apiKey           *macaroon.APIKey
-	encAccess        *access2.EncryptionAccess
+	satelliteURL storj.NodeURL
+	apiKey       *macaroon.APIKey
+	encAccess    *access2.EncryptionAccess
 }
 
 // SharePrefix defines a prefix that will be shared.
@@ -80,23 +81,28 @@ func ParseAccess(access string) (*Access, error) {
 		return nil, packageError.Wrap(err)
 	}
 
+	satelliteURL, err := parseNodeURL(inner.SatelliteAddress)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
 	return &Access{
-		satelliteAddress: inner.SatelliteAddress,
-		apiKey:           inner.APIKey,
-		encAccess:        inner.EncAccess,
+		satelliteURL: satelliteURL,
+		apiKey:       inner.APIKey,
+		encAccess:    inner.EncAccess,
 	}, nil
 }
 
 // SatelliteAddress returns the satellite node URL for this access grant.
 func (access *Access) SatelliteAddress() string {
-	return access.satelliteAddress
+	return access.satelliteURL.String()
 }
 
 // Serialize serializes an access grant such that it can be used later with
 // ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
 	inner := access2.Access{
-		SatelliteAddress: access.satelliteAddress,
+		SatelliteAddress: access.satelliteURL.String(),
 		APIKey:           access.apiKey,
 		EncAccess:        access.encAccess,
 	}
@@ -142,13 +148,18 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 		return nil, packageError.Wrap(err)
 	}
 
-	dialer, fullNodeURL, err := config.getDialer(ctx, satelliteAddress, parsedAPIKey)
+	satelliteURL, err := parseNodeURL(satelliteAddress)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
 
-	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteAddress, parsedAPIKey, config.UserAgent)
+	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteURL.String(), parsedAPIKey, config.UserAgent)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -166,11 +177,33 @@ func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Confi
 
 	encAccess := access2.NewEncryptionAccessWithDefaultKey(key)
 	encAccess.SetDefaultPathCipher(storj.EncAESGCM)
+
 	return &Access{
-		satelliteAddress: fullNodeURL,
-		apiKey:           parsedAPIKey,
-		encAccess:        encAccess,
+		satelliteURL: satelliteURL,
+		apiKey:       parsedAPIKey,
+		encAccess:    encAccess,
 	}, nil
+}
+
+// parseNodeURL parses the address into a storj.NodeURL adding the node id if necessary
+// for known addresses.
+func parseNodeURL(address string) (storj.NodeURL, error) {
+	nodeURL, err := storj.ParseNodeURL(address)
+	if err != nil {
+		return nodeURL, packageError.Wrap(err)
+	}
+
+	// Node id is required in satelliteNodeID for all unknown (non-storj) satellites.
+	// For known satellite it will be automatically prepended.
+	if nodeURL.ID.IsZero() {
+		nodeID, found := rpc.KnownNodeID(nodeURL.Address)
+		if !found {
+			return nodeURL, packageError.New("node id is required in satelliteNodeURL")
+		}
+		nodeURL.ID = nodeID
+	}
+
+	return nodeURL, nil
 }
 
 // enablePathEncryptionBypass enables path encryption bypass for embedded encryption access.
@@ -254,9 +287,9 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	}
 
 	restrictedAccess := &Access{
-		satelliteAddress: access.satelliteAddress,
-		apiKey:           restrictedAPIKey,
-		encAccess:        sharedAccess,
+		satelliteURL: access.satelliteURL,
+		apiKey:       restrictedAPIKey,
+		encAccess:    sharedAccess,
 	}
 	return restrictedAccess, nil
 }

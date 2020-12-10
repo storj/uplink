@@ -55,7 +55,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	var telemetry telemetryclient.Client
 	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
-		telemetry, err = ctor(access.satelliteAddress)
+		telemetry, err = ctor(access.satelliteURL.String())
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}()
 	}
 
-	dialer, _, err := config.getDialer(ctx, access.satelliteAddress, access.apiKey)
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -188,7 +188,7 @@ func (project *Project) getMetainfoClient(ctx context.Context) (_ *metainfo.Clie
 
 	metainfoClient, err := metainfo.DialNodeURL(ctx,
 		project.dialer,
-		project.access.satelliteAddress,
+		project.access.satelliteURL.String(),
 		project.access.apiKey,
 		project.config.UserAgent)
 	if err != nil {

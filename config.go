@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"storj.io/common/identity"
-	"storj.io/common/macaroon"
 	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
-	"storj.io/common/storj"
 	"storj.io/common/useragent"
 	"storj.io/uplink/internal/expose"
 )
@@ -38,13 +36,13 @@ type Config struct {
 	pool *rpcpool.Pool
 }
 
-func (config Config) getDialer(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ rpc.Dialer, fullNodeURL string, err error) {
+func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
 		Difficulty:  0,
 		Concurrency: 1,
 	})
 	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
 	tlsConfig := tlsopts.Config{
@@ -54,7 +52,7 @@ func (config Config) getDialer(ctx context.Context, satelliteAddress string, api
 
 	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
 	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
 	dialer := rpc.NewDefaultDialer(tlsOptions)
@@ -70,25 +68,7 @@ func (config Config) getDialer(ctx context.Context, satelliteAddress string, api
 	}
 	dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
 
-	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
-	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
-	}
-
-	// Node id is required in satelliteNodeID for all unknown (non-storj) satellites.
-	// For known satellite it will be automatically prepended.
-	if nodeURL.ID.IsZero() {
-		nodeID, found := rpc.KnownNodeID(nodeURL.Address)
-		if !found {
-			return rpc.Dialer{}, "", packageError.New("node id is required in satelliteNodeURL")
-		}
-		satelliteAddress = storj.NodeURL{
-			ID:      nodeID,
-			Address: nodeURL.Address,
-		}.String()
-	}
-
-	return dialer, satelliteAddress, packageError.Wrap(err)
+	return dialer, nil
 }
 
 func setConnectionPool(ctx context.Context, config *Config, pool *rpcpool.Pool) error {
