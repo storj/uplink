@@ -15,6 +15,7 @@ import (
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
 	"storj.io/common/storj"
+	"storj.io/common/useragent"
 	"storj.io/uplink/internal/expose"
 )
 
@@ -96,5 +97,17 @@ func setConnectionPool(ctx context.Context, config *Config, pool *rpcpool.Pool) 
 	}
 
 	config.pool = pool
+	return nil
+}
+
+func (config Config) validateUserAgent(ctx context.Context) error {
+	if len(config.UserAgent) == 0 {
+		return nil
+	}
+
+	if _, err := useragent.ParseEntries([]byte(config.UserAgent)); err != nil {
+		return err
+	}
+
 	return nil
 }

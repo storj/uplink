@@ -49,6 +49,10 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.New("access grant is nil")
 	}
 
+	if err := config.validateUserAgent(ctx); err != nil {
+		return nil, packageError.New("invalid user agent: %w", err)
+	}
+
 	var telemetry telemetryclient.Client
 	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
 		telemetry, err = ctor(access.satelliteAddress)
