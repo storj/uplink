@@ -6,7 +6,10 @@ package metainfo
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
+	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -637,6 +640,9 @@ func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginD
 // BeginDeleteObject begins object deletion process.
 func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
+
+	var buf [4096]byte
+	fmt.Fprintln(os.Stderr, "=== ISSUING DELETE", string(buf[:runtime.Stack(buf[:], false)]))
 
 	// response.StreamID is not processed because satellite will always return nil
 	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
