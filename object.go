@@ -97,8 +97,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	b := storj.Bucket{Name: bucket}
-	obj, err := db.GetObject(ctx, b, key)
+	obj, err := db.GetObject(ctx, bucket, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -116,8 +115,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	b := storj.Bucket{Name: bucket}
-	obj, err := db.DeleteObject(ctx, b, key)
+	obj, err := db.DeleteObject(ctx, bucket, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -142,13 +140,13 @@ func convertObject(obj *storj.Object) *Object {
 }
 
 func getObjectIPs(ctx context.Context, config Config, access *Access, bucket, key string) (ips []net.IP, err error) {
-	dialer, _, err := config.getDialer(ctx, access.satelliteAddress, access.apiKey)
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
 
-	metainfoClient, err := metainfo.DialNodeURL(ctx, dialer, access.satelliteAddress, access.apiKey, config.UserAgent)
+	metainfoClient, err := metainfo.DialNodeURL(ctx, dialer, access.satelliteURL.String(), access.apiKey, config.UserAgent)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

@@ -621,6 +621,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 
 		project, err := uplink.OpenProject(ctx, access)
 		require.NoError(t, err)
+		defer ctx.Check(project.Close)
 
 		objects := project.ListObjects(ctx, bucketName, &uplink.ListObjectsOptions{
 			Recursive: true,
@@ -666,6 +667,7 @@ func TestDeleteObject_EncryptionBypass(t *testing.T) {
 
 		project, err := uplink.OpenProject(ctx, access)
 		require.NoError(t, err)
+		defer ctx.Check(project.Close)
 
 		objects := project.ListObjects(ctx, bucketName, &uplink.ListObjectsOptions{
 			Recursive: true,

@@ -34,3 +34,15 @@ func TestProject_OpenProjectDialFail(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestProject_OpenProjectMalformedUserAgent(t *testing.T) {
+	config := uplink.Config{
+		UserAgent: "Invalid (darwin; amd64) invalid/v7.0.6 version/2020-11-17T00:39:14Z",
+	}
+
+	ctx := testcontext.New(t)
+	defer ctx.Cleanup()
+	_, err := config.OpenProject(ctx, &uplink.Access{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user agent")
+}

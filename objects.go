@@ -113,7 +113,7 @@ func (objects *ObjectIterator) tryLoadNext() (ok bool, err error) {
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	list, err := db.ListObjects(objects.ctx, objects.bucket, objects.options)
+	list, err := db.ListObjects(objects.ctx, objects.bucket.Name, objects.options)
 	if err != nil {
 		return false, convertKnownErrors(err, objects.bucket.Name, "")
 	}
