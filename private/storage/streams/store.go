@@ -16,6 +16,7 @@ import (
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
+	"storj.io/common/context2"
 	"storj.io/common/encryption"
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
@@ -24,6 +25,26 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metainfo"
 )
+
+type ctxKey int
+
+const (
+	disableDeleteOnCancelKey ctxKey = 1
+)
+
+// DisableDeleteOnCancel changes upload behavior to skip object cleanup
+// when an upload is canceled. This is not recommended and may cause
+// zombie segments. This function is a stop gap for one customer and will
+// be removed soon. Buyer beware.
+func DisableDeleteOnCancel(ctx context.Context) context.Context {
+	return context.WithValue(ctx, disableDeleteOnCancelKey, true)
+}
+
+func shouldDeleteOnCancel(ctx context.Context) bool {
+	val, ok := ctx.Value(disableDeleteOnCancelKey).(bool)
+	disable := ok && val
+	return !disable
+}
 
 var mon = monkit.Package()
 
@@ -106,7 +127,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	var streamID storj.StreamID
 	defer func() {
 		if err != nil {
-			s.cancelHandler(context.Background(), path)
+			s.cancelHandler(context2.WithoutCancellation(ctx), path)
 			return
 		}
 	}()
@@ -519,10 +540,12 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, e
 func (s *Store) cancelHandler(ctx context.Context, path Path) {
 	defer mon.Task()(&ctx)(nil)
 
-	// satellite deletes now from 0 to l so we can just use BeginDeleteObject
-	err := s.Delete(ctx, path)
-	if err != nil {
-		zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
+	if shouldDeleteOnCancel(ctx) {
+		// satellite deletes now from 0 to l so we can just use BeginDeleteObject
+		err := s.Delete(ctx, path)
+		if err != nil {
+			zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
+		}
 	}
 }
 
