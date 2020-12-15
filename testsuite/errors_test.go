@@ -75,12 +75,9 @@ func TestErrResourceExhausted(t *testing.T) {
 		err := satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, projectInfo.ID, 0)
 		require.NoError(t, err)
 
-		apiKey := planet.Uplinks[0].Projects[0].APIKey
-		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
-
-		project, err := uplink.OpenProject(ctx, access)
-		require.NoError(t, err)
+		defer ctx.Check(project.Close)
 
 		_, err = project.CreateBucket(ctx, "test-bucket")
 		require.NoError(t, err)
@@ -132,10 +129,9 @@ func TestBucketNotFoundError(t *testing.T) {
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
-
-		project, err := uplink.OpenProject(ctx, access)
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
+		defer ctx.Check(project.Close)
 
 		_, err = project.StatBucket(ctx, "non-existing-bucket")
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))

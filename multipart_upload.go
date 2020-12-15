@@ -574,7 +574,7 @@ func (uploads *MultipartUploadIterator) tryLoadNext() (ok bool, err error) {
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	list, err := db.ListObjects(uploads.ctx, uploads.bucket, uploads.options)
+	list, err := db.ListObjects(uploads.ctx, uploads.bucket.Name, uploads.options)
 	if err != nil {
 		return false, convertKnownErrors(err, uploads.bucket.Name, "")
 	}

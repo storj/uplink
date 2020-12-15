@@ -53,9 +53,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.New("access grant is nil")
 	}
 
+	if err := config.validateUserAgent(ctx); err != nil {
+		return nil, packageError.New("invalid user agent: %w", err)
+	}
+
 	var telemetry telemetryclient.Client
 	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
-		telemetry, err = ctor(access.satelliteAddress)
+		telemetry, err = ctor(access.satelliteURL.String())
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +71,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}()
 	}
 
-	dialer, _, err := config.getDialer(ctx, access.satelliteAddress, access.apiKey)
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -135,7 +139,10 @@ func (project *Project) Close() (err error) {
 		)
 	}
 
-	err = errs.Combine(err, project.dialer.Pool.Close())
+	// only close the connection pool if it's created through OpenProject
+	if project.config.pool == nil {
+		err = errs.Combine(err, project.dialer.Pool.Close())
+	}
 
 	return packageError.Wrap(err)
 }
@@ -153,9 +160,15 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		}
 	}()
 
+	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
+	ec := ecclient.NewClient(zap.L().Named("ecclient"), project.dialer, 0)
+
+	// TODO we need find a way how to pass it from satellite to client
+	maxInlineSize := 4 * memory.KiB.Int()
+
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,
-		project.ec,
+		ec,
 		project.segmentSize,
 		project.access.encAccess.Store,
 		project.encryptionParameters,
@@ -183,7 +196,7 @@ func (project *Project) getMetainfoClient(ctx context.Context) (_ *metainfo.Clie
 
 	metainfoClient, err := metainfo.DialNodeURL(ctx,
 		project.dialer,
-		project.access.satelliteAddress,
+		project.access.satelliteURL.String(),
 		project.access.apiKey,
 		project.config.UserAgent)
 	if err != nil {

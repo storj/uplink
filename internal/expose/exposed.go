@@ -17,3 +17,8 @@ var EnablePathEncryptionBypass interface{}
 //
 // func GetObjectIPs(ctx context.Context, config Config, access *Access, bucket, key string) (ips [][]byte, err error).
 var GetObjectIPs interface{}
+
+// SetConnectionPool exposes uplink.setConnectionPool.
+//
+// func SetConnectionPool(ctx context.Context, config *uplink.Config, pool *rpcpool.Pool) error.
+var SetConnectionPool interface{}

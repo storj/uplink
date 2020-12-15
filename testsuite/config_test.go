@@ -39,13 +39,7 @@ func TestRequestAccess(t *testing.T) {
 }
 
 func openProject(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) *uplink.Project {
-	projectInfo := planet.Uplinks[0].Projects[0]
-
-	uplinkConfig := uplink.Config{}
-	access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
-	require.NoError(t, err)
-
-	project, err := uplinkConfig.OpenProject(ctx, access)
+	project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 	require.NoError(t, err)
 
 	return project

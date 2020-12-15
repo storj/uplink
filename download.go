@@ -8,7 +8,6 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/storj"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -38,8 +37,6 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		}
 	}
 
-	b := storj.Bucket{Name: bucket}
-
 	// N.B. we always call dbCleanup which closes the db because
 	// closing it earlier has the benefit of returning a connection to
 	// the pool, so we try to do that as early as possible.
@@ -50,9 +47,14 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.GetObject(ctx, b, key)
+	obj, err := db.GetObject(ctx, bucket, key)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
+	}
+
+	// Return the connection to the pool as soon as we can.
+	if err := db.Close(); err != nil {
+		return nil, packageError.Wrap(err)
 	}
 
 	// Return the connection to the pool as soon as we can.

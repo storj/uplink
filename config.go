@@ -9,12 +9,17 @@ import (
 	"time"
 
 	"storj.io/common/identity"
-	"storj.io/common/macaroon"
 	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
+	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
-	"storj.io/common/storj"
+	"storj.io/common/useragent"
+	"storj.io/uplink/internal/expose"
 )
+
+func init() {
+	expose.SetConnectionPool = setConnectionPool
+}
 
 // Config defines configuration for using uplink library.
 type Config struct {
@@ -27,15 +32,17 @@ type Config struct {
 	// DialContext is how sockets are opened and is called to establish
 	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+
+	pool *rpcpool.Pool
 }
 
-func (config Config) getDialer(ctx context.Context, satelliteAddress string, apiKey *macaroon.APIKey) (_ rpc.Dialer, fullNodeURL string, err error) {
+func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
 		Difficulty:  0,
 		Concurrency: 1,
 	})
 	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
 	tlsConfig := tlsopts.Config{
@@ -45,10 +52,15 @@ func (config Config) getDialer(ctx context.Context, satelliteAddress string, api
 
 	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
 	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
+		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
-	dialer := rpc.NewDefaultPooledDialer(tlsOptions)
+	dialer := rpc.NewDefaultDialer(tlsOptions)
+	if config.pool != nil {
+		dialer.Pool = config.pool
+	} else {
+		dialer.Pool = rpc.NewDefaultConnectionPool()
+	}
 	dialer.DialTimeout = config.DialTimeout
 	dialContext := config.DialContext
 	if dialContext == nil {
@@ -56,23 +68,26 @@ func (config Config) getDialer(ctx context.Context, satelliteAddress string, api
 	}
 	dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
 
-	nodeURL, err := storj.ParseNodeURL(satelliteAddress)
-	if err != nil {
-		return rpc.Dialer{}, "", packageError.Wrap(err)
+	return dialer, nil
+}
+
+func setConnectionPool(ctx context.Context, config *Config, pool *rpcpool.Pool) error {
+	if config == nil {
+		return packageError.New("config is nil")
 	}
 
-	// Node id is required in satelliteNodeID for all unknown (non-storj) satellites.
-	// For known satellite it will be automatically prepended.
-	if nodeURL.ID.IsZero() {
-		nodeID, found := rpc.KnownNodeID(nodeURL.Address)
-		if !found {
-			return rpc.Dialer{}, "", packageError.New("node id is required in satelliteNodeURL")
-		}
-		satelliteAddress = storj.NodeURL{
-			ID:      nodeID,
-			Address: nodeURL.Address,
-		}.String()
+	config.pool = pool
+	return nil
+}
+
+func (config Config) validateUserAgent(ctx context.Context) error {
+	if len(config.UserAgent) == 0 {
+		return nil
 	}
 
-	return dialer, satelliteAddress, packageError.Wrap(err)
+	if _, err := useragent.ParseEntries([]byte(config.UserAgent)); err != nil {
+		return err
+	}
+
+	return nil
 }

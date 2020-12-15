@@ -12,7 +12,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
-	"storj.io/common/storj"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -51,8 +50,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	b := storj.Bucket{Name: bucket}
-	obj, err := db.CreateObject(ctx, b, key, nil)
+	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

@@ -46,7 +46,7 @@ func TestCreateObject(t *testing.T) {
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
 
-			obj, err := db.CreateObject(ctx, bucket, TestFile, tt.create)
+			obj, err := db.CreateObject(ctx, bucket.Name, TestFile, tt.create)
 			require.NoError(t, err)
 
 			info := obj.Info()
@@ -64,22 +64,19 @@ func TestGetObject(t *testing.T) {
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket, TestFile, nil)
 
-		_, err = db.GetObject(ctx, storj.Bucket{}, "")
+		_, err = db.GetObject(ctx, "", "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
-		_, err = db.GetObject(ctx, bucket, "")
+		_, err = db.GetObject(ctx, bucket.Name, "")
 		assert.True(t, storj.ErrNoPath.Has(err))
 
-		nonExistingBucket := storj.Bucket{
-			Name: "non-existing-bucket",
-		}
-		_, err = db.GetObject(ctx, nonExistingBucket, TestFile)
+		_, err = db.GetObject(ctx, "non-existing-bucket", TestFile)
 		assert.True(t, storj.ErrObjectNotFound.Has(err))
 
-		_, err = db.GetObject(ctx, bucket, "non-existing-file")
+		_, err = db.GetObject(ctx, bucket.Name, "non-existing-file")
 		assert.True(t, storj.ErrObjectNotFound.Has(err))
 
-		object, err := db.GetObject(ctx, bucket, TestFile)
+		object, err := db.GetObject(ctx, bucket.Name, TestFile)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestFile, object.Path)
 			assert.Equal(t, TestBucket, object.Bucket.Name)
@@ -98,13 +95,10 @@ func TestDownloadObject(t *testing.T) {
 		smallFile := upload(ctx, t, db, streams, bucket, "small-file", []byte("test"))
 		largeFile := upload(ctx, t, db, streams, bucket, "large-file", data)
 
-		emptyBucket := storj.Bucket{
-			PathCipher: storj.EncNull,
-		}
-		_, err = db.GetObject(ctx, emptyBucket, "")
+		_, err = db.GetObject(ctx, "", "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
-		_, err = db.GetObject(ctx, bucket, "")
+		_, err = db.GetObject(ctx, bucket.Name, "")
 		assert.True(t, storj.ErrNoPath.Has(err))
 
 		assertData(ctx, t, db, streams, bucket, emptyFile, []byte{})
@@ -127,7 +121,7 @@ func TestDownloadObject(t *testing.T) {
 }
 
 func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, path storj.Path, data []byte) storj.Object {
-	obj, err := db.CreateObject(ctx, bucket, path, nil)
+	obj, err := db.CreateObject(ctx, bucket.Name, path, nil)
 	require.NoError(t, err)
 
 	str, err := obj.CreateStream(ctx)
@@ -141,7 +135,7 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	err = upload.Close()
 	require.NoError(t, err)
 
-	info, err := db.GetObject(ctx, bucket, path)
+	info, err := db.GetObject(ctx, bucket.Name, path)
 	require.NoError(t, err)
 
 	return info
@@ -190,25 +184,19 @@ func TestDeleteObject(t *testing.T) {
 				encStore.EncryptionBypass = true
 			}
 
-			_, err = db.DeleteObject(ctx, storj.Bucket{}, "")
+			_, err = db.DeleteObject(ctx, "", "")
 			assert.True(t, storj.ErrNoBucket.Has(err))
 
-			_, err = db.DeleteObject(ctx, bucket, "")
+			_, err = db.DeleteObject(ctx, bucket.Name, "")
 			assert.True(t, storj.ErrNoPath.Has(err))
 
-			{
-				unexistingBucket := storj.Bucket{
-					Name:       bucket.Name + "-not-exist",
-					PathCipher: bucket.PathCipher,
-				}
-				_, err = db.DeleteObject(ctx, unexistingBucket, TestFile)
-				assert.Nil(t, err)
-			}
-
-			_, err = db.DeleteObject(ctx, bucket, "non-existing-file")
+			_, err = db.DeleteObject(ctx, bucket.Name+"-not-exist", TestFile)
 			assert.Nil(t, err)
 
-			object, err := db.DeleteObject(ctx, bucket, path)
+			_, err = db.DeleteObject(ctx, bucket.Name, "non-existing-file")
+			assert.Nil(t, err)
+
+			object, err := db.DeleteObject(ctx, bucket.Name, path)
 			if assert.NoError(t, err) {
 				assert.Equal(t, path, object.Path)
 			}
@@ -221,10 +209,10 @@ func TestListObjectsEmpty(t *testing.T) {
 		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		_, err = db.ListObjects(ctx, storj.Bucket{}, storj.ListOptions{})
+		_, err = db.ListObjects(ctx, "", storj.ListOptions{})
 		assert.True(t, storj.ErrNoBucket.Has(err))
 
-		_, err = db.ListObjects(ctx, testBucketInfo, storj.ListOptions{})
+		_, err = db.ListObjects(ctx, testBucketInfo.Name, storj.ListOptions{})
 		assert.EqualError(t, err, "metainfo: invalid direction 0")
 
 		// TODO for now we are supporting only storj.After
@@ -232,7 +220,7 @@ func TestListObjectsEmpty(t *testing.T) {
 			// storj.Forward,
 			storj.After,
 		} {
-			list, err := db.ListObjects(ctx, testBucketInfo, storj.ListOptions{Direction: direction})
+			list, err := db.ListObjects(ctx, testBucketInfo.Name, storj.ListOptions{Direction: direction})
 			if assert.NoError(t, err) {
 				assert.False(t, list.More)
 				assert.Equal(t, 0, len(list.Items))
@@ -271,7 +259,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 
 		opts := options("", "", 0)
 		opts.Recursive = true
-		encodedList, err := db.ListObjects(ctx, bucket, opts)
+		encodedList, err := db.ListObjects(ctx, bucket.Name, opts)
 		require.NoError(t, err)
 		require.Equal(t, len(filePaths), len(encodedList.Items))
 
@@ -428,7 +416,7 @@ func TestListObjects(t *testing.T) {
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
 
-			list, err := db.ListObjects(ctx, bucket, tt.options)
+			list, err := db.ListObjects(ctx, bucket.Name, tt.options)
 
 			if assert.NoError(t, err, errTag) {
 				assert.Equal(t, tt.more, list.More, errTag)
