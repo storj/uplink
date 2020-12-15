@@ -160,15 +160,9 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		}
 	}()
 
-	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
-	ec := ecclient.NewClient(zap.L().Named("ecclient"), project.dialer, 0)
-
-	// TODO we need find a way how to pass it from satellite to client
-	maxInlineSize := 4 * memory.KiB.Int()
-
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,
-		ec,
+		project.ec,
 		project.segmentSize,
 		project.access.encAccess.Store,
 		project.encryptionParameters,

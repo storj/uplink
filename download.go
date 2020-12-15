@@ -57,11 +57,6 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, packageError.Wrap(err)
 	}
 
-	// Return the connection to the pool as soon as we can.
-	if err := db.Close(); err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
 	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
