@@ -27,18 +27,18 @@ type Meta struct {
 }
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
-func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, path storj.Path) (ips []net.IP, err error) {
+func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, key string) (ips []net.IP, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
 		return nil, storj.ErrNoBucket.New("")
 	}
 
-	if path == "" {
+	if key == "" {
 		return nil, storj.ErrNoPath.New("")
 	}
 
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(path), db.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 	if needsEncryption {
 		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
 
-		startAfter, err = encryption.EncryptPathRaw(startAfter, db.pathCipher(base.PathCipher), prefixKey)
+		startAfter, err = encryption.EncryptPathRaw(startAfter, db.keyCipher(base.PathCipher), prefixKey)
 		if err != nil {
 			return storj.ObjectList{}, errClass.Wrap(err)
 		}
@@ -220,7 +220,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 		var itemPath string
 
 		if needsEncryption {
-			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.pathCipher(base.PathCipher), prefixKey)
+			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.keyCipher(base.PathCipher), prefixKey)
 			if err != nil {
 				// skip items that cannot be decrypted
 				if encryption.ErrDecryptFailed.Has(err) {
@@ -265,11 +265,11 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 	return list, nil
 }
 
-func (db *DB) pathCipher(pathCipher storj.CipherSuite) storj.CipherSuite {
+func (db *DB) keyCipher(keyCipher storj.CipherSuite) storj.CipherSuite {
 	if db.encStore.EncryptionBypass {
 		return storj.EncNullBase64URL
 	}
-	return pathCipher
+	return keyCipher
 }
 
 // GetObject returns information about an object.
@@ -300,7 +300,7 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info storj.Obj
 	return db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
 }
 
-func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path storj.Path, objectInfo RawObjectItem) (storj.Object, error) {
+func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, objectInfo RawObjectItem) (storj.Object, error) {
 	if objectInfo.Bucket == "" { // zero objectInfo
 		return storj.Object{}, nil
 	}
@@ -308,7 +308,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path s
 	object := storj.Object{
 		Version:  0, // TODO:
 		Bucket:   storj.Bucket{Name: bucket},
-		Path:     path,
+		Path:     key,
 		IsPrefix: false,
 
 		Created:  objectInfo.Modified, // TODO: use correct field
@@ -323,7 +323,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket string, path s
 		},
 	}
 
-	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(path), objectInfo.EncryptedMetadata, db.encStore)
+	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key), objectInfo.EncryptedMetadata, db.encStore)
 	if err != nil {
 		return storj.Object{}, err
 	}

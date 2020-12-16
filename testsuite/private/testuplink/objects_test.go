@@ -62,7 +62,7 @@ func TestGetObject(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
-		upload(ctx, t, db, streams, bucket, TestFile, nil)
+		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
 
 		_, err = db.GetObject(ctx, "", "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
@@ -91,9 +91,9 @@ func TestDownloadObject(t *testing.T) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		emptyFile := upload(ctx, t, db, streams, bucket, "empty-file", nil)
-		smallFile := upload(ctx, t, db, streams, bucket, "small-file", []byte("test"))
-		largeFile := upload(ctx, t, db, streams, bucket, "large-file", data)
+		emptyFile := upload(ctx, t, db, streams, bucket.Name, "empty-file", nil)
+		smallFile := upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
+		largeFile := upload(ctx, t, db, streams, bucket.Name, "large-file", data)
 
 		_, err = db.GetObject(ctx, "", "")
 		assert.True(t, storj.ErrNoBucket.Has(err))
@@ -120,8 +120,8 @@ func TestDownloadObject(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, path storj.Path, data []byte) storj.Object {
-	obj, err := db.CreateObject(ctx, bucket.Name, path, nil)
+func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) storj.Object {
+	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 
 	str, err := obj.CreateStream(ctx)
@@ -135,7 +135,7 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	err = upload.Close()
 	require.NoError(t, err)
 
-	info, err := db.GetObject(ctx, bucket.Name, path)
+	info, err := db.GetObject(ctx, bucket, key)
 	require.NoError(t, err)
 
 	return info
@@ -176,8 +176,8 @@ func TestDeleteObject(t *testing.T) {
 		encryptedPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, unencryptedPath, encStore)
 		require.NoError(t, err)
 
-		for i, path := range []string{unencryptedPath.String(), encryptedPath.String()} {
-			upload(ctx, t, db, streams, bucket, path, nil)
+		for i, key := range []string{unencryptedPath.String(), encryptedPath.String()} {
+			upload(ctx, t, db, streams, bucket.Name, key, nil)
 
 			if i < 0 {
 				// Enable encryption bypass
@@ -196,9 +196,9 @@ func TestDeleteObject(t *testing.T) {
 			_, err = db.DeleteObject(ctx, bucket.Name, "non-existing-file")
 			assert.Nil(t, err)
 
-			object, err := db.DeleteObject(ctx, bucket.Name, path)
+			object, err := db.DeleteObject(ctx, bucket.Name, key)
 			if assert.NoError(t, err) {
-				assert.Equal(t, path, object.Path)
+				assert.Equal(t, key, object.Path)
 			}
 		}
 	})
@@ -243,16 +243,16 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		filePaths := []string{
+		objectKeys := []string{
 			"a", "aa", "b", "bb", "c",
 			"a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc",
 			"b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc",
 		}
 
-		for _, path := range filePaths {
-			upload(ctx, t, db, streams, bucket, path, nil)
+		for _, key := range objectKeys {
+			upload(ctx, t, db, streams, bucket.Name, key, nil)
 		}
-		sort.Strings(filePaths)
+		sort.Strings(objectKeys)
 
 		// Enable encryption bypass
 		encStore.EncryptionBypass = true
@@ -261,7 +261,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		opts.Recursive = true
 		encodedList, err := db.ListObjects(ctx, bucket.Name, opts)
 		require.NoError(t, err)
-		require.Equal(t, len(filePaths), len(encodedList.Items))
+		require.Equal(t, len(objectKeys), len(encodedList.Items))
 
 		seenPaths := make(map[string]struct{})
 		for _, item := range encodedList.Items {
@@ -282,10 +282,10 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 			require.NoError(t, err)
 
 			// NB: require decrypted path is a member of `filePaths`.
-			result := sort.Search(len(filePaths), func(i int) bool {
-				return !paths.NewUnencrypted(filePaths[i]).Less(decryptedPath)
+			result := sort.Search(len(objectKeys), func(i int) bool {
+				return !paths.NewUnencrypted(objectKeys[i]).Less(decryptedPath)
 			})
-			require.NotEqual(t, len(filePaths), result)
+			require.NotEqual(t, len(objectKeys), result)
 
 			// NB: ensure each path is only seen once.
 			_, ok := seenPaths[decryptedPath.String()]
@@ -301,20 +301,20 @@ func TestListObjects(t *testing.T) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		filePaths := []string{
+		objectKeys := []string{
 			"a", "aa", "b", "bb", "c",
 			"a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc",
 			"b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc",
 		}
 
-		for _, path := range filePaths {
-			upload(ctx, t, db, streams, bucket, path, nil)
+		for _, key := range objectKeys {
+			upload(ctx, t, db, streams, bucket.Name, key, nil)
 		}
 
 		otherBucket, err := db.CreateBucket(ctx, "otherbucket")
 		require.NoError(t, err)
 
-		upload(ctx, t, db, streams, otherBucket, "file-in-other-bucket", nil)
+		upload(ctx, t, db, streams, otherBucket.Name, "file-in-other-bucket", nil)
 
 		for i, tt := range []struct {
 			options storj.ListOptions

@@ -603,17 +603,17 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		err = planet.Uplinks[0].CreateBucket(ctx, satellite, bucketName)
 		require.NoError(t, err)
 
-		filePaths := []string{
+		objectKeys := []string{
 			"a", "aa", "b", "bb", "c",
 			"a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc",
 			"b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc",
 		}
 
-		for _, path := range filePaths {
-			err = planet.Uplinks[0].Upload(ctx, satellite, bucketName, path, testrand.Bytes(memory.KiB))
+		for _, key := range objectKeys {
+			err = planet.Uplinks[0].Upload(ctx, satellite, bucketName, key, testrand.Bytes(memory.KiB))
 			require.NoError(t, err)
 		}
-		sort.Strings(filePaths)
+		sort.Strings(objectKeys)
 
 		// Enable encryption bypass
 		err = privateAccess.EnablePathEncryptionBypass(access)
