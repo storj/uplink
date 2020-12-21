@@ -110,14 +110,14 @@ func (project *Project) PutObjectPart(ctx context.Context, bucket, key string, s
 	case key == "":
 		return PartInfo{}, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 	case streamID == "":
-		return PartInfo{}, ErrStreamIDInvalid
+		return PartInfo{}, packageError.Wrap(ErrStreamIDInvalid)
 	case partNumber < 1:
 		return PartInfo{}, packageError.New("partNumber should be larger than 0")
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
 	if err != nil || version != 1 {
-		return PartInfo{}, packageError.New("invalid streamID format")
+		return PartInfo{}, packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	var (
@@ -287,12 +287,12 @@ func (project *Project) CompleteMultipartUpload(ctx context.Context, bucket, key
 	}
 
 	if streamID == "" {
-		return nil, packageError.New("streamID is missing")
+		return nil, packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
 	if err != nil || version != 1 {
-		return nil, errors.New("invalid streamID format")
+		return nil, packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	if opts == nil {
@@ -387,12 +387,12 @@ func (project *Project) AbortMultipartUpload(ctx context.Context, bucket, key, s
 		return ErrObjectKeyInvalid
 	}
 	if streamID == "" {
-		return ErrStreamIDInvalid
+		return packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
 	if err != nil || version != 1 {
-		return errors.New("invalid streamID format")
+		return packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	id, err := storj.StreamIDFromBytes(decodedStreamID)
@@ -439,7 +439,7 @@ func (project *Project) ListObjectParts(ctx context.Context, bucket, key, stream
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
 	if err != nil || version != 1 {
-		return ListObjectPartsResult{}, errors.New("invalid streamID format")
+		return ListObjectPartsResult{}, packageError.Wrap(ErrStreamIDInvalid)
 	}
 
 	id, err := storj.StreamIDFromBytes(decodedStreamID)
