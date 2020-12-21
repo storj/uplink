@@ -27,6 +27,9 @@ var ErrTooManyRequests = errors.New("too many requests")
 // ErrBandwidthLimitExceeded is returned when project will exceeded bandwidth limit.
 var ErrBandwidthLimitExceeded = errors.New("bandwidth limit exceeded")
 
+// ErrPermissionDenied is returned when the request is denied due to invalid permissions.
+var ErrPermissionDenied = errors.New("permission denied")
+
 func convertKnownErrors(err error, bucket, key string) error {
 	switch {
 	case storj.ErrNoBucket.Has(err):
@@ -52,6 +55,13 @@ func convertKnownErrors(err error, bucket, key string) error {
 		} else if strings.HasPrefix(message, storj.ErrObjectNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
+	case errs2.IsRPC(err, rpcstatus.PermissionDenied):
+		originalErr := err
+		wrappedErr := errwrapf("%w (%v)", ErrPermissionDenied, originalErr)
+		// TODO: once we have confirmed nothing downstream
+		// is using errs2.IsRPC(err, rpcstatus.PermissionDenied), we should
+		// just return wrappedErr instead of this.
+		return &joinedErr{main: wrappedErr, alt: originalErr}
 	}
 
 	return packageError.Wrap(err)
@@ -62,4 +72,35 @@ func errwrapf(format string, err error, args ...interface{}) error {
 	all = append(all, err)
 	all = append(all, args...)
 	return packageError.Wrap(fmt.Errorf(format, all...))
+}
+
+type joinedErr struct {
+	main, alt error
+}
+
+func (err *joinedErr) Is(target error) bool {
+	return errors.Is(err.main, target) || errors.Is(err.alt, target)
+}
+
+func (err *joinedErr) As(target interface{}) bool {
+	if errors.As(err.main, target) {
+		return true
+	}
+	if errors.As(err.alt, target) {
+		return true
+	}
+	return false
+}
+
+func (err *joinedErr) Unwrap() error {
+	return err.main
+}
+
+func (err *joinedErr) Error() string {
+	return err.main.Error()
+}
+
+// Ungroup works with errs2.IsRPC and errs.IsFunc.
+func (err *joinedErr) Ungroup() []error {
+	return []error{err.main, err.alt}
 }
