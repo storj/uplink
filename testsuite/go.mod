@@ -13,5 +13,5 @@ require (
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 	storj.io/common v0.0.0-20201207172416-78f4e59925c3
 	storj.io/storj v0.12.1-0.20201208113459-c8e8fea0520a
-	storj.io/uplink v1.4.1
+	storj.io/uplink v1.4.3
 )
