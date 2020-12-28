@@ -19,6 +19,7 @@ import (
 
 func init() {
 	expose.SetConnectionPool = setConnectionPool
+	expose.SetTLSOptions = setTLSOptions
 }
 
 // Config defines configuration for using uplink library.
@@ -34,28 +35,32 @@ type Config struct {
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
 	pool *rpcpool.Pool
+
+	tlsOptions *tlsopts.Options
 }
 
 func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
-	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
-		Difficulty:  0,
-		Concurrency: 1,
-	})
-	if err != nil {
-		return rpc.Dialer{}, packageError.Wrap(err)
+	if config.tlsOptions == nil {
+		ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
+			Difficulty:  0,
+			Concurrency: 1,
+		})
+		if err != nil {
+			return rpc.Dialer{}, packageError.Wrap(err)
+		}
+
+		tlsConfig := tlsopts.Config{
+			UsePeerCAWhitelist: false,
+			PeerIDVersions:     "0",
+		}
+
+		config.tlsOptions, err = tlsopts.NewOptions(ident, tlsConfig, nil)
+		if err != nil {
+			return rpc.Dialer{}, packageError.Wrap(err)
+		}
 	}
 
-	tlsConfig := tlsopts.Config{
-		UsePeerCAWhitelist: false,
-		PeerIDVersions:     "0",
-	}
-
-	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
-	if err != nil {
-		return rpc.Dialer{}, packageError.Wrap(err)
-	}
-
-	dialer := rpc.NewDefaultDialer(tlsOptions)
+	dialer := rpc.NewDefaultDialer(config.tlsOptions)
 	if config.pool != nil {
 		dialer.Pool = config.pool
 	} else {
@@ -77,6 +82,15 @@ func setConnectionPool(ctx context.Context, config *Config, pool *rpcpool.Pool) 
 	}
 
 	config.pool = pool
+	return nil
+}
+
+func setTLSOptions(ctx context.Context, config *Config, tlsOptions *tlsopts.Options) error {
+	if config == nil {
+		return packageError.New("config is nil")
+	}
+
+	config.tlsOptions = tlsOptions
 	return nil
 }
 

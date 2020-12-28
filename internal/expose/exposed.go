@@ -22,3 +22,8 @@ var GetObjectIPs interface{}
 //
 // func SetConnectionPool(ctx context.Context, config *uplink.Config, pool *rpcpool.Pool) error.
 var SetConnectionPool interface{}
+
+// SetTLSOptions exposes uplink.setTLSOptions.
+//
+// func SetTLSOptions(ctx context.Context, config *uplink.Config, tlsOptions *tlsopts.Options) error {
+var SetTLSOptions interface{}
