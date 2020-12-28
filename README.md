@@ -6,7 +6,7 @@ Go library for Storj V3 Network.
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://pkg.go.dev/storj.io/uplink)
 ![Beta](https://img.shields.io/badge/version-beta-green.svg)
 
-<img src="https://github.com/storj/storj/raw/master/resources/logo.png" width="100">
+<img src="https://github.com/storj/storj/raw/main/resources/logo.png" width="100">
 
 Storj is building a decentralized cloud storage network.
 [Check out our white paper for more info!](https://storj.io/white-paper)
