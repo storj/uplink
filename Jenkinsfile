@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             label 'main'
-            image docker.build("storj-ci", "--pull https://github.com/storj/ci.git").id
+            image docker.build("storj-ci", "--pull git://github.com/storj/ci.git#main").id
             args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod'
         }
     }
@@ -65,7 +65,7 @@ pipeline {
                     steps {
                         sh 'go vet ./...'
                         sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
-                        // TODO enable this later 
+                        // TODO enable this later
                         // sh 'check-clean-directory'
                     }
 
@@ -100,7 +100,7 @@ pipeline {
                             sh 'go vet ./...'
                             sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
-                        // TODO enable this later 
+                        // TODO enable this later
                         // sh 'check-clean-directory'
                     }
 
