@@ -11,7 +11,6 @@ import (
 	"github.com/zeebo/errs"
 	"golang.org/x/sync/errgroup"
 
-	"storj.io/common/storj"
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 )
@@ -45,7 +44,7 @@ func NewUpload(ctx context.Context, stream *metainfo.MutableStream, streamsStore
 	}
 
 	upload.errgroup.Go(func() error {
-		m, err := streamsStore.Put(ctx, streams.ParsePath(storj.JoinPaths(stream.BucketName(), stream.Path())), reader, stream, stream.Expires())
+		m, err := streamsStore.Put(ctx, stream.BucketName(), stream.Path(), reader, stream, stream.Expires())
 		if err != nil {
 			err = Error.Wrap(err)
 			return errs.Combine(err, reader.CloseWithError(err))

@@ -4,7 +4,7 @@
 
 New version should be released when we are ready to make changes generally available.
 
-New version should not be released if we want to test our latest changes or to make them available to a limited number of users. This can be achieved without releasing a new version. Go modules allow to point to latest master or specific Git commit. However, commits from master are not suitable for use in production unless they are a release tag. Do not use non-release commits in downstream projects in production.
+New version should not be released if we want to test our latest changes or to make them available to a limited number of users. This can be achieved without releasing a new version. Go modules allow to point to latest main or specific Git commit. However, commits from main are not suitable for use in production unless they are a release tag. Do not use non-release commits in downstream projects in production.
 
 Consider releasing a new Release Candidate version to make changes available to a larger group of users, if we are not ready to make them available to everyone yet.
 
@@ -26,12 +26,12 @@ Examples of Release Candidates:
 
 ## Step-by-step release process
 
-1. Clone or fetch latest master of these Git repositories:
+1. Clone or fetch latest main of these Git repositories:
   - https://github.com/storj/storj
   - https://github.com/storj/gateway
   - https://github.com/storj/uplink-c
   - https://github.com/storj/linksharing
-2. For each of them update, `go.mod` and `testsuite/go.mod` to latest master (or the specific Git commit that will be tagged as a new version) of `storj.io/uplink`. Makefile target `bump-dependencies` (available in all listed repositories) can bo used to do this automatically.
+2. For each of them update, `go.mod` and `testsuite/go.mod` to latest main (or the specific Git commit that will be tagged as a new version) of `storj.io/uplink`. Makefile target `bump-dependencies` (available in all listed repositories) can bo used to do this automatically.
 3. Use `go mod tidy` to update the respective `go.sum` files.
 4. Push a change to Gerrit with the updated `go.mod` and `go.sum` files for each of the Git repositories.
 5. Wait for the build to finish. If the build fails for any of the Git repositories, abort the release process. Investigate the issue, fix it, and start over the release process.
@@ -43,7 +43,7 @@ Examples of Release Candidates:
   - Click the `Draft a new release` button.
   - Enter `Tag version` following the rules for the version number, e.g. `v1.2.3`.
   - Enter the same value as `Release title`, e.g. `v1.2.3`.
-  - If there are new commits in master since you executed step 1, do not include them in the release. Change the `Target` from `master` to the specific Git commit used in step 1.
+  - If there are new commits in main since you executed step 1, do not include them in the release. Change the `Target` from `main` to the specific Git commit used in step 1.
   - Describe the changes since the previous release in a human-readable way. Only those changes that affect users. No need to describe refactorings, etc.
   - If you are releasing a new Release Candidate, select the `This is a pre-release` checkbox.
   - Click the `Publish release` button.

@@ -16,7 +16,9 @@ import (
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
+	"storj.io/common/context2"
 	"storj.io/common/encryption"
+	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/storj"
@@ -24,6 +26,26 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metainfo"
 )
+
+type ctxKey int
+
+const (
+	disableDeleteOnCancelKey ctxKey = 1
+)
+
+// DisableDeleteOnCancel changes upload behavior to skip object cleanup
+// when an upload is canceled. This is not recommended and may cause
+// zombie segments. This function is a stop gap for one customer and will
+// be removed soon. Buyer beware.
+func DisableDeleteOnCancel(ctx context.Context) context.Context {
+	return context.WithValue(ctx, disableDeleteOnCancelKey, true)
+}
+
+func shouldDeleteOnCancel(ctx context.Context) bool {
+	val, ok := ctx.Value(disableDeleteOnCancelKey).(bool)
+	disable := ok && val
+	return !disable
+}
 
 var mon = monkit.Package()
 
@@ -80,24 +102,24 @@ func (s *Store) Close() error {
 }
 
 // Put breaks up data as it comes in into s.segmentSize length pieces, then
-// store the first piece at s0/<path>, second piece at s1/<path>, and the
-// *last* piece at l/<path>. Store the given metadata, along with the number
-// of segments, in a new protobuf, in the metadata of l/<path>.
+// store the first piece at s0/<key>, second piece at s1/<key>, and the
+// *last* piece at l/<key>. Store the given metadata, along with the number
+// of segments, in a new protobuf, in the metadata of l/<key>.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
+func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
-	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return Meta{}, err
 	}
-	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return Meta{}, err
 	}
 
 	beginObjectReq := &metainfo.BeginObjectParams{
-		Bucket:               []byte(path.Bucket()),
+		Bucket:               []byte(bucket),
 		EncryptedPath:        []byte(encPath.Raw()),
 		ExpiresAt:            expiration,
 		EncryptionParameters: s.encryptionParameters,
@@ -106,7 +128,7 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	var streamID storj.StreamID
 	defer func() {
 		if err != nil {
-			s.cancelHandler(context.Background(), path)
+			s.cancelHandler(context2.WithoutCancellation(ctx), bucket, unencryptedKey)
 			return
 		}
 	}()
@@ -351,10 +373,10 @@ func (s *Store) Put(ctx context.Context, path Path, data io.Reader, metadata Met
 	return resultMeta, nil
 }
 
-// Get returns a ranger that knows what the overall size is (from l/<path> or listing all segments)
-// and then returns the appropriate data from segments s0/<path>, s1/<path>,
-// ..., n/<path>.
-func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
+// Get returns a ranger that knows what the overall size is (from l/<key>)
+// and then returns the appropriate data from segments s0/<key>, s1/<key>,
+// ..., l/<key>.
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if object.Size == 0 {
@@ -362,10 +384,10 @@ func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ran
 	}
 
 	if object.FixedSegmentSize != 0 {
-		return s.getWithLastSegment(ctx, path, object)
+		return s.getWithLastSegment(ctx, bucket, unencryptedKey, object)
 	}
 
-	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +424,7 @@ func (s *Store) Get(ctx context.Context, path Path, object storj.Object) (rr ran
 	return ranger.Concat(rangers...), nil
 }
 
-func (s *Store) getWithLastSegment(ctx context.Context, path Path, object storj.Object) (rr ranger.Ranger, err error) {
+func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey string, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
@@ -420,7 +442,7 @@ func (s *Store) getWithLastSegment(ctx context.Context, path Path, object storj.
 		return nil, err
 	}
 
-	derivedKey, err := encryption.DeriveContentKey(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return nil, err
 	}
@@ -473,16 +495,16 @@ func (s *Store) getWithLastSegment(ctx context.Context, path Path, object storj.
 }
 
 // Delete all the segments, with the last one last.
-func (s *Store) Delete(ctx context.Context, path Path) (err error) {
+func (s *Store) Delete(ctx context.Context, bucket, unencryptedKey string) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	encPath, err := encryption.EncryptPathWithStoreCipher(path.Bucket(), path.UnencryptedPath(), s.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return err
 	}
 
 	_, err = s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
-		Bucket:        []byte(path.Bucket()),
+		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
 	return err
@@ -575,13 +597,15 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, e
 }
 
 // CancelHandler handles clean up of segments on receiving CTRL+C.
-func (s *Store) cancelHandler(ctx context.Context, path Path) {
+func (s *Store) cancelHandler(ctx context.Context, bucket, unencryptedKey string) {
 	defer mon.Task()(&ctx)(nil)
 
-	// satellite deletes now from 0 to l so we can just use BeginDeleteObject
-	err := s.Delete(ctx, path)
-	if err != nil {
-		zap.L().Warn("Failed deleting object", zap.Stringer("path", path), zap.Error(err))
+	if shouldDeleteOnCancel(ctx) {
+		// satellite deletes now from 0 to l so we can just use BeginDeleteObject
+		err := s.Delete(ctx, bucket, unencryptedKey)
+		if err != nil {
+			zap.L().Warn("Failed deleting object", zap.String("Bucket", bucket), zap.String("key", unencryptedKey), zap.Error(err))
+		}
 	}
 }
 

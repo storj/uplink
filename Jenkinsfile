@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             label 'main'
-            image docker.build("storj-ci", "--pull https://github.com/storj/ci.git").id
+            image docker.build("storj-ci", "--pull git://github.com/storj/ci.git#main").id
             args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod'
         }
     }
@@ -60,12 +60,12 @@ pipeline {
 
                 stage('Tests') {
                     environment {
-                        COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                        COVERFLAGS = "${ env.BRANCH_NAME != 'main' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
                     }
                     steps {
                         sh 'go vet ./...'
                         sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
-                        // TODO enable this later 
+                        // TODO enable this later
                         // sh 'check-clean-directory'
                     }
 
@@ -91,7 +91,7 @@ pipeline {
                     environment {
                         STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
                         STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
-                        COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                        COVERFLAGS = "${ env.BRANCH_NAME != 'main' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
                     }
                     steps {
                         sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
@@ -100,7 +100,7 @@ pipeline {
                             sh 'go vet ./...'
                             sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
-                        // TODO enable this later 
+                        // TODO enable this later
                         // sh 'check-clean-directory'
                     }
 

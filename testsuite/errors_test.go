@@ -156,3 +156,46 @@ func TestBucketNotFoundError(t *testing.T) {
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound), err.Error())
 	})
 }
+
+func TestPermissionDenied(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.CreateBucket(ctx, "test-bucket")
+		require.NoError(t, err)
+
+		upload, err := project.UploadObject(ctx, "test-bucket", "file", nil)
+		require.NoError(t, err)
+
+		randData := testrand.Bytes(1 * memory.KiB)
+		source := bytes.NewBuffer(randData)
+		_, err = io.Copy(upload, source)
+		require.NoError(t, err)
+
+		err = upload.Commit()
+		require.NoError(t, err)
+
+		accessRestricted, err := planet.Uplinks[0].Access[planet.Satellites[0].ID()].Share(
+			uplink.Permission{
+				AllowDownload: true,
+			})
+		require.NoError(t, err)
+
+		projectRestricted, err := uplink.OpenProject(ctx, accessRestricted)
+		require.NoError(t, err)
+		defer ctx.Check(projectRestricted.Close)
+
+		it := projectRestricted.ListObjects(ctx, "test-bucket", nil)
+		require.False(t, it.Next())
+		err = it.Err()
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrPermissionDenied), err.Error())
+	})
+
+}
