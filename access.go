@@ -360,10 +360,16 @@ func (access *Access) OverrideEncryptionKey(bucket, prefix string, encryptionKey
 		return errors.New("prefix must end with slash")
 	}
 
+	// We need to remove the trailing slash. Otherwise, if we the shared
+	// prefix is `/bob/`, the encrypted shared prefix results in
+	// `enc("")/enc("bob")/enc("")`. This is an incorrect encrypted prefix,
+	// what we really want is `enc("")/enc("bob")`.
+	prefix = strings.TrimSuffix(prefix, "/")
+
 	store := access.encAccess.Store
 
 	unencPath := paths.NewUnencrypted(prefix)
-	encPath, err := encryption.EncryptPrefixWithStoreCipher(bucket, unencPath, store)
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, unencPath, store)
 	if err != nil {
 		return err
 	}
