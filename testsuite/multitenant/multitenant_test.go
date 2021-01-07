@@ -58,6 +58,17 @@ func TestMultiTenant(t *testing.T) {
 			require.Equal(t, fileData, downloaded)
 		}
 
+		{ // authenticate the same user, but use a different passphrase to download the file
+			serializedUserAccess, userSalt, err := authenticate(ctx, planet, userID, appBucket)
+			require.NoError(t, err)
+
+			userAccess, err := addPassphraseToAccess(serializedUserAccess, userID, "fakepassphrase", appBucket, userSalt)
+			require.NoError(t, err)
+
+			_, err = downloadFile(ctx, userAccess, userID, appBucket, fileName)
+			require.Error(t, err)
+		}
+
 		{ // authenticate another user and check it cannot download the file uploaded from the first user
 			cheaterID := "cheater@example.com"
 			serializedUserAccess, userSalt, err := authenticate(ctx, planet, cheaterID, appBucket)

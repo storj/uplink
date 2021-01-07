@@ -8,8 +8,6 @@ import (
 	"net"
 	"time"
 
-	"storj.io/common/identity"
-	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
@@ -37,20 +35,7 @@ type Config struct {
 }
 
 func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
-	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
-		Difficulty:  0,
-		Concurrency: 1,
-	})
-	if err != nil {
-		return rpc.Dialer{}, packageError.Wrap(err)
-	}
-
-	tlsConfig := tlsopts.Config{
-		UsePeerCAWhitelist: false,
-		PeerIDVersions:     "0",
-	}
-
-	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
+	tlsOptions, err := getProcessTLSOptions(ctx)
 	if err != nil {
 		return rpc.Dialer{}, packageError.Wrap(err)
 	}
