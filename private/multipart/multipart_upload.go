@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"strings"
 	"time"
 	_ "unsafe" // for go:linkname
 
@@ -541,16 +542,44 @@ func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket s
 	}
 
 	objects := UploadIterator{
-		ctx:     ctx,
-		project: project,
-		bucket:  storj.Bucket{Name: bucket},
-		options: opts,
+		ctx:         ctx,
+		project:     project,
+		bucket:      storj.Bucket{Name: bucket},
+		options:     opts,
+		listObjects: listObjects,
 	}
 
 	if options != nil {
 		objects.multipartOptions = *options
 	}
 
+	return &objects
+}
+
+// ListPendingObjectStreams returns an iterator over the multipart uploads.
+func ListPendingObjectStreams(ctx context.Context, project *uplink.Project, bucket, objectKey string, options *ListMultipartUploadsOptions) *UploadIterator {
+	defer mon.Func().RestartTrace(&ctx)(nil)
+
+	opts := storj.ListOptions{
+		Direction: storj.After,
+	}
+
+	if options != nil {
+		opts.Cursor = options.Cursor
+	}
+
+	opts.Prefix = objectKey
+
+	objects := UploadIterator{
+		ctx:         ctx,
+		project:     project,
+		bucket:      storj.Bucket{Name: bucket},
+		options:     opts,
+		listObjects: listPendingObjectStreams,
+	}
+	if options != nil {
+		objects.multipartOptions = *options
+	}
 	return &objects
 }
 
@@ -565,6 +594,15 @@ type UploadIterator struct {
 	position         int
 	completed        bool
 	err              error
+	listObjects      func(tx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error)
+}
+
+func listObjects(ctx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error) {
+	return db.ListObjects(ctx, bucket, options)
+}
+
+func listPendingObjectStreams(ctx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error) {
+	return db.ListPendingObjectStreams(ctx, bucket, options)
 }
 
 // Next prepares next Object for reading.
@@ -612,7 +650,7 @@ func (uploads *UploadIterator) tryLoadNext() (ok bool, err error) {
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	list, err := db.ListObjects(uploads.ctx, uploads.bucket.Name, uploads.options)
+	list, err := uploads.listObjects(uploads.ctx, db, uploads.bucket.Name, uploads.options)
 	if err != nil {
 		return false, convertKnownErrors(err, uploads.bucket.Name, "")
 	}
@@ -637,7 +675,7 @@ func (uploads *UploadIterator) Item() *Object {
 	}
 
 	key := item.Path
-	if len(uploads.options.Prefix) > 0 {
+	if len(uploads.options.Prefix) > 0 && strings.HasSuffix(uploads.options.Prefix, "/") {
 		key = uploads.options.Prefix + item.Path
 	}
 

@@ -127,6 +127,58 @@ func (db *DB) ListPendingObjects(ctx context.Context, bucket string, options sto
 	return storj.ObjectList{}, errors.New("not implemented")
 }
 
+// ListPendingObjectStreams lists streams for a specific pending object key.
+func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return storj.ObjectList{}, storj.ErrNoBucket.New("")
+	}
+
+	var startAfter string
+	switch options.Direction {
+	// TODO for now we are supporting only storj.After
+	// case storj.Forward:
+	// 	// forward lists forwards from cursor, including cursor
+	// 	startAfter = keyBefore(options.Cursor)
+	case storj.After:
+		// after lists forwards from cursor, without cursor
+		startAfter = options.Cursor
+	default:
+		return storj.ObjectList{}, errClass.New("invalid direction %d", options.Direction)
+	}
+
+	prefix := PathForKey(options.Prefix)
+
+	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
+	if err != nil {
+		return storj.ObjectList{}, errClass.Wrap(err)
+	}
+
+	resp, err := db.metainfo.ListPendingObjectStreams(ctx, ListPendingObjectStreamsParams{
+		Bucket:          []byte(bucket),
+		EncryptedPath:   []byte(encPrefix.Raw()),
+		EncryptedCursor: []byte(startAfter),
+		Limit:           int32(options.Limit),
+	})
+	if err != nil {
+		return storj.ObjectList{}, errClass.Wrap(err)
+	}
+
+	objectsList, err := db.objectsFromRawObjectList(ctx, resp.Items, true, "", bucket, startAfter)
+
+	if err != nil {
+		return storj.ObjectList{}, errClass.Wrap(err)
+	}
+	list = storj.ObjectList{
+		Bucket: bucket,
+		Prefix: options.Prefix,
+		More:   resp.More,
+		Items:  objectsList,
+	}
+	return list, nil
+}
+
 // ListObjects lists objects in bucket based on the ListOptions.
 func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -207,12 +259,38 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 		return storj.ObjectList{}, errClass.Wrap(err)
 	}
 
+	objectsList, err := db.objectsFromRawObjectList(ctx, items, needsEncryption, options.Prefix, bucket, startAfter)
+
+	if err != nil {
+		return storj.ObjectList{}, errClass.Wrap(err)
+	}
 	list = storj.ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   more,
-		Items:  make([]storj.Object, 0, len(items)),
+		Items:  objectsList,
 	}
+
+	return list, nil
+}
+
+func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, needsEncryption bool, _prefix, bucket, startAfter string) (objectList []storj.Object, err error) {
+	prefix := PathForKey(_prefix)
+	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
+	if err != nil {
+		return objectList, errClass.Wrap(err)
+	}
+
+	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
+	if err != nil {
+		return []storj.Object{}, errClass.Wrap(err)
+	}
+	var base *encryption.Base
+	if needsEncryption {
+		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
+	}
+
+	objectList = make([]storj.Object, 0, len(items))
 
 	for _, item := range items {
 		var bucketName string
@@ -226,7 +304,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 				if encryption.ErrDecryptFailed.Has(err) {
 					continue
 				}
-				return storj.ObjectList{}, errClass.Wrap(err)
+				return nil, errClass.Wrap(err)
 			}
 
 			// TODO(jeff): this shouldn't be necessary if we handled trailing slashes
@@ -251,18 +329,17 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 			if encryption.ErrDecryptFailed.Has(err) {
 				continue
 			}
-			return storj.ObjectList{}, errClass.Wrap(err)
+			return nil, errClass.Wrap(err)
 		}
 
 		object, err := db.objectFromRawObjectListItem(bucket, itemPath, item, stream, streamMeta)
 		if err != nil {
-			return storj.ObjectList{}, errClass.Wrap(err)
+			return nil, errClass.Wrap(err)
 		}
 
-		list.Items = append(list.Items, object)
+		objectList = append(objectList, object)
 	}
-
-	return list, nil
+	return objectList, nil
 }
 
 func (db *DB) keyCipher(keyCipher storj.CipherSuite) storj.CipherSuite {

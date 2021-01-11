@@ -534,6 +534,63 @@ func TestListMultipartUploads_Cursor(t *testing.T) {
 	})
 }
 
+func TestListPendingObjectStreams(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// without prefix
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+
+		assertPendingObjectStreamsList(ctx, t, project, "testbucket", "multipart-object", multipart.ListMultipartUploadsOptions{}, info.StreamID)
+
+		// with prefix
+		info, err = multipart.NewMultipartUpload(ctx, project, "testbucket", "a/prefixed/multipart-object2", nil)
+		require.NoError(t, err)
+
+		assertPendingObjectStreamsList(ctx, t, project, "testbucket", "a/prefixed/multipart-object2", multipart.ListMultipartUploadsOptions{}, info.StreamID)
+
+		// non-existing object
+		assertPendingObjectStreamsList(ctx, t, project, "testbucket", "a/prefixed/multipart-object", multipart.ListMultipartUploadsOptions{})
+	})
+}
+
+func assertPendingObjectStreamsList(ctx context.Context, t *testing.T, project *uplink.Project, bucket, objectKey string, opts multipart.ListMultipartUploadsOptions, streams ...string) {
+	list := multipart.ListPendingObjectStreams(ctx, project, bucket, objectKey, &opts)
+	require.NoError(t, list.Err())
+	require.Nil(t, list.Item())
+
+	itemStreams := make(map[string]struct{})
+
+	for list.Next() {
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.False(t, list.Item().IsPrefix)
+		itemStreams[list.Item().StreamID] = struct{}{}
+		require.Equal(t, objectKey, list.Item().Key)
+	}
+
+	require.Len(t, itemStreams, len(streams))
+	for _, stream := range streams {
+		if assert.Contains(t, itemStreams, stream) {
+			delete(itemStreams, stream)
+		}
+	}
+	require.Empty(t, itemStreams)
+
+	require.False(t, list.Next())
+	require.NoError(t, list.Err())
+	require.Nil(t, list.Item())
+}
+
 func assertMultipartUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *multipart.ListMultipartUploadsOptions, objectKeys ...string) {
 	list := multipart.ListMultipartUploads(ctx, project, bucket, options)
 	require.NoError(t, list.Err())

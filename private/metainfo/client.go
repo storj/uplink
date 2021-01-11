@@ -753,6 +753,80 @@ func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams)
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 
+// ListPendingObjectStreamsParams parameters for ListPendingObjectStreams method.
+type ListPendingObjectStreamsParams struct {
+	Bucket          []byte
+	EncryptedPath   []byte
+	EncryptedCursor []byte
+	Limit           int32
+}
+
+func (params *ListPendingObjectStreamsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListPendingStreamsRequest {
+	return &pb.ObjectListPendingStreamsRequest{
+		Header:         header,
+		Bucket:         params.Bucket,
+		EncryptedPath:  params.EncryptedPath,
+		StreamIdCursor: params.EncryptedCursor,
+		Limit:          params.Limit,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *ListPendingObjectStreamsParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_PendingStreams{
+			PendingStreams: params.toRequest(nil),
+		},
+	}
+}
+
+// ListPendingObjectStreamsResponse response for ListPendingObjectStreams request.
+type ListPendingObjectStreamsResponse struct {
+	Items []RawObjectListItem
+	More  bool
+}
+
+func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsResponse) ListPendingObjectStreamsResponse {
+	objects := make([]RawObjectListItem, len(response.Items))
+	for i, object := range response.Items {
+
+		objects[i] = RawObjectListItem{
+			EncryptedPath:          object.EncryptedPath,
+			Version:                object.Version,
+			Status:                 int32(object.Status),
+			StatusAt:               object.StatusAt,
+			CreatedAt:              object.CreatedAt,
+			ExpiresAt:              object.ExpiresAt,
+			PlainSize:              object.PlainSize,
+			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
+			EncryptedMetadata:      object.EncryptedMetadata,
+
+			IsPrefix: false,
+		}
+
+		if object.StreamId != nil {
+			objects[i].StreamID = *object.StreamId
+		}
+	}
+
+	return ListPendingObjectStreamsResponse{
+		Items: objects,
+		More:  response.More,
+	}
+}
+
+// ListPendingObjectStreams lists pending objects with the specified object key in the specified bucket.
+func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListPendingObjectStreamsParams) (_ ListPendingObjectStreamsResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.ListPendingObjectStreams(ctx, params.toRequest(client.header()))
+	if err != nil {
+		return ListPendingObjectStreamsResponse{}, Error.Wrap(err)
+	}
+
+	return newListPendingObjectStreamsResponse(response), nil
+}
+
 // SegmentListItem represents listed segment.
 type SegmentListItem struct {
 	Position  storj.SegmentPosition
