@@ -408,7 +408,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 		metainfo:             s.metainfo,
 		streams:              s,
 		streamID:             object.ID,
-		segmentIndex:         -1,
+		segmentIndex:         -1, // last segment
 		rs:                   object.RedundancyScheme,
 		size:                 object.LastSegment.Size,
 		derivedKey:           derivedKey,

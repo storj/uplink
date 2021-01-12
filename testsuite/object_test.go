@@ -17,6 +17,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/storagenode"
 	"storj.io/uplink"
 )
 
@@ -170,6 +171,56 @@ func TestUploadError(t *testing.T) {
 
 		err = upload.Commit()
 		require.Error(t, err)
+	})
+}
+
+func TestVeryLongDownload(t *testing.T) {
+	const (
+		segmentSize           = 100 * memory.KiB
+		orderLimitGracePeriod = 5 * time.Second
+	)
+
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(segmentSize),
+			StorageNode: func(index int, config *storagenode.Config) {
+				config.Storage2.OrderLimitGracePeriod = orderLimitGracePeriod
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		data := testrand.Bytes(segmentSize * 3 / 2) // 2 segments
+		err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "testbucket", "test.dat", data)
+		require.NoError(t, err)
+
+		download, cleanup, err := planet.Uplinks[0].DownloadStream(ctx, planet.Satellites[0], "testbucket", "test.dat")
+		require.NoError(t, err)
+		defer ctx.Check(download.Close)
+		defer ctx.Check(cleanup)
+
+		// read the first half of the first segment
+		buf := make([]byte, segmentSize.Int()/2)
+		n, err := io.ReadFull(download, buf)
+		require.NoError(t, err)
+		assert.Equal(t, segmentSize.Int()/2, n)
+		assert.Equal(t, data[:segmentSize.Int()/2], buf)
+
+		// sleep to expire already created orders
+		time.Sleep(orderLimitGracePeriod + 1*time.Second)
+
+		// read the rest: the remainder of the first segment, and the second (last) segment
+		buf = make([]byte, segmentSize.Int())
+		n, err = io.ReadFull(download, buf)
+		require.NoError(t, err)
+		assert.Equal(t, segmentSize.Int(), n)
+		assert.Equal(t, data[segmentSize.Int()/2:segmentSize.Int()*3/2], buf)
 	})
 }
 
