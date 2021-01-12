@@ -372,21 +372,6 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object storj.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	info, limits, err := s.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
-		StreamID: object.ID,
-		Position: storj.SegmentPosition{
-			Index: -1, // Request the last segment
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	lastSegmentRanger, err := s.Ranger(ctx, info, limits, object.RedundancyScheme)
-	if err != nil {
-		return nil, err
-	}
-
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return nil, err
@@ -419,21 +404,18 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 		return nil, err
 	}
 
-	decryptedLastSegmentRanger, err := decryptRanger(
-		ctx,
-		lastSegmentRanger,
-		object.LastSegment.Size,
-		object.EncryptionParameters,
-		derivedKey,
-		info.SegmentEncryption.EncryptedKey,
-		&info.SegmentEncryption.EncryptedKeyNonce,
-		&contentNonce,
-	)
-	if err != nil {
-		return nil, err
-	}
+	rangers = append(rangers, &lazySegmentRanger{
+		metainfo:             s.metainfo,
+		streams:              s,
+		streamID:             object.ID,
+		segmentIndex:         -1,
+		rs:                   object.RedundancyScheme,
+		size:                 object.LastSegment.Size,
+		derivedKey:           derivedKey,
+		startingNonce:        &contentNonce,
+		encryptionParameters: object.EncryptionParameters,
+	})
 
-	rangers = append(rangers, decryptedLastSegmentRanger)
 	return ranger.Concat(rangers...), nil
 }
 
