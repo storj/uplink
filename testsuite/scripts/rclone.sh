@@ -19,7 +19,6 @@ pushd $RCLONE
     git checkout $latest_version
 
     go mod edit -replace storj.io/uplink=$SCRIPTDIR/../../
-    go mod vendor
 
     go build ./fstest/test_all
     go build

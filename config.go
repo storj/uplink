@@ -12,6 +12,7 @@ import (
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
 	"storj.io/common/useragent"
+	"storj.io/uplink/internal/connector"
 )
 
 // Config defines configuration for using uplink library.
@@ -46,11 +47,13 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 		dialer.Pool = rpc.NewDefaultConnectionPool()
 	}
 	dialer.DialTimeout = config.DialTimeout
+
 	dialContext := config.DialContext
 	if dialContext == nil {
 		dialContext = socket.BackgroundDialer().DialContext
 	}
-	dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
+
+	dialer.Connector = connector.Get(&rpc.ConnectorAdapter{DialContext: dialContext})
 
 	return dialer, nil
 }
