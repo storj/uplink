@@ -16,7 +16,6 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/access2"
 	"storj.io/uplink/private/metainfo"
 )
@@ -30,6 +29,24 @@ type Access struct {
 	apiKey       *macaroon.APIKey
 	encAccess    *access2.EncryptionAccess
 }
+
+// getAPIKey are exposing the state do private methods.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint: unused
+func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
+
+// getEncAccess are exposing the state do private methods.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint: unused
+func (access *Access) getEncAccess() *access2.EncryptionAccess { return access.encAccess }
 
 // SharePrefix defines a prefix that will be shared.
 type SharePrefix struct {
@@ -128,21 +145,14 @@ func RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, 
 // (Argon2). This should be a setup-only step. Most common interactions with the library
 // should be using a serialized access grant through ParseAccess directly.
 func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
-	return requestAccessWithPassphraseAndConcurrency(ctx, config, satelliteAddress, apiKey, passphrase, 8)
-}
-
-func init() {
-	// expose this method for backcomp package.
-	expose.RequestAccessWithPassphraseAndConcurrency = requestAccessWithPassphraseAndConcurrency
-
-	// expose this method for private/access package.
-	expose.EnablePathEncryptionBypass = enablePathEncryptionBypass
+	return config.requestAccessWithPassphraseAndConcurrency(ctx, satelliteAddress, apiKey, passphrase, 8)
 }
 
 // requestAccessWithPassphraseAndConcurrency requests satellite for a new access grant using a passhprase and specific concurrency for the Argon2 key derivation.
 //
-// NB: when modifying the signature of this func, also update backcomp and internal/expose packages.
-func requestAccessWithPassphraseAndConcurrency(ctx context.Context, config Config, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+func (config Config) requestAccessWithPassphraseAndConcurrency(ctx context.Context, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
 		return nil, packageError.Wrap(err)
@@ -204,14 +214,6 @@ func parseNodeURL(address string) (storj.NodeURL, error) {
 	}
 
 	return nodeURL, nil
-}
-
-// enablePathEncryptionBypass enables path encryption bypass for embedded encryption access.
-//
-// NB: when modifying the signature of this func, also update private/access and internal/expose packages.
-func enablePathEncryptionBypass(access *Access) error {
-	access.encAccess.Store.EncryptionBypass = true
-	return nil
 }
 
 // Share creates a new access grant with specific permissions.

@@ -9,15 +9,30 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/private/metainfo"
 )
+
+// Error is default error class for uplink.
+var packageError = errs.Class("object")
 
 // GetObjectIPs exposes the GetObjectIPs method in the internal expose package.
 func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (ips []net.IP, err error) {
-	fn, ok := expose.GetObjectIPs.(func(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (ips []net.IP, err error))
-	if !ok {
-		return nil, errs.New("invalid type %T", fn)
+	dialer, err := expose.ConfigGetDialer(config, ctx)
+	if err != nil {
+		return nil, packageError.Wrap(err)
 	}
-	return fn(ctx, config, access, bucket, key)
+	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
+
+	metainfoClient, err := metainfo.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	db := metainfo.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
+
+	return db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
 }

@@ -12,12 +12,7 @@ import (
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/socket"
 	"storj.io/common/useragent"
-	"storj.io/uplink/internal/expose"
 )
-
-func init() {
-	expose.SetConnectionPool = setConnectionPool
-}
 
 // Config defines configuration for using uplink library.
 type Config struct {
@@ -34,6 +29,10 @@ type Config struct {
 	pool *rpcpool.Pool
 }
 
+// getDialer returns a new rpc.Dialer corresponding to the config.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
 func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	tlsOptions, err := getProcessTLSOptions(ctx)
 	if err != nil {
@@ -56,14 +55,14 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	return dialer, nil
 }
 
-func setConnectionPool(ctx context.Context, config *Config, pool *rpcpool.Pool) error {
-	if config == nil {
-		return packageError.New("config is nil")
-	}
-
-	config.pool = pool
-	return nil
-}
+// setConnectionPool exposes setting connection pool.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint: unused
+func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool }
 
 func (config Config) validateUserAgent(ctx context.Context) error {
 	if len(config.UserAgent) == 0 {
