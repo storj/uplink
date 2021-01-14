@@ -5,7 +5,6 @@ package object
 
 import (
 	"context"
-	"net"
 
 	"github.com/zeebo/errs"
 
@@ -18,8 +17,22 @@ import (
 // Error is default error class for uplink.
 var packageError = errs.Class("object")
 
-// GetObjectIPs exposes the GetObjectIPs method in the internal expose package.
-func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (ips []net.IP, err error) {
+// IPSummary contains information about the object IP-s.
+type IPSummary = metainfo.GetObjectIPsResponse
+
+// GetObjectIPs returns the IP-s for a given object.
+//
+// TODO: delete, once we have stopped using it.
+func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (_ [][]byte, err error) {
+	summary, err := GetObjectIPSummary(ctx, config, access, bucket, key)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	return summary.IPPorts, nil
+}
+
+// GetObjectIPSummary returns the object IP summary.
+func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (_ *IPSummary, err error) {
 	dialer, err := expose.ConfigGetDialer(config, ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
@@ -34,5 +47,6 @@ func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Acce
 
 	db := metainfo.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
 
-	return db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
+	summary, err := db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
+	return summary, packageError.Wrap(err)
 }
