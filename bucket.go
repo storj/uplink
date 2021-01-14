@@ -79,6 +79,9 @@ func (project *Project) CreateBucket(ctx context.Context, bucket string) (create
 			}
 			return existing, errwrapf("%w (%q)", ErrBucketAlreadyExists, bucket)
 		}
+		if errs2.IsRPC(err, rpcstatus.InvalidArgument) {
+			return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
+		}
 		return nil, convertKnownErrors(err, bucket, "")
 	}
 

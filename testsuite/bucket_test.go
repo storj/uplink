@@ -72,6 +72,13 @@ func TestBucket(t *testing.T) {
 			require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 			require.Nil(t, deleted)
 		}
+
+		{ // create an invalid bucket
+			created, err := project.CreateBucket(ctx, "UpperCaseBucket")
+			require.Error(t, err)
+			require.Nil(t, created)
+			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
+		}
 	})
 }
 
