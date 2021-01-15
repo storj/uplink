@@ -19,6 +19,7 @@ import (
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -32,7 +33,7 @@ func TestNewMultipartUpload(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		_, err = project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
+		_, err = multipart.NewMultipartUpload(ctx, project, "not-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
@@ -41,7 +42,7 @@ func TestNewMultipartUpload(t *testing.T) {
 		// assert there is no pending multipart upload
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
-		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
@@ -54,7 +55,7 @@ func TestNewMultipartUpload(t *testing.T) {
 		// require.NoError(t, err)
 		// require.NotNil(t, info.StreamID)
 
-		info, err = project.NewMultipartUpload(ctx, "testbucket", "multipart-object-1", nil)
+		info, err = multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object-1", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
@@ -73,7 +74,7 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		_, err = project.NewMultipartUpload(ctx, "not-existing-testbucket", "multipart-object", nil)
+		_, err = multipart.NewMultipartUpload(ctx, project, "not-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
@@ -83,7 +84,7 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 		expiresAt := time.Now().Add(time.Hour)
-		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", &uplink.MultipartUploadOptions{
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", &multipart.UploadOptions{
 			Expires: expiresAt,
 		})
 		require.NoError(t, err)
@@ -91,7 +92,7 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 
 		// assert there is one pending multipart upload and it has an expiration date
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
-		list := project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{
+		list := multipart.ListMultipartUploads(ctx, project, "testbucket", &multipart.ListMultipartUploadsOptions{
 			System: true,
 		})
 		require.NoError(t, list.Err())
@@ -121,25 +122,25 @@ func TestCompleteMultipartUpload(t *testing.T) {
 		createBucket(t, ctx, project, "testbucket")
 
 		{
-			_, err := project.CompleteMultipartUpload(ctx, "", "", "", nil)
+			_, err := multipart.CompleteMultipartUpload(ctx, project, "", "", "", nil)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "", "", nil)
+			_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "", "", nil)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
-			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "multipart-object", "", nil)
+			_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", "", nil)
 			require.Error(t, err) // TODO should we create an error like ErrInvalidArgument
 		}
 
 		{
-			info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
+			info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
 			require.NoError(t, err)
 			require.NotNil(t, info.StreamID)
 
 			// assert there is only one pending multipart upload
 			assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
-			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID, nil)
+			_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID, nil)
 			require.NoError(t, err)
 
 			// assert there is no pending multipart upload
@@ -149,12 +150,12 @@ func TestCompleteMultipartUpload(t *testing.T) {
 			require.NoError(t, err)
 
 			// object is already committed
-			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID, nil)
+			_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID, nil)
 			require.Error(t, err)
 		}
 
 		{
-			info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object-metadata", nil)
+			info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object-metadata", nil)
 			require.NoError(t, err)
 			require.NotNil(t, info.StreamID)
 
@@ -165,7 +166,7 @@ func TestCompleteMultipartUpload(t *testing.T) {
 				"TestField1": "TestFieldValue1",
 				"TestField2": "TestFieldValue2",
 			}
-			_, err = project.CompleteMultipartUpload(ctx, "testbucket", "multipart-object-metadata", info.StreamID, &uplink.MultipartObjectOptions{
+			_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object-metadata", info.StreamID, &multipart.ObjectOptions{
 				CustomMetadata: expectedMetadata,
 			})
 			require.NoError(t, err)
@@ -193,30 +194,30 @@ func TestAbortMultipartUpload(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 
-		info, err := project.NewMultipartUpload(ctx, "testbucket", "multipart-object", nil)
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
 		// assert there is only one pending multipart upload
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
-		err = project.AbortMultipartUpload(ctx, "", "multipart-object", info.StreamID)
+		err = multipart.AbortMultipartUpload(ctx, project, "", "multipart-object", info.StreamID)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-		err = project.AbortMultipartUpload(ctx, "testbucket", "", info.StreamID)
+		err = multipart.AbortMultipartUpload(ctx, project, "testbucket", "", info.StreamID)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
-		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", "")
+		err = multipart.AbortMultipartUpload(ctx, project, "testbucket", "multipart-object", "")
 		require.Error(t, err)
-		require.True(t, errors.Is(err, uplink.ErrStreamIDInvalid))
+		require.True(t, errors.Is(err, multipart.ErrStreamIDInvalid))
 
 		// TODO: testcases we cannot do now:
 		// - right streamID/wrong bucket or project ID
 		// - existing bucket/existing key/existing streamID, but not the good one
 
-		err = project.AbortMultipartUpload(ctx, "testbucket", "multipart-object", info.StreamID)
+		err = multipart.AbortMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID)
 		require.NoError(t, err)
 
 		// assert there is no pending multipart upload
@@ -246,11 +247,11 @@ func TestPutObjectPart(t *testing.T) {
 		createBucket(t, ctx, project, "testbucket")
 
 		// bucket not exists
-		_, err = project.NewMultipartUpload(newCtx, "non-existing-testbucket", "multipart-object", nil)
+		_, err = multipart.NewMultipartUpload(newCtx, project, "non-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
-		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
+		info, err := multipart.NewMultipartUpload(newCtx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
@@ -258,22 +259,22 @@ func TestPutObjectPart(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = project.PutObjectPart(newCtx, "", "multipart-object", info.StreamID, 1, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "", "multipart-object", info.StreamID, 1, nil)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = project.PutObjectPart(newCtx, "testbucket", "", info.StreamID, 1, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "", info.StreamID, 1, nil)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
-			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", "", 1, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", "", 1, nil)
 			require.Error(t, err)
 
 			// negative partID
-			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 0, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, nil)
 			require.Error(t, err)
 
 			// empty input data reader
-			_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer([]byte{}))
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer([]byte{}))
 			require.Error(t, err)
 		}
 
@@ -282,18 +283,18 @@ func TestPutObjectPart(t *testing.T) {
 		remoteSource1 := randData[len(remoteInlineSource) : len(remoteInlineSource)+10*memory.KiB.Int()]
 		remoteSource2 := randData[len(remoteInlineSource)+len(remoteSource1):]
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource1))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource1))
 		require.NoError(t, err)
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 3, bytes.NewBuffer(remoteSource2))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 3, bytes.NewBuffer(remoteSource2))
 		require.NoError(t, err)
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteInlineSource))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteInlineSource))
 		require.NoError(t, err)
 
 		// TODO verify that segment (1, 1) is inline
 
-		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
+		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
 
 		// assert there is no pending multipart upload
@@ -310,7 +311,7 @@ func TestPutObjectPart(t *testing.T) {
 		require.Equal(t, randData, downloaded.Bytes())
 
 		// create part for committed object
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(nil))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(nil))
 		require.Error(t, err)
 	})
 }
@@ -341,7 +342,7 @@ func TestListParts(t *testing.T) {
 		source1 := bytes.NewBuffer(randData[:firstPartLen])
 		source2 := bytes.NewBuffer(randData[firstPartLen:])
 
-		info, err := project.NewMultipartUpload(newCtx, "testbucket", "multipart-object", nil)
+		info, err := multipart.NewMultipartUpload(newCtx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
@@ -349,55 +350,55 @@ func TestListParts(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = project.ListObjectParts(newCtx, "", "multipart-object", info.StreamID, 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "", "multipart-object", info.StreamID, 1, 10)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = project.ListObjectParts(newCtx, "testbucket", "", info.StreamID, 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "", info.StreamID, 1, 10)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
-			_, err = project.ListObjectParts(newCtx, "testbucket", "multipart-object", "", 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "multipart-object", "", 1, 10)
 			require.Error(t, err)
 		}
 
 		// list multipart upload with no uploaded parts
-		parts, err := project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err := multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 1, source2)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, source2)
 		require.NoError(t, err)
 
-		_, err = project.PutObjectPart(newCtx, "testbucket", "multipart-object", info.StreamID, 5, source1)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 5, source1)
 		require.NoError(t, err)
 
 		// list parts of on going multipart upload
-		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 
-		_, err = project.CompleteMultipartUpload(newCtx, "testbucket", "multipart-object", info.StreamID, nil)
+		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
 
 		// assert there is no pending multipart upload
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 		// list parts of a completed multipart upload
-		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a limit of 1
-		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 1, 1)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a cursor starting after all parts
-		parts, err = project.ListObjectParts(ctx, "testbucket", "multipart-object", info.StreamID, 6, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 6, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 		require.Equal(t, false, parts.More)
@@ -414,7 +415,7 @@ func TestListMultipartUploads_NonExistingBucket(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		list := project.ListMultipartUploads(ctx, "non-existing-bucket", nil)
+		list := multipart.ListMultipartUploads(ctx, project, "non-existing-bucket", nil)
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
 		require.False(t, list.Next())
@@ -452,23 +453,23 @@ func TestListMultipartUploads_Prefix(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 
-		_, err = project.NewMultipartUpload(ctx, "testbucket", "a/b/c/multipart-object", nil)
+		_, err = multipart.NewMultipartUpload(ctx, project, "testbucket", "a/b/c/multipart-object", nil)
 		require.NoError(t, err)
 
 		// assert there is one pending multipart upload with prefix "a/b/"
-		assertMultipartUploadList(ctx, t, project, "testbucket", &uplink.ListMultipartUploadsOptions{
+		assertMultipartUploadList(ctx, t, project, "testbucket", &multipart.ListMultipartUploadsOptions{
 			Prefix:    "a/b/",
 			Recursive: true,
 		}, "a/b/c/multipart-object")
 
 		// assert there is no pending multipart upload with prefix "b/"
-		assertMultipartUploadList(ctx, t, project, "testbucket", &uplink.ListMultipartUploadsOptions{
+		assertMultipartUploadList(ctx, t, project, "testbucket", &multipart.ListMultipartUploadsOptions{
 			Prefix:    "b/",
 			Recursive: true,
 		})
 
 		// assert there is one prefix of pending multipart uploads with prefix "a/b/"
-		list := project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{
+		list := multipart.ListMultipartUploads(ctx, project, "testbucket", &multipart.ListMultipartUploadsOptions{
 			Prefix: "a/b/",
 		})
 		require.NoError(t, list.Err())
@@ -501,12 +502,12 @@ func TestListMultipartUploads_Cursor(t *testing.T) {
 		}
 
 		for object := range expectedObjects {
-			_, err := project.NewMultipartUpload(ctx, "testbucket", object, nil)
+			_, err := multipart.NewMultipartUpload(ctx, project, "testbucket", object, nil)
 			require.NoError(t, err)
 		}
 
 		// get the first list item and make it a cursor for the next list request
-		list := project.ListMultipartUploads(ctx, "testbucket", nil)
+		list := multipart.ListMultipartUploads(ctx, project, "testbucket", nil)
 		require.NoError(t, list.Err())
 		more := list.Next()
 		require.True(t, more)
@@ -515,7 +516,7 @@ func TestListMultipartUploads_Cursor(t *testing.T) {
 		cursor := list.Item().Key
 
 		// list again with cursor set to the first item from previous list request
-		list = project.ListMultipartUploads(ctx, "testbucket", &uplink.ListMultipartUploadsOptions{Cursor: cursor})
+		list = multipart.ListMultipartUploads(ctx, project, "testbucket", &multipart.ListMultipartUploadsOptions{Cursor: cursor})
 		require.NoError(t, list.Err())
 
 		// expect the second item as the first item in this new list request
@@ -533,8 +534,8 @@ func TestListMultipartUploads_Cursor(t *testing.T) {
 	})
 }
 
-func assertMultipartUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListMultipartUploadsOptions, objectKeys ...string) {
-	list := project.ListMultipartUploads(ctx, bucket, options)
+func assertMultipartUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *multipart.ListMultipartUploadsOptions, objectKeys ...string) {
+	list := multipart.ListMultipartUploads(ctx, project, bucket, options)
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())
 
