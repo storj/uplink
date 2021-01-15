@@ -6,7 +6,6 @@ package metainfo
 import (
 	"bytes"
 	"context"
-	"net"
 	"sync"
 	"time"
 
@@ -569,14 +568,22 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 	return getResponse.Info, nil
 }
 
-// GetObjectIPParams are params for the GetObectIPs request.
-type GetObjectIPParams struct {
+// GetObjectIPsParams are params for the GetObjectIPs request.
+type GetObjectIPsParams struct {
 	Bucket        []byte
 	EncryptedPath []byte
 	Version       int32
 }
 
-func (params *GetObjectIPParams) toRequest(header *pb.RequestHeader) *pb.ObjectGetIPsRequest {
+// GetObjectIPsResponse is the response from GetObjectIPs.
+type GetObjectIPsResponse struct {
+	IPPorts            [][]byte
+	SegmentCount       int64
+	PieceCount         int64
+	ReliablePieceCount int64
+}
+
+func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.ObjectGetIPsRequest {
 	return &pb.ObjectGetIPsRequest{
 		Header:        header,
 		Bucket:        params.Bucket,
@@ -586,7 +593,7 @@ func (params *GetObjectIPParams) toRequest(header *pb.RequestHeader) *pb.ObjectG
 }
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
-func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPParams) (ips []net.IP, err error) {
+func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParams) (r *GetObjectIPsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.GetObjectIPs(ctx, params.toRequest(client.header()))
@@ -597,11 +604,12 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPParams
 		return nil, Error.Wrap(err)
 	}
 
-	ips = make([]net.IP, 0, len(response.Ips))
-	for _, ip := range response.Ips {
-		ips = append(ips, net.IP(ip))
-	}
-	return ips, nil
+	return &GetObjectIPsResponse{
+		IPPorts:            response.Ips,
+		SegmentCount:       response.SegmentCount,
+		PieceCount:         response.PieceCount,
+		ReliablePieceCount: response.ReliablePieceCount,
+	}, nil
 }
 
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.

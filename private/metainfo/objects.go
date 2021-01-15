@@ -6,7 +6,6 @@ package metainfo
 import (
 	"context"
 	"errors"
-	"net"
 	"strings"
 	"time"
 
@@ -27,7 +26,7 @@ type Meta struct {
 }
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
-func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, key string) (ips []net.IP, err error) {
+func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, key string) (_ *GetObjectIPsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
@@ -43,7 +42,7 @@ func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, key string)
 		return nil, err
 	}
 
-	return db.metainfo.GetObjectIPs(ctx, GetObjectIPParams{
+	return db.metainfo.GetObjectIPs(ctx, GetObjectIPsParams{
 		Bucket:        []byte(bucket.Name),
 		EncryptedPath: []byte(encPath.Raw()),
 	})
