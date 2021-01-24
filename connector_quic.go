@@ -3,14 +3,14 @@
 
 // +build quic
 
-package connector
+package uplink
 
 import (
 	"storj.io/common/rpc"
 	"storj.io/storj/pkg/quic"
 )
 
-// Get returns a quic connector.
-func Get(dialAdapter *rpc.ConnectorAdapter) rpc.Connector {
+// newDefaultConnector returns a quic connector.
+func newDefaultConnector(dialAdapter *rpc.ConnectorAdapter) rpc.Connector {
 	return quic.NewDefaultConnector(nil)
 }
