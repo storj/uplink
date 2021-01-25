@@ -89,6 +89,7 @@ func NewMultipartUpload(ctx context.Context, project *uplink.Project, bucket, ke
 	if err != nil {
 		return Info{}, packageError.Wrap(err)
 	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	response, err := metainfoClient.BeginObject(ctx, metainfo.BeginObjectParams{
 		Bucket:               []byte(bucket),
@@ -154,6 +155,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 	if err != nil {
 		return PartInfo{}, packageError.Wrap(err)
 	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	eofReader := streams.NewEOFReader(data)
 	for !eofReader.IsEOF() && !eofReader.HasError() {
@@ -372,6 +374,7 @@ func CompleteMultipartUpload(ctx context.Context, project *uplink.Project, bucke
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	err = metainfoClient.CommitObject(ctx, metainfo.CommitObjectParams{
 		StreamID:                      id,
@@ -420,6 +423,7 @@ func AbortMultipartUpload(ctx context.Context, project *uplink.Project, bucket, 
 	if err != nil {
 		return convertKnownErrors(err, bucket, key)
 	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	_, err = metainfoClient.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
 		Bucket:        []byte(bucket),
@@ -461,6 +465,7 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 	if err != nil {
 		return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
 	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	listResult, err := metainfoClient.ListSegments(ctx, metainfo.ListSegmentsParams{
 		StreamID: id,
