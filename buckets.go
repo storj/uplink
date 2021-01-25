@@ -88,7 +88,7 @@ func (buckets *BucketIterator) loadNext() bool {
 }
 
 func (buckets *BucketIterator) tryLoadNext() (ok bool, err error) {
-	db, err := buckets.project.getMetainfoDB(buckets.ctx)
+	db, err := buckets.project.dialMetainfoDB(buckets.ctx)
 	if err != nil {
 		return false, err
 	}

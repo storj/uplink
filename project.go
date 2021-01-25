@@ -150,7 +150,7 @@ func (project *Project) Close() (err error) {
 func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	metainfoClient, err := project.getMetainfoClient(ctx)
+	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -174,10 +174,10 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 	return streamStore, nil
 }
 
-func (project *Project) getMetainfoDB(ctx context.Context) (_ *metainfo.DB, err error) {
+func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metainfo.DB, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	metainfoClient, err := project.getMetainfoClient(ctx)
+	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -185,7 +185,7 @@ func (project *Project) getMetainfoDB(ctx context.Context) (_ *metainfo.DB, err 
 	return metainfo.New(metainfoClient, project.access.encAccess.Store), nil
 }
 
-func (project *Project) getMetainfoClient(ctx context.Context) (_ *metainfo.Client, err error) {
+func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metainfo.Client, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := metainfo.DialNodeURL(ctx,

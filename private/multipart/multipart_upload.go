@@ -85,7 +85,7 @@ func NewMultipartUpload(ctx context.Context, project *uplink.Project, bucket, ke
 		return Info{}, packageError.Wrap(err)
 	}
 
-	metainfoClient, err := getMetainfoClient(ctx, project)
+	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return Info{}, packageError.Wrap(err)
 	}
@@ -150,7 +150,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 		return PartInfo{}, packageError.Wrap(err)
 	}
 
-	metainfoClient, err := getMetainfoClient(ctx, project)
+	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return PartInfo{}, packageError.Wrap(err)
 	}
@@ -368,7 +368,7 @@ func CompleteMultipartUpload(ctx context.Context, project *uplink.Project, bucke
 		return nil, packageError.Wrap(err)
 	}
 
-	metainfoClient, err := getMetainfoClient(ctx, project)
+	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -416,7 +416,7 @@ func AbortMultipartUpload(ctx context.Context, project *uplink.Project, bucket, 
 		return convertKnownErrors(err, bucket, key)
 	}
 
-	metainfoClient, err := getMetainfoClient(ctx, project)
+	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return convertKnownErrors(err, bucket, key)
 	}
@@ -457,7 +457,7 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 		return ListObjectPartsResult{}, packageError.Wrap(err)
 	}
 
-	metainfoClient, err := getMetainfoClient(ctx, project)
+	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
 	}
@@ -591,7 +591,7 @@ func (uploads *UploadIterator) loadNext() bool {
 }
 
 func (uploads *UploadIterator) tryLoadNext() (ok bool, err error) {
-	db, err := getMetainfoDB(uploads.ctx, uploads.project)
+	db, err := dialMetainfoDB(uploads.ctx, uploads.project)
 	if err != nil {
 		return false, convertKnownErrors(err, uploads.bucket.Name, "")
 	}
@@ -679,11 +679,11 @@ func errwrapf(format string, err error, args ...interface{}) error {
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
 
-//go:linkname getMetainfoClient storj.io/uplink.getMetainfoClient
-func getMetainfoClient(ctx context.Context, project *uplink.Project) (*metainfo.Client, error)
+//go:linkname dialMetainfoClient storj.io/uplink.dialMetainfoClient
+func dialMetainfoClient(ctx context.Context, project *uplink.Project) (*metainfo.Client, error)
 
-//go:linkname getMetainfoDB storj.io/uplink.getMetainfoDB
-func getMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metainfo.DB, err error)
+//go:linkname dialMetainfoDB storj.io/uplink.dialMetainfoDB
+func dialMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metainfo.DB, err error)
 
 //go:linkname encryptionParameters storj.io/uplink.encryptionParameters
 func encryptionParameters(project *uplink.Project) storj.EncryptionParameters

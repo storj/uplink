@@ -83,7 +83,7 @@ func (meta CustomMetadata) Verify() error {
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (info *Object, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -101,7 +101,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

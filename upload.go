@@ -44,7 +44,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	// closing it earlier has the benefit of returning a connection to
 	// the pool, so we try to do that as early as possible.
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

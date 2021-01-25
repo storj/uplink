@@ -107,7 +107,7 @@ func (objects *ObjectIterator) loadNext() bool {
 }
 
 func (objects *ObjectIterator) tryLoadNext() (ok bool, err error) {
-	db, err := objects.project.getMetainfoDB(objects.ctx)
+	db, err := objects.project.dialMetainfoDB(objects.ctx)
 	if err != nil {
 		return false, convertKnownErrors(err, objects.bucket.Name, "")
 	}

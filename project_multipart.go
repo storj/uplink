@@ -16,18 +16,18 @@ import (
 	"storj.io/uplink/private/metainfo"
 )
 
-// getMetainfoClient is exposing project.getMetainfoClient method.
+// dialMetainfoClient is exposing project.dialMetainfoClient method.
 //
 // NB: this is used with linkname in private/multipart.
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
 //nolint: deadcode,unused
-func getMetainfoClient(ctx context.Context, project *Project) (_ *metainfo.Client, err error) {
-	return project.getMetainfoClient(ctx)
+func dialMetainfoClient(ctx context.Context, project *Project) (_ *metainfo.Client, err error) {
+	return project.dialMetainfoClient(ctx)
 }
 
-// getMetainfoClient is exposing project encryptionParameters field.
+// dialMetainfoClient is exposing project encryptionParameters field.
 //
 // NB: this is used with linkname in private/multipart.
 // It needs to be updated when this is updated.
@@ -87,13 +87,13 @@ func ecPutSingleResult(ctx context.Context, project *Project, limits []*pb.Addre
 	return project.ec.PutSingleResult(ctx, limits, privateKey, rs, data, expiration)
 }
 
-// getMetainfoDB is exposing project.getMetainfoDB method.
+// dialMetainfoDB is exposing project.dialMetainfoDB method.
 //
 // NB: this is used with linkname in private/multipart.
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
 //nolint: deadcode,unused
-func getMetainfoDB(ctx context.Context, project *Project) (_ *metainfo.DB, err error) {
-	return project.getMetainfoDB(ctx)
+func dialMetainfoDB(ctx context.Context, project *Project) (_ *metainfo.DB, err error) {
+	return project.dialMetainfoDB(ctx)
 }

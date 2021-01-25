@@ -37,7 +37,7 @@ type Bucket struct {
 func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, "")
 	}
@@ -60,7 +60,7 @@ func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bu
 func (project *Project) CreateBucket(ctx context.Context, bucket string) (created *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, "")
 	}
@@ -111,7 +111,7 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, "")
 	}
@@ -139,7 +139,7 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket string) (deleted *Bucket, err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	db, err := project.getMetainfoDB(ctx)
+	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, "")
 	}

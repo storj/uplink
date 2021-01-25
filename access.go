@@ -310,7 +310,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err error) {
 	defer mon.Func().RestartTrace(&ctx)(&err)
 
-	metainfoClient, err := project.getMetainfoClient(ctx)
+	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
 		return err
 	}
