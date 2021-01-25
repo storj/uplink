@@ -37,6 +37,14 @@ var packageError = errs.Class("multipart")
 // ErrStreamIDInvalid is returned when the stream ID is invalid.
 var ErrStreamIDInvalid = errors.New("stream ID invalid")
 
+// Object object metadata.
+type Object struct {
+	// StreamID multipart upload identifier encoded with base58.
+	StreamID string
+
+	uplink.Object
+}
+
 // Info contains information about multipart upload.
 type Info struct {
 	// StreamID multipart upload identifier encoded with base58.
@@ -620,7 +628,7 @@ func (uploads *UploadIterator) Err() error {
 }
 
 // Item returns the current object in the iterator.
-func (uploads *UploadIterator) Item() *uplink.Object {
+func (uploads *UploadIterator) Item() *Object {
 	item := uploads.item()
 	if item == nil {
 		return nil
@@ -631,9 +639,12 @@ func (uploads *UploadIterator) Item() *uplink.Object {
 		key = uploads.options.Prefix + item.Path
 	}
 
-	obj := uplink.Object{
-		Key:      key,
-		IsPrefix: item.IsPrefix,
+	obj := Object{
+		Object: uplink.Object{
+			Key:      key,
+			IsPrefix: item.IsPrefix,
+		},
+		StreamID: base58.CheckEncode(item.Stream.ID, 1),
 	}
 
 	// TODO: Make this filtering on the satellite
@@ -642,7 +653,6 @@ func (uploads *UploadIterator) Item() *uplink.Object {
 			Created:       item.Created,
 			Expires:       item.Expires,
 			ContentLength: item.Size,
-			StreamID:      base58.CheckEncode(item.Stream.ID, 1),
 		}
 	}
 

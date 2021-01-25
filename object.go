@@ -37,7 +37,6 @@ type SystemMetadata struct {
 	Created       time.Time
 	Expires       time.Time
 	ContentLength int64
-	StreamID      string
 }
 
 // CustomMetadata contains custom user metadata about the object.
