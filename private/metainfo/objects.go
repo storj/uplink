@@ -201,6 +201,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
 		Recursive:       options.Recursive,
+		Status:          options.Status,
 	})
 	if err != nil {
 		return storj.ObjectList{}, errClass.Wrap(err)
@@ -317,6 +318,8 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		Stream: storj.Stream{
 			ID: objectInfo.StreamID,
 
+			Size: objectInfo.PlainSize,
+
 			RedundancyScheme:     objectInfo.RedundancyScheme,
 			EncryptionParameters: objectInfo.EncryptionParameters,
 		},
@@ -361,7 +364,13 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field
 		Expires:  listItem.ExpiresAt,
+
+		Stream: storj.Stream{
+			Size: listItem.PlainSize,
+		},
 	}
+
+	object.Stream.ID = listItem.StreamID
 
 	err := updateObjectWithStream(&object, stream, streamMeta)
 	if err != nil {

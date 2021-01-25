@@ -187,7 +187,6 @@ func (config Config) requestAccessWithPassphraseAndConcurrency(ctx context.Conte
 
 	encAccess := access2.NewEncryptionAccessWithDefaultKey(key)
 	encAccess.SetDefaultPathCipher(storj.EncAESGCM)
-
 	return &Access{
 		satelliteURL: satelliteURL,
 		apiKey:       parsedAPIKey,

@@ -20,6 +20,9 @@ import (
 	"storj.io/uplink/private/testuplink"
 )
 
+// TODO we need find a way how to pass it from satellite to client.
+const maxInlineSize = 4096 // 4KiB
+
 // maxSegmentSize can be used to override max segment size with ldflags build parameter.
 // Example: go build -ldflags "-X 'storj.io/uplink.maxSegmentSize=1MiB'" storj.io/storj/cmd/uplink.
 var maxSegmentSize string
@@ -29,6 +32,7 @@ type Project struct {
 	config               Config
 	access               *Access
 	dialer               rpc.Dialer
+	ec                   ecclient.Client
 	segmentSize          int64
 	encryptionParameters storj.EncryptionParameters
 
@@ -109,10 +113,14 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}
 	}
 
+	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
+	ec := ecclient.NewClient(zap.L().Named("ecclient"), dialer, 0)
+
 	return &Project{
 		config:               config,
 		access:               access,
 		dialer:               dialer,
+		ec:                   ec,
 		segmentSize:          segmentsSize,
 		encryptionParameters: encryptionParameters,
 
@@ -152,15 +160,9 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		}
 	}()
 
-	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
-	ec := ecclient.NewClient(zap.L().Named("ecclient"), project.dialer, 0)
-
-	// TODO we need find a way how to pass it from satellite to client
-	maxInlineSize := 4 * memory.KiB.Int()
-
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,
-		ec,
+		project.ec,
 		project.segmentSize,
 		project.access.encAccess.Store,
 		project.encryptionParameters,

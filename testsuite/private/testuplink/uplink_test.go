@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
-	"storj.io/common/testcontext"
-	"storj.io/common/testrand"
-	"storj.io/storj/private/testplanet"
-	"storj.io/storj/storage"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -30,22 +26,32 @@ func TestWithMaxSegmentSize(t *testing.T) {
 }
 
 func TestWithMaxSegmentSize_Upload(t *testing.T) {
-	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
-	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+	// TODO we need to add TestingAllCommittedObjects and TestingAllObjectSegments to storj/storj main
 
-		expectedData := testrand.Bytes(19 * memory.KiB)
-		err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "super-bucket", "super-object", expectedData)
-		require.NoError(t, err)
+	// testplanet.Run(t, testplanet.Config{
+	// 	SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+	// }, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+	// 	newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
 
-		data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], "super-bucket", "super-object")
-		require.NoError(t, err)
-		require.Equal(t, expectedData, data)
+	// 	expectedData := testrand.Bytes(19 * memory.KiB)
+	// 	err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "super-bucket", "super-object", expectedData)
+	// 	require.NoError(t, err)
 
-		// verify we have two segments instead of one
-		keys, err := planet.Satellites[0].Metainfo.Database.List(ctx, storage.Key{}, -1)
-		require.NoError(t, err)
-		require.Equal(t, 2, len(keys.Strings()))
-	})
+	// 	data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], "super-bucket", "super-object")
+	// 	require.NoError(t, err)
+	// 	require.Equal(t, expectedData, data)
+
+	// 	// verify we have two segments instead of one
+	// 	objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "super-bucket")
+	// 	require.NoError(t, err)
+	// 	require.Len(t, objects, 1)
+
+	// 	segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+	// 		ProjectID:  planet.Uplinks[0].Projects[0].ID,
+	// 		BucketName: "super-bucket",
+	// 		ObjectKey:  objects[0].ObjectKey,
+	// 	})
+	// 	require.NoError(t, err)
+	// 	require.Equal(t, 2, len(segments))
+	// })
 }

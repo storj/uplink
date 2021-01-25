@@ -446,16 +446,18 @@ func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams)
 type CommitObjectParams struct {
 	StreamID storj.StreamID
 
-	EncryptedMetadataNonce storj.Nonce
-	EncryptedMetadata      []byte
+	EncryptedMetadataNonce        storj.Nonce
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
 	return &pb.ObjectCommitRequest{
-		Header:                 header,
-		StreamId:               params.StreamID,
-		EncryptedMetadataNonce: params.EncryptedMetadataNonce,
-		EncryptedMetadata:      params.EncryptedMetadata,
+		Header:                        header,
+		StreamId:                      params.StreamID,
+		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		EncryptedMetadata:             params.EncryptedMetadata,
+		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 	}
 }
 
@@ -526,6 +528,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 
 		Created:           object.CreatedAt,
 		Modified:          object.CreatedAt,
+		PlainSize:         object.PlainSize,
 		Expires:           object.ExpiresAt,
 		EncryptedMetadata: object.EncryptedMetadata,
 
@@ -614,6 +617,8 @@ type BeginDeleteObjectParams struct {
 	Bucket        []byte
 	EncryptedPath []byte
 	Version       int32
+	StreamID      storj.StreamID
+	Status        int32
 }
 
 func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginDeleteRequest {
@@ -622,6 +627,8 @@ func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.O
 		Bucket:        params.Bucket,
 		EncryptedPath: params.EncryptedPath,
 		Version:       params.Version,
+		StreamId:      &params.StreamID,
+		Status:        params.Status,
 	}
 }
 
@@ -666,6 +673,7 @@ type ListObjectsParams struct {
 	Limit           int32
 	IncludeMetadata bool
 	Recursive       bool
+	Status          int32
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -679,6 +687,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 			Metadata: params.IncludeMetadata,
 		},
 		Recursive: params.Recursive,
+		Status:    pb.Object_Status(params.Status),
 	}
 }
 
@@ -713,10 +722,15 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			StatusAt:               object.StatusAt,
 			CreatedAt:              object.CreatedAt,
 			ExpiresAt:              object.ExpiresAt,
+			PlainSize:              object.PlainSize,
 			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
 			EncryptedMetadata:      object.EncryptedMetadata,
 
 			IsPrefix: isPrefix,
+		}
+
+		if object.StreamId != nil {
+			objects[i].StreamID = *object.StreamId
 		}
 	}
 
@@ -737,6 +751,76 @@ func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams)
 
 	listResponse := newListObjectsResponse(response, params.EncryptedPrefix, params.Recursive)
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
+}
+
+// SegmentListItem represents listed segment.
+type SegmentListItem struct {
+	Position  storj.SegmentPosition
+	PlainSize int64
+}
+
+// ListSegmentsParams parameters for ListSegments method.
+type ListSegmentsParams struct {
+	StreamID []byte
+	Cursor   storj.SegmentPosition
+	Limit    int32
+}
+
+func (params *ListSegmentsParams) toRequest(header *pb.RequestHeader) *pb.SegmentListRequest {
+	return &pb.SegmentListRequest{
+		Header:   header,
+		StreamId: params.StreamID,
+		CursorPosition: &pb.SegmentPosition{
+			PartNumber: params.Cursor.PartNumber,
+			Index:      params.Cursor.Index,
+		},
+		Limit: params.Limit,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *ListSegmentsParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_SegmentList{
+			SegmentList: params.toRequest(nil),
+		},
+	}
+}
+
+// ListSegmentsResponse response for ListSegments request.
+type ListSegmentsResponse struct {
+	Items []SegmentListItem
+	More  bool
+}
+
+func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsResponse {
+	segments := make([]SegmentListItem, len(response.Items))
+	for i, segment := range response.Items {
+		segments[i] = SegmentListItem{
+			Position: storj.SegmentPosition{
+				PartNumber: segment.Position.PartNumber,
+				Index:      segment.Position.Index,
+			},
+			PlainSize: segment.PlainSize,
+		}
+	}
+
+	return ListSegmentsResponse{
+		Items: segments,
+		More:  response.More,
+	}
+}
+
+// ListSegments lists segments according to specific parameters.
+func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParams) (_ ListSegmentsResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.ListSegments(ctx, params.toRequest(client.header()))
+	if err != nil {
+		return ListSegmentsResponse{}, Error.Wrap(err)
+	}
+
+	return newListSegmentsResponse(response), nil
 }
 
 // BeginSegmentParams parameters for BeginSegment method.
@@ -769,29 +853,39 @@ func (params *BeginSegmentParams) BatchItem() *pb.BatchRequestItem {
 
 // BeginSegmentResponse response for BeginSegment request.
 type BeginSegmentResponse struct {
-	SegmentID       storj.SegmentID
-	Limits          []*pb.AddressedOrderLimit
-	PiecePrivateKey storj.PiecePrivateKey
+	SegmentID          storj.SegmentID
+	Limits             []*pb.AddressedOrderLimit
+	PiecePrivateKey    storj.PiecePrivateKey
+	RedundancyStrategy eestream.RedundancyStrategy
 }
 
-func newBeginSegmentResponse(response *pb.SegmentBeginResponse) BeginSegmentResponse {
-	return BeginSegmentResponse{
-		SegmentID:       response.SegmentId,
-		Limits:          response.AddressedLimits,
-		PiecePrivateKey: response.PrivateKey,
+func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentResponse, error) {
+	var rs eestream.RedundancyStrategy
+	var err error
+	if response.RedundancyScheme != nil {
+		rs, err = eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
+		if err != nil {
+			return BeginSegmentResponse{}, err
+		}
 	}
+	return BeginSegmentResponse{
+		SegmentID:          response.SegmentId,
+		Limits:             response.AddressedLimits,
+		PiecePrivateKey:    response.PrivateKey,
+		RedundancyStrategy: rs,
+	}, nil
 }
 
 // BeginSegment begins a segment upload.
-func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ storj.SegmentID, limits []*pb.AddressedOrderLimit, piecePrivateKey storj.PiecePrivateKey, err error) {
+func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ BeginSegmentResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.BeginSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return storj.SegmentID{}, nil, storj.PiecePrivateKey{}, Error.Wrap(err)
+		return BeginSegmentResponse{}, Error.Wrap(err)
 	}
 
-	return response.SegmentId, response.AddressedLimits, response.PrivateKey, nil
+	return newBeginSegmentResponse(response)
 }
 
 // CommitSegmentParams parameters for CommitSegment method.
@@ -799,6 +893,7 @@ type CommitSegmentParams struct {
 	SegmentID         storj.SegmentID
 	Encryption        storj.SegmentEncryption
 	SizeEncryptedData int64
+	PlainSize         int64
 
 	UploadResult []*pb.SegmentPieceUploadResult
 }
@@ -811,6 +906,7 @@ func (params *CommitSegmentParams) toRequest(header *pb.RequestHeader) *pb.Segme
 		EncryptedKeyNonce: params.Encryption.EncryptedKeyNonce,
 		EncryptedKey:      params.Encryption.EncryptedKey,
 		SizeEncryptedData: params.SizeEncryptedData,
+		PlainSize:         params.PlainSize,
 		UploadResult:      params.UploadResult,
 	}
 }
@@ -839,6 +935,7 @@ type MakeInlineSegmentParams struct {
 	Position            storj.SegmentPosition
 	Encryption          storj.SegmentEncryption
 	EncryptedInlineData []byte
+	PlainSize           int64
 }
 
 func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentMakeInlineRequest {
@@ -852,6 +949,7 @@ func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.S
 		EncryptedKeyNonce:   params.Encryption.EncryptedKeyNonce,
 		EncryptedKey:        params.Encryption.EncryptedKey,
 		EncryptedInlineData: params.EncryptedInlineData,
+		PlainSize:           params.PlainSize,
 	}
 }
 

@@ -30,10 +30,12 @@ func (r *EOFReader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
-func (r *EOFReader) isEOF() bool {
+// IsEOF returns true if EOF was returned during reading.
+func (r *EOFReader) IsEOF() bool {
 	return r.eof
 }
 
-func (r *EOFReader) hasError() bool {
+// HasError returns true if error was returned during reading.
+func (r *EOFReader) HasError() bool {
 	return r.err != nil
 }
