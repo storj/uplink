@@ -131,8 +131,8 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 		return PartInfo{}, errwrapf("%w (%q)", uplink.ErrObjectKeyInvalid, key)
 	case streamID == "":
 		return PartInfo{}, packageError.Wrap(ErrStreamIDInvalid)
-	case partNumber < 1:
-		return PartInfo{}, packageError.New("partNumber should be larger than 0")
+	case partNumber < 0:
+		return PartInfo{}, packageError.New("partNumber should be positive")
 	case partNumber >= math.MaxInt32:
 		return PartInfo{}, packageError.New("partNumber should be less than max(int32)")
 	}

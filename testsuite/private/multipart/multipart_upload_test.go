@@ -259,10 +259,10 @@ func TestPutObjectPart(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = multipart.PutObjectPart(newCtx, project, "", "multipart-object", info.StreamID, 1, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "", "multipart-object", info.StreamID, 0, nil)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "", info.StreamID, 1, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "", info.StreamID, 0, nil)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
@@ -270,11 +270,11 @@ func TestPutObjectPart(t *testing.T) {
 			require.Error(t, err)
 
 			// negative partID
-			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, nil)
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, -1, nil)
 			require.Error(t, err)
 
 			// empty input data reader
-			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer([]byte{}))
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer([]byte{}))
 			require.Error(t, err)
 		}
 
@@ -283,13 +283,13 @@ func TestPutObjectPart(t *testing.T) {
 		remoteSource1 := randData[len(remoteInlineSource) : len(remoteInlineSource)+10*memory.KiB.Int()]
 		remoteSource2 := randData[len(remoteInlineSource)+len(remoteSource1):]
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource1))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteSource1))
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 3, bytes.NewBuffer(remoteSource2))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource2))
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteInlineSource))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer(remoteInlineSource))
 		require.NoError(t, err)
 
 		// TODO verify that segment (1, 1) is inline
@@ -311,7 +311,7 @@ func TestPutObjectPart(t *testing.T) {
 		require.Equal(t, randData, downloaded.Bytes())
 
 		// create part for committed object
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(nil))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer(nil))
 		require.Error(t, err)
 	})
 }
@@ -350,30 +350,30 @@ func TestListParts(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		{
-			_, err = multipart.ListObjectParts(newCtx, project, "", "multipart-object", info.StreamID, 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "", "multipart-object", info.StreamID, 0, 10)
 			require.True(t, errors.Is(err, uplink.ErrBucketNameInvalid))
 
-			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "", info.StreamID, 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "", info.StreamID, 0, 10)
 			require.True(t, errors.Is(err, uplink.ErrObjectKeyInvalid))
 
 			// empty streamID
-			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "multipart-object", "", 1, 10)
+			_, err = multipart.ListObjectParts(newCtx, project, "testbucket", "multipart-object", "", 0, 10)
 			require.Error(t, err)
 		}
 
 		// list multipart upload with no uploaded parts
-		parts, err := multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err := multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, source2)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, source2)
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 5, source1)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 4, source1)
 		require.NoError(t, err)
 
 		// list parts of on going multipart upload
-		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 
@@ -384,21 +384,21 @@ func TestListParts(t *testing.T) {
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil)
 
 		// list parts of a completed multipart upload
-		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a limit of 1
-		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, 1)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts.Items))
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
 
 		// list parts with a cursor starting after all parts
-		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 6, 10)
+		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 5, 10)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 		require.Equal(t, false, parts.More)
