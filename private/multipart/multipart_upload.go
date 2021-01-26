@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"time"
 	_ "unsafe" // for go:linkname
 
@@ -122,7 +123,6 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 	// TODO
 	// * use Batch to combine requests
 	// * how pass expiration time
-	// * most probably we need to adjust content nonce generation
 
 	switch {
 	case bucket == "":
@@ -133,6 +133,8 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 		return PartInfo{}, packageError.Wrap(ErrStreamIDInvalid)
 	case partNumber < 1:
 		return PartInfo{}, packageError.New("partNumber should be larger than 0")
+	case partNumber >= math.MaxInt32:
+		return PartInfo{}, packageError.New("partNumber should be less than max(int32)")
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(streamID)
@@ -179,7 +181,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 		// The increment by 1 is to avoid nonce reuse with the metadata encryption,
 		// which is encrypted with the zero nonce.
 		contentNonce := storj.Nonce{}
-		_, err = encryption.Increment(&contentNonce, currentSegment+1)
+		_, err = encryption.Increment(&contentNonce, (int64(partNumber)<<32)|(currentSegment+1))
 		if err != nil {
 			return PartInfo{}, packageError.Wrap(err)
 		}

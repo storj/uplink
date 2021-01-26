@@ -403,7 +403,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 	var rangers []ranger.Ranger
 	for _, segment := range segmentsList.Items {
 		var contentNonce storj.Nonce
-		_, err = encryption.Increment(&contentNonce, int64(segment.Position.Index)+1)
+		_, err = encryption.Increment(&contentNonce, int64(segment.Position.PartNumber)<<32|(int64(segment.Position.Index)+1))
 		if err != nil {
 			return nil, err
 		}
