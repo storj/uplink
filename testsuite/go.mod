@@ -10,6 +10,6 @@ require (
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20210119231202-8321551aa24d
-	storj.io/storj v0.12.1-0.20210122120839-c44368c489c3
-	storj.io/uplink v1.4.6-0.20210124003008-12812391b849
+	storj.io/storj v0.12.1-0.20210201115950-5d895fb4044d
+	storj.io/uplink v1.4.6-0.20210125122828-3cf0f8cae40f
 )

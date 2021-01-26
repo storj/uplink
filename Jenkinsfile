@@ -103,7 +103,8 @@ pipeline {
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         dir('testsuite'){
                             sh 'go vet ./...'
-                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race storj.io/uplink/testsuite 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                            // remove 'multipart' package from tests against non-multipart satellite
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race $(go list ./... | grep -v \'storj.io/uplink/testsuite/private/multipart\' | tr \'\n\' \' \') 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
                         // TODO enable this later
                         // sh 'check-clean-directory'
@@ -142,38 +143,37 @@ pipeline {
                     }
                 }
 
-                // TODO this needs some adjustments in storj/storj
-                // stage('Integration [storj/storj]') {
-                //     environment {
-                //         STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
-                //         STORJ_TEST_COCKROACH = 'omit'
-                //     }
-                //     steps {
-                //         sh 'psql -U postgres -c \'create database teststorj2;\''
-                //         dir('testsuite'){
-                //             sh 'go vet storj.io/storj/...'
-                //             sh 'go test -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
-                //         }
-                //     }
+                stage('Integration [storj/storj]') {
+                    environment {
+                        STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
+                        STORJ_TEST_COCKROACH = 'omit'
+                    }
+                    steps {
+                        sh 'psql -U postgres -c \'create database teststorj2;\''
+                        dir('testsuite'){
+                            sh 'go vet storj.io/storj/...'
+                            sh 'go test -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                        }
+                    }
 
-                //     post {
-                //         always {
-                //             sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
-                //             archiveArtifacts artifacts: '.build/testsuite-storj.json'
-                //             junit '.build/testsuite-storj.xml'
-                //         }
-                //     }
-                // }
+                    post {
+                        always {
+                            sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite-storj.json'
+                            junit '.build/testsuite-storj.xml'
+                        }
+                    }
+                }
 
-                // stage('Integration [tools]') {
-                //     environment {
-                //         STORJ_SIM_POSTGRES = 'postgres://postgres@localhost/teststorj3?sslmode=disable'
-                //     }
-                //     steps {
-                //         sh 'psql -U postgres -c \'create database teststorj3;\''
-                //         sh './testsuite/scripts/test-sim.sh'
-                //     }
-                // }
+                stage('Integration [rclone]') {
+                    environment {
+                        STORJ_SIM_POSTGRES = 'postgres://postgres@localhost/teststorj3?sslmode=disable'
+                    }
+                    steps {
+                        sh 'psql -U postgres -c \'create database teststorj3;\''
+                        sh './testsuite/scripts/test-sim.sh'
+                    }
+                }
             }
         }
     }
