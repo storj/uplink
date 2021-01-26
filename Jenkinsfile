@@ -19,6 +19,9 @@ pipeline {
                 checkout scm
 
                 sh 'mkdir -p .build'
+                // make a backup of the mod file in case, for later linting
+                sh 'cp go.mod .build/go.mod.orig'
+                sh 'cp testsuite/go.mod .build/testsuite.go.mod.orig'
 
                 sh 'service postgresql start'
 
@@ -46,6 +49,7 @@ pipeline {
                         sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
                         sh 'go-licenses check ./...'
                         sh './scripts/check-libuplink-size.sh'
+                        sh 'check-mod-tidy -mod .build/go.mod.orig'
 
                         dir("testsuite") {
                             sh 'check-imports ./...'
@@ -54,6 +58,7 @@ pipeline {
                             sh 'check-errs ./...'
                             sh 'staticcheck ./...'
                             sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
+                            sh 'check-mod-tidy -mod ../.build/testsuite.go.mod.orig'
                         }
                     }
                 }
