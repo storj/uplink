@@ -4,6 +4,7 @@
 package access2
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -54,6 +55,7 @@ func ParseAccess(access string) (*Access, error) {
 	if err != nil {
 		return nil, fmt.Errorf("access grant has malformed encryption access: %w", err)
 	}
+	encAccess.LimitTo(apiKey)
 
 	return &Access{
 		SatelliteAddress: p.SatelliteAddr,
@@ -122,6 +124,129 @@ func (s *EncryptionAccess) SetDefaultKey(defaultKey *storj.Key) {
 // SetDefaultPathCipher sets which cipher suite to use by default.
 func (s *EncryptionAccess) SetDefaultPathCipher(defaultPathCipher storj.CipherSuite) {
 	s.Store.SetDefaultPathCipher(defaultPathCipher)
+}
+
+// LimitTo limits the data in the encryption access only to the paths that would be
+// allowed by the api key. Any errors that happen due to the consistency of the api
+// key cause no keys to be stored.
+func (s *EncryptionAccess) LimitTo(apiKey *macaroon.APIKey) {
+	store, err := s.limitTo(apiKey)
+	if err != nil {
+		store = encryption.NewStore()
+	}
+	s.Store = store
+}
+
+// collapsePrefixes collapses the caveat paths in a macaroon into a single list of valid
+// prefixes. This function should move to be exported in the common repo at some point.
+func collapsePrefixes(mac *macaroon.Macaroon) ([]*macaroon.Caveat_Path, bool, error) {
+	isAllowedByGroup := func(cav *macaroon.Caveat_Path, group []*macaroon.Caveat_Path) bool {
+		for _, other := range group {
+			if bytes.Equal(cav.Bucket, other.Bucket) &&
+				bytes.HasPrefix(cav.EncryptedPathPrefix, other.EncryptedPathPrefix) {
+				return true
+			}
+		}
+		return false
+	}
+
+	isAllowed := func(cav *macaroon.Caveat_Path, groups [][]*macaroon.Caveat_Path) bool {
+		for _, group := range groups {
+			if !isAllowedByGroup(cav, group) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// load all of the groups and prefixes from the caveats
+	var groups [][]*macaroon.Caveat_Path
+	var prefixes []*macaroon.Caveat_Path
+	for _, cavData := range mac.Caveats() {
+		var cav macaroon.Caveat
+		if err := pb.Unmarshal(cavData, &cav); err != nil {
+			return nil, false, err
+		}
+		if len(cav.AllowedPaths) > 0 {
+			groups = append(groups, cav.AllowedPaths)
+			prefixes = append(prefixes, cav.AllowedPaths...)
+		}
+	}
+
+	// if we have no groups/prefixes, then there are no path restrictions.
+	if len(groups) == 0 || len(prefixes) == 0 {
+		return nil, false, nil
+	}
+
+	// filter the prefixes by if every group allows them
+	j := 0
+	for i, prefix := range prefixes {
+		if !isAllowed(prefix, groups) {
+			continue
+		}
+		prefixes[j] = prefixes[i]
+		j++
+	}
+	prefixes = prefixes[:j]
+
+	return prefixes, true, nil
+}
+
+// limitTo returns the store that the access should be limited to and any error that
+// happened during processing. If there should be no limits, then it returns the
+// pointer identical store that currently exists on the EncryptionAccess. Otherwise
+// the returned store is a new value.
+func (s *EncryptionAccess) limitTo(apiKey *macaroon.APIKey) (*encryption.Store, error) {
+	// This is a bit hacky. We may want to export some stuff.
+	data := apiKey.SerializeRaw()
+	mac, err := macaroon.ParseMacaroon(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// collapse the prefixes of the macaroon into a list of valid ones and if there were
+	// any restrictions at all.
+	prefixes, restricted, err := collapsePrefixes(mac)
+	if err != nil {
+		return nil, err
+	}
+
+	// if we have no restrictions, we're done. we can return the same store that we have.
+	if !restricted {
+		return s.Store, nil
+	}
+
+	// create the new store that we'll load into and carry some necessary defaults
+	store := encryption.NewStore()
+	store.SetDefaultPathCipher(s.Store.GetDefaultPathCipher()) // keep default path cipher
+
+	// add the prefixes to the store, skipping any that fail for any reason
+	for _, prefix := range prefixes {
+		bucket := string(prefix.Bucket)
+		encPath := paths.NewEncrypted(string(prefix.EncryptedPathPrefix))
+
+		unencPath, err := encryption.DecryptPathWithStoreCipher(bucket, encPath, s.Store)
+		if err != nil {
+			continue
+		}
+		key, err := encryption.DerivePathKey(bucket, unencPath, s.Store)
+		if err != nil {
+			continue
+		}
+
+		// we have to unfortunately look up the cipher again because the Decrypt function
+		// does not return it.
+		_, _, base := s.Store.LookupEncrypted(bucket, encPath)
+		if base == nil {
+			continue // this should not happen given Decrypt succeeded, but whatever
+		}
+
+		if err := store.AddWithCipher(bucket, unencPath, encPath, *key, base.PathCipher); err != nil {
+			continue
+		}
+	}
+
+	return store, nil
 }
 
 func (s *EncryptionAccess) toProto() (*pb.EncryptionAccess, error) {
