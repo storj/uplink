@@ -492,6 +492,45 @@ func TestSharePrefix_UploadDownload(t *testing.T) {
 	})
 }
 
+// TestShareUnique asserts sharing from the same root grant with the same
+// permissions should result in different access grants.
+func TestShareUnique(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		uplinkConfig := uplink.Config{}
+
+		projectInfo := planet.Uplinks[0].Projects[0]
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
+		require.NoError(t, err)
+
+		permission := uplink.FullPermission()
+		permission.NotBefore = time.Now()
+		permission.NotAfter = permission.NotBefore.Add(1 * time.Hour)
+
+		prefix := uplink.SharePrefix{
+			Bucket: "testbucket",
+			Prefix: "test.dat",
+		}
+
+		key1, err := access.Share(permission, prefix)
+		require.NoError(t, err)
+
+		key2, err := access.Share(permission, prefix)
+		require.NoError(t, err)
+
+		key1s, err := key1.Serialize()
+		require.NoError(t, err)
+
+		key2s, err := key2.Serialize()
+		require.NoError(t, err)
+
+		require.NotEqual(t, key1s, key2s)
+	})
+}
+
 func TestAccessSerialization(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,

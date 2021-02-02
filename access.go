@@ -242,14 +242,14 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 		return nil, packageError.New("invalid time range")
 	}
 
-	caveat := macaroon.Caveat{
+	caveat := macaroon.WithNonce(macaroon.Caveat{
 		DisallowReads:   !permission.AllowDownload,
 		DisallowWrites:  !permission.AllowUpload,
 		DisallowLists:   !permission.AllowList,
 		DisallowDeletes: !permission.AllowDelete,
 		NotBefore:       notBefore,
 		NotAfter:        notAfter,
-	}
+	})
 
 	sharedAccess := access2.NewEncryptionAccess()
 	sharedAccess.SetDefaultPathCipher(access.encAccess.Store.GetDefaultPathCipher())
