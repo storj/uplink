@@ -9,7 +9,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20210119231202-8321551aa24d
-	storj.io/storj v0.12.1-0.20210121160013-3c13aae61e60
-	storj.io/uplink v1.4.6-0.20210115090500-10cfa3d1c277
+	storj.io/common v0.0.0-20210204085205-60ce54e6c840
+	storj.io/storj v0.12.1-0.20210204083808-9a6001177471
+	storj.io/uplink v1.4.6-0.20210201122710-48b82ce14a37
 )
