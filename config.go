@@ -26,7 +26,8 @@ type Config struct {
 	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-	pool *rpcpool.Pool
+	pool      *rpcpool.Pool
+	connector rpc.Connector
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
@@ -45,14 +46,19 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	} else {
 		dialer.Pool = rpc.NewDefaultConnectionPool()
 	}
+
 	dialer.DialTimeout = config.DialTimeout
 
-	dialContext := config.DialContext
-	if dialContext == nil {
-		dialContext = socket.BackgroundDialer().DialContext
-	}
+	if config.connector != nil {
+		dialer.Connector = config.connector
+	} else {
+		dialContext := config.DialContext
+		if dialContext == nil {
+			dialContext = socket.BackgroundDialer().DialContext
+		}
 
-	dialer.Connector = newDefaultConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
+		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
+	}
 
 	return dialer, nil
 }
@@ -65,6 +71,17 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 //lint:ignore U1000, used with linkname
 //nolint: unused
 func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool }
+
+// setConnector exposes setting a connector used by the dialer.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint: unused
+func (config *Config) setConnector(connector rpc.Connector) {
+	config.connector = connector
+}
 
 func (config Config) validateUserAgent(ctx context.Context) error {
 	if len(config.UserAgent) == 0 {

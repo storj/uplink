@@ -25,6 +25,12 @@ func ConfigSetConnectionPool(*uplink.Config, *rpcpool.Pool)
 //go:linkname ConfigGetDialer storj.io/uplink.Config.getDialer
 func ConfigGetDialer(uplink.Config, context.Context) (rpc.Dialer, error)
 
+//  ConfigSetConnector exposes Config.setConnector
+//
+//nolint: golint
+//go:linkname ConfigSetConnector storj.io/uplink.(*Config).setConnector
+func ConfigSetConnector(*uplink.Config, rpc.Connector)
+
 // AccessGetAPIKey exposes Access.getAPIKey.
 //
 //go:linkname AccessGetAPIKey storj.io/uplink.(*Access).getAPIKey

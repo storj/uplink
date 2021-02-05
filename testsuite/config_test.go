@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"testing"
@@ -13,11 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
+	"storj.io/common/rpc"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/transport"
 )
 
 func TestRequestAccess(t *testing.T) {
@@ -124,4 +127,30 @@ func TestCustomDialContext(t *testing.T) {
 
 func badDialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	return nil, errors.New("dial error")
+}
+
+func TestCustomConnector(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		config := uplink.Config{}
+		transport.SetConnector(&config, fakeConnector{})
+
+		project, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.EnsureBucket(ctx, "bucket")
+		require.True(t, errors.Is(err, errfakeConnector))
+	})
+}
+
+var errfakeConnector = errors.New("fake connector error")
+
+type fakeConnector struct{}
+
+func (c fakeConnector) DialContext(ctx context.Context, tlsConfig *tls.Config, address string) (rpc.ConnectorConn, error) {
+	return nil, errfakeConnector
 }
