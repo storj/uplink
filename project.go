@@ -18,6 +18,7 @@ import (
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/testuplink"
+	"storj.io/uplink/private/version"
 )
 
 // TODO we need find a way how to pass it from satellite to client.
@@ -55,6 +56,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	if err := config.validateUserAgent(ctx); err != nil {
 		return nil, packageError.New("invalid user agent: %w", err)
+	}
+
+	config.UserAgent, err = version.AppendVersionToUserAgent(config.UserAgent)
+	if err != nil {
+		return nil, packageError.Wrap(err)
 	}
 
 	var telemetry telemetryclient.Client

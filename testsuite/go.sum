@@ -900,8 +900,8 @@ storj.io/common v0.0.0-20200424175742-65ac59022f4f/go.mod h1:pZyXiIE7bGETIRXtfs0
 storj.io/common v0.0.0-20201026135900-1aaeec90670b/go.mod h1:GqdmNf3fLm2UZX/7Zr0BLFCJ4gFjgm6eHrk/fnmr5jQ=
 storj.io/common v0.0.0-20210204114159-106c992bbc05 h1:2FMeP4zBLcRueApRPEhkrPkNI9FifmTPln3orfX/CBo=
 storj.io/common v0.0.0-20210204114159-106c992bbc05/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
-storj.io/common v0.0.0-20210205111539-d92870f49405 h1:qcPaQoICnz6QMxEGRr44Yj9XGjWljun5KsaKPUltbIs=
-storj.io/common v0.0.0-20210205111539-d92870f49405/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
+storj.io/common v0.0.0-20210208122718-577b1f8a0a0f h1:O2/ia55Q/xhMBJ/WgeTQBEST7h8IWXZE4FEQyiM+RYc=
+storj.io/common v0.0.0-20210208122718-577b1f8a0a0f/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
 storj.io/drpc v0.0.11/go.mod h1:TiFc2obNjL9/3isMW1Rpxjy8V9uE0B2HMeMFGiiI7Iw=
 storj.io/drpc v0.0.14/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
 storj.io/drpc v0.0.16 h1:9sxypc5lKi/0D69cR21BR0S21+IvXfON8L5nXMVNTwQ=
@@ -910,5 +910,5 @@ storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b h1:Bbg9JCtY6l3HrDxs3BX
 storj.io/monkit-jaeger v0.0.0-20200518165323-80778fc3f91b/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
 storj.io/private v0.0.0-20210203200143-9d2ec06f0d3c h1:9sLvfSIZgUhw98J8/3FBOVVJ+huhgYedhYpbrLbE+uk=
 storj.io/private v0.0.0-20210203200143-9d2ec06f0d3c/go.mod h1:VHaDkpBka3Pp5rXqFSDHbEmzMaFFW4BYrXJfGIN1Udo=
-storj.io/storj v0.12.1-0.20210205205703-8b49b210a175 h1:LYXRnWWWlWXsD6/G8c/pqhjgUKOqFk24pop6kYV3eUQ=
-storj.io/storj v0.12.1-0.20210205205703-8b49b210a175/go.mod h1:7IFMGZDueWmuzCxQdKKPQ974Kiwdtrwz0RJszSSyFYE=
+storj.io/storj v0.12.1-0.20210208135250-3b49d3cddf56 h1:mLJKxnlLeIvrFU8FuA7cL5pEqe6wF6ktElnEFrDyOsY=
+storj.io/storj v0.12.1-0.20210208135250-3b49d3cddf56/go.mod h1:7IFMGZDueWmuzCxQdKKPQ974Kiwdtrwz0RJszSSyFYE=

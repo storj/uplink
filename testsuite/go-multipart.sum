@@ -838,6 +838,8 @@ storj.io/common v0.0.0-20210204114159-106c992bbc05 h1:2FMeP4zBLcRueApRPEhkrPkNI9
 storj.io/common v0.0.0-20210204114159-106c992bbc05/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
 storj.io/common v0.0.0-20210205111539-d92870f49405 h1:qcPaQoICnz6QMxEGRr44Yj9XGjWljun5KsaKPUltbIs=
 storj.io/common v0.0.0-20210205111539-d92870f49405/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
+storj.io/common v0.0.0-20210208122718-577b1f8a0a0f h1:O2/ia55Q/xhMBJ/WgeTQBEST7h8IWXZE4FEQyiM+RYc=
+storj.io/common v0.0.0-20210208122718-577b1f8a0a0f/go.mod h1:b8XP/TdW8OyTZ/J2BDFOIE9KojSUNZgImBFZI99zS04=
 storj.io/drpc v0.0.11/go.mod h1:TiFc2obNjL9/3isMW1Rpxjy8V9uE0B2HMeMFGiiI7Iw=
 storj.io/drpc v0.0.14/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
 storj.io/drpc v0.0.16 h1:9sxypc5lKi/0D69cR21BR0S21+IvXfON8L5nXMVNTwQ=
@@ -848,3 +850,6 @@ storj.io/storj v0.12.1-0.20210204083808-9a6001177471 h1:qcEwKjcMr4cM083VSxicwxfQ
 storj.io/storj v0.12.1-0.20210204083808-9a6001177471/go.mod h1:h4tj0os8rUQs8SLZJab7zfdQecF5iTDuBb670BvgrsI=
 storj.io/storj v0.12.1-0.20210204110913-615586a4712d/go.mod h1:MeB7pnv7ASY5QLvZTPoCXgst2b1tmtE+axC4BiW+QNU=
 storj.io/storj v0.12.1-0.20210205205703-8b49b210a175/go.mod h1:7IFMGZDueWmuzCxQdKKPQ974Kiwdtrwz0RJszSSyFYE=
+storj.io/storj v0.12.1-0.20210208093605-0c223f288aff h1:X/lf86e/pY1YYhcY1jvVpOdATxxyXVmFtjS1kcDgmwc=
+storj.io/storj v0.12.1-0.20210208093605-0c223f288aff/go.mod h1:h4tj0os8rUQs8SLZJab7zfdQecF5iTDuBb670BvgrsI=
+storj.io/storj v0.12.1-0.20210208135250-3b49d3cddf56/go.mod h1:7IFMGZDueWmuzCxQdKKPQ974Kiwdtrwz0RJszSSyFYE=
