@@ -172,7 +172,13 @@ pipeline {
                     }
                     steps {
                         sh 'psql -U postgres -c \'create database teststorj3;\''
+                        echo 'Testing against satellite [main]'
                         sh './testsuite/scripts/test-sim.sh'
+                        sh 'psql -U postgres -c \'drop database teststorj3;\''
+
+                        sh 'psql -U postgres -c \'create database teststorj3;\''
+                        echo 'Testing against satellite [multipart-upload]'
+                        sh 'STORJ_GO_MOD=\'../go-multipart.mod\' ./testsuite/scripts/test-sim.sh'
                     }
                 }
 

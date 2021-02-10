@@ -12,7 +12,9 @@ cleanup(){
 }
 trap cleanup EXIT
 
-VERSION=$(go list -m -f "{{.Version}}" storj.io/storj)
+STORJ_GO_MOD=${STORJ_GO_MOD:-"../go.mod"}
+VERSION=$(go list -modfile $STORJ_GO_MOD -m -f "{{.Version}}" storj.io/storj)
+
 
 go install storj.io/storj/cmd/certificates@$VERSION
 go install storj.io/storj/cmd/identity@$VERSION
@@ -21,6 +23,8 @@ go install storj.io/storj/cmd/storagenode@$VERSION
 go install storj.io/storj/cmd/versioncontrol@$VERSION
 go install storj.io/storj/cmd/storj-sim@$VERSION
 go install storj.io/gateway@latest
+
+echo "Used version: $VERSION"
 
 export STORJ_NETWORK_DIR=$TMP
 
