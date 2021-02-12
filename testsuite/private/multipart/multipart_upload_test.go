@@ -66,9 +66,13 @@ func TestNewMultipartUpload(t *testing.T) {
 
 func TestNewMultipartUpload_Expires(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount:   1,
-		StorageNodeCount: 0,
-		UplinkCount:      1,
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			// Reconfigure RS for ensuring that we don't have long-tail cancellations
+			Satellite: testplanet.Combine(
+				testplanet.ReconfigureRS(2, 2, 4, 4),
+			),
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
 		require.NoError(t, err)
@@ -90,6 +94,10 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
+		reader := bytes.NewReader(testrand.Bytes(5 * memory.KiB))
+		_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, reader)
+		require.NoError(t, err)
+
 		// assert there is one pending multipart upload and it has an expiration date
 		assertMultipartUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 		list := multipart.ListMultipartUploads(ctx, project, "testbucket", &multipart.ListMultipartUploadsOptions{
@@ -106,6 +114,13 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		require.False(t, list.Next())
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
+
+		// check that storage nodes have pieces that will expire
+		for _, sn := range planet.StorageNodes {
+			expiredInfos, err := sn.Storage2.Store.GetExpired(ctx, expiresAt.Add(time.Hour), 100)
+			require.NoError(t, err)
+			require.NotEmpty(t, expiredInfos)
+		}
 	})
 }
 
