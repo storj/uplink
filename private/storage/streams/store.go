@@ -247,7 +247,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				segmentRS = objectRS
 			}
 			encSizedReader := SizeReader(transformedReader)
-			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader, expiration)
+			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader)
 			if err != nil {
 				return Meta{}, err
 			}

@@ -237,11 +237,8 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 			}
 
 			encSizedReader := streams.SizeReader(transformedReader)
-
-			// TODO handle expiration
-			expiration := time.Time{}
 			uploadResults, err := ecPutSingleResult(ctx, project, response.Limits, response.PiecePrivateKey,
-				response.RedundancyStrategy, encSizedReader, expiration)
+				response.RedundancyStrategy, encSizedReader)
 			if err != nil {
 				return PartInfo{}, packageError.Wrap(err)
 			}
@@ -754,4 +751,4 @@ func deriveContentKey(project *uplink.Project, bucket, key string) (*storj.Key, 
 
 //go:linkname ecPutSingleResult storj.io/uplink.ecPutSingleResult
 func ecPutSingleResult(ctx context.Context, project *uplink.Project, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey,
-	rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (results []*pb.SegmentPieceUploadResult, err error)
+	rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error)

@@ -6,7 +6,6 @@ package uplink
 import (
 	"context"
 	"io"
-	"time"
 
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
@@ -83,8 +82,8 @@ func deriveContentKey(project *Project, bucket, key string) (*storj.Key, error) 
 //lint:ignore U1000, used with linkname
 //nolint: deadcode,unused
 func ecPutSingleResult(ctx context.Context, project *Project, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey,
-	rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (results []*pb.SegmentPieceUploadResult, err error) {
-	return project.ec.PutSingleResult(ctx, limits, privateKey, rs, data, expiration)
+	rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
+	return project.ec.PutSingleResult(ctx, limits, privateKey, rs, data)
 }
 
 // dialMetainfoDB is exposing project.dialMetainfoDB method.
