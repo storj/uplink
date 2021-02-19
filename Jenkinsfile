@@ -151,8 +151,9 @@ pipeline {
                     steps {
                         sh 'psql -U postgres -c \'create database teststorj2;\''
                         dir('testsuite'){
-                            sh 'go vet storj.io/storj/...'
-                            sh 'go test -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            sh 'cp go.mod go-temp.mod'
+                            sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
+                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
                         }
                     }
 
