@@ -19,9 +19,7 @@ cd $SCRIPTDIR && go install \
 	storj.io/storj/cmd/versioncontrol \
 	storj.io/storj/cmd/storj-sim
 
-mkdir -p $TMP/gateway-tmp
-cd $TMP/gateway-tmp && go mod init gatewaybuild
-cd $TMP/gateway-tmp && GO111MODULE=on go get storj.io/gateway@latest
+go install storj.io/gateway@latest
 
 export STORJ_NETWORK_DIR=$TMP
 
