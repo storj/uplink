@@ -21,8 +21,8 @@ pushd $RCLONE
     go mod edit -replace storj.io/uplink=$SCRIPTDIR/../../
     go mod tidy
 
-    go build ./fstest/test_all
-    go build
+    go build -mod=mod ./fstest/test_all
+    go build -mod=mod
 
     ./rclone config create TestTardigrade tardigrade access_grant $GATEWAY_0_ACCESS
 
