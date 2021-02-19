@@ -11,14 +11,14 @@ cleanup(){
 }
 trap cleanup EXIT
 
-cd $SCRIPTDIR && go install \
-	storj.io/storj/cmd/certificates \
-	storj.io/storj/cmd/identity \
-	storj.io/storj/cmd/satellite \
-	storj.io/storj/cmd/storagenode \
-	storj.io/storj/cmd/versioncontrol \
-	storj.io/storj/cmd/storj-sim
+VERSION=$(go list -m -f "{{.Version}}" storj.io/storj)
 
+go install storj.io/storj/cmd/certificates@$VERSION
+go install storj.io/storj/cmd/identity@$VERSION
+go install storj.io/storj/cmd/satellite@$VERSION
+go install storj.io/storj/cmd/storagenode@$VERSION
+go install storj.io/storj/cmd/versioncontrol@$VERSION
+go install storj.io/storj/cmd/storj-sim@$VERSION
 go install storj.io/gateway@latest
 
 export STORJ_NETWORK_DIR=$TMP
