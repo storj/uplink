@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -ueo pipefail
+set +x
 
 # This script is a wrapper for running integration tests locally.
 # It's using postgres-dev.sh to configure new postgres instance for
