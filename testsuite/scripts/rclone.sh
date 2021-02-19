@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -ueo pipefail
+set +x
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -19,9 +20,10 @@ pushd $RCLONE
     git checkout $latest_version
 
     go mod edit -replace storj.io/uplink=$SCRIPTDIR/../../
+    go mod tidy
 
-    go build ./fstest/test_all
-    go build
+    go build -mod=mod ./fstest/test_all
+    go build -mod=mod
 
     ./rclone config create TestTardigrade tardigrade access_grant $GATEWAY_0_ACCESS
 

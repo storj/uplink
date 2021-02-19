@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -ueo pipefail
+set +x
 
 # This is helper script to setup and run postgres docker image with
 # all configuration needed to execute storj-sim integration tests locally
