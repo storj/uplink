@@ -367,8 +367,9 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info storj.Obj
 	}
 
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
-		Bucket:        []byte(bucket),
-		EncryptedPath: []byte(encPath.Raw()),
+		Bucket:                     []byte(bucket),
+		EncryptedPath:              []byte(encPath.Raw()),
+		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
 		return storj.Object{}, err

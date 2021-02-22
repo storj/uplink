@@ -413,7 +413,6 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 			streams:              s,
 			streamID:             object.ID,
 			position:             segment.Position,
-			rs:                   object.RedundancyScheme,
 			size:                 segment.PlainSize,
 			derivedKey:           derivedKey,
 			startingNonce:        &contentNonce,
@@ -447,7 +446,6 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 			position: storj.SegmentPosition{
 				Index: int32(i),
 			},
-			rs:                   object.RedundancyScheme,
 			size:                 object.FixedSegmentSize,
 			derivedKey:           derivedKey,
 			startingNonce:        &contentNonce,
@@ -468,7 +466,6 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 		position: storj.SegmentPosition{
 			Index: -1, // last segment
 		},
-		rs:                   object.RedundancyScheme,
 		size:                 object.LastSegment.Size,
 		derivedKey:           derivedKey,
 		startingNonce:        &contentNonce,
@@ -500,7 +497,6 @@ type lazySegmentRanger struct {
 	streams              *Store
 	streamID             storj.StreamID
 	position             storj.SegmentPosition
-	rs                   storj.RedundancyScheme
 	size                 int64
 	derivedKey           *storj.Key
 	startingNonce        *storj.Nonce
@@ -517,7 +513,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 	defer mon.Task()(&ctx)(&err)
 
 	if lr.ranger == nil {
-		info, limits, err := lr.metainfo.DownloadSegment(ctx, metainfo.DownloadSegmentParams{
+		info, limits, err := lr.metainfo.DownloadSegmentWithRS(ctx, metainfo.DownloadSegmentParams{
 			StreamID: lr.streamID,
 			Position: storj.SegmentPosition{
 				PartNumber: lr.position.PartNumber,
@@ -528,7 +524,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 			return nil, err
 		}
 
-		rr, err := lr.streams.Ranger(ctx, info, limits, lr.rs)
+		rr, err := lr.streams.Ranger(ctx, info, limits)
 		if err != nil {
 			return nil, err
 		}
@@ -595,16 +591,16 @@ func (s *Store) cancelHandler(ctx context.Context, bucket, unencryptedKey string
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
 func (s *Store) Ranger(
-	ctx context.Context, info storj.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit, objectRS storj.RedundancyScheme,
+	ctx context.Context, info metainfo.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit,
 ) (rr ranger.Ranger, err error) {
-	defer mon.Task()(&ctx, info, limits, objectRS)(&err)
+	defer mon.Task()(&ctx, info, limits, info.RedundancyScheme)(&err)
 
 	// no order limits also means its inline segment
 	if len(info.EncryptedInlineData) != 0 || len(limits) == 0 {
 		return ranger.ByteRanger(info.EncryptedInlineData), nil
 	}
 
-	needed := objectRS.DownloadNodes()
+	needed := info.RedundancyScheme.DownloadNodes()
 	selected := make([]*pb.AddressedOrderLimit, len(limits))
 	s.rngMu.Lock()
 	perm := s.rng.Perm(len(limits))
@@ -624,7 +620,7 @@ func (s *Store) Ranger(
 		}
 	}
 
-	redundancy, err := eestream.NewRedundancyStrategyFromStorj(objectRS)
+	redundancy, err := eestream.NewRedundancyStrategyFromStorj(info.RedundancyScheme)
 	if err != nil {
 		return nil, err
 	}

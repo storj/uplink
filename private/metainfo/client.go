@@ -484,14 +484,17 @@ type GetObjectParams struct {
 	Bucket        []byte
 	EncryptedPath []byte
 	Version       int32
+
+	RedundancySchemePerSegment bool
 }
 
 func (params *GetObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectGetRequest {
 	return &pb.ObjectGetRequest{
-		Header:        header,
-		Bucket:        params.Bucket,
-		EncryptedPath: params.EncryptedPath,
-		Version:       params.Version,
+		Header:                     header,
+		Bucket:                     params.Bucket,
+		EncryptedPath:              params.EncryptedPath,
+		Version:                    params.Version,
+		RedundancySchemePerSegment: params.RedundancySchemePerSegment,
 	}
 }
 
@@ -1122,6 +1125,65 @@ func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmen
 
 	downloadResponse := newDownloadSegmentResponse(response)
 	return downloadResponse.Info, downloadResponse.Limits, nil
+}
+
+// SegmentDownloadInfo represents information necessary for downloading segment (inline and remote).
+type SegmentDownloadInfo struct {
+	SegmentID           storj.SegmentID
+	Size                int64
+	EncryptedInlineData []byte
+	PiecePrivateKey     storj.PiecePrivateKey
+	SegmentEncryption   storj.SegmentEncryption
+	RedundancyScheme    storj.RedundancyScheme
+}
+
+func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) (SegmentDownloadInfo, []*pb.AddressedOrderLimit) {
+	info := SegmentDownloadInfo{
+		SegmentID:           response.SegmentId,
+		Size:                response.SegmentSize,
+		EncryptedInlineData: response.EncryptedInlineData,
+		PiecePrivateKey:     response.PrivateKey,
+		SegmentEncryption: storj.SegmentEncryption{
+			EncryptedKeyNonce: response.EncryptedKeyNonce,
+			EncryptedKey:      response.EncryptedKey,
+		},
+	}
+
+	if response.RedundancyScheme != nil {
+		info.RedundancyScheme = storj.RedundancyScheme{
+			Algorithm:      storj.RedundancyAlgorithm(response.RedundancyScheme.Type),
+			ShareSize:      response.RedundancyScheme.ErasureShareSize,
+			RequiredShares: int16(response.RedundancyScheme.MinReq),
+			RepairShares:   int16(response.RedundancyScheme.RepairThreshold),
+			OptimalShares:  int16(response.RedundancyScheme.SuccessThreshold),
+			TotalShares:    int16(response.RedundancyScheme.Total),
+		}
+	}
+
+	for i := range response.AddressedLimits {
+		if response.AddressedLimits[i].Limit == nil {
+			response.AddressedLimits[i] = nil
+		}
+	}
+	return info, response.AddressedLimits
+}
+
+// TODO replace DownloadSegment with DownloadSegmentWithRS in batch
+
+// DownloadSegmentWithRS gets information for downloading remote segment or data from an inline segment.
+func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ SegmentDownloadInfo, _ []*pb.AddressedOrderLimit, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return SegmentDownloadInfo{}, nil, storj.ErrObjectNotFound.Wrap(err)
+		}
+		return SegmentDownloadInfo{}, nil, Error.Wrap(err)
+	}
+
+	info, limits := newDownloadSegmentResponseWithRS(response)
+	return info, limits, nil
 }
 
 // RevokeAPIKey revokes the APIKey provided in the params.
