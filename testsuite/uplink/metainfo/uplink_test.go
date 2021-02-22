@@ -12,6 +12,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite/metainfo/metabase"
 )
 
 func TestMultisegmentUploadWithLastInline(t *testing.T) {
@@ -33,5 +34,20 @@ func TestMultisegmentUploadWithLastInline(t *testing.T) {
 		downloaded, err := uplink.Download(ctx, satellite, "testbucket", "test/path")
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
+
+		// verify that object has 3 segments, 2 remote + 1 inline
+		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "testbucket")
+		require.NoError(t, err)
+		require.Len(t, objects, 1)
+
+		segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+			ProjectID:  planet.Uplinks[0].Projects[0].ID,
+			BucketName: "testbucket",
+			ObjectKey:  objects[0].ObjectKey,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(segments))
+		// TODO we should check 2 segments to be remote and last one to be inline
+		// but main satellite implementation doens't give such info at the moment
 	})
 }

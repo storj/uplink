@@ -262,23 +262,25 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 				return PartInfo{}, packageError.Wrap(err)
 			}
 
-			cipherData, err := encryption.Encrypt(data, encryptionParameters.CipherSuite, &contentKey, &contentNonce)
-			if err != nil {
-				return PartInfo{}, packageError.Wrap(err)
-			}
+			if len(data) > 0 {
+				cipherData, err := encryption.Encrypt(data, encryptionParameters.CipherSuite, &contentKey, &contentNonce)
+				if err != nil {
+					return PartInfo{}, packageError.Wrap(err)
+				}
 
-			err = metainfoClient.MakeInlineSegment(ctx, metainfo.MakeInlineSegmentParams{
-				StreamID: decodedStreamID,
-				Position: storj.SegmentPosition{
-					PartNumber: int32(partNumber),
-					Index:      int32(currentSegment),
-				},
-				Encryption:          segmentEncryption,
-				EncryptedInlineData: cipherData,
-				PlainSize:           int64(len(data)),
-			})
-			if err != nil {
-				return PartInfo{}, packageError.Wrap(err)
+				err = metainfoClient.MakeInlineSegment(ctx, metainfo.MakeInlineSegmentParams{
+					StreamID: decodedStreamID,
+					Position: storj.SegmentPosition{
+						PartNumber: int32(partNumber),
+						Index:      int32(currentSegment),
+					},
+					Encryption:          segmentEncryption,
+					EncryptedInlineData: cipherData,
+					PlainSize:           int64(len(data)),
+				})
+				if err != nil {
+					return PartInfo{}, packageError.Wrap(err)
+				}
 			}
 		}
 		streamSize += sizeReader.Size()

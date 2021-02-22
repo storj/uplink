@@ -18,6 +18,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite/metainfo/metabase"
 	"storj.io/uplink"
 	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/testuplink"
@@ -575,6 +576,55 @@ func TestListPendingObjectStreams(t *testing.T) {
 
 		// non-existing object
 		assertPendingObjectStreamsList(ctx, t, project, "testbucket", "a/prefixed/multipart-object", multipart.ListMultipartUploadsOptions{})
+	})
+}
+
+func TestPutObjectPartCheckNoEmptyInlineSegment(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+
+		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := multipart.NewMultipartUpload(newCtx, project, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.StreamID)
+
+		expectedData := testrand.Bytes(30 * memory.KiB)
+		_, err = multipart.PutObjectPart(newCtx, project, bucket, objectKey, info.StreamID, 1, bytes.NewBuffer(expectedData))
+		require.NoError(t, err)
+
+		_, err = multipart.CompleteMultipartUpload(newCtx, project, bucket, objectKey, info.StreamID, nil)
+		require.NoError(t, err)
+
+		data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], bucket, objectKey)
+		require.NoError(t, err)
+		require.Equal(t, expectedData, data)
+
+		// verify that part has 3 segments and no empty inline segment at the end
+		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, bucket)
+		require.NoError(t, err)
+		require.Len(t, objects, 1)
+
+		segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+			ProjectID:  planet.Uplinks[0].Projects[0].ID,
+			BucketName: bucket,
+			ObjectKey:  objects[0].ObjectKey,
+		})
+		require.NoError(t, err)
+		require.Len(t, segments, 3)
+		// TODO would be nice to check that but how implement that for pointerdb
+		// require.NotZero(t, segments[2].PlainSize)
 	})
 }
 
