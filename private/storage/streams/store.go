@@ -392,32 +392,44 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 		return nil, err
 	}
 
-	// TODO can be batched with GetObject
-	segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
-		StreamID: object.ID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var rangers []ranger.Ranger
-	for _, segment := range segmentsList.Items {
-		var contentNonce storj.Nonce
-		_, err = encryption.Increment(&contentNonce, int64(segment.Position.PartNumber)<<32|(int64(segment.Position.Index)+1))
+	// TODO this is naive solution which will introduce additional round trips to satellite.
+	// We need at least batch it here or force satellite to return all segments in single request
+	// or maybe there is third option.
+	rangers := make([]ranger.Ranger, 0, object.SegmentCount)
+	cursor := storj.SegmentPosition{}
+	for {
+		segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
+			StreamID: object.ID,
+			Cursor:   cursor,
+		})
 		if err != nil {
 			return nil, err
 		}
 
-		rangers = append(rangers, &lazySegmentRanger{
-			metainfo:             s.metainfo,
-			streams:              s,
-			streamID:             object.ID,
-			position:             segment.Position,
-			size:                 segment.PlainSize,
-			derivedKey:           derivedKey,
-			startingNonce:        &contentNonce,
-			encryptionParameters: object.EncryptionParameters,
-		})
+		for _, segment := range segmentsList.Items {
+			var contentNonce storj.Nonce
+			_, err = encryption.Increment(&contentNonce, int64(segment.Position.PartNumber)<<32|(int64(segment.Position.Index)+1))
+			if err != nil {
+				return nil, err
+			}
+
+			rangers = append(rangers, &lazySegmentRanger{
+				metainfo:             s.metainfo,
+				streams:              s,
+				streamID:             object.ID,
+				position:             segment.Position,
+				size:                 segment.PlainSize,
+				derivedKey:           derivedKey,
+				startingNonce:        &contentNonce,
+				encryptionParameters: object.EncryptionParameters,
+			})
+
+			cursor = segment.Position
+		}
+
+		if !segmentsList.More {
+			break
+		}
 	}
 
 	return ranger.Concat(rangers...), nil

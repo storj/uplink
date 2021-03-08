@@ -638,6 +638,42 @@ func TestPutObjectPartCheckNoEmptyInlineSegment(t *testing.T) {
 	})
 }
 
+func TestDownloadObjectWithManySegments(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+
+		expectedData := []byte{}
+
+		// Current max limit for segments listing is 1000, we need
+		// to check if more than that will be handlel correctly
+		for i := 0; i < 1010; i++ {
+			expectedData = append(expectedData, byte(i))
+
+			// TODO maybe put it in parallel
+			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i+1, bytes.NewBuffer([]byte{byte(i)}))
+			require.NoError(t, err)
+		}
+
+		_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID, nil)
+		require.NoError(t, err)
+
+		data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "testbucket", "multipart-object")
+		require.NoError(t, err)
+		require.Equal(t, expectedData, data)
+	})
+}
+
 func assertPendingObjectStreamsList(ctx context.Context, t *testing.T, project *uplink.Project, bucket, objectKey string, opts multipart.ListMultipartUploadsOptions, streams ...string) {
 	list := multipart.ListPendingObjectStreams(ctx, project, bucket, objectKey, &opts)
 	require.NoError(t, list.Err())
