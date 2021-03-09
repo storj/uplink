@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/spacemonkeygo/monkit/v3 v3.0.7
+	github.com/spacemonkeygo/monkit/v3 v3.0.9
 	github.com/stretchr/testify v1.6.1
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.2.2
