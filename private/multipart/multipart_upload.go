@@ -487,23 +487,26 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 		return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
 	}
 
-	partInfosMap := make(map[int]PartInfo)
+	partInfosMap := make(map[int]*PartInfo)
 
 	for _, item := range listResult.Items {
 		partNumber := int(item.Position.PartNumber)
 		_, exists := partInfosMap[partNumber]
 		if !exists {
-			partInfosMap[partNumber] = PartInfo{
+			partInfosMap[partNumber] = &PartInfo{
 				PartNumber:   partNumber,
+				Size:         item.PlainSize,
 				LastModified: time.Now(), // TODO: handle last modified time correctly
 			}
+		} else {
+			partInfosMap[partNumber].Size += item.PlainSize
 		}
 	}
 
 	partInfos := make([]PartInfo, 0, len(partInfosMap))
 
 	for _, partInfo := range partInfosMap {
-		partInfos = append(partInfos, partInfo)
+		partInfos = append(partInfos, *partInfo)
 	}
 
 	return ListObjectPartsResult{Items: partInfos, More: listResult.More}, nil

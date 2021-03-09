@@ -392,6 +392,16 @@ func TestListParts(t *testing.T) {
 		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 10)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
+		partsMap := make(map[int]multipart.PartInfo)
+		for _, part := range parts.Items {
+			partsMap[part.PartNumber] = part
+		}
+		part, exists := partsMap[0]
+		require.True(t, exists)
+		require.EqualValues(t, len(randData)-firstPartLen, part.Size)
+		part, exists = partsMap[4]
+		require.True(t, exists)
+		require.EqualValues(t, firstPartLen, part.Size)
 
 		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
