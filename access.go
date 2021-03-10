@@ -310,7 +310,7 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 // There may be a delay between a successful revocation request and actual
 // revocation, depending on the satellite's access caching policies.
 func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {

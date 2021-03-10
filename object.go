@@ -80,7 +80,7 @@ func (meta CustomMetadata) Verify() error {
 
 // StatObject returns information about an object at the specific key.
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (info *Object, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -98,7 +98,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 
 // DeleteObject deletes the object at the specific key.
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {

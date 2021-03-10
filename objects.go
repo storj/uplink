@@ -28,7 +28,7 @@ type ListObjectsOptions struct {
 
 // ListObjects returns an iterator over the objects.
 func (project *Project) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) *ObjectIterator {
-	defer mon.Func().RestartTrace(&ctx)(nil)
+	defer mon.Task()(&ctx)(nil)
 
 	b := storj.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
 	opts := storj.ListOptions{

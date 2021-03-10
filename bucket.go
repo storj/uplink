@@ -35,7 +35,7 @@ type Bucket struct {
 
 // StatBucket returns information about a bucket.
 func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bucket, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -58,7 +58,7 @@ func (project *Project) StatBucket(ctx context.Context, bucket string) (info *Bu
 //
 // When bucket already exists it returns a valid Bucket and ErrBucketExists.
 func (project *Project) CreateBucket(ctx context.Context, bucket string) (created *Bucket, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -95,7 +95,7 @@ func (project *Project) CreateBucket(ctx context.Context, bucket string) (create
 //
 // When bucket already exists it returns a valid Bucket and no error.
 func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensured *Bucket, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	ensured, err = project.CreateBucket(ctx, bucket)
 	if err != nil && !errors.Is(err, ErrBucketAlreadyExists) {
@@ -109,7 +109,7 @@ func (project *Project) EnsureBucket(ctx context.Context, bucket string) (ensure
 //
 // When bucket is not empty it returns ErrBucketNotEmpty.
 func (project *Project) DeleteBucket(ctx context.Context, bucket string) (deleted *Bucket, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -137,7 +137,7 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 
 // DeleteBucketWithObjects deletes a bucket and all objects within that bucket.
 func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket string) (deleted *Bucket, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {

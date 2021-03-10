@@ -21,7 +21,7 @@ type DownloadOptions struct {
 
 // DownloadObject starts a download from the specific key.
 func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (download *Download, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
 		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)

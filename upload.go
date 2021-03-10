@@ -27,7 +27,7 @@ type UploadOptions struct {
 
 // UploadObject starts an upload to the specific key.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (upload *Upload, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
 		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)

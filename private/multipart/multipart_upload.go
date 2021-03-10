@@ -77,7 +77,7 @@ type PartInfo struct {
 // NewMultipartUpload begins new multipart upload.
 // Potential name: BeginObject.
 func NewMultipartUpload(ctx context.Context, project *uplink.Project, bucket, key string, options *UploadOptions) (info Info, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
 		return Info{}, uplink.ErrBucketNameInvalid
@@ -119,7 +119,7 @@ func NewMultipartUpload(ctx context.Context, project *uplink.Project, bucket, ke
 
 // PutObjectPart uploads a part.
 func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key string, streamID string, partNumber int, data io.Reader) (info PartInfo, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	// TODO
 	// * use Batch to combine requests
@@ -300,7 +300,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 // CompleteMultipartUpload commits object after uploading all parts.
 // TODO should we accept parameter with info uploaded parts.
 func CompleteMultipartUpload(ctx context.Context, project *uplink.Project, bucket, key, streamID string, opts *ObjectOptions) (obj *uplink.Object, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
 		return nil, errwrapf("%w (%q)", uplink.ErrBucketNameInvalid, bucket)
@@ -403,7 +403,7 @@ func CompleteMultipartUpload(ctx context.Context, project *uplink.Project, bucke
 // AbortMultipartUpload aborts a multipart upload.
 // TODO: implement dedicated metainfo methods to handle aborting correctly.
 func AbortMultipartUpload(ctx context.Context, project *uplink.Project, bucket, key, streamID string) (err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 	if bucket == "" {
 		return uplink.ErrBucketNameInvalid
 	}
@@ -451,7 +451,7 @@ func AbortMultipartUpload(ctx context.Context, project *uplink.Project, bucket, 
 // ListObjectParts lists  the  parts  that have been uploaded for a specific multipart upload.
 // TODO: For now, maxParts is not correctly handled as the limit is applied to the number of segments we retrieve.
 func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, streamID string, partCursor, maxParts int) (infos ListObjectPartsResult, err error) {
-	defer mon.Func().RestartTrace(&ctx)(&err)
+	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
 		return ListObjectPartsResult{}, uplink.ErrBucketNameInvalid
@@ -530,7 +530,7 @@ type ListMultipartUploadsOptions struct {
 
 // ListMultipartUploads returns an iterator over the multipart uploads.
 func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket string, options *ListMultipartUploadsOptions) *UploadIterator {
-	defer mon.Func().RestartTrace(&ctx)(nil)
+	defer mon.Task()(&ctx)(nil)
 
 	opts := storj.ListOptions{
 		Direction: storj.After,
@@ -560,7 +560,7 @@ func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket s
 
 // ListPendingObjectStreams returns an iterator over the multipart uploads.
 func ListPendingObjectStreams(ctx context.Context, project *uplink.Project, bucket, objectKey string, options *ListMultipartUploadsOptions) *UploadIterator {
-	defer mon.Func().RestartTrace(&ctx)(nil)
+	defer mon.Task()(&ctx)(nil)
 
 	opts := storj.ListOptions{
 		Direction: storj.After,
