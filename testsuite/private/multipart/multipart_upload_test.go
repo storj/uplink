@@ -383,6 +383,8 @@ func TestListParts(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 
+		uploadTime := time.Now()
+
 		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, source0)
 		require.NoError(t, err)
 
@@ -395,8 +397,10 @@ func TestListParts(t *testing.T) {
 		require.Equal(t, 2, len(parts.Items))
 		require.Equal(t, 0, parts.Items[0].PartNumber)
 		require.Equal(t, int64(part0size), parts.Items[0].Size)
+		require.WithinDuration(t, uploadTime, parts.Items[0].LastModified, 10*time.Second)
 		require.Equal(t, 4, parts.Items[1].PartNumber)
 		require.Equal(t, int64(part4size), parts.Items[1].Size)
+		require.WithinDuration(t, uploadTime, parts.Items[1].LastModified, 10*time.Second)
 
 		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)

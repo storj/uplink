@@ -12,5 +12,5 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	storj.io/common v0.0.0-20210309163522-46893d0ea5ea
+	storj.io/common v0.0.0-20210311141746-133f4d716d1d
 )

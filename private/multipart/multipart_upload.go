@@ -498,10 +498,13 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 			partInfosMap[partNumber] = &PartInfo{
 				PartNumber:   partNumber,
 				Size:         item.PlainSize,
-				LastModified: time.Now(), // TODO: handle last modified time correctly
+				LastModified: item.CreatedAt,
 			}
 		} else {
 			partInfosMap[partNumber].Size += item.PlainSize
+			if item.CreatedAt.After(partInfosMap[partNumber].LastModified) {
+				partInfosMap[partNumber].LastModified = item.CreatedAt
+			}
 		}
 	}
 

@@ -834,6 +834,7 @@ func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListP
 type SegmentListItem struct {
 	Position  storj.SegmentPosition
 	PlainSize int64
+	CreatedAt time.Time
 }
 
 // ListSegmentsParams parameters for ListSegments method.
@@ -879,6 +880,7 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 				Index:      segment.Position.Index,
 			},
 			PlainSize: segment.PlainSize,
+			CreatedAt: segment.CreatedAt,
 		}
 	}
 
