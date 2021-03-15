@@ -354,9 +354,10 @@ func TestListParts(t *testing.T) {
 		createBucket(t, ctx, project, "testbucket")
 
 		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
-		firstPartLen := int(float32(len(randData)) * 0.3)
-		source1 := bytes.NewBuffer(randData[:firstPartLen])
-		source2 := bytes.NewBuffer(randData[firstPartLen:])
+		part0size := len(randData) * 3 / 10
+		part4size := len(randData) - part0size
+		source0 := bytes.NewBuffer(randData[:part0size])
+		source4 := bytes.NewBuffer(randData[part0size:])
 
 		info, err := multipart.NewMultipartUpload(newCtx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
@@ -382,26 +383,20 @@ func TestListParts(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, source2)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, source0)
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 4, source1)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 4, source4)
 		require.NoError(t, err)
 
 		// list parts of on going multipart upload
 		parts, err = multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 100)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(parts.Items))
-		partsMap := make(map[int]multipart.PartInfo)
-		for _, part := range parts.Items {
-			partsMap[part.PartNumber] = part
-		}
-		part, exists := partsMap[0]
-		require.True(t, exists)
-		require.EqualValues(t, len(randData)-firstPartLen, part.Size)
-		part, exists = partsMap[4]
-		require.True(t, exists)
-		require.EqualValues(t, firstPartLen, part.Size)
+		require.Equal(t, 0, parts.Items[0].PartNumber)
+		require.Equal(t, int64(part0size), parts.Items[0].Size)
+		require.Equal(t, 4, parts.Items[1].PartNumber)
+		require.Equal(t, int64(part4size), parts.Items[1].Size)
 
 		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
@@ -428,6 +423,52 @@ func TestListParts(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, len(parts.Items))
 		require.Equal(t, false, parts.More)
+	})
+}
+
+func TestListParts_Ordering(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		projectInfo := planet.Uplinks[0].Projects[0]
+
+		uplinkConfig := uplink.Config{}
+		access, err := uplinkConfig.RequestAccessWithPassphrase(ctx, projectInfo.Satellite.URL(), projectInfo.APIKey, "mypassphrase")
+		require.NoError(t, err)
+
+		project, err := uplinkConfig.OpenProject(ctx, access)
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		const partCount = 10
+		data := testrand.Bytes(partCount + 1)
+
+		info, err := multipart.NewMultipartUpload(ctx, project, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.StreamID)
+
+		for i := 0; i < partCount; i++ {
+			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i, bytes.NewReader(data[:i+1]))
+			require.NoError(t, err)
+		}
+		_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID, nil)
+		require.NoError(t, err)
+
+		// list parts with a cursor starting after all parts
+		parts, err := multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.StreamID, 0, 100)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(parts.Items))
+		require.Equal(t, false, parts.More)
+
+		for i, item := range parts.Items {
+			require.Equal(t, i, item.PartNumber)
+			require.Equal(t, int64(i+1), item.Size)
+		}
 	})
 }
 

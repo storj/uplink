@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"sort"
 	"strings"
 	"time"
 	_ "unsafe" // for go:linkname
@@ -448,8 +449,9 @@ func AbortMultipartUpload(ctx context.Context, project *uplink.Project, bucket, 
 	return nil
 }
 
-// ListObjectParts lists  the  parts  that have been uploaded for a specific multipart upload.
-// TODO: For now, maxParts is not correctly handled as the limit is applied to the number of segments we retrieve.
+// ListObjectParts lists the parts in position order that have been uploaded for a specific multipart upload.
+//
+// BUG: For now, maxParts is not correctly handled as the limit is applied to the number of segments we retrieve.
 func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, streamID string, partCursor, maxParts int) (infos ListObjectPartsResult, err error) {
 	defer mon.Task()(&ctx)(&err)
 
@@ -504,10 +506,12 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 	}
 
 	partInfos := make([]PartInfo, 0, len(partInfosMap))
-
 	for _, partInfo := range partInfosMap {
 		partInfos = append(partInfos, *partInfo)
 	}
+	sort.Slice(partInfos, func(i, k int) bool {
+		return partInfos[i].PartNumber < partInfos[k].PartNumber
+	})
 
 	return ListObjectPartsResult{Items: partInfos, More: listResult.More}, nil
 }
