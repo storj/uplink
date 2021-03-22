@@ -4,7 +4,4 @@ bump-dependencies:
 	go mod tidy
 	cd testsuite;\
 		go get storj.io/common@main storj.io/storj@main storj.io/uplink@main;\
-		cp go.mod go-multipart.mod;\
-		go get --modfile go-multipart.mod storj.io/common@main storj.io/storj@multipart-upload storj.io/uplink@main;\
 		go mod tidy;\
-		go mod tidy --modfile go-multipart.mod

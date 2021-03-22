@@ -11,6 +11,6 @@ require (
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	storj.io/common v0.0.0-20210311141746-133f4d716d1d
 )

@@ -103,35 +103,10 @@ pipeline {
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         dir('testsuite'){
                             sh 'go vet ./...'
-                            // remove 'multipart' package from tests against non-multipart satellite
-                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race $(go list ./... | grep -v \'storj.io/uplink/testsuite/private/multipart\' | tr \'\n\' \' \') 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
                         // TODO enable this later
                         // sh 'check-clean-directory'
-                    }
-
-                    post {
-                        always {
-                            sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
-                            archiveArtifacts artifacts: '.build/testsuite.json'
-                            junit '.build/testsuite.xml'
-                        }
-                    }
-                }
-
-                stage('Testsuite (storj/storj [multipart-upload])') {
-                    environment {
-                        STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach_multipart?sslmode=disable'
-                        STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj_multipart?sslmode=disable'
-                        COVERFLAGS = "${ env.BRANCH_NAME != 'master' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
-                    }
-                    steps {
-                        sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach_multipart;\''
-                        sh 'psql -U postgres -c \'create database teststorj_multipart;\''
-                        dir('testsuite'){
-                            sh 'go vet  --modfile go-multipart.mod ./...'
-                            sh 'go test --modfile go-multipart.mod -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
-                        }
                     }
 
                     post {
@@ -147,9 +122,12 @@ pipeline {
                     environment {
                         STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
                         STORJ_TEST_COCKROACH = 'omit'
+                        // TODO add 'omit' for metabase STORJ_TEST_DATABASES
+                        STORJ_TEST_DATABASES = 'pg|pgx|postgres://postgres@localhost/testmetabase?sslmode=disable'
                     }
                     steps {
                         sh 'psql -U postgres -c \'create database teststorj2;\''
+                        sh 'psql -U postgres -c \'create database testmetabase;\''
                         dir('testsuite'){
                             sh 'cp go.mod go-temp.mod'
                             sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
@@ -172,13 +150,9 @@ pipeline {
                     }
                     steps {
                         sh 'psql -U postgres -c \'create database teststorj3;\''
-                        echo 'Testing against satellite [main]'
+                        echo 'Testing against satellite'
                         sh './testsuite/scripts/test-sim.sh'
                         sh 'psql -U postgres -c \'drop database teststorj3;\''
-
-                        sh 'psql -U postgres -c \'create database teststorj3;\''
-                        echo 'Testing against satellite [multipart-upload]'
-                        sh 'STORJ_GO_MOD=\'../go-multipart.mod\' ./testsuite/scripts/test-sim.sh'
                     }
                 }
 
