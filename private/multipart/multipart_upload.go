@@ -208,9 +208,9 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 			return PartInfo{}, packageError.Wrap(err)
 		}
 
-		segmentEncryption := storj.SegmentEncryption{}
+		segmentEncryption := metainfo.SegmentEncryption{}
 		if encryptionParameters.CipherSuite != storj.EncNull {
-			segmentEncryption = storj.SegmentEncryption{
+			segmentEncryption = metainfo.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: keyNonce,
 			}
@@ -228,7 +228,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 			response, err := metainfoClient.BeginSegment(ctx, metainfo.BeginSegmentParams{
 				StreamID:      decodedStreamID,
 				MaxOrderLimit: maxEncryptedSegmentSize,
-				Position: storj.SegmentPosition{
+				Position: metainfo.SegmentPosition{
 					PartNumber: int32(partNumber),
 					Index:      int32(currentSegment),
 				},
@@ -271,7 +271,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 
 				err = metainfoClient.MakeInlineSegment(ctx, metainfo.MakeInlineSegmentParams{
 					StreamID: decodedStreamID,
-					Position: storj.SegmentPosition{
+					Position: metainfo.SegmentPosition{
 						PartNumber: int32(partNumber),
 						Index:      int32(currentSegment),
 					},
@@ -481,7 +481,7 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 
 	listResult, err := metainfoClient.ListSegments(ctx, metainfo.ListSegmentsParams{
 		StreamID: id,
-		Cursor:   storj.SegmentPosition{PartNumber: int32(partCursor), Index: 0},
+		Cursor:   metainfo.SegmentPosition{PartNumber: int32(partCursor), Index: 0},
 		Limit:    int32(maxParts), // TODO: handle limit correctly
 	})
 

@@ -189,9 +189,9 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			return Meta{}, err
 		}
 
-		segmentEncryption := storj.SegmentEncryption{}
+		segmentEncryption := metainfo.SegmentEncryption{}
 		if s.encryptionParameters.CipherSuite != storj.EncNull {
-			segmentEncryption = storj.SegmentEncryption{
+			segmentEncryption = metainfo.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: keyNonce,
 			}
@@ -208,7 +208,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 			beginSegment := &metainfo.BeginSegmentParams{
 				MaxOrderLimit: maxEncryptedSegmentSize,
-				Position: storj.SegmentPosition{
+				Position: metainfo.SegmentPosition{
 					Index: int32(currentSegment),
 				},
 			}
@@ -271,7 +271,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			}
 
 			makeInlineSegment := &metainfo.MakeInlineSegmentParams{
-				Position: storj.SegmentPosition{
+				Position: metainfo.SegmentPosition{
 					Index: int32(currentSegment),
 				},
 				Encryption:          segmentEncryption,
@@ -396,7 +396,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 	// We need at least batch it here or force satellite to return all segments in single request
 	// or maybe there is third option.
 	rangers := make([]ranger.Ranger, 0, object.SegmentCount)
-	cursor := storj.SegmentPosition{}
+	cursor := metainfo.SegmentPosition{}
 	for {
 		segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
 			StreamID: object.ID,
@@ -455,7 +455,7 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 			metainfo: s.metainfo,
 			streams:  s,
 			streamID: object.ID,
-			position: storj.SegmentPosition{
+			position: metainfo.SegmentPosition{
 				Index: int32(i),
 			},
 			size:                 object.FixedSegmentSize,
@@ -475,7 +475,7 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 		metainfo: s.metainfo,
 		streams:  s,
 		streamID: object.ID,
-		position: storj.SegmentPosition{
+		position: metainfo.SegmentPosition{
 			Index: -1, // last segment
 		},
 		size:                 object.LastSegment.Size,
@@ -508,7 +508,7 @@ type lazySegmentRanger struct {
 	metainfo             *metainfo.Client
 	streams              *Store
 	streamID             storj.StreamID
-	position             storj.SegmentPosition
+	position             metainfo.SegmentPosition
 	size                 int64
 	derivedKey           *storj.Key
 	startingNonce        *storj.Nonce
@@ -527,7 +527,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 	if lr.ranger == nil {
 		info, limits, err := lr.metainfo.DownloadSegmentWithRS(ctx, metainfo.DownloadSegmentParams{
 			StreamID: lr.streamID,
-			Position: storj.SegmentPosition{
+			Position: metainfo.SegmentPosition{
 				PartNumber: lr.position.PartNumber,
 				Index:      lr.position.Index,
 			},

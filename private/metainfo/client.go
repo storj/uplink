@@ -832,7 +832,7 @@ func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListP
 
 // SegmentListItem represents listed segment.
 type SegmentListItem struct {
-	Position  storj.SegmentPosition
+	Position  SegmentPosition
 	PlainSize int64
 	CreatedAt time.Time
 }
@@ -840,7 +840,7 @@ type SegmentListItem struct {
 // ListSegmentsParams parameters for ListSegments method.
 type ListSegmentsParams struct {
 	StreamID []byte
-	Cursor   storj.SegmentPosition
+	Cursor   SegmentPosition
 	Limit    int32
 }
 
@@ -875,7 +875,7 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 	segments := make([]SegmentListItem, len(response.Items))
 	for i, segment := range response.Items {
 		segments[i] = SegmentListItem{
-			Position: storj.SegmentPosition{
+			Position: SegmentPosition{
 				PartNumber: segment.Position.PartNumber,
 				Index:      segment.Position.Index,
 			},
@@ -905,7 +905,7 @@ func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParam
 // BeginSegmentParams parameters for BeginSegment method.
 type BeginSegmentParams struct {
 	StreamID      storj.StreamID
-	Position      storj.SegmentPosition
+	Position      SegmentPosition
 	MaxOrderLimit int64
 }
 
@@ -970,7 +970,7 @@ func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParam
 // CommitSegmentParams parameters for CommitSegment method.
 type CommitSegmentParams struct {
 	SegmentID         storj.SegmentID
-	Encryption        storj.SegmentEncryption
+	Encryption        SegmentEncryption
 	SizeEncryptedData int64
 	PlainSize         int64
 
@@ -1011,8 +1011,8 @@ func (client *Client) CommitSegment(ctx context.Context, params CommitSegmentPar
 // MakeInlineSegmentParams parameters for MakeInlineSegment method.
 type MakeInlineSegmentParams struct {
 	StreamID            storj.StreamID
-	Position            storj.SegmentPosition
-	Encryption          storj.SegmentEncryption
+	Position            SegmentPosition
+	Encryption          SegmentEncryption
 	EncryptedInlineData []byte
 	PlainSize           int64
 }
@@ -1053,7 +1053,7 @@ func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSe
 // DownloadSegmentParams parameters for DownloadSegment method.
 type DownloadSegmentParams struct {
 	StreamID storj.StreamID
-	Position storj.SegmentPosition
+	Position SegmentPosition
 }
 
 func (params *DownloadSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentDownloadRequest {
@@ -1078,24 +1078,24 @@ func (params *DownloadSegmentParams) BatchItem() *pb.BatchRequestItem {
 
 // DownloadSegmentResponse response for DownloadSegment request.
 type DownloadSegmentResponse struct {
-	Info storj.SegmentDownloadInfo
+	Info SegmentDownloadResponseInfo
 
 	Limits []*pb.AddressedOrderLimit
 }
 
 func newDownloadSegmentResponse(response *pb.SegmentDownloadResponse) DownloadSegmentResponse {
-	info := storj.SegmentDownloadInfo{
+	info := SegmentDownloadResponseInfo{
 		SegmentID:           response.SegmentId,
 		Size:                response.SegmentSize,
 		EncryptedInlineData: response.EncryptedInlineData,
 		PiecePrivateKey:     response.PrivateKey,
-		SegmentEncryption: storj.SegmentEncryption{
+		SegmentEncryption: SegmentEncryption{
 			EncryptedKeyNonce: response.EncryptedKeyNonce,
 			EncryptedKey:      response.EncryptedKey,
 		},
 	}
 	if response.Next != nil {
-		info.Next = storj.SegmentPosition{
+		info.Next = SegmentPosition{
 			PartNumber: response.Next.PartNumber,
 			Index:      response.Next.Index,
 		}
@@ -1114,15 +1114,15 @@ func newDownloadSegmentResponse(response *pb.SegmentDownloadResponse) DownloadSe
 
 // DownloadSegment gets information for downloading remote segment or data
 // from an inline segment.
-func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmentParams) (_ storj.SegmentDownloadInfo, _ []*pb.AddressedOrderLimit, err error) {
+func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmentParams) (_ SegmentDownloadResponseInfo, _ []*pb.AddressedOrderLimit, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.SegmentDownloadInfo{}, nil, storj.ErrObjectNotFound.Wrap(err)
+			return SegmentDownloadResponseInfo{}, nil, storj.ErrObjectNotFound.Wrap(err)
 		}
-		return storj.SegmentDownloadInfo{}, nil, Error.Wrap(err)
+		return SegmentDownloadResponseInfo{}, nil, Error.Wrap(err)
 	}
 
 	downloadResponse := newDownloadSegmentResponse(response)
@@ -1135,7 +1135,7 @@ type SegmentDownloadInfo struct {
 	Size                int64
 	EncryptedInlineData []byte
 	PiecePrivateKey     storj.PiecePrivateKey
-	SegmentEncryption   storj.SegmentEncryption
+	SegmentEncryption   SegmentEncryption
 	RedundancyScheme    storj.RedundancyScheme
 }
 
@@ -1145,7 +1145,7 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) (Seg
 		Size:                response.SegmentSize,
 		EncryptedInlineData: response.EncryptedInlineData,
 		PiecePrivateKey:     response.PrivateKey,
-		SegmentEncryption: storj.SegmentEncryption{
+		SegmentEncryption: SegmentEncryption{
 			EncryptedKeyNonce: response.EncryptedKeyNonce,
 			EncryptedKey:      response.EncryptedKey,
 		},
