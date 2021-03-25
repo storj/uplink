@@ -8,7 +8,6 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/metainfo"
@@ -47,6 +46,6 @@ func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplin
 
 	db := metainfo.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
 
-	summary, err := db.GetObjectIPs(ctx, storj.Bucket{Name: bucket}, key)
+	summary, err := db.GetObjectIPs(ctx, metainfo.Bucket{Name: bucket}, key)
 	return summary, packageError.Wrap(err)
 }

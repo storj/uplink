@@ -40,7 +40,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Check that bucket list include the new bucket
-		bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.After})
+		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 1, len(bucketList.Items))
@@ -60,7 +60,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Check that the bucket list is empty
-		bucketList, err = db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.After})
+		bucketList, err = db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -68,7 +68,7 @@ func TestBucketsBasic(t *testing.T) {
 
 		// Check that the bucket cannot be get explicitly
 		bucket, err = db.GetBucket(ctx, TestBucket)
-		assert.True(t, storj.ErrBucketNotFound.Has(err))
+		assert.True(t, metainfo.ErrBucketNotFound.Has(err))
 	})
 }
 
@@ -81,7 +81,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Check that bucket list include the new bucket
-		bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.After})
+		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 1, len(bucketList.Items))
@@ -101,7 +101,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Check that the bucket list is empty
-		bucketList, err = db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.After})
+		bucketList, err = db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -109,20 +109,20 @@ func TestBucketsReadWrite(t *testing.T) {
 
 		// Check that the bucket cannot be get explicitly
 		bucket, err = db.GetBucket(ctx, TestBucket)
-		assert.True(t, storj.ErrBucketNotFound.Has(err))
+		assert.True(t, metainfo.ErrBucketNotFound.Has(err))
 	})
 }
 
 func TestErrNoBucket(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 
 		_, err = db.GetBucket(ctx, "")
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 
 		_, err = db.DeleteBucket(ctx, "", false)
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 	})
 }
 
@@ -152,7 +152,7 @@ func TestBucketDeleteAll(t *testing.T) {
 
 func TestListBucketsEmpty(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
-		bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{Direction: storj.Forward})
+		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.Forward})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -171,31 +171,31 @@ func TestListBuckets(t *testing.T) {
 
 		for i, tt := range []struct {
 			cursor string
-			dir    storj.ListDirection
+			dir    metainfo.ListDirection
 			limit  int
 			more   bool
 			result []string
 		}{
-			{cursor: "", dir: storj.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
-			{cursor: "`", dir: storj.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
-			{cursor: "b00", dir: storj.Forward, limit: 0, more: false, result: []string{"b00", "bb0", "c00"}},
-			{cursor: "c00", dir: storj.Forward, limit: 0, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: storj.Forward, limit: 0, more: false, result: []string{}},
-			{cursor: "", dir: storj.Forward, limit: 1, more: true, result: []string{"a00"}},
-			{cursor: "`", dir: storj.Forward, limit: 1, more: true, result: []string{"a00"}},
-			{cursor: "aa0", dir: storj.Forward, limit: 1, more: true, result: []string{"aa0"}},
-			{cursor: "c00", dir: storj.Forward, limit: 1, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: storj.Forward, limit: 1, more: false, result: []string{}},
-			{cursor: "", dir: storj.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
-			{cursor: "`", dir: storj.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
-			{cursor: "aa0", dir: storj.Forward, limit: 2, more: true, result: []string{"aa0", "b00"}},
-			{cursor: "bb0", dir: storj.Forward, limit: 2, more: false, result: []string{"bb0", "c00"}},
-			{cursor: "c00", dir: storj.Forward, limit: 2, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: storj.Forward, limit: 2, more: false, result: []string{}},
+			{cursor: "", dir: metainfo.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
+			{cursor: "`", dir: metainfo.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
+			{cursor: "b00", dir: metainfo.Forward, limit: 0, more: false, result: []string{"b00", "bb0", "c00"}},
+			{cursor: "c00", dir: metainfo.Forward, limit: 0, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metainfo.Forward, limit: 0, more: false, result: []string{}},
+			{cursor: "", dir: metainfo.Forward, limit: 1, more: true, result: []string{"a00"}},
+			{cursor: "`", dir: metainfo.Forward, limit: 1, more: true, result: []string{"a00"}},
+			{cursor: "aa0", dir: metainfo.Forward, limit: 1, more: true, result: []string{"aa0"}},
+			{cursor: "c00", dir: metainfo.Forward, limit: 1, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metainfo.Forward, limit: 1, more: false, result: []string{}},
+			{cursor: "", dir: metainfo.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
+			{cursor: "`", dir: metainfo.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
+			{cursor: "aa0", dir: metainfo.Forward, limit: 2, more: true, result: []string{"aa0", "b00"}},
+			{cursor: "bb0", dir: metainfo.Forward, limit: 2, more: false, result: []string{"bb0", "c00"}},
+			{cursor: "c00", dir: metainfo.Forward, limit: 2, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metainfo.Forward, limit: 2, more: false, result: []string{}},
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
 
-			bucketList, err := db.ListBuckets(ctx, storj.BucketListOptions{
+			bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{
 				Cursor:    tt.cursor,
 				Direction: tt.dir,
 				Limit:     tt.limit,
@@ -209,7 +209,7 @@ func TestListBuckets(t *testing.T) {
 	})
 }
 
-func getBucketNames(bucketList storj.BucketList) []string {
+func getBucketNames(bucketList metainfo.BucketList) []string {
 	names := make([]string, len(bucketList.Items))
 
 	for i, item := range bucketList.Items {

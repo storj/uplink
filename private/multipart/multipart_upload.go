@@ -539,8 +539,8 @@ type ListMultipartUploadsOptions struct {
 func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket string, options *ListMultipartUploadsOptions) *UploadIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := storj.ListOptions{
-		Direction: storj.After,
+	opts := metainfo.ListOptions{
+		Direction: metainfo.After,
 		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
 	}
 
@@ -553,7 +553,7 @@ func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket s
 	objects := UploadIterator{
 		ctx:         ctx,
 		project:     project,
-		bucket:      storj.Bucket{Name: bucket},
+		bucket:      metainfo.Bucket{Name: bucket},
 		options:     opts,
 		listObjects: listObjects,
 	}
@@ -569,8 +569,8 @@ func ListMultipartUploads(ctx context.Context, project *uplink.Project, bucket s
 func ListPendingObjectStreams(ctx context.Context, project *uplink.Project, bucket, objectKey string, options *ListMultipartUploadsOptions) *UploadIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := storj.ListOptions{
-		Direction: storj.After,
+	opts := metainfo.ListOptions{
+		Direction: metainfo.After,
 	}
 
 	if options != nil {
@@ -582,7 +582,7 @@ func ListPendingObjectStreams(ctx context.Context, project *uplink.Project, buck
 	objects := UploadIterator{
 		ctx:         ctx,
 		project:     project,
-		bucket:      storj.Bucket{Name: bucket},
+		bucket:      metainfo.Bucket{Name: bucket},
 		options:     opts,
 		listObjects: listPendingObjectStreams,
 	}
@@ -596,21 +596,21 @@ func ListPendingObjectStreams(ctx context.Context, project *uplink.Project, buck
 type UploadIterator struct {
 	ctx              context.Context
 	project          *uplink.Project
-	bucket           storj.Bucket
-	options          storj.ListOptions
+	bucket           metainfo.Bucket
+	options          metainfo.ListOptions
 	multipartOptions ListMultipartUploadsOptions
-	list             *storj.ObjectList
+	list             *metainfo.ObjectList
 	position         int
 	completed        bool
 	err              error
-	listObjects      func(tx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error)
+	listObjects      func(tx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error)
 }
 
-func listObjects(ctx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error) {
+func listObjects(ctx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error) {
 	return db.ListObjects(ctx, bucket, options)
 }
 
-func listPendingObjectStreams(ctx context.Context, db *metainfo.DB, bucket string, options storj.ListOptions) (storj.ObjectList, error) {
+func listPendingObjectStreams(ctx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error) {
 	return db.ListPendingObjectStreams(ctx, bucket, options)
 }
 
@@ -713,7 +713,7 @@ func (uploads *UploadIterator) Item() *Object {
 	return &obj
 }
 
-func (uploads *UploadIterator) item() *storj.Object {
+func (uploads *UploadIterator) item() *metainfo.Object {
 	if uploads.completed {
 		return nil
 	}

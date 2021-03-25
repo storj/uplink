@@ -9,7 +9,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
-	"storj.io/common/storj"
 )
 
 var errClass = errs.Class("metainfo")
@@ -35,54 +34,54 @@ func (db *DB) Close() error {
 }
 
 // CreateBucket creates a new bucket with the specified information.
-func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket storj.Bucket, err error) {
+func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
-		return storj.Bucket{}, storj.ErrNoBucket.New("")
+		return Bucket{}, ErrNoBucket.New("")
 	}
 
 	newBucket, err = db.metainfo.CreateBucket(ctx, CreateBucketParams{
 		Name: []byte(bucketName),
 	})
-	return newBucket, storj.ErrBucket.Wrap(err)
+	return newBucket, ErrBucket.Wrap(err)
 }
 
 // DeleteBucket deletes bucket.
-func (db *DB) DeleteBucket(ctx context.Context, bucketName string, deleteAll bool) (bucket storj.Bucket, err error) {
+func (db *DB) DeleteBucket(ctx context.Context, bucketName string, deleteAll bool) (bucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
-		return storj.Bucket{}, storj.ErrNoBucket.New("")
+		return Bucket{}, ErrNoBucket.New("")
 	}
 
 	bucket, err = db.metainfo.DeleteBucket(ctx, DeleteBucketParams{
 		Name:      []byte(bucketName),
 		DeleteAll: deleteAll,
 	})
-	return bucket, storj.ErrBucket.Wrap(err)
+	return bucket, ErrBucket.Wrap(err)
 }
 
 // GetBucket gets bucket information.
-func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket storj.Bucket, err error) {
+func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
-		return storj.Bucket{}, storj.ErrNoBucket.New("")
+		return Bucket{}, ErrNoBucket.New("")
 	}
 
 	bucket, err = db.metainfo.GetBucket(ctx, GetBucketParams{
 		Name: []byte(bucketName),
 	})
-	return bucket, storj.ErrBucket.Wrap(err)
+	return bucket, ErrBucket.Wrap(err)
 }
 
 // ListBuckets lists buckets.
-func (db *DB) ListBuckets(ctx context.Context, options storj.BucketListOptions) (bucketList storj.BucketList, err error) {
+func (db *DB) ListBuckets(ctx context.Context, options BucketListOptions) (bucketList BucketList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	bucketList, err = db.metainfo.ListBuckets(ctx, ListBucketsParams{
 		ListOpts: options,
 	})
-	return bucketList, storj.ErrBucket.Wrap(err)
+	return bucketList, ErrBucket.Wrap(err)
 }

@@ -26,15 +26,15 @@ type Meta struct {
 }
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
-func (db *DB) GetObjectIPs(ctx context.Context, bucket storj.Bucket, key string) (_ *GetObjectIPsResponse, err error) {
+func (db *DB) GetObjectIPs(ctx context.Context, bucket Bucket, key string) (_ *GetObjectIPsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket.Name == "" {
-		return nil, storj.ErrNoBucket.New("")
+		return nil, ErrNoBucket.New("")
 	}
 
 	if key == "" {
-		return nil, storj.ErrNoPath.New("")
+		return nil, ErrNoPath.New("")
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, paths.NewUnencrypted(key), db.encStore)
@@ -53,15 +53,15 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return nil, storj.ErrNoBucket.New("")
+		return nil, ErrNoBucket.New("")
 	}
 
 	if key == "" {
-		return nil, storj.ErrNoPath.New("")
+		return nil, ErrNoPath.New("")
 	}
 
-	info := storj.Object{
-		Bucket: storj.Bucket{Name: bucket},
+	info := Object{
+		Bucket: Bucket{Name: bucket},
 		Path:   key,
 	}
 
@@ -88,20 +88,20 @@ func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *Mut
 }
 
 // DeleteObject deletes an object from database.
-func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ storj.Object, err error) {
+func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return storj.Object{}, storj.ErrNoBucket.New("")
+		return Object{}, ErrNoBucket.New("")
 	}
 
 	if len(key) == 0 {
-		return storj.Object{}, storj.ErrNoPath.New("")
+		return Object{}, ErrNoPath.New("")
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
@@ -109,7 +109,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ storj.Obj
 		EncryptedPath: []byte(encPath.Raw()),
 	})
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	return db.objectFromRawObjectItem(ctx, bucket, key, object)
@@ -122,37 +122,37 @@ func (db *DB) ModifyPendingObject(ctx context.Context, bucket, key string) (obje
 }
 
 // ListPendingObjects lists pending objects in bucket based on the ListOptions.
-func (db *DB) ListPendingObjects(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
+func (db *DB) ListPendingObjects(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
-	return storj.ObjectList{}, errors.New("not implemented")
+	return ObjectList{}, errors.New("not implemented")
 }
 
 // ListPendingObjectStreams lists streams for a specific pending object key.
-func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
+func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return storj.ObjectList{}, storj.ErrNoBucket.New("")
+		return ObjectList{}, ErrNoBucket.New("")
 	}
 
 	var startAfter string
 	switch options.Direction {
-	// TODO for now we are supporting only storj.After
-	// case storj.Forward:
+	// TODO for now we are supporting only After
+	// case Forward:
 	// 	// forward lists forwards from cursor, including cursor
 	// 	startAfter = keyBefore(options.Cursor)
-	case storj.After:
+	case After:
 		// after lists forwards from cursor, without cursor
 		startAfter = options.Cursor
 	default:
-		return storj.ObjectList{}, errClass.New("invalid direction %d", options.Direction)
+		return ObjectList{}, errClass.New("invalid direction %d", options.Direction)
 	}
 
 	prefix := PathForKey(options.Prefix)
 
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	resp, err := db.metainfo.ListPendingObjectStreams(ctx, ListPendingObjectStreamsParams{
@@ -162,15 +162,15 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 		Limit:           int32(options.Limit),
 	})
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	objectsList, err := db.objectsFromRawObjectList(ctx, resp.Items, true, "", bucket, startAfter)
 
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
-	list = storj.ObjectList{
+	list = ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   resp.More,
@@ -180,33 +180,33 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 }
 
 // ListObjects lists objects in bucket based on the ListOptions.
-func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.ListOptions) (list storj.ObjectList, err error) {
+func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return storj.ObjectList{}, storj.ErrNoBucket.New("")
+		return ObjectList{}, ErrNoBucket.New("")
 	}
 
 	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") {
-		return storj.ObjectList{}, errClass.New("prefix should end with slash")
+		return ObjectList{}, errClass.New("prefix should end with slash")
 	}
 
 	var startAfter string
 	switch options.Direction {
-	// TODO for now we are supporting only storj.After
-	// case storj.Forward:
+	// TODO for now we are supporting only After
+	// case Forward:
 	// 	// forward lists forwards from cursor, including cursor
 	// 	startAfter = keyBefore(options.Cursor)
-	case storj.After:
+	case After:
 		// after lists forwards from cursor, without cursor
 		startAfter = options.Cursor
 	default:
-		return storj.ObjectList{}, errClass.New("invalid direction %d", options.Direction)
+		return ObjectList{}, errClass.New("invalid direction %d", options.Direction)
 	}
 
 	// TODO: we should let libuplink users be able to determine what metadata fields they request as well
 	// metaFlags := meta.All
-	// if db.pathCipher(bucket) == storj.EncNull || db.pathCipher(bucket) == storj.EncNullBase64URL {
+	// if db.pathCipher(bucket) == EncNull || db.pathCipher(bucket) == EncNullBase64URL {
 	// 	metaFlags = meta.None
 	// }
 
@@ -224,12 +224,12 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 	prefix := PathForKey(options.Prefix)
 	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	// We have to encrypt startAfter but only if it doesn't contain a bucket.
@@ -243,7 +243,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 
 		startAfter, err = encryption.EncryptPathRaw(startAfter, db.keyCipher(base.PathCipher), prefixKey)
 		if err != nil {
-			return storj.ObjectList{}, errClass.Wrap(err)
+			return ObjectList{}, errClass.Wrap(err)
 		}
 	}
 
@@ -256,15 +256,15 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 		Status:          options.Status,
 	})
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	objectsList, err := db.objectsFromRawObjectList(ctx, items, needsEncryption, options.Prefix, bucket, startAfter)
 
 	if err != nil {
-		return storj.ObjectList{}, errClass.Wrap(err)
+		return ObjectList{}, errClass.Wrap(err)
 	}
-	list = storj.ObjectList{
+	list = ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   more,
@@ -274,7 +274,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options storj.List
 	return list, nil
 }
 
-func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, needsEncryption bool, _prefix, bucket, startAfter string) (objectList []storj.Object, err error) {
+func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, needsEncryption bool, _prefix, bucket, startAfter string) (objectList []Object, err error) {
 	prefix := PathForKey(_prefix)
 	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
 	if err != nil {
@@ -283,14 +283,14 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 
 	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
 	if err != nil {
-		return []storj.Object{}, errClass.Wrap(err)
+		return []Object{}, errClass.Wrap(err)
 	}
 	var base *encryption.Base
 	if needsEncryption {
 		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
 	}
 
-	objectList = make([]storj.Object, 0, len(items))
+	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
 		var bucketName string
@@ -350,20 +350,20 @@ func (db *DB) keyCipher(keyCipher storj.CipherSuite) storj.CipherSuite {
 }
 
 // GetObject returns information about an object.
-func (db *DB) GetObject(ctx context.Context, bucket, key string) (info storj.Object, err error) {
+func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return storj.Object{}, storj.ErrNoBucket.New("")
+		return Object{}, ErrNoBucket.New("")
 	}
 
 	if key == "" {
-		return storj.Object{}, storj.ErrNoPath.New("")
+		return Object{}, ErrNoPath.New("")
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
@@ -372,20 +372,20 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info storj.Obj
 		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	return db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
 }
 
-func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, objectInfo RawObjectItem) (storj.Object, error) {
+func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, objectInfo RawObjectItem) (Object, error) {
 	if objectInfo.Bucket == "" { // zero objectInfo
-		return storj.Object{}, nil
+		return Object{}, nil
 	}
 
-	object := storj.Object{
+	object := Object{
 		Version:  0, // TODO:
-		Bucket:   storj.Bucket{Name: bucket},
+		Bucket:   Bucket{Name: bucket},
 		Path:     key,
 		IsPrefix: false,
 
@@ -393,7 +393,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		Modified: objectInfo.Modified, // TODO: use correct field
 		Expires:  objectInfo.Expires,  // TODO: use correct field
 
-		Stream: storj.Stream{
+		Stream: Stream{
 			ID: objectInfo.StreamID,
 
 			Size: objectInfo.PlainSize,
@@ -405,7 +405,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key), objectInfo.EncryptedMetadata, db.encStore)
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	if object.Stream.EncryptionParameters.CipherSuite == storj.EncUnspecified {
@@ -418,7 +418,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		var nonce storj.Nonce
 		copy(nonce[:], streamMeta.LastSegmentMeta.KeyNonce)
 
-		object.Stream.LastSegment = storj.LastSegment{
+		object.Stream.LastSegment = LastSegment{
 			EncryptedKeyNonce: nonce,
 			EncryptedKey:      streamMeta.LastSegmentMeta.EncryptedKey,
 		}
@@ -426,16 +426,16 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 	err = updateObjectWithStream(&object, streamInfo, streamMeta)
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	return object, nil
 }
 
-func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (storj.Object, error) {
-	object := storj.Object{
+func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
+	object := Object{
 		Version:  0, // TODO:
-		Bucket:   storj.Bucket{Name: bucket},
+		Bucket:   Bucket{Name: bucket},
 		Path:     path,
 		IsPrefix: listItem.IsPrefix,
 
@@ -443,7 +443,7 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		Modified: listItem.CreatedAt, // TODO: use correct field
 		Expires:  listItem.ExpiresAt,
 
-		Stream: storj.Stream{
+		Stream: Stream{
 			Size: listItem.PlainSize,
 		},
 	}
@@ -452,13 +452,13 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 
 	err := updateObjectWithStream(&object, stream, streamMeta)
 	if err != nil {
-		return storj.Object{}, err
+		return Object{}, err
 	}
 
 	return object, nil
 }
 
-func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamMeta pb.StreamMeta) error {
+func updateObjectWithStream(object *Object, stream *pb.StreamInfo, streamMeta pb.StreamMeta) error {
 	if stream == nil {
 		return nil
 	}
@@ -494,11 +494,11 @@ func updateObjectWithStream(object *storj.Object, stream *pb.StreamInfo, streamM
 
 // MutableObject is for creating an object stream.
 type MutableObject struct {
-	info storj.Object
+	info Object
 }
 
 // Info gets the current information about the object.
-func (object *MutableObject) Info() storj.Object { return object.info }
+func (object *MutableObject) Info() Object { return object.info }
 
 // CreateStream creates a new stream for the object.
 func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {

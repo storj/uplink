@@ -376,7 +376,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 // Get returns a ranger that knows what the overall size is (from l/<key>)
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
-func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object storj.Object) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object metainfo.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if object.Size == 0 {
@@ -435,7 +435,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object s
 	return ranger.Concat(rangers...), nil
 }
 
-func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey string, object storj.Object) (rr ranger.Ranger, err error) {
+func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey string, object metainfo.Object) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)

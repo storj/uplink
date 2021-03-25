@@ -19,7 +19,7 @@ import (
 	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
-	"storj.io/storj/satellite/metainfo"
+	satmetainfo "storj.io/storj/satellite/metainfo"
 	"storj.io/uplink"
 )
 
@@ -163,10 +163,10 @@ type satelliteDBWithBucketsListLimit struct {
 
 type bucketsDBWithListLimit struct {
 	limit int
-	metainfo.BucketsDB
+	satmetainfo.BucketsDB
 }
 
-func (db *satelliteDBWithBucketsListLimit) Buckets() metainfo.BucketsDB {
+func (db *satelliteDBWithBucketsListLimit) Buckets() satmetainfo.BucketsDB {
 	return &bucketsDBWithListLimit{db.limit, db.DB.Buckets()}
 }
 

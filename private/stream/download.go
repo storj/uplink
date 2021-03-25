@@ -7,14 +7,14 @@ import (
 	"context"
 	"io"
 
-	"storj.io/common/storj"
+	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 )
 
 // Download implements Reader, Seeker and Closer for reading from stream.
 type Download struct {
 	ctx     context.Context
-	object  storj.Object
+	object  metainfo.Object
 	streams *streams.Store
 	reader  io.ReadCloser
 	offset  int64
@@ -23,7 +23,7 @@ type Download struct {
 }
 
 // NewDownload creates new stream download.
-func NewDownload(ctx context.Context, object storj.Object, streams *streams.Store) *Download {
+func NewDownload(ctx context.Context, object metainfo.Object, streams *streams.Store) *Download {
 	return &Download{
 		ctx:     ctx,
 		object:  object,
@@ -33,7 +33,7 @@ func NewDownload(ctx context.Context, object storj.Object, streams *streams.Stor
 }
 
 // NewDownloadRange creates new stream range download with range from offset to offset+limit.
-func NewDownloadRange(ctx context.Context, object storj.Object, streams *streams.Store, offset, limit int64) *Download {
+func NewDownloadRange(ctx context.Context, object metainfo.Object, streams *streams.Store, offset, limit int64) *Download {
 	size := object.Size
 	if offset > size {
 		offset = size

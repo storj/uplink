@@ -8,7 +8,7 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/storj"
+	"storj.io/uplink/private/metainfo"
 )
 
 // ListBucketsOptions defines bucket listing options.
@@ -21,8 +21,8 @@ type ListBucketsOptions struct {
 func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOptions) *BucketIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := storj.BucketListOptions{
-		Direction: storj.After,
+	opts := metainfo.BucketListOptions{
+		Direction: metainfo.After,
 	}
 
 	if options != nil {
@@ -42,8 +42,8 @@ func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOpt
 type BucketIterator struct {
 	ctx       context.Context
 	project   *Project
-	options   storj.BucketListOptions
-	list      *storj.BucketList
+	options   metainfo.BucketListOptions
+	list      *metainfo.BucketList
 	position  int
 	completed bool
 	err       error
@@ -123,7 +123,7 @@ func (buckets *BucketIterator) Item() *Bucket {
 	}
 }
 
-func (buckets *BucketIterator) item() *storj.Bucket {
+func (buckets *BucketIterator) item() *metainfo.Bucket {
 	if buckets.completed {
 		return nil
 	}

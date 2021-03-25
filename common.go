@@ -13,7 +13,7 @@ import (
 
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
-	"storj.io/common/storj"
+	"storj.io/uplink/private/metainfo"
 )
 
 var mon = monkit.Package()
@@ -32,13 +32,13 @@ var ErrPermissionDenied = errors.New("permission denied")
 
 func convertKnownErrors(err error, bucket, key string) error {
 	switch {
-	case storj.ErrNoBucket.Has(err):
+	case metainfo.ErrNoBucket.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
-	case storj.ErrNoPath.Has(err):
+	case metainfo.ErrNoPath.Has(err):
 		return errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-	case storj.ErrBucketNotFound.Has(err):
+	case metainfo.ErrBucketNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
-	case storj.ErrObjectNotFound.Has(err):
+	case metainfo.ErrObjectNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrObjectNotFound, key)
 	case errs2.IsRPC(err, rpcstatus.ResourceExhausted):
 		// TODO is a better way to do this?
@@ -50,9 +50,9 @@ func convertKnownErrors(err error, bucket, key string) error {
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		message := errs.Unwrap(err).Error()
-		if strings.HasPrefix(message, storj.ErrBucketNotFound.New("").Error()) {
+		if strings.HasPrefix(message, metainfo.ErrBucketNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
-		} else if strings.HasPrefix(message, storj.ErrObjectNotFound.New("").Error()) {
+		} else if strings.HasPrefix(message, metainfo.ErrObjectNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 	case errs2.IsRPC(err, rpcstatus.PermissionDenied):

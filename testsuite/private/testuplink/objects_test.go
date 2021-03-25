@@ -65,16 +65,16 @@ func TestGetObject(t *testing.T) {
 		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
 
 		_, err = db.GetObject(ctx, "", "")
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "")
-		assert.True(t, storj.ErrNoPath.Has(err))
+		assert.True(t, metainfo.ErrNoPath.Has(err))
 
 		_, err = db.GetObject(ctx, "non-existing-bucket", TestFile)
-		assert.True(t, storj.ErrObjectNotFound.Has(err))
+		assert.True(t, metainfo.ErrObjectNotFound.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "non-existing-file")
-		assert.True(t, storj.ErrObjectNotFound.Has(err))
+		assert.True(t, metainfo.ErrObjectNotFound.Has(err))
 
 		object, err := db.GetObject(ctx, bucket.Name, TestFile)
 		if assert.NoError(t, err) {
@@ -96,10 +96,10 @@ func TestDownloadObject(t *testing.T) {
 		largeFile := upload(ctx, t, db, streams, bucket.Name, "large-file", data)
 
 		_, err = db.GetObject(ctx, "", "")
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "")
-		assert.True(t, storj.ErrNoPath.Has(err))
+		assert.True(t, metainfo.ErrNoPath.Has(err))
 
 		assertData(ctx, t, db, streams, bucket, emptyFile, []byte{})
 		assertData(ctx, t, db, streams, bucket, smallFile, []byte("test"))
@@ -120,7 +120,7 @@ func TestDownloadObject(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) storj.Object {
+func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) metainfo.Object {
 	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	return info
 }
 
-func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket storj.Bucket, object storj.Object, content []byte) {
+func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket metainfo.Bucket, object metainfo.Object, content []byte) {
 	download := stream.NewDownload(ctx, object, streams)
 	defer func() {
 		err := download.Close()
@@ -185,10 +185,10 @@ func TestDeleteObject(t *testing.T) {
 			}
 
 			_, err = db.DeleteObject(ctx, "", "")
-			assert.True(t, storj.ErrNoBucket.Has(err))
+			assert.True(t, metainfo.ErrNoBucket.Has(err))
 
 			_, err = db.DeleteObject(ctx, bucket.Name, "")
-			assert.True(t, storj.ErrNoPath.Has(err))
+			assert.True(t, metainfo.ErrNoPath.Has(err))
 
 			_, err = db.DeleteObject(ctx, bucket.Name+"-not-exist", TestFile)
 			assert.Nil(t, err)
@@ -209,18 +209,18 @@ func TestListObjectsEmpty(t *testing.T) {
 		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		_, err = db.ListObjects(ctx, "", storj.ListOptions{})
-		assert.True(t, storj.ErrNoBucket.Has(err))
+		_, err = db.ListObjects(ctx, "", metainfo.ListOptions{})
+		assert.True(t, metainfo.ErrNoBucket.Has(err))
 
-		_, err = db.ListObjects(ctx, testBucketInfo.Name, storj.ListOptions{})
+		_, err = db.ListObjects(ctx, testBucketInfo.Name, metainfo.ListOptions{})
 		assert.EqualError(t, err, "metainfo: invalid direction 0")
 
-		// TODO for now we are supporting only storj.After
-		for _, direction := range []storj.ListDirection{
-			// storj.Forward,
-			storj.After,
+		// TODO for now we are supporting only metainfo.After
+		for _, direction := range []metainfo.ListDirection{
+			// metainfo.Forward,
+			metainfo.After,
 		} {
-			list, err := db.ListObjects(ctx, testBucketInfo.Name, storj.ListOptions{Direction: direction})
+			list, err := db.ListObjects(ctx, testBucketInfo.Name, metainfo.ListOptions{Direction: direction})
 			if assert.NoError(t, err) {
 				assert.False(t, list.More)
 				assert.Equal(t, 0, len(list.Items))
@@ -317,7 +317,7 @@ func TestListObjects(t *testing.T) {
 		upload(ctx, t, db, streams, otherBucket.Name, "file-in-other-bucket", nil)
 
 		for i, tt := range []struct {
-			options storj.ListOptions
+			options metainfo.ListOptions
 			more    bool
 			result  []string
 		}{
@@ -431,20 +431,20 @@ func TestListObjects(t *testing.T) {
 	})
 }
 
-func options(prefix, cursor string, limit int) storj.ListOptions {
-	return storj.ListOptions{
+func options(prefix, cursor string, limit int) metainfo.ListOptions {
+	return metainfo.ListOptions{
 		Prefix:    prefix,
 		Cursor:    cursor,
-		Direction: storj.After,
+		Direction: metainfo.After,
 		Limit:     limit,
 	}
 }
 
-func optionsRecursive(prefix, cursor string, limit int) storj.ListOptions {
-	return storj.ListOptions{
+func optionsRecursive(prefix, cursor string, limit int) metainfo.ListOptions {
+	return metainfo.ListOptions{
 		Prefix:    prefix,
 		Cursor:    cursor,
-		Direction: storj.After,
+		Direction: metainfo.After,
 		Limit:     limit,
 		Recursive: true,
 	}

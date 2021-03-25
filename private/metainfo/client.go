@@ -157,7 +157,7 @@ func (params *CreateBucketParams) BatchItem() *pb.BatchRequestItem {
 
 // CreateBucketResponse response for CreateBucket request.
 type CreateBucketResponse struct {
-	Bucket storj.Bucket
+	Bucket Bucket
 }
 
 func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketResponse, error) {
@@ -171,17 +171,17 @@ func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketRes
 }
 
 // CreateBucket creates a new bucket.
-func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParams) (respBucket storj.Bucket, err error) {
+func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParams) (respBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.CreateBucket(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 
 	respBucket, err = convertProtoToBucket(response.Bucket)
 	if err != nil {
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 	return respBucket, nil
 }
@@ -209,7 +209,7 @@ func (params *GetBucketParams) BatchItem() *pb.BatchRequestItem {
 
 // GetBucketResponse response for GetBucket request.
 type GetBucketResponse struct {
-	Bucket storj.Bucket
+	Bucket Bucket
 }
 
 func newGetBucketResponse(response *pb.BucketGetResponse) (GetBucketResponse, error) {
@@ -223,20 +223,20 @@ func newGetBucketResponse(response *pb.BucketGetResponse) (GetBucketResponse, er
 }
 
 // GetBucket returns a bucket.
-func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (respBucket storj.Bucket, err error) {
+func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (respBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	resp, err := client.client.GetBucket(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.Bucket{}, storj.ErrBucketNotFound.Wrap(err)
+			return Bucket{}, ErrBucketNotFound.Wrap(err)
 		}
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 
 	respBucket, err = convertProtoToBucket(resp.Bucket)
 	if err != nil {
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 	return respBucket, nil
 }
@@ -265,26 +265,26 @@ func (params *DeleteBucketParams) BatchItem() *pb.BatchRequestItem {
 }
 
 // DeleteBucket deletes a bucket.
-func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ storj.Bucket, err error) {
+func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 	resp, err := client.client.DeleteBucket(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return storj.Bucket{}, storj.ErrBucketNotFound.Wrap(err)
+			return Bucket{}, ErrBucketNotFound.Wrap(err)
 		}
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 
 	respBucket, err := convertProtoToBucket(resp.Bucket)
 	if err != nil {
-		return storj.Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(err)
 	}
 	return respBucket, nil
 }
 
 // ListBucketsParams parmaters for ListBucketsParams method.
 type ListBucketsParams struct {
-	ListOpts storj.BucketListOptions
+	ListOpts BucketListOptions
 }
 
 func (params *ListBucketsParams) toRequest(header *pb.RequestHeader) *pb.BucketListRequest {
@@ -307,16 +307,16 @@ func (params *ListBucketsParams) BatchItem() *pb.BatchRequestItem {
 
 // ListBucketsResponse response for ListBucket request.
 type ListBucketsResponse struct {
-	BucketList storj.BucketList
+	BucketList BucketList
 }
 
 func newListBucketsResponse(response *pb.BucketListResponse) ListBucketsResponse {
-	bucketList := storj.BucketList{
+	bucketList := BucketList{
 		More: response.More,
 	}
-	bucketList.Items = make([]storj.Bucket, len(response.Items))
+	bucketList.Items = make([]Bucket, len(response.Items))
 	for i, item := range response.GetItems() {
-		bucketList.Items[i] = storj.Bucket{
+		bucketList.Items[i] = Bucket{
 			Name:    string(item.Name),
 			Created: item.CreatedAt,
 		}
@@ -327,19 +327,19 @@ func newListBucketsResponse(response *pb.BucketListResponse) ListBucketsResponse
 }
 
 // ListBuckets lists buckets.
-func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams) (_ storj.BucketList, err error) {
+func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams) (_ BucketList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	resp, err := client.client.ListBuckets(ctx, params.toRequest(client.header()))
 	if err != nil {
-		return storj.BucketList{}, Error.Wrap(err)
+		return BucketList{}, Error.Wrap(err)
 	}
-	resultBucketList := storj.BucketList{
+	resultBucketList := BucketList{
 		More: resp.GetMore(),
 	}
-	resultBucketList.Items = make([]storj.Bucket, len(resp.GetItems()))
+	resultBucketList.Items = make([]Bucket, len(resp.GetItems()))
 	for i, item := range resp.GetItems() {
-		resultBucketList.Items[i] = storj.Bucket{
+		resultBucketList.Items[i] = Bucket{
 			Name:    string(item.GetName()),
 			Created: item.GetCreatedAt(),
 		}
@@ -347,12 +347,12 @@ func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams)
 	return resultBucketList, nil
 }
 
-func convertProtoToBucket(pbBucket *pb.Bucket) (bucket storj.Bucket, err error) {
+func convertProtoToBucket(pbBucket *pb.Bucket) (bucket Bucket, err error) {
 	if pbBucket == nil {
-		return storj.Bucket{}, nil
+		return Bucket{}, nil
 	}
 
-	return storj.Bucket{
+	return Bucket{
 		Name:    string(pbBucket.GetName()),
 		Created: pbBucket.GetCreatedAt(),
 	}, nil
@@ -562,7 +562,7 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 	response, err := client.client.GetObject(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return RawObjectItem{}, storj.ErrObjectNotFound.Wrap(err)
+			return RawObjectItem{}, ErrObjectNotFound.Wrap(err)
 		}
 		return RawObjectItem{}, Error.Wrap(err)
 	}
@@ -602,7 +602,7 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParam
 	response, err := client.client.GetObjectIPs(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return nil, storj.ErrObjectNotFound.Wrap(err)
+			return nil, ErrObjectNotFound.Wrap(err)
 		}
 		return nil, Error.Wrap(err)
 	}
@@ -660,7 +660,7 @@ func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteO
 	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return RawObjectItem{}, storj.ErrObjectNotFound.Wrap(err)
+			return RawObjectItem{}, ErrObjectNotFound.Wrap(err)
 		}
 		return RawObjectItem{}, Error.Wrap(err)
 	}
@@ -1120,7 +1120,7 @@ func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmen
 	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return SegmentDownloadResponseInfo{}, nil, storj.ErrObjectNotFound.Wrap(err)
+			return SegmentDownloadResponseInfo{}, nil, ErrObjectNotFound.Wrap(err)
 		}
 		return SegmentDownloadResponseInfo{}, nil, Error.Wrap(err)
 	}
@@ -1179,7 +1179,7 @@ func (client *Client) DownloadSegmentWithRS(ctx context.Context, params Download
 	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return SegmentDownloadInfo{}, nil, storj.ErrObjectNotFound.Wrap(err)
+			return SegmentDownloadInfo{}, nil, ErrObjectNotFound.Wrap(err)
 		}
 		return SegmentDownloadInfo{}, nil, Error.Wrap(err)
 	}

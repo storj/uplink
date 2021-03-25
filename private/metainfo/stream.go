@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"storj.io/common/pb"
-	"storj.io/common/storj"
 )
 
 // MutableStream is for manipulating stream information.
 type MutableStream struct {
-	info storj.Object
+	info Object
 
 	dynamic         bool
 	dynamicMetadata SerializableMeta
@@ -31,7 +30,7 @@ func (stream *MutableStream) BucketName() string { return stream.info.Bucket.Nam
 func (stream *MutableStream) Path() string { return stream.info.Path }
 
 // Info returns object info about the stream.
-func (stream *MutableStream) Info() storj.Object { return stream.info }
+func (stream *MutableStream) Info() Object { return stream.info }
 
 // Expires returns stream expiration time.
 func (stream *MutableStream) Expires() time.Time {
