@@ -7,11 +7,11 @@ import (
 	"context"
 	_ "unsafe" // for go:linkname
 
+	"storj.io/common/grant"
 	"storj.io/common/macaroon"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/uplink"
-	"storj.io/uplink/private/access2"
 )
 
 // ConfigSetConnectionPool exposes Config.setConnectionPool.
@@ -39,7 +39,7 @@ func AccessGetAPIKey(*uplink.Access) *macaroon.APIKey
 // AccessGetEncAccess exposes Access.getEncAccess.
 //
 //go:linkname AccessGetEncAccess storj.io/uplink.(*Access).getEncAccess
-func AccessGetEncAccess(*uplink.Access) *access2.EncryptionAccess
+func AccessGetEncAccess(*uplink.Access) *grant.EncryptionAccess
 
 // ConfigRequestAccessWithPassphraseAndConcurrency exposes Config.requestAccessWithPassphraseAndConcurrency.
 //

@@ -12,11 +12,11 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
+	"storj.io/common/grant"
 	"storj.io/common/macaroon"
 	"storj.io/common/paths"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/access2"
 	"storj.io/uplink/private/metainfo"
 )
 
@@ -27,7 +27,7 @@ import (
 type Access struct {
 	satelliteURL storj.NodeURL
 	apiKey       *macaroon.APIKey
-	encAccess    *access2.EncryptionAccess
+	encAccess    *grant.EncryptionAccess
 }
 
 // getAPIKey are exposing the state do private methods.
@@ -46,7 +46,7 @@ func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
 //
 //lint:ignore U1000, used with linkname
 //nolint: unused
-func (access *Access) getEncAccess() *access2.EncryptionAccess { return access.encAccess }
+func (access *Access) getEncAccess() *grant.EncryptionAccess { return access.encAccess }
 
 // SharePrefix defines a prefix that will be shared.
 type SharePrefix struct {
@@ -93,7 +93,7 @@ type Permission struct {
 // This should be the main way to instantiate an access grant for opening a project.
 // See the note on RequestAccessWithPassphrase.
 func ParseAccess(access string) (*Access, error) {
-	inner, err := access2.ParseAccess(access)
+	inner, err := grant.ParseAccess(access)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -118,7 +118,7 @@ func (access *Access) SatelliteAddress() string {
 // Serialize serializes an access grant such that it can be used later with
 // ParseAccess or other tools.
 func (access *Access) Serialize() (string, error) {
-	inner := access2.Access{
+	inner := grant.Access{
 		SatelliteAddress: access.satelliteURL.String(),
 		APIKey:           access.apiKey,
 		EncAccess:        access.encAccess,
@@ -185,7 +185,7 @@ func (config Config) requestAccessWithPassphraseAndConcurrency(ctx context.Conte
 		return nil, packageError.Wrap(err)
 	}
 
-	encAccess := access2.NewEncryptionAccessWithDefaultKey(key)
+	encAccess := grant.NewEncryptionAccessWithDefaultKey(key)
 	encAccess.SetDefaultPathCipher(storj.EncAESGCM)
 	encAccess.LimitTo(parsedAPIKey)
 
@@ -228,73 +228,36 @@ func parseNodeURL(address string) (storj.NodeURL, error) {
 //
 // To revoke an access grant see the Project.RevokeAccess method.
 func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Access, error) {
-	if permission == (Permission{}) {
-		return nil, packageError.New("permission is empty")
-	}
-
-	var notBefore, notAfter *time.Time
-	if !permission.NotBefore.IsZero() {
-		notBefore = &permission.NotBefore
-	}
-	if !permission.NotAfter.IsZero() {
-		notAfter = &permission.NotAfter
-	}
-
-	if notBefore != nil && notAfter != nil && notAfter.Before(*notBefore) {
-		return nil, packageError.New("invalid time range")
-	}
-
-	caveat := macaroon.WithNonce(macaroon.Caveat{
-		DisallowReads:   !permission.AllowDownload,
-		DisallowWrites:  !permission.AllowUpload,
-		DisallowLists:   !permission.AllowList,
-		DisallowDeletes: !permission.AllowDelete,
-		NotBefore:       notBefore,
-		NotAfter:        notAfter,
-	})
-
-	sharedAccess := access2.NewEncryptionAccess()
-	sharedAccess.SetDefaultPathCipher(access.encAccess.Store.GetDefaultPathCipher())
-	if len(prefixes) == 0 {
-		sharedAccess.SetDefaultKey(access.encAccess.Store.GetDefaultKey())
-	}
-
+	internalPrefixes := make([]grant.SharePrefix, 0, len(prefixes))
 	for _, prefix := range prefixes {
-		// If the share prefix ends in a `/` we need to remove this final slash.
-		// Otherwise, if we the shared prefix is `/bob/`, the encrypted shared
-		// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
-		// encrypted prefix, what we really want is `enc("")/enc("bob")`.
-		unencPath := paths.NewUnencrypted(strings.TrimSuffix(prefix.Prefix, "/"))
-
-		encPath, err := encryption.EncryptPathWithStoreCipher(prefix.Bucket, unencPath, access.encAccess.Store)
-		if err != nil {
-			return nil, err
-		}
-		derivedKey, err := encryption.DerivePathKey(prefix.Bucket, unencPath, access.encAccess.Store)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := sharedAccess.Store.Add(prefix.Bucket, unencPath, encPath, *derivedKey); err != nil {
-			return nil, err
-		}
-		caveat.AllowedPaths = append(caveat.AllowedPaths, &macaroon.Caveat_Path{
-			Bucket:              []byte(prefix.Bucket),
-			EncryptedPathPrefix: []byte(encPath.Raw()),
-		})
+		internalPrefixes = append(internalPrefixes, grant.SharePrefix(prefix))
 	}
-
-	restrictedAPIKey, err := access.apiKey.Restrict(caveat)
+	rv, err := access.toInternal().Restrict(grant.Permission(permission), internalPrefixes...)
 	if err != nil {
 		return nil, err
 	}
+	return accessFromInternal(rv)
+}
 
-	restrictedAccess := &Access{
-		satelliteURL: access.satelliteURL,
-		apiKey:       restrictedAPIKey,
-		encAccess:    sharedAccess,
+func (access *Access) toInternal() *grant.Access {
+	return &grant.Access{
+		SatelliteAddress: access.satelliteURL.String(),
+		APIKey:           access.apiKey,
+		EncAccess:        access.encAccess,
 	}
-	return restrictedAccess, nil
+}
+
+func accessFromInternal(access *grant.Access) (*Access, error) {
+	satelliteURL, err := parseNodeURL(access.SatelliteAddress)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	return &Access{
+		satelliteURL: satelliteURL,
+		apiKey:       access.APIKey,
+		encAccess:    access.EncAccess,
+	}, nil
 }
 
 // RevokeAccess revokes the API key embedded in the provided access grant.
