@@ -6,6 +6,7 @@ package multipartupload_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"io"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite/metainfo/metabase"
 	"storj.io/uplink"
+	"storj.io/uplink/private/etag"
 	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/testuplink"
 )
@@ -95,7 +97,7 @@ func TestNewMultipartUpload_Expires(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, info.StreamID)
 
-		reader := bytes.NewReader(testrand.Bytes(5 * memory.KiB))
+		reader := etag.NewHashReader(bytes.NewReader(testrand.Bytes(5*memory.KiB)), sha256.New())
 		_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, 1, reader)
 		require.NoError(t, err)
 
@@ -290,7 +292,8 @@ func TestPutObjectPart(t *testing.T) {
 			require.Error(t, err)
 
 			// empty input data reader
-			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer([]byte{}))
+			_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0,
+				etag.NewHashReader(bytes.NewReader(nil), sha256.New()))
 			require.Error(t, err)
 		}
 
@@ -299,13 +302,16 @@ func TestPutObjectPart(t *testing.T) {
 		remoteSource1 := randData[len(remoteInlineSource) : len(remoteInlineSource)+10*memory.KiB.Int()]
 		remoteSource2 := randData[len(remoteInlineSource)+len(remoteSource1):]
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1, bytes.NewBuffer(remoteSource1))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 1,
+			etag.NewHashReader(bytes.NewReader(remoteSource1), sha256.New()))
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 2, bytes.NewBuffer(remoteSource2))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 2,
+			etag.NewHashReader(bytes.NewReader(remoteSource2), sha256.New()))
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer(remoteInlineSource))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0,
+			etag.NewHashReader(bytes.NewReader(remoteInlineSource), sha256.New()))
 		require.NoError(t, err)
 
 		// TODO verify that segment (1, 1) is inline
@@ -327,7 +333,8 @@ func TestPutObjectPart(t *testing.T) {
 		require.Equal(t, randData, downloaded.Bytes())
 
 		// create part for committed object
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, bytes.NewBuffer(nil))
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0,
+			etag.NewHashReader(bytes.NewReader(nil), sha256.New()))
 		require.Error(t, err)
 	})
 }
@@ -356,8 +363,10 @@ func TestListParts(t *testing.T) {
 		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
 		part0size := len(randData) * 3 / 10
 		part4size := len(randData) - part0size
-		source0 := bytes.NewBuffer(randData[:part0size])
-		source4 := bytes.NewBuffer(randData[part0size:])
+		source0 := randData[:part0size]
+		source0SHA256 := sha256.Sum256(source0)
+		source4 := randData[part0size:]
+		source4SHA256 := sha256.Sum256(source4)
 
 		info, err := multipart.NewMultipartUpload(newCtx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
@@ -385,10 +394,12 @@ func TestListParts(t *testing.T) {
 
 		uploadTime := time.Now()
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0, source0)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 0,
+			etag.NewHashReader(bytes.NewReader(source0), sha256.New()))
 		require.NoError(t, err)
 
-		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 4, source4)
+		_, err = multipart.PutObjectPart(newCtx, project, "testbucket", "multipart-object", info.StreamID, 4,
+			etag.NewHashReader(bytes.NewReader(source4), sha256.New()))
 		require.NoError(t, err)
 
 		// list parts of on going multipart upload
@@ -398,9 +409,11 @@ func TestListParts(t *testing.T) {
 		require.Equal(t, 0, parts.Items[0].PartNumber)
 		require.Equal(t, int64(part0size), parts.Items[0].Size)
 		require.WithinDuration(t, uploadTime, parts.Items[0].LastModified, 10*time.Second)
+		require.Equal(t, source0SHA256[:], parts.Items[0].ETag)
 		require.Equal(t, 4, parts.Items[1].PartNumber)
 		require.Equal(t, int64(part4size), parts.Items[1].Size)
 		require.WithinDuration(t, uploadTime, parts.Items[1].LastModified, 10*time.Second)
+		require.Equal(t, source4SHA256[:], parts.Items[1].ETag)
 
 		_, err = multipart.CompleteMultipartUpload(newCtx, project, "testbucket", "multipart-object", info.StreamID, nil)
 		require.NoError(t, err)
@@ -457,7 +470,8 @@ func TestListParts_Ordering(t *testing.T) {
 		require.NotNil(t, info.StreamID)
 
 		for i := 0; i < partCount; i++ {
-			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i, bytes.NewReader(data[:i+1]))
+			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i,
+				etag.NewHashReader(bytes.NewReader(data[:i+1]), sha256.New()))
 			require.NoError(t, err)
 		}
 		_, err = multipart.CompleteMultipartUpload(ctx, project, "testbucket", "multipart-object", info.StreamID, nil)
@@ -656,7 +670,8 @@ func TestPutObjectPartCheckNoEmptyInlineSegment(t *testing.T) {
 		require.NotEmpty(t, info.StreamID)
 
 		expectedData := testrand.Bytes(30 * memory.KiB)
-		_, err = multipart.PutObjectPart(newCtx, project, bucket, objectKey, info.StreamID, 1, bytes.NewBuffer(expectedData))
+		_, err = multipart.PutObjectPart(newCtx, project, bucket, objectKey, info.StreamID, 1,
+			etag.NewHashReader(bytes.NewReader(expectedData), sha256.New()))
 		require.NoError(t, err)
 
 		_, err = multipart.CompleteMultipartUpload(newCtx, project, bucket, objectKey, info.StreamID, nil)
@@ -706,7 +721,8 @@ func TestDownloadObjectWithManySegments(t *testing.T) {
 			expectedData = append(expectedData, byte(i))
 
 			// TODO maybe put it in parallel
-			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i+1, bytes.NewBuffer([]byte{byte(i)}))
+			_, err = multipart.PutObjectPart(ctx, project, "testbucket", "multipart-object", info.StreamID, i+1,
+				etag.NewHashReader(bytes.NewReader([]byte{byte(i)}), sha256.New()))
 			require.NoError(t, err)
 		}
 

@@ -832,9 +832,12 @@ func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListP
 
 // SegmentListItem represents listed segment.
 type SegmentListItem struct {
-	Position  SegmentPosition
-	PlainSize int64
-	CreatedAt time.Time
+	Position          SegmentPosition
+	PlainSize         int64
+	CreatedAt         time.Time
+	EncryptedETag     []byte
+	EncryptedKeyNonce storj.Nonce
+	EncryptedKey      []byte
 }
 
 // ListSegmentsParams parameters for ListSegments method.
@@ -867,8 +870,9 @@ func (params *ListSegmentsParams) BatchItem() *pb.BatchRequestItem {
 
 // ListSegmentsResponse response for ListSegments request.
 type ListSegmentsResponse struct {
-	Items []SegmentListItem
-	More  bool
+	Items                []SegmentListItem
+	More                 bool
+	EncryptionParameters storj.EncryptionParameters
 }
 
 func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsResponse {
@@ -879,14 +883,26 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 				PartNumber: segment.Position.PartNumber,
 				Index:      segment.Position.Index,
 			},
-			PlainSize: segment.PlainSize,
-			CreatedAt: segment.CreatedAt,
+			PlainSize:         segment.PlainSize,
+			CreatedAt:         segment.CreatedAt,
+			EncryptedETag:     segment.EncryptedETag,
+			EncryptedKeyNonce: segment.EncryptedKeyNonce,
+			EncryptedKey:      segment.EncryptedKey,
+		}
+	}
+
+	ep := storj.EncryptionParameters{}
+	if response.EncryptionParameters != nil {
+		ep = storj.EncryptionParameters{
+			CipherSuite: storj.CipherSuite(response.EncryptionParameters.CipherSuite),
+			BlockSize:   int32(response.EncryptionParameters.BlockSize),
 		}
 	}
 
 	return ListSegmentsResponse{
-		Items: segments,
-		More:  response.More,
+		Items:                segments,
+		More:                 response.More,
+		EncryptionParameters: ep,
 	}
 }
 
@@ -973,6 +989,7 @@ type CommitSegmentParams struct {
 	Encryption        SegmentEncryption
 	SizeEncryptedData int64
 	PlainSize         int64
+	EncryptedTag      []byte
 
 	UploadResult []*pb.SegmentPieceUploadResult
 }
@@ -986,6 +1003,7 @@ func (params *CommitSegmentParams) toRequest(header *pb.RequestHeader) *pb.Segme
 		EncryptedKey:      params.Encryption.EncryptedKey,
 		SizeEncryptedData: params.SizeEncryptedData,
 		PlainSize:         params.PlainSize,
+		EncryptedETag:     params.EncryptedTag,
 		UploadResult:      params.UploadResult,
 	}
 }
@@ -1015,6 +1033,7 @@ type MakeInlineSegmentParams struct {
 	Encryption          SegmentEncryption
 	EncryptedInlineData []byte
 	PlainSize           int64
+	EncryptedTag        []byte
 }
 
 func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentMakeInlineRequest {
@@ -1029,6 +1048,7 @@ func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.S
 		EncryptedKey:        params.Encryption.EncryptedKey,
 		EncryptedInlineData: params.EncryptedInlineData,
 		PlainSize:           params.PlainSize,
+		EncryptedETag:       params.EncryptedTag,
 	}
 }
 

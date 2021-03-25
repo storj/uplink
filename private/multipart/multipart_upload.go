@@ -26,6 +26,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/private/eestream"
+	"storj.io/uplink/private/etag"
 	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 )
@@ -73,6 +74,7 @@ type PartInfo struct {
 	PartNumber   int
 	Size         int64
 	LastModified time.Time
+	ETag         []byte
 }
 
 // NewMultipartUpload begins new multipart upload.
@@ -119,7 +121,7 @@ func NewMultipartUpload(ctx context.Context, project *uplink.Project, bucket, ke
 }
 
 // PutObjectPart uploads a part.
-func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key string, streamID string, partNumber int, data io.Reader) (info PartInfo, err error) {
+func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key string, streamID string, partNumber int, reader etag.Reader) (info PartInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	// TODO
@@ -169,7 +171,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	eofReader := streams.NewEOFReader(data)
+	eofReader := streams.NewEOFReader(reader)
 	for !eofReader.IsEOF() && !eofReader.HasError() {
 		// generate random key for encrypting the segment's content
 		_, err := rand.Read(contentKey[:])
@@ -246,10 +248,16 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 
 			plainSegmentSize := sizeReader.Size()
 			if plainSegmentSize > 0 {
+				encryptedETag, err := encryptETag(reader.CurrentETag(), encryptionParameters, &contentKey)
+				if err != nil {
+					return PartInfo{}, packageError.Wrap(err)
+				}
+
 				err = metainfoClient.CommitSegment(ctx, metainfo.CommitSegmentParams{
 					SegmentID:         response.SegmentID,
 					SizeEncryptedData: encSizedReader.Size(),
 					PlainSize:         plainSegmentSize,
+					EncryptedTag:      encryptedETag,
 					Encryption:        segmentEncryption,
 					UploadResult:      uploadResults,
 				})
@@ -269,6 +277,11 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 					return PartInfo{}, packageError.Wrap(err)
 				}
 
+				encryptedETag, err := encryptETag(reader.CurrentETag(), encryptionParameters, &contentKey)
+				if err != nil {
+					return PartInfo{}, packageError.Wrap(err)
+				}
+
 				err = metainfoClient.MakeInlineSegment(ctx, metainfo.MakeInlineSegmentParams{
 					StreamID: decodedStreamID,
 					Position: metainfo.SegmentPosition{
@@ -278,6 +291,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 					Encryption:          segmentEncryption,
 					EncryptedInlineData: cipherData,
 					PlainSize:           int64(len(data)),
+					EncryptedTag:        encryptedETag,
 				})
 				if err != nil {
 					return PartInfo{}, packageError.Wrap(err)
@@ -295,6 +309,7 @@ func PutObjectPart(ctx context.Context, project *uplink.Project, bucket, key str
 	return PartInfo{
 		PartNumber: partNumber,
 		Size:       streamSize,
+		ETag:       reader.CurrentETag(),
 	}, nil
 }
 
@@ -492,6 +507,11 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 	partInfosMap := make(map[int]*PartInfo)
 
 	for _, item := range listResult.Items {
+		etag, err := decryptETag(project, bucket, key, listResult.EncryptionParameters, item)
+		if err != nil {
+			return ListObjectPartsResult{}, convertKnownErrors(err, bucket, key)
+		}
+
 		partNumber := int(item.Position.PartNumber)
 		_, exists := partInfosMap[partNumber]
 		if !exists {
@@ -499,12 +519,18 @@ func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key, 
 				PartNumber:   partNumber,
 				Size:         item.PlainSize,
 				LastModified: item.CreatedAt,
+				ETag:         etag,
 			}
 		} else {
 			partInfosMap[partNumber].Size += item.PlainSize
 			if item.CreatedAt.After(partInfosMap[partNumber].LastModified) {
 				partInfosMap[partNumber].LastModified = item.CreatedAt
 			}
+			// The satellite returns the segments ordered by position. So it is
+			// OK to just overwrite the ETag with the one from the next segment.
+			// Eventually, the map will contain the ETag of the last segment,
+			// which is the part's ETag.
+			partInfosMap[partNumber].ETag = etag
 		}
 	}
 
@@ -738,6 +764,51 @@ func errwrapf(format string, err error, args ...interface{}) error {
 	all = append(all, err)
 	all = append(all, args...)
 	return packageError.Wrap(fmt.Errorf(format, all...))
+}
+
+func deriveETagKey(key *storj.Key) (*storj.Key, error) {
+	return encryption.DeriveKey(key, "storj-etag-v1")
+}
+
+func encryptETag(etag []byte, encryptionParameters storj.EncryptionParameters, contentKey *storj.Key) ([]byte, error) {
+	// Derive another key from the randomly generated content key to encrypt
+	// the segment's ETag.
+	etagKey, err := deriveETagKey(contentKey)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	encryptedETag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	return encryptedETag, nil
+}
+
+func decryptETag(project *uplink.Project, bucket, key string, encryptionParameters storj.EncryptionParameters, segment metainfo.SegmentListItem) ([]byte, error) {
+	if segment.EncryptedETag == nil {
+		return nil, nil
+	}
+
+	derivedKey, err := deriveContentKey(project, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+
+	contentKey, err := encryption.DecryptKey(segment.EncryptedKey, encryptionParameters.CipherSuite, derivedKey, &segment.EncryptedKeyNonce)
+	if err != nil {
+		return nil, err
+	}
+
+	// Derive another key from the randomly generated content key to decrypt
+	// the segment's ETag.
+	etagKey, err := deriveETagKey(contentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryption.Decrypt(segment.EncryptedETag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
