@@ -11,6 +11,7 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/encryption"
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/uplink/private/metainfo"
@@ -40,6 +41,10 @@ func convertKnownErrors(err error, bucket, key string) error {
 		return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
 	case metainfo.ErrObjectNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrObjectNotFound, key)
+	case encryption.ErrMissingEncryptionBase.Has(err):
+		return errwrapf("%w (%q)", ErrPermissionDenied, key)
+	case encryption.ErrMissingDecryptionBase.Has(err):
+		return errwrapf("%w (%q)", ErrPermissionDenied, key)
 	case errs2.IsRPC(err, rpcstatus.ResourceExhausted):
 		// TODO is a better way to do this?
 		message := errs.Unwrap(err).Error()
