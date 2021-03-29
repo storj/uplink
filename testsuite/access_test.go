@@ -308,23 +308,24 @@ func TestSharePrefix_List(t *testing.T) {
 
 		for _, tt := range []struct {
 			sharePrefix, listPrefix string
+			deniedListPrefixes      []string
 		}{
 			{sharePrefix: "", listPrefix: ""},
 			{sharePrefix: "", listPrefix: "a/"},
 			{sharePrefix: "", listPrefix: "a/b/"},
-			{sharePrefix: "a", listPrefix: "a/"},
-			{sharePrefix: "a", listPrefix: "a/b/"},
-			{sharePrefix: "a", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/", listPrefix: "a/"},
-			{sharePrefix: "a/", listPrefix: "a/b/"},
-			{sharePrefix: "a/", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/b", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/b", listPrefix: "a/b/"},
-			{sharePrefix: "a/b", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/b/", listPrefix: "a/b/"},
-			{sharePrefix: "a/b/", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/b/c", listPrefix: "a/b/c/"},
-			{sharePrefix: "a/b/c/", listPrefix: "a/b/c/"},
+			{sharePrefix: "a", listPrefix: "a/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a", listPrefix: "a/b/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a", listPrefix: "a/b/c/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a/", listPrefix: "a/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a/", listPrefix: "a/b/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a/", listPrefix: "a/b/c/", deniedListPrefixes: []string{""}},
+			{sharePrefix: "a/b", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b", listPrefix: "a/b/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b/", listPrefix: "a/b/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b/", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b/c", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
+			{sharePrefix: "a/b/c/", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
 		} {
 			tt := tt
 			t.Run("sharePrefix: "+tt.sharePrefix+", listPrefix: "+tt.listPrefix, func(t *testing.T) {
@@ -347,6 +348,15 @@ func TestSharePrefix_List(t *testing.T) {
 				require.NotNil(t, list.Item())
 				require.False(t, list.Item().IsPrefix)
 				require.Equal(t, "a/b/c/test.dat", list.Item().Key)
+
+				for _, listPrefix := range tt.deniedListPrefixes {
+					list := project.ListObjects(ctx, "testbucket", &uplink.ListObjectsOptions{
+						Prefix:    listPrefix,
+						Recursive: true,
+					})
+					assert.False(t, list.Next())
+					require.True(t, errors.Is(list.Err(), uplink.ErrPermissionDenied))
+				}
 			})
 		}
 	})
