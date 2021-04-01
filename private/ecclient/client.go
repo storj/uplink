@@ -30,7 +30,6 @@ var mon = monkit.Package()
 
 // Client defines an interface for storing erasure coded data to piece store nodes.
 type Client interface {
-	Put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error)
 	PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error)
 	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (ranger.Ranger, error)
 	WithForceErrorDetection(force bool) Client
@@ -66,8 +65,33 @@ func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piece
 	return piecestore.DialNodeURL(ctx, ec.dialer, n, logger, piecestore.DefaultConfig)
 }
 
-// TODO remove this method when storj/storj tests will be adjusted to use PutSingleResult.
-func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
+func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
+	successfulNodes, successfulHashes, err := ec.put(ctx, limits, privateKey, rs, data, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	uploadResults := make([]*pb.SegmentPieceUploadResult, 0, len(successfulNodes))
+	for i := range successfulNodes {
+		if successfulNodes[i] == nil {
+			continue
+		}
+
+		uploadResults = append(uploadResults, &pb.SegmentPieceUploadResult{
+			PieceNum: int32(i),
+			NodeId:   successfulNodes[i].Id,
+			Hash:     successfulHashes[i],
+		})
+	}
+
+	if l := len(uploadResults); l < rs.OptimalThreshold() {
+		return nil, Error.New("uploaded results (%d) are below the optimal threshold (%d)", l, rs.OptimalThreshold())
+	}
+
+	return uploadResults, nil
+}
+
+func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	pieceCount := len(limits)
@@ -175,32 +199,6 @@ func (ec *ecClient) Put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	}
 
 	return successfulNodes, successfulHashes, nil
-}
-
-func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
-	successfulNodes, successfulHashes, err := ec.Put(ctx, limits, privateKey, rs, data, time.Time{})
-	if err != nil {
-		return nil, err
-	}
-
-	uploadResults := make([]*pb.SegmentPieceUploadResult, 0, len(successfulNodes))
-	for i := range successfulNodes {
-		if successfulNodes[i] == nil {
-			continue
-		}
-
-		uploadResults = append(uploadResults, &pb.SegmentPieceUploadResult{
-			PieceNum: int32(i),
-			NodeId:   successfulNodes[i].Id,
-			Hash:     successfulHashes[i],
-		})
-	}
-
-	if l := len(uploadResults); l < rs.OptimalThreshold() {
-		return nil, Error.New("uploaded results (%d) are below the optimal threshold (%d)", l, rs.OptimalThreshold())
-	}
-
-	return uploadResults, nil
 }
 
 func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, peerID *identity.PeerIdentity, err error) {
