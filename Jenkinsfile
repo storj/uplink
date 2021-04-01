@@ -154,6 +154,11 @@ pipeline {
                         sh './testsuite/scripts/test-sim.sh'
                         sh 'psql -U postgres -c \'drop database teststorj3;\''
                     }
+                    post {
+                        always {
+                            zip zipFile: 'rclone-integration-tests.zip', archive: true, dir: '.build/rclone-integration-tests'
+                        }
+                    }
                 }
 
                 stage('Go Compatibility') {

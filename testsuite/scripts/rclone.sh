@@ -27,5 +27,5 @@ pushd $RCLONE
 
     ./rclone config create TestTardigrade tardigrade access_grant $GATEWAY_0_ACCESS
 
-    ./test_all -backends tardigrade
+    ./test_all -backends tardigrade -output $SCRIPTDIR/../../.build/rclone-integration-tests
 popd
