@@ -349,6 +349,58 @@ func (db *DB) keyCipher(keyCipher storj.CipherSuite) storj.CipherSuite {
 	return keyCipher
 }
 
+// DownloadOptions contains additional options for downloading.
+type DownloadOptions struct {
+	Range StreamRange
+}
+
+// DownloadInfo contains response for DownloadObject.
+type DownloadInfo struct {
+	Object             storj.Object
+	DownloadedSegments []DownloadSegmentWithRSResponse
+	ListSegments       ListSegmentsResponse
+}
+
+// DownloadObject gets object information, lists segments and downloads the first segment.
+func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options DownloadOptions) (info DownloadInfo, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return DownloadInfo{}, storj.ErrNoBucket.New("")
+	}
+	if key == "" {
+		return DownloadInfo{}, storj.ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return DownloadInfo{}, err
+	}
+
+	resp, err := db.metainfo.DownloadObject(ctx, DownloadObjectParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		Range:              options.Range,
+	})
+	if err != nil {
+		return DownloadInfo{}, err
+	}
+
+	return db.newDownloadInfo(ctx, bucket, key, resp)
+}
+
+func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response DownloadObjectResponse) (DownloadInfo, error) {
+	object, err := db.objectFromRawObjectItem(ctx, bucket, key, response.Object)
+	if err != nil {
+		return DownloadInfo{}, err
+	}
+	return DownloadInfo{
+		Object:             object,
+		DownloadedSegments: response.DownloadedSegments,
+		ListSegments:       response.ListSegments,
+	}, nil
+}
+
 // GetObject returns information about an object.
 func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)

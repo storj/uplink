@@ -1072,6 +1072,121 @@ func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSe
 	return Error.Wrap(err)
 }
 
+// DownloadObjectParams parameters for DownloadSegment method.
+type DownloadObjectParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+
+	Range StreamRange
+}
+
+// StreamRange contains range specification.
+type StreamRange struct {
+	Mode   StreamRangeMode
+	Start  int64
+	Limit  int64
+	Suffix int64
+}
+
+// StreamRangeMode contains different modes for range.
+type StreamRangeMode byte
+
+const (
+	// StreamRangeAll selects all.
+	StreamRangeAll StreamRangeMode = iota
+	// StreamRangeStart selects starting from range.Start.
+	StreamRangeStart
+	// StreamRangeStartLimit selects starting from range.Start to range.End (inclusive).
+	StreamRangeStartLimit
+	// StreamRangeSuffix selects last range.Suffix bytes.
+	StreamRangeSuffix
+)
+
+func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectDownloadRequest {
+	var rg *pb.Range
+
+	switch params.Range.Mode {
+	case StreamRangeAll:
+	case StreamRangeStart:
+		rg = &pb.Range{
+			Range: &pb.Range_Start{
+				Start: &pb.RangeStart{
+					PlainStart: params.Range.Start,
+				},
+			},
+		}
+
+	case StreamRangeStartLimit:
+		rg = &pb.Range{
+			Range: &pb.Range_StartLimit{
+				StartLimit: &pb.RangeStartLimit{
+					PlainStart: params.Range.Start,
+					PlainLimit: params.Range.Limit,
+				},
+			},
+		}
+
+	case StreamRangeSuffix:
+		rg = &pb.Range{
+			Range: &pb.Range_Suffix{
+				Suffix: &pb.RangeSuffix{
+					PlainSuffix: params.Range.Suffix,
+				},
+			},
+		}
+	}
+
+	return &pb.ObjectDownloadRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		Range:              rg,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *DownloadObjectParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_ObjectDownload{
+			ObjectDownload: params.toRequest(nil),
+		},
+	}
+}
+
+// DownloadObjectResponse response for DownloadSegment request.
+type DownloadObjectResponse struct {
+	Object             RawObjectItem
+	DownloadedSegments []DownloadSegmentWithRSResponse
+	ListSegments       ListSegmentsResponse
+}
+
+func newDownloadObjectResponse(response *pb.ObjectDownloadResponse) DownloadObjectResponse {
+	downloadedSegments := make([]DownloadSegmentWithRSResponse, 0, len(response.SegmentDownload))
+	for _, segmentDownload := range response.SegmentDownload {
+		downloadedSegments = append(downloadedSegments, newDownloadSegmentResponseWithRS(segmentDownload))
+	}
+	return DownloadObjectResponse{
+		Object:             newObjectInfo(response.Object),
+		DownloadedSegments: downloadedSegments,
+		ListSegments:       newListSegmentsResponse(response.SegmentList),
+	}
+}
+
+// DownloadObject gets object information, lists segments and downloads the first segment.
+func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	response, err := client.client.DownloadObject(ctx, params.toRequest(client.header()))
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return DownloadObjectResponse{}, storj.ErrObjectNotFound.Wrap(err)
+		}
+		return DownloadObjectResponse{}, Error.Wrap(err)
+	}
+
+	return newDownloadObjectResponse(response), nil
+}
+
 // DownloadSegmentParams parameters for DownloadSegment method.
 type DownloadSegmentParams struct {
 	StreamID storj.StreamID
