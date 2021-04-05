@@ -1301,6 +1301,7 @@ type DownloadSegmentWithRSResponse struct {
 type SegmentDownloadInfo struct {
 	SegmentID           storj.SegmentID
 	PlainOffset         int64
+	PlainSize           int64
 	EncryptedSize       int64
 	EncryptedInlineData []byte
 	PiecePrivateKey     storj.PiecePrivateKey
@@ -1313,6 +1314,7 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) Down
 	info := SegmentDownloadInfo{
 		SegmentID:           response.SegmentId,
 		PlainOffset:         response.PlainOffset,
+		PlainSize:           response.PlainSize,
 		EncryptedSize:       response.SegmentSize,
 		EncryptedInlineData: response.EncryptedInlineData,
 		PiecePrivateKey:     response.PrivateKey,

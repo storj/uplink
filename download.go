@@ -8,6 +8,9 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/errs2"
+	"storj.io/common/rpc/rpcstatus"
+	"storj.io/uplink/private/metainfo"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -30,10 +33,22 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 	}
 
-	if options == nil {
-		options = &DownloadOptions{
-			Offset: 0,
-			Length: -1,
+	var opts metainfo.DownloadOptions
+	switch {
+	case options == nil:
+		opts.Range = metainfo.StreamRange{
+			Mode: metainfo.StreamRangeAll,
+		}
+	case options.Length < 0:
+		opts.Range = metainfo.StreamRange{
+			Mode:  metainfo.StreamRangeStart,
+			Start: options.Offset,
+		}
+	default:
+		opts.Range = metainfo.StreamRange{
+			Mode:  metainfo.StreamRangeStartLimit,
+			Start: options.Offset,
+			Limit: options.Offset + options.Length,
 		}
 	}
 
@@ -47,8 +62,21 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.GetObject(ctx, bucket, key)
-	if err != nil {
+	// TODO: handle DownloadObject & downloadInfo.ListSegments.More in the same location.
+	//       currently this code is rather disjoint.
+
+	objectDownload, err := db.DownloadObject(ctx, bucket, key, opts)
+	if errs2.IsRPC(err, rpcstatus.Unimplemented) {
+		objectDownload.Object, err = db.GetObject(ctx, bucket, key)
+		if err != nil {
+			return nil, convertKnownErrors(err, bucket, key)
+		}
+		objectDownload.Range = opts.Range.Normalize(objectDownload.Object.Size)
+		if objectDownload.Object.Size > 0 {
+			objectDownload.ListSegments.More = true
+		}
+		objectDownload.ListSegments.EncryptionParameters = objectDownload.Object.EncryptionParameters
+	} else if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
@@ -62,10 +90,11 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, packageError.Wrap(err)
 	}
 
+	streamRange := objectDownload.Range
 	return &Download{
 		streams:  streams,
-		download: stream.NewDownloadRange(ctx, obj, streams, options.Offset, options.Length),
-		object:   convertObject(&obj),
+		download: stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start),
+		object:   convertObject(&objectDownload.Object),
 	}, nil
 }
 

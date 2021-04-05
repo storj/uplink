@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+	"sort"
 	"sync"
 	"time"
 
@@ -376,15 +377,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 // Get returns a ranger that knows what the overall size is (from l/<key>)
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
-func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object metainfo.Object) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metainfo.DownloadInfo) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	object := info.Object
 	if object.Size == 0 {
 		return ranger.ByteRanger(nil), nil
-	}
-
-	if object.FixedSegmentSize != 0 {
-		return s.getWithLastSegment(ctx, bucket, unencryptedKey, object)
 	}
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
@@ -392,99 +390,154 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object m
 		return nil, err
 	}
 
-	// TODO this is naive solution which will introduce additional round trips to satellite.
-	// We need at least batch it here or force satellite to return all segments in single request
-	// or maybe there is third option.
-	rangers := make([]ranger.Ranger, 0, object.SegmentCount)
-	cursor := metainfo.SegmentPosition{}
-	for {
-		segmentsList, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
-			StreamID: object.ID,
-			Cursor:   cursor,
-		})
-		if err != nil {
-			return nil, err
-		}
+	// download all missing segments
+	if info.ListSegments.More {
+		for info.ListSegments.More {
+			var cursor storj.SegmentPosition
+			if len(info.ListSegments.Items) > 0 {
+				last := info.ListSegments.Items[len(info.ListSegments.Items)-1]
+				cursor = last.Position
+			}
 
-		for _, segment := range segmentsList.Items {
-			var contentNonce storj.Nonce
-			_, err = encryption.Increment(&contentNonce, int64(segment.Position.PartNumber)<<32|(int64(segment.Position.Index)+1))
+			result, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
+				StreamID: object.ID,
+				Cursor:   cursor,
+				Range:    info.Range,
+			})
 			if err != nil {
 				return nil, err
 			}
+
+			info.ListSegments.Items = append(info.ListSegments.Items, result.Items...)
+			info.ListSegments.More = result.More
+		}
+	}
+
+	downloaded := info.DownloadedSegments
+	listed := info.ListSegments.Items
+
+	sort.Slice(downloaded, func(i, k int) bool {
+		return downloaded[i].Info.PlainOffset < downloaded[k].Info.PlainOffset
+	})
+	sort.Slice(listed, func(i, k int) bool {
+		return listed[i].PlainOffset < listed[k].PlainOffset
+	})
+
+	var offset int64
+	switch {
+	case len(downloaded) > 0 && len(listed) > 0:
+		if listed[0].PlainOffset < downloaded[0].Info.PlainOffset {
+			offset = listed[0].PlainOffset
+		} else {
+			offset = downloaded[0].Info.PlainOffset
+		}
+	case len(downloaded) > 0:
+		offset = downloaded[0].Info.PlainOffset
+	case len(listed) > 0:
+		offset = listed[0].PlainOffset
+	}
+
+	rangers := make([]ranger.Ranger, 0, len(downloaded)+len(listed)+2)
+
+	if offset > 0 {
+		rangers = append(rangers, &invalidRanger{size: offset})
+	}
+
+	for len(downloaded) > 0 || len(listed) > 0 {
+		switch {
+		case len(downloaded) > 0 && downloaded[0].Info.PlainOffset == offset:
+			segment := downloaded[0]
+			downloaded = downloaded[1:]
+
+			// drop any duplicate segment info in listing
+			for len(listed) > 0 && listed[0].PlainOffset == offset {
+				if listed[0].Position != *segment.Info.Position {
+					return nil, errs.New("segment info for download and list does not match: %v != %v", listed[0].Position, *segment.Info.Position)
+				}
+				listed = listed[1:]
+			}
+
+			encryptedRanger, err := s.Ranger(ctx, segment)
+			if err != nil {
+				return nil, err
+			}
+
+			contentNonce, err := deriveContentNonce(*segment.Info.Position)
+			if err != nil {
+				return nil, err
+			}
+
+			plainSize := calculatePlainSize(segment.Info.PlainSize, *segment.Info.Position, object)
+
+			enc := segment.Info.SegmentEncryption
+			decrypted, err := decryptRanger(ctx, encryptedRanger, plainSize, object.EncryptionParameters, derivedKey, enc.EncryptedKey, &enc.EncryptedKeyNonce, &contentNonce)
+			if err != nil {
+				return nil, err
+			}
+
+			rangers = append(rangers, decrypted)
+			offset += plainSize
+
+		case len(listed) > 0 && listed[0].PlainOffset == offset:
+			segment := listed[0]
+			listed = listed[1:]
+
+			contentNonce, err := deriveContentNonce(segment.Position)
+			if err != nil {
+				return nil, err
+			}
+
+			plainSize := calculatePlainSize(segment.PlainSize, segment.Position, object)
 
 			rangers = append(rangers, &lazySegmentRanger{
 				metainfo:             s.metainfo,
 				streams:              s,
 				streamID:             object.ID,
 				position:             segment.Position,
-				plainSize:            segment.PlainSize,
+				plainSize:            plainSize,
 				derivedKey:           derivedKey,
 				startingNonce:        &contentNonce,
 				encryptionParameters: object.EncryptionParameters,
 			})
+			offset += plainSize
 
-			cursor = segment.Position
+		default:
+			return nil, errs.New("missing segment for offset %d", offset)
 		}
+	}
 
-		if !segmentsList.More {
-			break
-		}
+	if offset < object.Size {
+		rangers = append(rangers, &invalidRanger{size: object.Size - offset})
+	}
+	if offset > object.Size {
+		return nil, errs.New("invalid final offset %d; expected %d", offset, object.Size)
 	}
 
 	return ranger.Concat(rangers...), nil
 }
 
-func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey string, object metainfo.Object) (rr ranger.Ranger, err error) {
-	defer mon.Task()(&ctx)(&err)
+func deriveContentNonce(pos storj.SegmentPosition) (storj.Nonce, error) {
+	var n storj.Nonce
+	_, err := encryption.Increment(&n, int64(pos.PartNumber)<<32|(int64(pos.Index)+1))
+	return n, err
+}
 
-	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
-	if err != nil {
-		return nil, err
+// calculatePlainSize calculates segment plain size, taking into account backwards compatibility.
+func calculatePlainSize(segmentPlainSize int64, segmentPosition storj.SegmentPosition, object storj.Object) int64 {
+	switch {
+	case object.FixedSegmentSize <= 0:
+		// this is a multipart object that has correct plain size.
+		return segmentPlainSize
+	case segmentPosition.PartNumber > 0:
+		// this case should be impossible, however let's return the input segment size.
+		return segmentPlainSize
+	case segmentPosition.Index == int32(object.SegmentCount-1):
+		// this is a last segment
+		return object.LastSegment.Size
+	default:
+		// this is a fixed size segment
+		return object.FixedSegmentSize
 	}
-
-	var rangers []ranger.Ranger
-	for i := int64(0); i < object.SegmentCount-1; i++ {
-		var contentNonce storj.Nonce
-		_, err = encryption.Increment(&contentNonce, i+1)
-		if err != nil {
-			return nil, err
-		}
-
-		rangers = append(rangers, &lazySegmentRanger{
-			metainfo: s.metainfo,
-			streams:  s,
-			streamID: object.ID,
-			position: metainfo.SegmentPosition{
-				Index: int32(i),
-			},
-			plainSize:            object.FixedSegmentSize,
-			derivedKey:           derivedKey,
-			startingNonce:        &contentNonce,
-			encryptionParameters: object.EncryptionParameters,
-		})
-	}
-
-	var contentNonce storj.Nonce
-	_, err = encryption.Increment(&contentNonce, object.SegmentCount)
-	if err != nil {
-		return nil, err
-	}
-
-	rangers = append(rangers, &lazySegmentRanger{
-		metainfo: s.metainfo,
-		streams:  s,
-		streamID: object.ID,
-		position: metainfo.SegmentPosition{
-			Index: -1, // last segment
-		},
-		plainSize:            object.LastSegment.Size,
-		derivedKey:           derivedKey,
-		startingNonce:        &contentNonce,
-		encryptionParameters: object.EncryptionParameters,
-	})
-
-	return ranger.Concat(rangers...), nil
 }
 
 // Delete all the segments, with the last one last.
@@ -640,4 +693,16 @@ func (s *Store) Ranger(ctx context.Context, response metainfo.DownloadSegmentWit
 
 	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.EncryptedSize)
 	return rr, err
+}
+
+type invalidRanger struct {
+	size int64
+}
+
+func (d *invalidRanger) Size() int64 {
+	return d.size
+}
+
+func (d *invalidRanger) Range(ctx context.Context, offset, length int64) (io.ReadCloser, error) {
+	return nil, errs.New("invalid range %d:%d (size:%d)", offset, length, d.size)
 }

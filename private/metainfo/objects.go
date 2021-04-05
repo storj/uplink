@@ -395,11 +395,12 @@ func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response 
 	if err != nil {
 		return DownloadInfo{}, err
 	}
+
 	return DownloadInfo{
 		Object:             object,
 		DownloadedSegments: response.DownloadedSegments,
 		ListSegments:       response.ListSegments,
-		Range:              streamRange,
+		Range:              streamRange.Normalize(object.Size),
 	}, nil
 }
 

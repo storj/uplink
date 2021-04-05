@@ -14,7 +14,7 @@ import (
 // Download implements Reader, Seeker and Closer for reading from stream.
 type Download struct {
 	ctx     context.Context
-	object  metainfo.Object
+	info    metainfo.DownloadInfo
 	streams *streams.Store
 	reader  io.ReadCloser
 	offset  int64
@@ -23,18 +23,18 @@ type Download struct {
 }
 
 // NewDownload creates new stream download.
-func NewDownload(ctx context.Context, object metainfo.Object, streams *streams.Store) *Download {
+func NewDownload(ctx context.Context, info metainfo.DownloadInfo, streams *streams.Store) *Download {
 	return &Download{
 		ctx:     ctx,
-		object:  object,
+		info:    info,
 		streams: streams,
-		length:  object.Size,
+		length:  info.Object.Size,
 	}
 }
 
 // NewDownloadRange creates new stream range download with range from start to start+length.
-func NewDownloadRange(ctx context.Context, object metainfo.Object, streams *streams.Store, start, length int64) *Download {
-	size := object.Size
+func NewDownloadRange(ctx context.Context, info metainfo.DownloadInfo, streams *streams.Store, start, length int64) *Download {
+	size := info.Object.Size
 	if start > size {
 		start = size
 	}
@@ -43,7 +43,7 @@ func NewDownloadRange(ctx context.Context, object metainfo.Object, streams *stre
 	}
 	return &Download{
 		ctx:     ctx,
-		object:  object,
+		info:    info,
 		streams: streams,
 		offset:  start,
 		length:  length,
@@ -104,9 +104,9 @@ func (download *Download) resetReader() error {
 		}
 	}
 
-	obj := download.object
+	obj := download.info.Object
 
-	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, obj)
+	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, download.info)
 	if err != nil {
 		return err
 	}

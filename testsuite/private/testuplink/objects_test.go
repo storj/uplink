@@ -16,8 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/encryption"
+	"storj.io/common/errs2"
 	"storj.io/common/memory"
 	"storj.io/common/paths"
+	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -91,9 +93,9 @@ func TestDownloadObject(t *testing.T) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		emptyFile := upload(ctx, t, db, streams, bucket.Name, "empty-file", nil)
-		smallFile := upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
-		largeFile := upload(ctx, t, db, streams, bucket.Name, "large-file", data)
+		upload(ctx, t, db, streams, bucket.Name, "empty-file", nil)
+		upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
+		upload(ctx, t, db, streams, bucket.Name, "large-file", data)
 
 		_, err = db.GetObject(ctx, "", "")
 		assert.True(t, metainfo.ErrNoBucket.Has(err))
@@ -101,9 +103,9 @@ func TestDownloadObject(t *testing.T) {
 		_, err = db.GetObject(ctx, bucket.Name, "")
 		assert.True(t, metainfo.ErrNoPath.Has(err))
 
-		assertData(ctx, t, db, streams, bucket, emptyFile, []byte{})
-		assertData(ctx, t, db, streams, bucket, smallFile, []byte("test"))
-		assertData(ctx, t, db, streams, bucket, largeFile, data)
+		assertData(ctx, t, db, streams, bucket.Name, "empty-file", []byte{})
+		assertData(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
+		assertData(ctx, t, db, streams, bucket.Name, "large-file", data)
 
 		/* TODO: Disable stopping due to flakiness.
 		// Stop randomly half of the storage nodes and remove them from satellite's overlay
@@ -120,7 +122,7 @@ func TestDownloadObject(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) metainfo.Object {
+func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) {
 	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 
@@ -134,15 +136,16 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 
 	err = upload.Close()
 	require.NoError(t, err)
-
-	info, err := db.GetObject(ctx, bucket, key)
-	require.NoError(t, err)
-
-	return info
 }
 
-func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket metainfo.Bucket, object metainfo.Object, content []byte) {
-	download := stream.NewDownload(ctx, object, streams)
+func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucketName, objectKey string, content []byte) {
+	info, err := db.DownloadObject(ctx, bucketName, objectKey, metainfo.DownloadOptions{})
+	if errs2.IsRPC(err, rpcstatus.Unimplemented) {
+		t.Skip("unimplemented DownloadObject")
+	}
+	require.NoError(t, err)
+
+	download := stream.NewDownload(ctx, info, streams)
 	defer func() {
 		err := download.Close()
 		assert.NoError(t, err)
