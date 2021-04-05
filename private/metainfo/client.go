@@ -834,6 +834,7 @@ func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListP
 type SegmentListItem struct {
 	Position          SegmentPosition
 	PlainSize         int64
+	PlainOffset       int64
 	CreatedAt         time.Time
 	EncryptedETag     []byte
 	EncryptedKeyNonce storj.Nonce
@@ -884,6 +885,7 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 				Index:      segment.Position.Index,
 			},
 			PlainSize:         segment.PlainSize,
+			PlainOffset:       segment.PlainOffset,
 			CreatedAt:         segment.CreatedAt,
 			EncryptedETag:     segment.EncryptedETag,
 			EncryptedKeyNonce: segment.EncryptedKeyNonce,
@@ -1149,6 +1151,12 @@ func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmen
 	return downloadResponse.Info, downloadResponse.Limits, nil
 }
 
+// DownloadSegmentWithRSResponse contains information for downloading remote segment or data from an inline segment.
+type DownloadSegmentWithRSResponse struct {
+	Info   SegmentDownloadInfo
+	Limits []*pb.AddressedOrderLimit
+}
+
 // SegmentDownloadInfo represents information necessary for downloading segment (inline and remote).
 type SegmentDownloadInfo struct {
 	SegmentID           storj.SegmentID
@@ -1157,9 +1165,10 @@ type SegmentDownloadInfo struct {
 	PiecePrivateKey     storj.PiecePrivateKey
 	SegmentEncryption   SegmentEncryption
 	RedundancyScheme    storj.RedundancyScheme
+	Position            *storj.SegmentPosition
 }
 
-func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) (SegmentDownloadInfo, []*pb.AddressedOrderLimit) {
+func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) DownloadSegmentWithRSResponse {
 	info := SegmentDownloadInfo{
 		SegmentID:           response.SegmentId,
 		Size:                response.SegmentSize,
@@ -1169,6 +1178,13 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) (Seg
 			EncryptedKeyNonce: response.EncryptedKeyNonce,
 			EncryptedKey:      response.EncryptedKey,
 		},
+	}
+
+	if response.Position != nil {
+		info.Position = &storj.SegmentPosition{
+			PartNumber: response.Position.PartNumber,
+			Index:      response.Position.Index,
+		}
 	}
 
 	if response.RedundancyScheme != nil {
@@ -1187,25 +1203,27 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) (Seg
 			response.AddressedLimits[i] = nil
 		}
 	}
-	return info, response.AddressedLimits
+	return DownloadSegmentWithRSResponse{
+		Info:   info,
+		Limits: response.AddressedLimits,
+	}
 }
 
 // TODO replace DownloadSegment with DownloadSegmentWithRS in batch
 
 // DownloadSegmentWithRS gets information for downloading remote segment or data from an inline segment.
-func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ SegmentDownloadInfo, _ []*pb.AddressedOrderLimit, err error) {
+func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ DownloadSegmentWithRSResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return SegmentDownloadInfo{}, nil, ErrObjectNotFound.Wrap(err)
+			return DownloadSegmentWithRSResponse{}, ErrObjectNotFound.Wrap(err)
 		}
-		return SegmentDownloadInfo{}, nil, Error.Wrap(err)
+		return DownloadSegmentWithRSResponse{}, Error.Wrap(err)
 	}
 
-	info, limits := newDownloadSegmentResponseWithRS(response)
-	return info, limits, nil
+	return newDownloadSegmentResponseWithRS(response), nil
 }
 
 // RevokeAPIKey revokes the APIKey provided in the params.

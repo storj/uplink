@@ -525,7 +525,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 	defer mon.Task()(&ctx)(&err)
 
 	if lr.ranger == nil {
-		info, limits, err := lr.metainfo.DownloadSegmentWithRS(ctx, metainfo.DownloadSegmentParams{
+		downloadResponse, err := lr.metainfo.DownloadSegmentWithRS(ctx, metainfo.DownloadSegmentParams{
 			StreamID: lr.streamID,
 			Position: metainfo.SegmentPosition{
 				PartNumber: lr.position.PartNumber,
@@ -536,12 +536,12 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 			return nil, err
 		}
 
-		rr, err := lr.streams.Ranger(ctx, info, limits)
+		rr, err := lr.streams.Ranger(ctx, downloadResponse)
 		if err != nil {
 			return nil, err
 		}
 
-		encryptedKey, keyNonce := info.SegmentEncryption.EncryptedKey, info.SegmentEncryption.EncryptedKeyNonce
+		encryptedKey, keyNonce := downloadResponse.Info.SegmentEncryption.EncryptedKey, downloadResponse.Info.SegmentEncryption.EncryptedKeyNonce
 		lr.ranger, err = decryptRanger(ctx, rr, lr.size, lr.encryptionParameters, lr.derivedKey, encryptedKey, &keyNonce, lr.startingNonce)
 		if err != nil {
 			return nil, err
@@ -602,9 +602,10 @@ func (s *Store) cancelHandler(ctx context.Context, bucket, unencryptedKey string
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
-func (s *Store) Ranger(
-	ctx context.Context, info metainfo.SegmentDownloadInfo, limits []*pb.AddressedOrderLimit,
-) (rr ranger.Ranger, err error) {
+func (s *Store) Ranger(ctx context.Context, response metainfo.DownloadSegmentWithRSResponse) (rr ranger.Ranger, err error) {
+	info := response.Info
+	limits := response.Limits
+
 	defer mon.Task()(&ctx, info, limits, info.RedundancyScheme)(&err)
 
 	// no order limits also means its inline segment
