@@ -128,6 +128,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	var streamID storj.StreamID
 	defer func() {
 		if err != nil {
+			fmt.Println("upload error in defer", err)
 			s.cancelHandler(context2.WithoutCancellation(ctx), bucket, unencryptedKey)
 			return
 		}
