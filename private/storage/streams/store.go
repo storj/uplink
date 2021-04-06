@@ -219,10 +219,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			if currentSegment == 0 {
 				responses, err = s.metainfo.Batch(ctx, beginObjectReq, beginSegment)
 				if err != nil {
+					fmt.Println("metainfo.Batch, currentSegment=0", err)
 					return Meta{}, err
 				}
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
+					fmt.Println("responses[0].BeginObject", err)
 					return Meta{}, err
 				}
 				streamID = objResponse.StreamID
@@ -232,12 +234,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
 				requestsToBatch = requestsToBatch[:0]
 				if err != nil {
+					fmt.Println("metainfo.Batch", err)
 					return Meta{}, err
 				}
 			}
 
 			segResponse, err := responses[1].BeginSegment()
 			if err != nil {
+				fmt.Println("responses[1].BeginObject", err)
 				return Meta{}, err
 			}
 			segmentID := segResponse.SegmentID
@@ -251,6 +255,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			encSizedReader := SizeReader(transformedReader)
 			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader)
 			if err != nil {
+				fmt.Println("PutSingleResult", err)
 				return Meta{}, err
 			}
 
@@ -264,6 +269,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
 			if err != nil {
+				fmt.Println("ReadAll", err)
 				return Meta{}, err
 			}
 
@@ -283,10 +289,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			if currentSegment == 0 {
 				responses, err := s.metainfo.Batch(ctx, beginObjectReq, makeInlineSegment)
 				if err != nil {
+					fmt.Println("inline metainfo.Batch", err)
 					return Meta{}, err
 				}
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
+					fmt.Println("inline responses[0].BeginObject", err)
 					return Meta{}, err
 				}
 				streamID = objResponse.StreamID
@@ -304,6 +312,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	totalSegments := currentSegment
 
 	if eofReader.HasError() {
+		fmt.Println("eofReader.HasError", err)
 		return Meta{}, eofReader.err
 	}
 
@@ -356,6 +365,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		err = s.metainfo.CommitObject(ctx, commitObject)
 	}
 	if err != nil {
+		fmt.Println("commitObject", err)
 		return Meta{}, err
 	}
 
