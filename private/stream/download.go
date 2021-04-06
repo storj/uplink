@@ -18,7 +18,7 @@ type Download struct {
 	streams *streams.Store
 	reader  io.ReadCloser
 	offset  int64
-	limit   int64
+	length  int64
 	closed  bool
 }
 
@@ -28,25 +28,25 @@ func NewDownload(ctx context.Context, object metainfo.Object, streams *streams.S
 		ctx:     ctx,
 		object:  object,
 		streams: streams,
-		limit:   object.Size,
+		length:  object.Size,
 	}
 }
 
-// NewDownloadRange creates new stream range download with range from offset to offset+limit.
-func NewDownloadRange(ctx context.Context, object metainfo.Object, streams *streams.Store, offset, limit int64) *Download {
+// NewDownloadRange creates new stream range download with range from start to start+length.
+func NewDownloadRange(ctx context.Context, object metainfo.Object, streams *streams.Store, start, length int64) *Download {
 	size := object.Size
-	if offset > size {
-		offset = size
+	if start > size {
+		start = size
 	}
-	if limit < 0 || limit+offset > size {
-		limit = size - offset
+	if length < 0 || length+start > size {
+		length = size - start
 	}
 	return &Download{
 		ctx:     ctx,
 		object:  object,
 		streams: streams,
-		offset:  offset,
-		limit:   limit,
+		offset:  start,
+		length:  length,
 	}
 }
 
@@ -68,14 +68,14 @@ func (download *Download) Read(data []byte) (n int, err error) {
 		}
 	}
 
-	if download.limit <= 0 {
+	if download.length <= 0 {
 		return 0, io.EOF
 	}
-	if download.limit < int64(len(data)) {
-		data = data[:download.limit]
+	if download.length < int64(len(data)) {
+		data = data[:download.length]
 	}
 	n, err = download.reader.Read(data)
-	download.limit -= int64(n)
+	download.length -= int64(n)
 	download.offset += int64(n)
 
 	return n, err
@@ -111,7 +111,7 @@ func (download *Download) resetReader() error {
 		return err
 	}
 
-	download.reader, err = rr.Range(download.ctx, download.offset, download.limit)
+	download.reader, err = rr.Range(download.ctx, download.offset, download.length)
 	if err != nil {
 		return err
 	}

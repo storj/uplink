@@ -418,7 +418,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, object m
 				streams:              s,
 				streamID:             object.ID,
 				position:             segment.Position,
-				size:                 segment.PlainSize,
+				plainSize:            segment.PlainSize,
 				derivedKey:           derivedKey,
 				startingNonce:        &contentNonce,
 				encryptionParameters: object.EncryptionParameters,
@@ -458,7 +458,7 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 			position: metainfo.SegmentPosition{
 				Index: int32(i),
 			},
-			size:                 object.FixedSegmentSize,
+			plainSize:            object.FixedSegmentSize,
 			derivedKey:           derivedKey,
 			startingNonce:        &contentNonce,
 			encryptionParameters: object.EncryptionParameters,
@@ -478,7 +478,7 @@ func (s *Store) getWithLastSegment(ctx context.Context, bucket, unencryptedKey s
 		position: metainfo.SegmentPosition{
 			Index: -1, // last segment
 		},
-		size:                 object.LastSegment.Size,
+		plainSize:            object.LastSegment.Size,
 		derivedKey:           derivedKey,
 		startingNonce:        &contentNonce,
 		encryptionParameters: object.EncryptionParameters,
@@ -509,7 +509,7 @@ type lazySegmentRanger struct {
 	streams              *Store
 	streamID             storj.StreamID
 	position             metainfo.SegmentPosition
-	size                 int64
+	plainSize            int64
 	derivedKey           *storj.Key
 	startingNonce        *storj.Nonce
 	encryptionParameters storj.EncryptionParameters
@@ -517,7 +517,7 @@ type lazySegmentRanger struct {
 
 // Size implements Ranger.Size.
 func (lr *lazySegmentRanger) Size() int64 {
-	return lr.size
+	return lr.plainSize
 }
 
 // Range implements Ranger.Range to be lazily connected.
@@ -542,7 +542,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 		}
 
 		encryptedKey, keyNonce := downloadResponse.Info.SegmentEncryption.EncryptedKey, downloadResponse.Info.SegmentEncryption.EncryptedKeyNonce
-		lr.ranger, err = decryptRanger(ctx, rr, lr.size, lr.encryptionParameters, lr.derivedKey, encryptedKey, &keyNonce, lr.startingNonce)
+		lr.ranger, err = decryptRanger(ctx, rr, lr.plainSize, lr.encryptionParameters, lr.derivedKey, encryptedKey, &keyNonce, lr.startingNonce)
 		if err != nil {
 			return nil, err
 		}
@@ -551,7 +551,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 }
 
 // decryptRanger returns a decrypted ranger of the given rr ranger.
-func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, encryptionParameters storj.EncryptionParameters, derivedKey *storj.Key, encryptedKey storj.EncryptedPrivateKey, encryptedKeyNonce, startingNonce *storj.Nonce) (decrypted ranger.Ranger, err error) {
+func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encryptionParameters storj.EncryptionParameters, derivedKey *storj.Key, encryptedKey storj.EncryptedPrivateKey, encryptedKeyNonce, startingNonce *storj.Nonce) (decrypted ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 	contentKey, err := encryption.DecryptKey(encryptedKey, encryptionParameters.CipherSuite, derivedKey, encryptedKeyNonce)
 	if err != nil {
@@ -585,7 +585,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, decryptedSize int64, e
 	if err != nil {
 		return nil, err
 	}
-	return encryption.Unpad(rd, int(rd.Size()-decryptedSize))
+	return encryption.Unpad(rd, int(rd.Size()-plainSize))
 }
 
 // CancelHandler handles clean up of segments on receiving CTRL+C.
@@ -638,6 +638,6 @@ func (s *Store) Ranger(ctx context.Context, response metainfo.DownloadSegmentWit
 		return nil, err
 	}
 
-	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.Size)
+	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.EncryptedSize)
 	return rr, err
 }

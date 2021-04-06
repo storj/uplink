@@ -51,7 +51,7 @@ type SegmentPosition = storj.SegmentPosition
 // SegmentDownloadResponseInfo represents segment download information inline/remote.
 type SegmentDownloadResponseInfo struct {
 	SegmentID           storj.SegmentID
-	Size                int64
+	EncryptedSize       int64
 	EncryptedInlineData []byte
 	Next                SegmentPosition
 	Position            SegmentPosition

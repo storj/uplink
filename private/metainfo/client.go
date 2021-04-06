@@ -846,6 +846,7 @@ type ListSegmentsParams struct {
 	StreamID []byte
 	Cursor   SegmentPosition
 	Limit    int32
+	Range    StreamRange
 }
 
 func (params *ListSegmentsParams) toRequest(header *pb.RequestHeader) *pb.SegmentListRequest {
@@ -857,6 +858,7 @@ func (params *ListSegmentsParams) toRequest(header *pb.RequestHeader) *pb.Segmen
 			Index:      params.Cursor.Index,
 		},
 		Limit: params.Limit,
+		Range: params.Range.toProto(),
 	}
 }
 
@@ -1102,45 +1104,68 @@ const (
 	StreamRangeSuffix
 )
 
-func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectDownloadRequest {
-	var rg *pb.Range
-
-	switch params.Range.Mode {
+func (streamRange StreamRange) toProto() *pb.Range {
+	switch streamRange.Mode {
 	case StreamRangeAll:
 	case StreamRangeStart:
-		rg = &pb.Range{
+		return &pb.Range{
 			Range: &pb.Range_Start{
 				Start: &pb.RangeStart{
-					PlainStart: params.Range.Start,
+					PlainStart: streamRange.Start,
 				},
 			},
 		}
-
 	case StreamRangeStartLimit:
-		rg = &pb.Range{
+		return &pb.Range{
 			Range: &pb.Range_StartLimit{
 				StartLimit: &pb.RangeStartLimit{
-					PlainStart: params.Range.Start,
-					PlainLimit: params.Range.Limit,
+					PlainStart: streamRange.Start,
+					PlainLimit: streamRange.Limit,
 				},
 			},
 		}
-
 	case StreamRangeSuffix:
-		rg = &pb.Range{
+		return &pb.Range{
 			Range: &pb.Range_Suffix{
 				Suffix: &pb.RangeSuffix{
-					PlainSuffix: params.Range.Suffix,
+					PlainSuffix: streamRange.Suffix,
 				},
 			},
 		}
 	}
+	return nil
+}
 
+// Normalize converts the range to a StreamRangeStartLimit or StreamRangeAll.
+func (streamRange StreamRange) Normalize(plainSize int64) StreamRange {
+	switch streamRange.Mode {
+	case StreamRangeAll:
+		streamRange.Limit = plainSize
+	case StreamRangeStart:
+		streamRange.Mode = StreamRangeStartLimit
+		streamRange.Limit = plainSize
+	case StreamRangeStartLimit:
+	case StreamRangeSuffix:
+		streamRange.Mode = StreamRangeStartLimit
+		streamRange.Start = plainSize - streamRange.Suffix
+		streamRange.Limit = plainSize
+	}
+
+	if streamRange.Start < 0 {
+		streamRange.Start = 0
+	}
+	if streamRange.Limit > plainSize {
+		streamRange.Limit = plainSize
+	}
+	return streamRange
+}
+
+func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectDownloadRequest {
 	return &pb.ObjectDownloadRequest{
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
-		Range:              rg,
+		Range:              params.Range.toProto(),
 	}
 }
 
@@ -1223,7 +1248,7 @@ type DownloadSegmentResponse struct {
 func newDownloadSegmentResponse(response *pb.SegmentDownloadResponse) DownloadSegmentResponse {
 	info := SegmentDownloadResponseInfo{
 		SegmentID:           response.SegmentId,
-		Size:                response.SegmentSize,
+		EncryptedSize:       response.SegmentSize,
 		EncryptedInlineData: response.EncryptedInlineData,
 		PiecePrivateKey:     response.PrivateKey,
 		SegmentEncryption: SegmentEncryption{
@@ -1275,7 +1300,8 @@ type DownloadSegmentWithRSResponse struct {
 // SegmentDownloadInfo represents information necessary for downloading segment (inline and remote).
 type SegmentDownloadInfo struct {
 	SegmentID           storj.SegmentID
-	Size                int64
+	PlainOffset         int64
+	EncryptedSize       int64
 	EncryptedInlineData []byte
 	PiecePrivateKey     storj.PiecePrivateKey
 	SegmentEncryption   SegmentEncryption
@@ -1286,7 +1312,8 @@ type SegmentDownloadInfo struct {
 func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) DownloadSegmentWithRSResponse {
 	info := SegmentDownloadInfo{
 		SegmentID:           response.SegmentId,
-		Size:                response.SegmentSize,
+		PlainOffset:         response.PlainOffset,
+		EncryptedSize:       response.SegmentSize,
 		EncryptedInlineData: response.EncryptedInlineData,
 		PiecePrivateKey:     response.PrivateKey,
 		SegmentEncryption: SegmentEncryption{

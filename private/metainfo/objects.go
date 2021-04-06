@@ -359,6 +359,7 @@ type DownloadInfo struct {
 	Object             storj.Object
 	DownloadedSegments []DownloadSegmentWithRSResponse
 	ListSegments       ListSegmentsResponse
+	Range              StreamRange
 }
 
 // DownloadObject gets object information, lists segments and downloads the first segment.
@@ -386,10 +387,10 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options Do
 		return DownloadInfo{}, err
 	}
 
-	return db.newDownloadInfo(ctx, bucket, key, resp)
+	return db.newDownloadInfo(ctx, bucket, key, resp, options.Range)
 }
 
-func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response DownloadObjectResponse) (DownloadInfo, error) {
+func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response DownloadObjectResponse, streamRange StreamRange) (DownloadInfo, error) {
 	object, err := db.objectFromRawObjectItem(ctx, bucket, key, response.Object)
 	if err != nil {
 		return DownloadInfo{}, err
@@ -398,6 +399,7 @@ func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response 
 		Object:             object,
 		DownloadedSegments: response.DownloadedSegments,
 		ListSegments:       response.ListSegments,
+		Range:              streamRange,
 	}, nil
 }
 
