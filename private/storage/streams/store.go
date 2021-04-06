@@ -6,6 +6,7 @@ package streams
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"io/ioutil"
 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
