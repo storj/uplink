@@ -318,9 +318,10 @@ func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err e
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	return metainfoClient.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
+	err = metainfoClient.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
 		APIKey: access.apiKey.SerializeRaw(),
 	})
+	return convertKnownErrors(err, "", "")
 }
 
 // ReadOnlyPermission returns a Permission that allows reading and listing
@@ -374,8 +375,9 @@ func (access *Access) OverrideEncryptionKey(bucket, prefix string, encryptionKey
 	unencPath := paths.NewUnencrypted(prefix)
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, unencPath, store)
 	if err != nil {
-		return err
+		return convertKnownErrors(err, bucket, prefix)
 	}
 
-	return store.Add(bucket, unencPath, encPath, *encryptionKey.key)
+	err = store.Add(bucket, unencPath, encPath, *encryptionKey.key)
+	return convertKnownErrors(err, bucket, prefix)
 }

@@ -49,9 +49,9 @@ func convertKnownErrors(err error, bucket, key string) error {
 		// TODO is a better way to do this?
 		message := errs.Unwrap(err).Error()
 		if message == "Exceeded Usage Limit" {
-			return packageError.Wrap(ErrBandwidthLimitExceeded)
+			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrBandwidthLimitExceeded))
 		} else if message == "Too Many Requests" {
-			return packageError.Wrap(ErrTooManyRequests)
+			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrTooManyRequests))
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		message := errs.Unwrap(err).Error()
@@ -66,7 +66,7 @@ func convertKnownErrors(err error, bucket, key string) error {
 		// TODO: once we have confirmed nothing downstream
 		// is using errs2.IsRPC(err, rpcstatus.PermissionDenied), we should
 		// just return wrappedErr instead of this.
-		return &joinedErr{main: wrappedErr, alt: originalErr}
+		return &joinedErr{main: wrappedErr, alt: originalErr, code: rpcstatus.PermissionDenied}
 	}
 
 	return packageError.Wrap(err)
@@ -80,7 +80,9 @@ func errwrapf(format string, err error, args ...interface{}) error {
 }
 
 type joinedErr struct {
-	main, alt error
+	main error
+	alt  error
+	code rpcstatus.StatusCode
 }
 
 func (err *joinedErr) Is(target error) bool {
@@ -95,6 +97,10 @@ func (err *joinedErr) As(target interface{}) bool {
 		return true
 	}
 	return false
+}
+
+func (err *joinedErr) Code() uint64 {
+	return uint64(err.code)
 }
 
 func (err *joinedErr) Unwrap() error {
