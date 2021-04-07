@@ -152,6 +152,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		return Meta{}, err
 	}
 
+	var lastReqToSat time.Time
 	eofReader := NewEOFReader(data)
 	for !eofReader.IsEOF() && !eofReader.HasError() {
 		// generate random key for encrypting the segment's content
@@ -232,6 +233,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			} else {
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
+				lastReqToSat = time.Now()
 				requestsToBatch = requestsToBatch[:0]
 				if err != nil {
 					fmt.Println("metainfo.Batch", err)
@@ -359,6 +361,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		StreamID:          streamID,
 		EncryptedMetadata: objectMetadata,
 	}
+	fmt.Println("tims since last satellite req", time.Since(lastReqToSat))
 	if len(requestsToBatch) > 0 {
 		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
 	} else {
