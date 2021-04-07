@@ -223,6 +223,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 					fmt.Println("metainfo.Batch, currentSegment=0", err)
 					return Meta{}, err
 				}
+				lastReqToSat = time.Now()
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
 					fmt.Println("responses[0].BeginObject", err)
@@ -294,6 +295,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 					fmt.Println("inline metainfo.Batch", err)
 					return Meta{}, err
 				}
+				lastReqToSat = time.Now()
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
 					fmt.Println("inline responses[0].BeginObject", err)
