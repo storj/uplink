@@ -224,6 +224,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 					return Meta{}, err
 				}
 				lastReqToSat = time.Now()
+				fmt.Println("set lastReqToSat 227", lastReqToSat)
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
 					fmt.Println("responses[0].BeginObject", err)
@@ -235,6 +236,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
 				lastReqToSat = time.Now()
+				fmt.Println("set lastReqToSat 239", lastReqToSat)
 				requestsToBatch = requestsToBatch[:0]
 				if err != nil {
 					fmt.Println("metainfo.Batch", err)
@@ -296,6 +298,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 					return Meta{}, err
 				}
 				lastReqToSat = time.Now()
+				fmt.Println("set lastReqToSat 301", lastReqToSat)
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
 					fmt.Println("inline responses[0].BeginObject", err)
