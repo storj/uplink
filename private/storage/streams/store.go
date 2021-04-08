@@ -517,6 +517,8 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 }
 
 func deriveContentNonce(pos storj.SegmentPosition) (storj.Nonce, error) {
+	// The increment by 1 is to avoid nonce reuse with the metadata encryption,
+	// which is encrypted with the zero nonce.
 	var n storj.Nonce
 	_, err := encryption.Increment(&n, int64(pos.PartNumber)<<32|(int64(pos.Index)+1))
 	return n, err
