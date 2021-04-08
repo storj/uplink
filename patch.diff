@@ -1,0 +1,116 @@
+diff --git a/private/storage/streams/store.go b/private/storage/streams/store.go
+index f29b1530..2e59ece1 100644
+--- a/private/storage/streams/store.go
++++ b/private/storage/streams/store.go
+@@ -6,6 +6,7 @@ package streams
+ import (
+ 	"context"
+ 	"crypto/rand"
++	"fmt"
+ 	"io"
+ 	"io/ioutil"
+ 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+@@ -128,6 +129,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 	var streamID storj.StreamID
+ 	defer func() {
+ 		if err != nil {
++			fmt.Println("upload error in defer", err)
+ 			s.cancelHandler(context2.WithoutCancellation(ctx), bucket, unencryptedKey)
+ 			return
+ 		}
+@@ -150,6 +152,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 		return Meta{}, err
+ 	}
+ 
++	var lastReqToSat time.Time
+ 	eofReader := NewEOFReader(data)
+ 	for !eofReader.IsEOF() && !eofReader.HasError() {
+ 		// generate random key for encrypting the segment's content
+@@ -217,10 +220,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 			if currentSegment == 0 {
+ 				responses, err = s.metainfo.Batch(ctx, beginObjectReq, beginSegment)
+ 				if err != nil {
++					fmt.Println("metainfo.Batch, currentSegment=0", err)
+ 					return Meta{}, err
+ 				}
++				lastReqToSat = time.Now()
++				fmt.Println("set lastReqToSat 227", lastReqToSat)
+ 				objResponse, err := responses[0].BeginObject()
+ 				if err != nil {
++					fmt.Println("responses[0].BeginObject", err)
+ 					return Meta{}, err
+ 				}
+ 				streamID = objResponse.StreamID
+@@ -228,14 +235,18 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 			} else {
+ 				beginSegment.StreamID = streamID
+ 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
++				lastReqToSat = time.Now()
++				fmt.Println("set lastReqToSat 239", lastReqToSat)
+ 				requestsToBatch = requestsToBatch[:0]
+ 				if err != nil {
++					fmt.Println("metainfo.Batch", err)
+ 					return Meta{}, err
+ 				}
+ 			}
+ 
+ 			segResponse, err := responses[1].BeginSegment()
+ 			if err != nil {
++				fmt.Println("responses[1].BeginObject", err)
+ 				return Meta{}, err
+ 			}
+ 			segmentID := segResponse.SegmentID
+@@ -249,6 +260,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 			encSizedReader := SizeReader(transformedReader)
+ 			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader)
+ 			if err != nil {
++				fmt.Println("PutSingleResult", err)
+ 				return Meta{}, err
+ 			}
+ 
+@@ -262,6 +274,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 		} else {
+ 			data, err := ioutil.ReadAll(peekReader)
+ 			if err != nil {
++				fmt.Println("ReadAll", err)
+ 				return Meta{}, err
+ 			}
+ 
+@@ -281,10 +294,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 			if currentSegment == 0 {
+ 				responses, err := s.metainfo.Batch(ctx, beginObjectReq, makeInlineSegment)
+ 				if err != nil {
++					fmt.Println("inline metainfo.Batch", err)
+ 					return Meta{}, err
+ 				}
++				lastReqToSat = time.Now()
++				fmt.Println("set lastReqToSat 301", lastReqToSat)
+ 				objResponse, err := responses[0].BeginObject()
+ 				if err != nil {
++					fmt.Println("inline responses[0].BeginObject", err)
+ 					return Meta{}, err
+ 				}
+ 				streamID = objResponse.StreamID
+@@ -302,6 +319,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 	totalSegments := currentSegment
+ 
+ 	if eofReader.HasError() {
++		fmt.Println("eofReader.HasError", err)
+ 		return Meta{}, eofReader.err
+ 	}
+ 
+@@ -348,12 +366,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
+ 		StreamID:          streamID,
+ 		EncryptedMetadata: objectMetadata,
+ 	}
++	fmt.Println("tims since last satellite req", time.Since(lastReqToSat))
+ 	if len(requestsToBatch) > 0 {
+ 		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
+ 	} else {
+ 		err = s.metainfo.CommitObject(ctx, commitObject)
+ 	}
+ 	if err != nil {
++		fmt.Println("commitObject", err)
+ 		return Meta{}, err
+ 	}
+ 

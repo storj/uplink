@@ -264,6 +264,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				return Meta{}, err
 			}
 
+			time.Sleep(30 * time.Second)
 			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
 				SegmentID:         segmentID,
 				SizeEncryptedData: encSizedReader.Size(),
