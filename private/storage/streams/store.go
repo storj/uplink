@@ -697,14 +697,30 @@ func (s *Store) Ranger(ctx context.Context, response metainfo.DownloadSegmentWit
 	return rr, err
 }
 
+// invalidRanger is used to mark a range as invalid.
 type invalidRanger struct {
 	size int64
 }
 
-func (d *invalidRanger) Size() int64 {
-	return d.size
-}
+func (d *invalidRanger) Size() int64 { return d.size }
 
 func (d *invalidRanger) Range(ctx context.Context, offset, length int64) (io.ReadCloser, error) {
+	if offset < 0 {
+		return nil, errs.New("negative offset")
+	}
+	if length < 0 {
+		return nil, errs.New("negative length")
+	}
+	// allow reading zero bytes from an invalid range.
+	if 0 <= offset && offset <= d.size && length == 0 {
+		return emptyReader{}, nil
+	}
 	return nil, errs.New("invalid range %d:%d (size:%d)", offset, length, d.size)
 }
+
+// emptyReader is used to read no data.
+type emptyReader struct{}
+
+func (emptyReader) Read(data []byte) (n int, err error) { return 0, io.EOF }
+
+func (emptyReader) Close() error { return nil }
