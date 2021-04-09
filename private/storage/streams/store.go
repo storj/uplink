@@ -416,6 +416,17 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 	downloaded := info.DownloadedSegments
 	listed := info.ListSegments.Items
 
+	// calculate plain offset and plain size for migrated objects.
+	for i := 0; i < len(info.DownloadedSegments); i++ {
+		seg := &info.DownloadedSegments[i].Info
+		seg.PlainOffset, seg.PlainSize = calculatePlain(*seg.Position, seg.PlainOffset, seg.PlainSize, object)
+	}
+	for i := 0; i < len(info.ListSegments.Items); i++ {
+		seg := &info.ListSegments.Items[i]
+		seg.PlainOffset, seg.PlainSize = calculatePlain(seg.Position, seg.PlainOffset, seg.PlainSize, object)
+	}
+
+	// ensure that the items are correctly sorted
 	sort.Slice(downloaded, func(i, k int) bool {
 		return downloaded[i].Info.PlainOffset < downloaded[k].Info.PlainOffset
 	})
@@ -423,6 +434,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 		return listed[i].PlainOffset < listed[k].PlainOffset
 	})
 
+	// calculate the offset for the range listed / downloaded
 	var offset int64
 	switch {
 	case len(downloaded) > 0 && len(listed) > 0:
@@ -467,16 +479,14 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				return nil, err
 			}
 
-			plainSize := calculatePlainSize(segment.Info.PlainSize, *segment.Info.Position, object)
-
 			enc := segment.Info.SegmentEncryption
-			decrypted, err := decryptRanger(ctx, encryptedRanger, plainSize, object.EncryptionParameters, derivedKey, enc.EncryptedKey, &enc.EncryptedKeyNonce, &contentNonce)
+			decrypted, err := decryptRanger(ctx, encryptedRanger, segment.Info.PlainSize, object.EncryptionParameters, derivedKey, enc.EncryptedKey, &enc.EncryptedKeyNonce, &contentNonce)
 			if err != nil {
 				return nil, err
 			}
 
 			rangers = append(rangers, decrypted)
-			offset += plainSize
+			offset += segment.Info.PlainSize
 
 		case len(listed) > 0 && listed[0].PlainOffset == offset:
 			segment := listed[0]
@@ -487,19 +497,17 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				return nil, err
 			}
 
-			plainSize := calculatePlainSize(segment.PlainSize, segment.Position, object)
-
 			rangers = append(rangers, &lazySegmentRanger{
 				metainfo:             s.metainfo,
 				streams:              s,
 				streamID:             object.ID,
 				position:             segment.Position,
-				plainSize:            plainSize,
+				plainSize:            segment.PlainSize,
 				derivedKey:           derivedKey,
 				startingNonce:        &contentNonce,
 				encryptionParameters: object.EncryptionParameters,
 			})
-			offset += plainSize
+			offset += segment.PlainSize
 
 		default:
 			return nil, errs.New("missing segment for offset %d", offset)
@@ -524,21 +532,21 @@ func deriveContentNonce(pos storj.SegmentPosition) (storj.Nonce, error) {
 	return n, err
 }
 
-// calculatePlainSize calculates segment plain size, taking into account backwards compatibility.
-func calculatePlainSize(segmentPlainSize int64, segmentPosition storj.SegmentPosition, object storj.Object) int64 {
+// calculatePlain calculates segment plain size, taking into account migrated objects.
+func calculatePlain(pos storj.SegmentPosition, rawOffset, rawSize int64, object storj.Object) (plainOffset, plainSize int64) {
 	switch {
 	case object.FixedSegmentSize <= 0:
-		// this is a multipart object that has correct plain size.
-		return segmentPlainSize
-	case segmentPosition.PartNumber > 0:
-		// this case should be impossible, however let's return the input segment size.
-		return segmentPlainSize
-	case segmentPosition.Index == int32(object.SegmentCount-1):
+		// this is a multipart object and has correct offset and size.
+		return rawOffset, rawSize
+	case pos.PartNumber > 0:
+		// this case should be impossible, however let's return the initial values.
+		return rawOffset, rawSize
+	case pos.Index == int32(object.SegmentCount-1):
 		// this is a last segment
-		return object.LastSegment.Size
+		return int64(pos.Index) * object.FixedSegmentSize, object.LastSegment.Size
 	default:
 		// this is a fixed size segment
-		return object.FixedSegmentSize
+		return int64(pos.Index) * object.FixedSegmentSize, object.FixedSegmentSize
 	}
 }
 
