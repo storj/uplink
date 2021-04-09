@@ -13,6 +13,7 @@ import (
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite/metainfo/metabase"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestMultisegmentUploadWithLastInline(t *testing.T) {
@@ -49,5 +50,48 @@ func TestMultisegmentUploadWithLastInline(t *testing.T) {
 		require.Equal(t, 3, len(segments))
 		// TODO we should check 2 segments to be remote and last one to be inline
 		// but main satellite implementation doens't give such info at the moment
+	})
+}
+
+func TestDownloadMigratedObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		// this configures uplink to NOT send plain size while upload
+		// such uploaded object will look like object after migration from pointerdb
+		newCtx := testuplink.WithoutPlainSize(ctx)
+
+		{ // inline segment
+			expectedData := testrand.Bytes(1 * memory.KiB)
+			err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "bucket", "inline-segment", expectedData)
+			require.NoError(t, err)
+
+			data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], "bucket", "inline-segment")
+			require.NoError(t, err)
+			require.Equal(t, expectedData, data)
+		}
+
+		{ // single segment
+			expectedData := testrand.Bytes(10 * memory.KiB)
+			err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "bucket", "single-segment", expectedData)
+			require.NoError(t, err)
+
+			data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], "bucket", "single-segment")
+			require.NoError(t, err)
+			require.Equal(t, expectedData, data)
+		}
+
+		{ // many segments
+			expectedData := testrand.Bytes(100 * memory.KiB)
+			err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "bucket", "many-segments", expectedData)
+			require.NoError(t, err)
+
+			data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], "bucket", "many-segments")
+			require.NoError(t, err)
+			require.Equal(t, expectedData, data)
+		}
 	})
 }

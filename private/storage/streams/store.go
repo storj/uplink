@@ -26,6 +26,7 @@ import (
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/testuplink"
 )
 
 type ctxKey int
@@ -253,10 +254,15 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				return Meta{}, err
 			}
 
+			plainSize := sizeReader.Size()
+			if testuplink.IsWithoutPlainSize(ctx) {
+				plainSize = 0
+			}
+
 			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
 				SegmentID:         segmentID,
 				SizeEncryptedData: encSizedReader.Size(),
-				PlainSize:         sizeReader.Size(),
+				PlainSize:         plainSize,
 				Encryption:        segmentEncryption,
 				UploadResult:      uploadResults,
 			})
@@ -271,13 +277,18 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				return Meta{}, err
 			}
 
+			plainSize := int64(len(data))
+			if testuplink.IsWithoutPlainSize(ctx) {
+				plainSize = 0
+			}
+
 			makeInlineSegment := &metainfo.MakeInlineSegmentParams{
 				Position: metainfo.SegmentPosition{
 					Index: int32(currentSegment),
 				},
 				Encryption:          segmentEncryption,
 				EncryptedInlineData: cipherData,
-				PlainSize:           int64(len(data)),
+				PlainSize:           plainSize,
 			}
 			if currentSegment == 0 {
 				responses, err := s.metainfo.Batch(ctx, beginObjectReq, makeInlineSegment)
