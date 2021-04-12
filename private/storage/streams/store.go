@@ -15,9 +15,7 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 
-	"storj.io/common/context2"
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
 	"storj.io/common/pb"
@@ -29,24 +27,9 @@ import (
 	"storj.io/uplink/private/testuplink"
 )
 
-type ctxKey int
-
-const (
-	disableDeleteOnCancelKey ctxKey = 1
-)
-
-// DisableDeleteOnCancel changes upload behavior to skip object cleanup
-// when an upload is canceled. This is not recommended and may cause
-// zombie segments. This function is a stop gap for one customer and will
-// be removed soon. Buyer beware.
+// DisableDeleteOnCancel is now a no-op.
 func DisableDeleteOnCancel(ctx context.Context) context.Context {
-	return context.WithValue(ctx, disableDeleteOnCancelKey, true)
-}
-
-func shouldDeleteOnCancel(ctx context.Context) bool {
-	val, ok := ctx.Value(disableDeleteOnCancelKey).(bool)
-	disable := ok && val
-	return !disable
+	return ctx
 }
 
 var mon = monkit.Package()
@@ -128,12 +111,6 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	var streamID storj.StreamID
-	defer func() {
-		if err != nil {
-			s.cancelHandler(context2.WithoutCancellation(ctx), bucket, unencryptedKey)
-			return
-		}
-	}()
 
 	var (
 		currentSegment      int64
@@ -561,22 +538,6 @@ func calculatePlain(pos storj.SegmentPosition, rawOffset, rawSize int64, object 
 	}
 }
 
-// Delete all the segments, with the last one last.
-func (s *Store) Delete(ctx context.Context, bucket, unencryptedKey string) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.metainfo.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
-		Bucket:        []byte(bucket),
-		EncryptedPath: []byte(encPath.Raw()),
-	})
-	return err
-}
-
 type lazySegmentRanger struct {
 	ranger               ranger.Ranger
 	metainfo             *metainfo.Client
@@ -660,19 +621,6 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 		return nil, err
 	}
 	return encryption.Unpad(rd, int(rd.Size()-plainSize))
-}
-
-// CancelHandler handles clean up of segments on receiving CTRL+C.
-func (s *Store) cancelHandler(ctx context.Context, bucket, unencryptedKey string) {
-	defer mon.Task()(&ctx)(nil)
-
-	if shouldDeleteOnCancel(ctx) {
-		// satellite deletes now from 0 to l so we can just use BeginDeleteObject
-		err := s.Delete(ctx, bucket, unencryptedKey)
-		if err != nil {
-			zap.L().Warn("Failed deleting object", zap.String("Bucket", bucket), zap.String("key", unencryptedKey), zap.Error(err))
-		}
-	}
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
