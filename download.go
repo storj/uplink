@@ -17,6 +17,8 @@ import (
 
 // DownloadOptions contains additional options for downloading.
 type DownloadOptions struct {
+	// When Offset is negative it will read the suffix of the blob.
+	// Combining negative offset and positive length is not supported.
 	Offset int64
 	// When Length is negative it will read until the end of the blob.
 	Length int64
@@ -39,11 +41,20 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		opts.Range = metainfo.StreamRange{
 			Mode: metainfo.StreamRangeAll,
 		}
+	case options.Offset < 0:
+		if options.Length >= 0 {
+			return nil, packageError.New("suffix requires length to be negative, got %v", options.Length)
+		}
+		opts.Range = metainfo.StreamRange{
+			Mode:   metainfo.StreamRangeSuffix,
+			Suffix: -options.Offset,
+		}
 	case options.Length < 0:
 		opts.Range = metainfo.StreamRange{
 			Mode:  metainfo.StreamRangeStart,
 			Start: options.Offset,
 		}
+
 	default:
 		opts.Range = metainfo.StreamRange{
 			Mode:  metainfo.StreamRangeStartLimit,

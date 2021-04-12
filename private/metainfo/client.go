@@ -1140,6 +1140,7 @@ func (streamRange StreamRange) toProto() *pb.Range {
 func (streamRange StreamRange) Normalize(plainSize int64) StreamRange {
 	switch streamRange.Mode {
 	case StreamRangeAll:
+		streamRange.Start = 0
 		streamRange.Limit = plainSize
 	case StreamRangeStart:
 		streamRange.Mode = StreamRangeStartLimit
@@ -1157,6 +1158,8 @@ func (streamRange StreamRange) Normalize(plainSize int64) StreamRange {
 	if streamRange.Limit > plainSize {
 		streamRange.Limit = plainSize
 	}
+	streamRange.Suffix = 0
+
 	return streamRange
 }
 

@@ -77,22 +77,29 @@ func TestObject(t *testing.T) {
 				require.False(t, uploadInfo.IsPrefix)
 				require.EqualValues(t, len(randData), uploadInfo.System.ContentLength)
 
-				t.Run("download", func(t *testing.T) {
-					download, err := project.DownloadObject(ctx, "testbucket", tc.Name, nil)
-					require.NoError(t, err)
-					assertObject(t, download.Info(), tc.Name)
+				objectSize := tc.ObjectSize.Int64()
 
-					downloaded, err := ioutil.ReadAll(download)
-					require.NoError(t, err)
-					require.NoError(t, download.Close())
+				var tests = []*uplink.DownloadOptions{
+					nil,
+					{Offset: 0, Length: -1},
+					{Offset: objectSize / 2, Length: -1},
+					{Offset: objectSize, Length: -1},
+					{Offset: 0, Length: 0},
+					{Offset: objectSize / 2, Length: 0},
+					{Offset: objectSize, Length: 0},
+					{Offset: 0, Length: 15},
+					{Offset: objectSize / 2, Length: 15},
+					{Offset: -objectSize / 3, Length: -1},
+					// {Offset: -objectSize / 3, Length: 15}, // TODO: unsupported at the moment
+				}
+				for _, test := range tests {
+					if test != nil && test.Length > objectSize {
+						continue
+					}
 
-					assert.Equal(t, randData, downloaded)
-				})
-
-				if tc.ObjectSize > 600 {
-					t.Run("download offset:100,length:500", func(t *testing.T) {
-						download, err := project.DownloadObject(ctx, "testbucket", tc.Name,
-							&uplink.DownloadOptions{Offset: 100, Length: 500})
+					test := test
+					t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+						download, err := project.DownloadObject(ctx, "testbucket", tc.Name, test)
 						require.NoError(t, err)
 						assertObject(t, download.Info(), tc.Name)
 
@@ -100,31 +107,25 @@ func TestObject(t *testing.T) {
 						require.NoError(t, err)
 						require.NoError(t, download.Close())
 
-						assert.Equal(t, randData[100:600], downloaded)
-					})
-				}
+						if test == nil {
+							require.Equal(t, randData, downloaded)
+							return
+						}
 
-				size := tc.ObjectSize.Int64()
-				offsets := []int64{0}
-				if size > 0 {
-					offsets = append(offsets, size/2, size)
-				}
+						start := test.Offset
+						if start < 0 {
+							start = objectSize + start
+						}
 
-				for _, offset := range offsets {
-					offset := offset
-					n := fmt.Sprintf("download offset:%d,length:0", offset)
-					t.Run(n, func(t *testing.T) {
-						// download zero bytes from beginning
-						download, err := project.DownloadObject(ctx, "testbucket", tc.Name,
-							&uplink.DownloadOptions{Offset: offset, Length: 0})
-						require.NoError(t, err)
-						assertObject(t, download.Info(), tc.Name)
+						length := test.Length
+						if length < 0 {
+							length = objectSize
+						}
+						if start+length > objectSize {
+							length = objectSize - start
+						}
 
-						downloaded, err := ioutil.ReadAll(download)
-						require.NoError(t, err)
-						require.NoError(t, download.Close())
-
-						assert.Len(t, downloaded, 0)
+						require.Equal(t, randData[start:start+length], downloaded)
 					})
 				}
 
