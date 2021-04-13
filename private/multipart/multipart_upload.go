@@ -71,7 +71,8 @@ type ListObjectPartsResult struct {
 
 // PartInfo contains information about uploaded part.
 type PartInfo struct {
-	PartNumber   int
+	PartNumber int
+	// Size plain size of part.
 	Size         int64
 	LastModified time.Time
 	ETag         []byte

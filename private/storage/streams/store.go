@@ -42,9 +42,22 @@ type Meta struct {
 	Data       []byte
 }
 
+// Part info about a part.
+type Part struct {
+	PartNumber uint32
+	Size       int64
+	Modified   time.Time
+	ETag       []byte
+}
+
 // Metadata interface returns the latest metadata for an object.
 type Metadata interface {
 	Metadata() ([]byte, error)
+}
+
+// ETag interface returns the latest ETag for a part.
+type ETag interface {
+	ETag() []byte
 }
 
 // Store is a store for streams. It implements typedStore as part of an ongoing migration
@@ -360,6 +373,211 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	return resultMeta, nil
+}
+
+// PutPart uploads single part.
+func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, streamID storj.StreamID, partNumber uint32, eTag ETag, data io.Reader) (_ Part, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var (
+		currentSegment int64
+		streamSize     int64
+		contentKey     storj.Key
+
+		lastCommitRequest metainfo.BatchItem
+	)
+
+	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
+	if err != nil {
+		return Part{}, err
+	}
+
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
+	if err != nil {
+		return Part{}, err
+	}
+
+	eofReader := NewEOFReader(data)
+	for !eofReader.IsEOF() && !eofReader.HasError() {
+
+		if lastCommitRequest != nil {
+			switch singleRequest := lastCommitRequest.(type) {
+			case *metainfo.MakeInlineSegmentParams:
+				err = s.metainfo.MakeInlineSegment(ctx, *singleRequest)
+			case *metainfo.CommitSegmentParams:
+				err = s.metainfo.CommitSegment(ctx, *singleRequest)
+			default:
+				return Part{}, errs.New("unsupported request type")
+			}
+			if err != nil {
+				return Part{}, err
+			}
+			lastCommitRequest = nil
+		}
+
+		// generate random key for encrypting the segment's content
+		_, err := rand.Read(contentKey[:])
+		if err != nil {
+			return Part{}, err
+		}
+
+		// Initialize the content nonce with the current total segment incremented
+		// by 1 because at this moment the next segment has not been already
+		// uploaded.
+		// The increment by 1 is to avoid nonce reuse with the metadata encryption,
+		// which is encrypted with the zero nonce.
+		contentNonce := storj.Nonce{}
+		_, err = encryption.Increment(&contentNonce, (int64(partNumber)<<32)|(currentSegment+1))
+		if err != nil {
+			return Part{}, err
+		}
+
+		var encryptedKeyNonce storj.Nonce
+		// generate random nonce for encrypting the content key
+		_, err = rand.Read(encryptedKeyNonce[:])
+		if err != nil {
+			return Part{}, err
+		}
+
+		encryptedKey, err := encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+		if err != nil {
+			return Part{}, err
+		}
+
+		sizeReader := SizeReader(eofReader)
+		segmentReader := io.LimitReader(sizeReader, s.segmentSize)
+		peekReader := NewPeekThresholdReader(segmentReader)
+		// If the data is larger than the inline threshold size, then it will be a remote segment
+		isRemote, err := peekReader.IsLargerThan(s.inlineThreshold)
+		if err != nil {
+			return Part{}, err
+		}
+
+		segmentEncryption := metainfo.SegmentEncryption{}
+		if s.encryptionParameters.CipherSuite != storj.EncNull {
+			segmentEncryption = metainfo.SegmentEncryption{
+				EncryptedKey:      encryptedKey,
+				EncryptedKeyNonce: encryptedKeyNonce,
+			}
+		}
+
+		if isRemote {
+			encrypter, err := encryption.NewEncrypter(s.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(s.encryptionParameters.BlockSize))
+			if err != nil {
+				return Part{}, err
+			}
+
+			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
+			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
+
+			response, err := s.metainfo.BeginSegment(ctx, metainfo.BeginSegmentParams{
+				StreamID:      streamID,
+				MaxOrderLimit: maxEncryptedSegmentSize,
+				Position: metainfo.SegmentPosition{
+					PartNumber: int32(partNumber),
+					Index:      int32(currentSegment),
+				},
+			})
+			if err != nil {
+				return Part{}, err
+			}
+
+			encSizedReader := SizeReader(transformedReader)
+			uploadResults, err := s.ec.PutSingleResult(ctx, response.Limits, response.PiecePrivateKey,
+				response.RedundancyStrategy, encSizedReader)
+			if err != nil {
+				return Part{}, err
+			}
+
+			plainSegmentSize := sizeReader.Size()
+			if plainSegmentSize > 0 {
+				lastCommitRequest = &metainfo.CommitSegmentParams{
+					SegmentID:         response.SegmentID,
+					SizeEncryptedData: encSizedReader.Size(),
+					PlainSize:         plainSegmentSize,
+					Encryption:        segmentEncryption,
+					UploadResult:      uploadResults,
+				}
+			}
+		} else {
+			data, err := ioutil.ReadAll(peekReader)
+			if err != nil {
+				return Part{}, err
+			}
+
+			if len(data) > 0 {
+				cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
+				if err != nil {
+					return Part{}, err
+				}
+
+				lastCommitRequest = &metainfo.MakeInlineSegmentParams{
+					StreamID: streamID,
+					Position: metainfo.SegmentPosition{
+						PartNumber: int32(partNumber),
+						Index:      int32(currentSegment),
+					},
+					Encryption:          segmentEncryption,
+					EncryptedInlineData: cipherData,
+					PlainSize:           int64(len(data)),
+				}
+			}
+		}
+		streamSize += sizeReader.Size()
+		currentSegment++
+	}
+
+	encryptedTag, err := encryptETag(eTag.ETag(), s.encryptionParameters, &contentKey)
+	if err != nil {
+		return Part{}, err
+	}
+	if lastCommitRequest != nil {
+		switch singleRequest := lastCommitRequest.(type) {
+		case *metainfo.MakeInlineSegmentParams:
+			singleRequest.EncryptedTag = encryptedTag
+			err = s.metainfo.MakeInlineSegment(ctx, *singleRequest)
+		case *metainfo.CommitSegmentParams:
+			singleRequest.EncryptedTag = encryptedTag
+			err = s.metainfo.CommitSegment(ctx, *singleRequest)
+		default:
+			return Part{}, errs.New("unsupported request type")
+		}
+		if err != nil {
+			return Part{}, err
+		}
+	}
+
+	if streamSize == 0 {
+		return Part{}, errs.New("input data reader was empty")
+	}
+
+	return Part{
+		PartNumber: partNumber,
+		Size:       streamSize,
+		ETag:       eTag.ETag(), // return plain ETag
+	}, nil
+}
+
+// TODO move it to separate package?
+func encryptETag(etag []byte, encryptionParameters storj.EncryptionParameters, contentKey *storj.Key) ([]byte, error) {
+	// Derive another key from the randomly generated content key to encrypt
+	// the segment's ETag.
+	etagKey, err := deriveETagKey(contentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedETag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptedETag, nil
+}
+
+// TODO move it to separate package?
+func deriveETagKey(key *storj.Key) (*storj.Key, error) {
+	return encryption.DeriveKey(key, "storj-etag-v1")
 }
 
 // Get returns a ranger that knows what the overall size is (from l/<key>)
