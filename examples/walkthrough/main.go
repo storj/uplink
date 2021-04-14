@@ -19,11 +19,10 @@ import (
 // UploadAndDownloadData uploads the specified data to the specified key in the
 // specified bucket, using the specified Satellite, API key, and passphrase.
 func UploadAndDownloadData(ctx context.Context,
-	satelliteAddress, apiKey, passphrase, bucketName, uploadKey string,
-	dataToUpload []byte) error {
+	accessGrant, bucketName, uploadKey string, dataToUpload []byte) error {
 
 	// Request access grant to the satellite with the API key and passphrase.
-	access, err := uplink.RequestAccessWithPassphrase(ctx, satelliteAddress, apiKey, passphrase)
+	access, err := uplink.ParseAccess(accessGrant)
 	if err != nil {
 		return fmt.Errorf("could not request access grant: %v", err)
 	}
@@ -83,11 +82,9 @@ func UploadAndDownloadData(ctx context.Context,
 }
 
 func main() {
-	satellite := flag.String("satellite", "us-central-1.tardigrade.io:7777", "satellite address")
-	myPassphrase := flag.String("passphrase", os.Getenv("PASSPHRASE"), "passphrase for data encryption")
-	myAPIKey := flag.String("apikey", os.Getenv("API_KEY"), "apikey for the satellite")
+	accessGrant := flag.String("access", os.Getenv("ACCESS_GRANT"), "access grant from satellite")
 
-	err := UploadAndDownloadData(context.Background(), *satellite, *myAPIKey, *myPassphrase,
+	err := UploadAndDownloadData(context.Background(), *accessGrant,
 		"my-first-bucket", "foo/bar/baz", []byte("one fish two fish red fish blue fish"))
 	if err != nil {
 		log.Fatalln("error:", err)

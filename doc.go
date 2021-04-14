@@ -5,7 +5,7 @@
 Package uplink is the main entrypoint to interacting with Storj Labs' decentralized
 storage network.
 
-Sign up for an account on a Satellite today! https://tardigrade.io/satellites/
+Sign up for an account on a Satellite today! https://storj.io/
 
 Access Grants
 
@@ -20,9 +20,8 @@ Satellite, generate an API Key, and encapsulate that API Key with encryption
 information into an access grant.
 
 If you don't already have an account on a Satellite, first make one at
-https://tardigrade.io/satellites/ and note the Satellite you choose (such as
-us-central-1.tardigrade.io, europe-west-1.tardigrade.io, etc). Then, make an
-API Key in the web interface.
+https://storj.io/ and note the Satellite you choose (such as
+us1.storj.io, eu1.storj.io, etc). Then, make an API Key in the web interface.
 
 The first step to any project is to generate a restricted access grant with the
 minimal permissions that are needed. Access grants contains all encryption information
