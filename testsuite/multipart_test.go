@@ -20,7 +20,6 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite/metainfo/metabase"
 	"storj.io/uplink"
-	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -97,7 +96,7 @@ func TestBeginUpload_Expires(t *testing.T) {
 
 		// assert there is one pending multipart upload and it has an expiration date
 		assertUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
-		list := multipart.ListMultipartUploads(ctx, project, "testbucket", &multipart.ListMultipartUploadsOptions{
+		list := project.ListUploads(ctx, "testbucket", &uplink.ListUploadsOptions{
 			System: true,
 		})
 		require.NoError(t, list.Err())
@@ -283,9 +282,10 @@ func TestUploadPart_ETag(t *testing.T) {
 		_, err = project.CommitUpload(newCtx, "testbucket", "multipart-object", info.UploadID, nil)
 		require.NoError(t, err)
 
-		parts, err := multipart.ListObjectParts(ctx, project, "testbucket", "multipart-object", info.UploadID, 0, 100)
-		require.NoError(t, err)
-		require.Equal(t, etag[:], parts.Items[0].ETag)
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.True(t, iterator.Next())
+		item := iterator.Item()
+		require.Equal(t, etag[:], item.ETag)
 
 		// TODO add more cases
 	})
@@ -426,8 +426,340 @@ func TestAbortUpload_Multipart(t *testing.T) {
 	})
 }
 
-func assertUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *multipart.ListMultipartUploadsOptions, objectKeys ...string) {
-	list := multipart.ListMultipartUploads(ctx, project, bucket, options)
+func TestListUploads_NonExistingBucket(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		list := project.ListUploads(ctx, "non-existing-bucket", nil)
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+		require.False(t, list.Next())
+		require.Error(t, list.Err())
+		require.True(t, errors.Is(list.Err(), uplink.ErrBucketNotFound))
+	})
+}
+
+func TestListUploads_EmptyBucket(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// assert the there is no pending multipart upload
+		assertUploadList(ctx, t, project, "testbucket", nil)
+	})
+}
+
+func TestListUploads_Prefix(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		_, err = project.BeginUpload(ctx, "testbucket", "a/b/c/multipart-object", nil)
+		require.NoError(t, err)
+
+		// assert there is one pending multipart upload with prefix "a/b/"
+		assertUploadList(ctx, t, project, "testbucket", &uplink.ListUploadsOptions{
+			Prefix:    "a/b/",
+			Recursive: true,
+		}, "a/b/c/multipart-object")
+
+		// assert there is no pending multipart upload with prefix "b/"
+		assertUploadList(ctx, t, project, "testbucket", &uplink.ListUploadsOptions{
+			Prefix:    "b/",
+			Recursive: true,
+		})
+
+		// assert there is one prefix of pending multipart uploads with prefix "a/b/"
+		list := project.ListUploads(ctx, "testbucket", &uplink.ListUploadsOptions{
+			Prefix: "a/b/",
+		})
+		require.NoError(t, list.Err())
+		require.True(t, list.Next())
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.True(t, list.Item().IsPrefix)
+		require.Equal(t, "a/b/c/", list.Item().Key)
+		require.False(t, list.Next())
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+	})
+}
+
+func TestListUploads_Cursor(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		expectedObjects := map[string]bool{
+			"multipart-upload-1": true,
+			"multipart-upload-2": true,
+		}
+
+		for object := range expectedObjects {
+			_, err := project.BeginUpload(ctx, "testbucket", object, nil)
+			require.NoError(t, err)
+		}
+
+		// get the first list item and make it a cursor for the next list request
+		list := project.ListUploads(ctx, "testbucket", nil)
+		require.NoError(t, list.Err())
+		more := list.Next()
+		require.True(t, more)
+		require.NoError(t, list.Err())
+		delete(expectedObjects, list.Item().Key)
+		cursor := list.Item().Key
+
+		// list again with cursor set to the first item from previous list request
+		list = project.ListUploads(ctx, "testbucket", &uplink.ListUploadsOptions{Cursor: cursor})
+		require.NoError(t, list.Err())
+
+		// expect the second item as the first item in this new list request
+		more = list.Next()
+		require.True(t, more)
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.False(t, list.Item().IsPrefix)
+		delete(expectedObjects, list.Item().Key)
+
+		require.Empty(t, expectedObjects)
+		require.False(t, list.Next())
+		require.NoError(t, list.Err())
+		require.Nil(t, list.Item())
+	})
+}
+
+func TestListUploadParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 50*memory.KiB)
+
+		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
+		part0size := len(randData) * 3 / 10
+		part4size := len(randData) - part0size
+		source0 := randData[:part0size]
+		source0SHA256 := sha256.Sum256(source0)
+		source4 := randData[part0size:]
+		source4SHA256 := sha256.Sum256(source4)
+
+		info, err := project.BeginUpload(newCtx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		// assert there is only one pending multipart upload
+		assertUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
+
+		{
+			iterator := project.ListUploadParts(newCtx, "", "multipart-object", info.UploadID, nil)
+			require.False(t, iterator.Next())
+			require.True(t, errors.Is(iterator.Err(), uplink.ErrBucketNameInvalid))
+
+			iterator = project.ListUploadParts(newCtx, "testbucket", "", info.UploadID, nil)
+			require.False(t, iterator.Next())
+			require.True(t, errors.Is(iterator.Err(), uplink.ErrObjectKeyInvalid))
+
+			// empty streamID
+			iterator = project.ListUploadParts(newCtx, "testbucket", "multipart-object", "", nil)
+			require.False(t, iterator.Next())
+			require.Error(t, iterator.Err())
+
+			// TODO add test case for bucket/key that doesn't match UploadID
+		}
+
+		// list multipart upload with no uploaded parts
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+
+		uploadTime := time.Now()
+		upload, err := project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 0)
+		require.NoError(t, err)
+		_, err = upload.Write(source0)
+		require.NoError(t, err)
+		require.NoError(t, upload.SetETag(source0SHA256[:]))
+		require.NoError(t, upload.Commit())
+
+		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 4)
+		require.NoError(t, err)
+		_, err = upload.Write(source4)
+		require.NoError(t, err)
+		require.NoError(t, upload.SetETag(source4SHA256[:]))
+		require.NoError(t, upload.Commit())
+
+		// list parts of on going multipart upload
+		iterator = project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+
+		require.True(t, iterator.Next())
+		part01 := iterator.Item()
+
+		require.EqualValues(t, 0, part01.PartNumber)
+		require.Equal(t, int64(part0size), part01.Size)
+		require.WithinDuration(t, uploadTime, part01.Modified, 10*time.Second)
+		require.Equal(t, source0SHA256[:], part01.ETag)
+
+		require.True(t, iterator.Next())
+		part04 := iterator.Item()
+		require.EqualValues(t, 4, part04.PartNumber)
+		require.Equal(t, int64(part4size), part04.Size)
+		require.WithinDuration(t, uploadTime, part04.Modified, 10*time.Second)
+		require.Equal(t, source4SHA256[:], part04.ETag)
+
+		_, err = project.CommitUpload(newCtx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		// assert there is no pending multipart upload
+		assertUploadList(ctx, t, project, "testbucket", nil)
+
+		// TODO we should not list parts for committed objects
+		// list parts of a completed multipart upload
+		// iterator = project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		// require.False(t, iterator.Next())
+		// require.NoError(t, iterator.Err())
+
+		// TODO: this should pass once we correctly handle the maxParts parameter
+		// require.Equal(t, false, parts.More)
+	})
+}
+
+func TestListUploadParts_Ordering(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		const partCount = 10
+		data := testrand.Bytes(partCount + 1)
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		for i := 0; i < partCount; i++ {
+			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
+			require.NoError(t, err)
+
+			_, err = upload.Write(data[:i+1])
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+		}
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		// list parts with a cursor starting after all parts
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+
+		for i := 0; i < partCount; i++ {
+			require.True(t, iterator.Next())
+			item := iterator.Item()
+			require.EqualValues(t, i, item.PartNumber)
+			require.EqualValues(t, i+1, item.Size)
+		}
+
+		// no more entries
+		require.False(t, iterator.Next())
+	})
+}
+
+func TestListUploadParts_Cursor(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		const partCount = 10
+		data := testrand.Bytes(partCount + 1)
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		for i := 0; i < partCount; i++ {
+			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
+			require.NoError(t, err)
+
+			_, err = upload.Write(data[:i+1])
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+		}
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		cursor := 5
+		// list parts with a cursor starting after all parts
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, &uplink.ListUploadPartsOptions{
+			Cursor: uint32(cursor),
+		})
+		for i := cursor + 1; i < partCount; i++ {
+			require.True(t, iterator.Next())
+			item := iterator.Item()
+			require.EqualValues(t, i, item.PartNumber)
+			require.EqualValues(t, i+1, item.Size)
+		}
+
+		// no more entries
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+
+		// list parts with a cursor starting after all parts
+		iterator = project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, &uplink.ListUploadPartsOptions{
+			Cursor: 20,
+		})
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+}
+
+func assertUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListUploadsOptions, objectKeys ...string) {
+	list := project.ListUploads(ctx, bucket, options)
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())
 

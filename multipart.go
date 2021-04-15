@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,30 +28,18 @@ var ErrUploadIDInvalid = errors.New("upload ID invalid")
 
 // UploadInfo contains information about multipart upload.
 type UploadInfo struct {
-	Bucket   string
-	Key      string
 	UploadID string
-	Created  time.Time
+	Key      string
+
+	IsPrefix bool
+
+	System SystemMetadata
+	Custom CustomMetadata
 }
 
 // CommitUploadOptions options for committing multipart upload.
 type CommitUploadOptions struct {
 	CustomMetadata CustomMetadata
-}
-
-// ListUploadsOptions options for listing uncommitted uploads.
-type ListUploadsOptions struct {
-	// Prefix allows to filter uncommitted uploads by a key prefix. If not empty, it must end with slash.
-	Prefix string
-	// Cursor sets the starting position of the iterator. The first item listed will be the one after the cursor.
-	Cursor string
-	// Recursive iterates the objects without collapsing prefixes.
-	Recursive bool
-
-	// System includes SystemMetadata in the results.
-	System bool
-	// Custom includes CustomMetadata in the results.
-	Custom bool
 }
 
 type etag struct {
@@ -107,7 +96,11 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 
 	encodedStreamID := base58.CheckEncode(response.StreamID[:], 1)
 	return UploadInfo{
+		Key:      key,
 		UploadID: encodedStreamID,
+		System: SystemMetadata{
+			Expires: options.Expires,
+		},
 	}, nil
 }
 
@@ -309,13 +302,81 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 }
 
 // ListUploadParts returns an iterator over the parts of a multipart upload started with BeginUpload.
-func (project *Project) ListUploadParts(ctx context.Context, bucket, key, uploadID string, opts *ListUploadPartsOptions) *PartIterator {
-	return &PartIterator{}
+func (project *Project) ListUploadParts(ctx context.Context, bucket, key, uploadID string, options *ListUploadPartsOptions) *PartIterator {
+	defer mon.Task()(&ctx)(nil)
+
+	opts := metainfo.ListSegmentsParams{}
+
+	if options != nil {
+		opts.Cursor = metainfo.SegmentPosition{
+			PartNumber: int32(options.Cursor),
+		}
+	}
+
+	parts := PartIterator{
+		ctx:      ctx,
+		project:  project,
+		bucket:   bucket,
+		key:      key,
+		options:  opts,
+		uploadID: uploadID,
+	}
+
+	switch {
+	case parts.bucket == "":
+		parts.err = errwrapf("%w (%q)", ErrBucketNameInvalid, parts.bucket)
+		return &parts
+	case parts.key == "":
+		parts.err = errwrapf("%w (%q)", ErrObjectKeyInvalid, parts.key)
+		return &parts
+	case parts.uploadID == "":
+		parts.err = packageError.Wrap(ErrUploadIDInvalid)
+		return &parts
+	}
+
+	decodedStreamID, version, err := base58.CheckDecode(uploadID)
+	if err != nil || version != 1 {
+		parts.err = packageError.Wrap(ErrUploadIDInvalid)
+		return &parts
+	}
+
+	parts.options.StreamID = decodedStreamID
+	return &parts
 }
 
 // ListUploads returns an iterator over the uncommitted uploads in bucket.
 func (project *Project) ListUploads(ctx context.Context, bucket string, options *ListUploadsOptions) *UploadIterator {
-	return &UploadIterator{}
+	defer mon.Task()(&ctx)(nil)
+
+	opts := metainfo.ListOptions{
+		Direction: metainfo.After,
+		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
+	}
+
+	if options != nil {
+		opts.Prefix = options.Prefix
+		opts.Cursor = options.Cursor
+		opts.Recursive = options.Recursive
+	}
+
+	uploads := UploadIterator{
+		ctx:     ctx,
+		project: project,
+		bucket:  bucket,
+		options: opts,
+	}
+
+	if opts.Prefix != "" && !strings.HasSuffix(opts.Prefix, "/") {
+		uploads.listObjects = listPendingObjectStreams
+	} else {
+		uploads.listObjects = listObjects
+	}
+
+	if options != nil {
+		uploads.uploadOptions = *options
+	}
+
+	return &uploads
 }
 
 // Part part metadata.
@@ -422,47 +483,4 @@ func (upload *PartUpload) Info() *Part {
 		upload.part.ETag = part.ETag
 	}
 	return upload.part
-}
-
-// UploadIterator is an iterator over a collection of uncommitted uploads.
-type UploadIterator struct {
-}
-
-// Next prepares next entry for reading.
-func (iter *UploadIterator) Next() bool {
-	return false
-}
-
-// Item returns the current entry in the iterator.
-func (iter *UploadIterator) Item() *UploadInfo {
-	return nil
-}
-
-// Err returns error, if one happened during iteration.
-func (iter *UploadIterator) Err() error {
-	return nil
-}
-
-// ListUploadPartsOptions options for listing upload parts.
-type ListUploadPartsOptions struct {
-	Cursor uint32
-}
-
-// PartIterator is an iterator over a collection of parts of an upload.
-type PartIterator struct {
-}
-
-// Next prepares next entry for reading.
-func (iter *PartIterator) Next() bool {
-	return false
-}
-
-// Item returns the current entry in the iterator.
-func (iter *PartIterator) Item() *Part {
-	return nil
-}
-
-// Err returns error, if one happened during iteration.
-func (iter *PartIterator) Err() error {
-	return nil
 }
