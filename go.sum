@@ -156,7 +156,7 @@ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c h1:dUUwHk2QECo/6vqA44rthZ8ie
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
-storj.io/common v0.0.0-20210429174118-60091ebbbdaf h1:OEKQlWDSvswTPPGOJZxSoIqyyyPGQr/rrjbN4Z5/7WA=
-storj.io/common v0.0.0-20210429174118-60091ebbbdaf/go.mod h1:PdP3eTld9RqSV3E4K44JSlw7Z/zNsymj9rnKuHFKhJE=
+storj.io/common v0.0.0-20210504141454-bcb03a80052f h1:TwWEzxjvhnkCKUGds4HQKtAgFBjzf/C0hcA1luiNuKI=
+storj.io/common v0.0.0-20210504141454-bcb03a80052f/go.mod h1:PdP3eTld9RqSV3E4K44JSlw7Z/zNsymj9rnKuHFKhJE=
 storj.io/drpc v0.0.20 h1:nzOxsetLi0fJ8xCL92LPlYL0B6iYdDDk1Cpdbn0/r9Y=
 storj.io/drpc v0.0.20/go.mod h1:eAxUDk8HWvGl9iqznpuphtZ+WIjIGPJFqNXuKHgRiMM=

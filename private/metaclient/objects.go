@@ -148,16 +148,14 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 		return ObjectList{}, errClass.New("invalid direction %d", options.Direction)
 	}
 
-	prefix := PathForKey(options.Prefix)
-
-	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
+	pi, err := encryption.GetPrefixInfo(bucket, paths.NewUnencrypted(options.Prefix), db.encStore)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
 	resp, err := db.metainfo.ListPendingObjectStreams(ctx, ListPendingObjectStreamsParams{
 		Bucket:          []byte(bucket),
-		EncryptedPath:   []byte(encPrefix.Raw()),
+		EncryptedPath:   []byte(pi.PathEnc.Raw()),
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
 	})
@@ -165,18 +163,41 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
-	objectsList, err := db.objectsFromRawObjectList(ctx, resp.Items, true, "", bucket, startAfter)
-
+	objectsList, err := db.pendingObjectsFromRawObjectList(ctx, resp.Items, pi, startAfter)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
-	list = ObjectList{
+
+	return ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   resp.More,
 		Items:  objectsList,
+	}, nil
+}
+
+func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo, startAfter string) (objectList []Object, err error) {
+	objectList = make([]Object, 0, len(items))
+
+	for _, item := range items {
+		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc, item.EncryptedMetadata, db.encStore)
+		if err != nil {
+			// skip items that cannot be decrypted
+			if encryption.ErrDecryptFailed.Has(err) {
+				continue
+			}
+			return nil, errClass.Wrap(err)
+		}
+
+		object, err := db.objectFromRawObjectListItem(pi.Bucket, pi.PathUnenc.Raw(), item, stream, streamMeta)
+		if err != nil {
+			return nil, errClass.Wrap(err)
+		}
+
+		objectList = append(objectList, object)
 	}
-	return list, nil
+
+	return objectList, nil
 }
 
 // ListObjects lists objects in bucket based on the ListOptions.
@@ -217,39 +238,19 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	// metaFlags |= meta.UserDefined
 	// }
 
-	// Remove the trailing slash from list prefix.
-	// Otherwise, if we the list prefix is `/bob/`, the encrypted list
-	// prefix results in `enc("")/enc("bob")/enc("")`. This is an incorrect
-	// encrypted prefix, what we really want is `enc("")/enc("bob")`.
-	prefix := PathForKey(options.Prefix)
-	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
+	pi, err := encryption.GetPrefixInfo(bucket, paths.NewUnencrypted(options.Prefix), db.encStore)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
-	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
+	startAfter, err = encryption.EncryptPathRaw(startAfter, pi.Cipher, &pi.ParentKey)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
-	}
-
-	// We have to encrypt startAfter but only if it doesn't contain a bucket.
-	// It contains a bucket if and only if the prefix has no bucket. This is why it is a raw
-	// string instead of a typed string: it's either a bucket or an unencrypted path component
-	// and that isn't known at compile time.
-	needsEncryption := bucket != ""
-	var base *encryption.Base
-	if needsEncryption {
-		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
-
-		startAfter, err = encryption.EncryptPathRaw(startAfter, db.keyCipher(base.PathCipher), prefixKey)
-		if err != nil {
-			return ObjectList{}, errClass.Wrap(err)
-		}
 	}
 
 	items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
 		Bucket:          []byte(bucket),
-		EncryptedPrefix: []byte(encPrefix.Raw()),
+		EncryptedPrefix: []byte(pi.ParentEnc.Raw()),
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
 		Recursive:       options.Recursive,
@@ -259,71 +260,24 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
-	objectsList, err := db.objectsFromRawObjectList(ctx, items, needsEncryption, options.Prefix, bucket, startAfter)
-
+	objectsList, err := db.objectsFromRawObjectList(ctx, items, pi, startAfter)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
-	list = ObjectList{
+
+	return ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
 		More:   more,
 		Items:  objectsList,
-	}
-
-	return list, nil
+	}, nil
 }
 
-func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, needsEncryption bool, _prefix, bucket, startAfter string) (objectList []Object, err error) {
-	prefix := PathForKey(_prefix)
-	prefixKey, err := encryption.DerivePathKey(bucket, prefix, db.encStore)
-	if err != nil {
-		return objectList, errClass.Wrap(err)
-	}
-
-	encPrefix, err := encryption.EncryptPathWithStoreCipher(bucket, prefix, db.encStore)
-	if err != nil {
-		return []Object{}, errClass.Wrap(err)
-	}
-	var base *encryption.Base
-	if needsEncryption {
-		_, _, base = db.encStore.LookupEncrypted(bucket, encPrefix)
-	}
-
+func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo, startAfter string) (objectList []Object, err error) {
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
-		var bucketName string
-		var unencryptedKey paths.Unencrypted
-		var itemPath string
-
-		if needsEncryption {
-			itemPath, err = encryption.DecryptPathRaw(string(item.EncryptedPath), db.keyCipher(base.PathCipher), prefixKey)
-			if err != nil {
-				// skip items that cannot be decrypted
-				if encryption.ErrDecryptFailed.Has(err) {
-					continue
-				}
-				return nil, errClass.Wrap(err)
-			}
-
-			// TODO(jeff): this shouldn't be necessary if we handled trailing slashes
-			// appropriately. there's some issues with list.
-			fullPath := prefix.Raw()
-			if len(fullPath) > 0 && fullPath[len(fullPath)-1] != '/' {
-				fullPath += "/"
-			}
-			fullPath += itemPath
-
-			bucketName = bucket
-			unencryptedKey = paths.NewUnencrypted(fullPath)
-		} else {
-			itemPath = string(item.EncryptedPath)
-			bucketName = string(item.EncryptedPath)
-			unencryptedKey = paths.Unencrypted{}
-		}
-
-		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, bucketName, unencryptedKey, item.EncryptedMetadata, db.encStore)
+		unencItem, err := encryption.DecryptPathRaw(string(item.EncryptedPath), pi.Cipher, &pi.ParentKey)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -332,21 +286,31 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			return nil, errClass.Wrap(err)
 		}
 
-		object, err := db.objectFromRawObjectListItem(bucket, itemPath, item, stream, streamMeta)
+		var unencKey paths.Unencrypted
+		if pi.ParentEnc.Valid() {
+			unencKey = paths.NewUnencrypted(pi.ParentUnenc.Raw() + "/" + unencItem)
+		} else {
+			unencKey = paths.NewUnencrypted(unencItem)
+		}
+
+		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, unencKey, item.EncryptedMetadata, db.encStore)
+		if err != nil {
+			// skip items that cannot be decrypted
+			if encryption.ErrDecryptFailed.Has(err) {
+				continue
+			}
+			return nil, errClass.Wrap(err)
+		}
+
+		object, err := db.objectFromRawObjectListItem(pi.Bucket, unencItem, item, stream, streamMeta)
 		if err != nil {
 			return nil, errClass.Wrap(err)
 		}
 
 		objectList = append(objectList, object)
 	}
-	return objectList, nil
-}
 
-func (db *DB) keyCipher(keyCipher storj.CipherSuite) storj.CipherSuite {
-	if db.encStore.EncryptionBypass {
-		return storj.EncNullBase64URL
-	}
-	return keyCipher
+	return objectList, nil
 }
 
 // DownloadOptions contains additional options for downloading.
@@ -624,11 +588,4 @@ func getEncryptedKeyAndNonce(m *pb.SegmentMeta) (storj.EncryptedPrivateKey, *sto
 	copy(nonce[:], m.KeyNonce)
 
 	return m.EncryptedKey, &nonce
-}
-
-// PathForKey removes the trailing `/` from the raw path, which is required so
-// the derived key matches the final list path (which also has the trailing
-// encrypted `/` part of the path removed).
-func PathForKey(raw string) paths.Unencrypted {
-	return paths.NewUnencrypted(strings.TrimSuffix(raw, "/"))
 }

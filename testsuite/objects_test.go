@@ -349,6 +349,99 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 	})
 }
 
+func TestListObjects_DifficultNames(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+		defer func() {
+			_, err := project.DeleteBucket(ctx, "testbucket")
+			require.NoError(t, err)
+		}()
+
+		uploadObject(t, ctx, project, "testbucket", "/", 1*memory.KiB)
+		defer func() {
+			_, err := project.DeleteObject(ctx, "testbucket", "/")
+			require.NoError(t, err)
+		}()
+
+		uploadObject(t, ctx, project, "testbucket", "//", 1*memory.KiB)
+		defer func() {
+			_, err := project.DeleteObject(ctx, "testbucket", "//")
+			require.NoError(t, err)
+		}()
+
+		uploadObject(t, ctx, project, "testbucket", "///", 1*memory.KiB)
+		defer func() {
+			_, err := project.DeleteObject(ctx, "testbucket", "///")
+			require.NoError(t, err)
+		}()
+
+		{
+			list := listObjects(ctx, t, project, "testbucket", nil)
+
+			require.True(t, list.Next())
+			require.True(t, list.Item().IsPrefix)
+			require.Equal(t, "/", list.Item().Key)
+
+			require.NoError(t, list.Err())
+			assertNoNextObject(t, list)
+		}
+
+		{
+			list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Prefix: "/",
+			})
+
+			require.True(t, list.Next())
+			require.False(t, list.Item().IsPrefix)
+			require.Equal(t, "/", list.Item().Key)
+
+			require.True(t, list.Next())
+			require.True(t, list.Item().IsPrefix)
+			require.Equal(t, "//", list.Item().Key)
+
+			require.NoError(t, list.Err())
+			assertNoNextObject(t, list)
+		}
+
+		{
+			list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Prefix: "//",
+			})
+
+			require.True(t, list.Next())
+			require.False(t, list.Item().IsPrefix)
+			require.Equal(t, "//", list.Item().Key)
+
+			require.True(t, list.Next())
+			require.True(t, list.Item().IsPrefix)
+			require.Equal(t, "///", list.Item().Key)
+
+			require.NoError(t, list.Err())
+			assertNoNextObject(t, list)
+		}
+
+		{
+			list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Prefix: "///",
+			})
+
+			require.True(t, list.Next())
+			require.False(t, list.Item().IsPrefix)
+			require.Equal(t, "///", list.Item().Key)
+
+			require.NoError(t, list.Err())
+			assertNoNextObject(t, list)
+		}
+	})
+}
+
 func listObjects(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListObjectsOptions) *uplink.ObjectIterator {
 	list := project.ListObjects(ctx, bucket, options)
 	require.NoError(t, list.Err())
