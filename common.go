@@ -6,6 +6,7 @@ package uplink
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -33,6 +34,8 @@ var ErrPermissionDenied = errors.New("permission denied")
 
 func convertKnownErrors(err error, bucket, key string) error {
 	switch {
+	case err == io.EOF:
+		return err
 	case metainfo.ErrNoBucket.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
 	case metainfo.ErrNoPath.Has(err):
@@ -48,9 +51,9 @@ func convertKnownErrors(err error, bucket, key string) error {
 	case errs2.IsRPC(err, rpcstatus.ResourceExhausted):
 		// TODO is a better way to do this?
 		message := errs.Unwrap(err).Error()
-		if message == "Exceeded Usage Limit" {
+		if strings.HasSuffix(message, "Exceeded Usage Limit") {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrBandwidthLimitExceeded))
-		} else if message == "Too Many Requests" {
+		} else if strings.HasSuffix(message, "Too Many Requests") {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrTooManyRequests))
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):

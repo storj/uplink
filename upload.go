@@ -68,17 +68,17 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	meta := dynamicMetadata{upload.object}
 	mutableStream, err := obj.CreateDynamicStream(ctx, meta, options.Expires)
 	if err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	// Return the connection to the pool as soon as we can.
 	if err := db.Close(); err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	upload.streams = streams
@@ -121,7 +121,8 @@ func (upload *Upload) Info() *Object {
 // It returns the number of bytes written from p (0 <= n <= len(p))
 // and any error encountered that caused the write to stop early.
 func (upload *Upload) Write(p []byte) (n int, err error) {
-	return upload.upload.Write(p)
+	n, err = upload.upload.Write(p)
+	return n, convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
 
 // Commit commits data to the store.

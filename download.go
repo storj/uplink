@@ -93,18 +93,19 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	// Return the connection to the pool as soon as we can.
 	if err := db.Close(); err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	streamRange := objectDownload.Range
 	return &Download{
 		streams:  streams,
 		download: stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start),
+		bucket:   bucket,
 		object:   convertObject(&objectDownload.Object),
 	}, nil
 }
@@ -113,6 +114,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 type Download struct {
 	download *stream.Download
 	object   *Object
+	bucket   string
 	streams  *streams.Store
 }
 
@@ -124,13 +126,15 @@ func (download *Download) Info() *Object {
 // Read downloads up to len(p) bytes into p from the object's data stream.
 // It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
 func (download *Download) Read(p []byte) (n int, err error) {
-	return download.download.Read(p)
+	n, err = download.download.Read(p)
+	return n, convertKnownErrors(err, download.bucket, download.object.Key)
 }
 
 // Close closes the reader of the download.
 func (download *Download) Close() error {
-	return errs.Combine(
+	err := errs.Combine(
 		download.download.Close(),
 		download.streams.Close(),
 	)
+	return convertKnownErrors(err, download.bucket, download.object.Key)
 }
