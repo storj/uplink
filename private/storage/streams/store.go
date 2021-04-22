@@ -384,7 +384,8 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		streamSize     int64
 		contentKey     storj.Key
 
-		lastCommitRequest metainfo.BatchItem
+		// requests to send in a single call, in this case it will be always CommitSegment or MakeInlineSegment
+		requestsToBatch []metainfo.BatchItem
 	)
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
@@ -399,21 +400,6 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 
 	eofReader := NewEOFReader(data)
 	for !eofReader.IsEOF() && !eofReader.HasError() {
-
-		if lastCommitRequest != nil {
-			switch singleRequest := lastCommitRequest.(type) {
-			case *metainfo.MakeInlineSegmentParams:
-				err = s.metainfo.MakeInlineSegment(ctx, *singleRequest)
-			case *metainfo.CommitSegmentParams:
-				err = s.metainfo.CommitSegment(ctx, *singleRequest)
-			default:
-				return Part{}, errs.New("unsupported request type")
-			}
-			if err != nil {
-				return Part{}, err
-			}
-			lastCommitRequest = nil
-		}
 
 		// generate random key for encrypting the segment's content
 		_, err := rand.Read(contentKey[:])
@@ -470,34 +456,51 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
-			response, err := s.metainfo.BeginSegment(ctx, metainfo.BeginSegmentParams{
+			beginSegment := metainfo.BeginSegmentParams{
 				StreamID:      streamID,
 				MaxOrderLimit: maxEncryptedSegmentSize,
 				Position: metainfo.SegmentPosition{
 					PartNumber: int32(partNumber),
 					Index:      int32(currentSegment),
 				},
-			})
-			if err != nil {
-				return Part{}, err
+			}
+
+			var beginResponse metainfo.BeginSegmentResponse
+			if len(requestsToBatch) == 0 {
+				beginResponse, err = s.metainfo.BeginSegment(ctx, beginSegment)
+				if err != nil {
+					return Part{}, err
+				}
+			} else {
+				responses, err := s.metainfo.Batch(ctx, append(requestsToBatch, &beginSegment)...)
+				if err != nil {
+					return Part{}, err
+				}
+
+				requestsToBatch = requestsToBatch[:0]
+
+				beginResponse, err = responses[1].BeginSegment()
+				if err != nil {
+					return Part{}, err
+				}
 			}
 
 			encSizedReader := SizeReader(transformedReader)
-			uploadResults, err := s.ec.PutSingleResult(ctx, response.Limits, response.PiecePrivateKey,
-				response.RedundancyStrategy, encSizedReader)
+			uploadResults, err := s.ec.PutSingleResult(ctx, beginResponse.Limits, beginResponse.PiecePrivateKey,
+				beginResponse.RedundancyStrategy, encSizedReader)
 			if err != nil {
 				return Part{}, err
 			}
 
 			plainSegmentSize := sizeReader.Size()
 			if plainSegmentSize > 0 {
-				lastCommitRequest = &metainfo.CommitSegmentParams{
-					SegmentID:         response.SegmentID,
+				requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
+					SegmentID:         beginResponse.SegmentID,
 					SizeEncryptedData: encSizedReader.Size(),
 					PlainSize:         plainSegmentSize,
 					Encryption:        segmentEncryption,
 					UploadResult:      uploadResults,
-				}
+				})
 			}
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
@@ -511,7 +514,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 					return Part{}, err
 				}
 
-				lastCommitRequest = &metainfo.MakeInlineSegmentParams{
+				requestsToBatch = append(requestsToBatch, &metainfo.MakeInlineSegmentParams{
 					StreamID: streamID,
 					Position: metainfo.SegmentPosition{
 						PartNumber: int32(partNumber),
@@ -520,7 +523,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 					Encryption:          segmentEncryption,
 					EncryptedInlineData: cipherData,
 					PlainSize:           int64(len(data)),
-				}
+				})
 			}
 		}
 		streamSize += sizeReader.Size()
@@ -531,17 +534,17 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	if err != nil {
 		return Part{}, err
 	}
-	if lastCommitRequest != nil {
-		switch singleRequest := lastCommitRequest.(type) {
+	if len(requestsToBatch) > 0 {
+		// take last segment in a part and set ETag
+		switch singleRequest := requestsToBatch[len(requestsToBatch)-1].(type) {
 		case *metainfo.MakeInlineSegmentParams:
 			singleRequest.EncryptedTag = encryptedTag
-			err = s.metainfo.MakeInlineSegment(ctx, *singleRequest)
 		case *metainfo.CommitSegmentParams:
 			singleRequest.EncryptedTag = encryptedTag
-			err = s.metainfo.CommitSegment(ctx, *singleRequest)
 		default:
 			return Part{}, errs.New("unsupported request type")
 		}
+		_, err = s.metainfo.Batch(ctx, requestsToBatch...)
 		if err != nil {
 			return Part{}, err
 		}
