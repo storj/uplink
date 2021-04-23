@@ -11,12 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/satellite/metainfo"
 	"storj.io/uplink"
 )
 
@@ -266,46 +264,26 @@ func TestListObjects_Cursor(t *testing.T) {
 	})
 }
 
-type pointerDBWithLookupLimit struct {
-	limit int
-	metainfo.PointerDB
-}
-
-func (db *pointerDBWithLookupLimit) LookupLimit() int { return db.limit }
-
-func TestListObjects_AutoPaging(t *testing.T) {
+func TestListObjects_Paging(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
 		UplinkCount:      1,
-		Reconfigure: testplanet.Reconfigure{
-			SatellitePointerDB: func(log *zap.Logger, index int, pointerdb metainfo.PointerDB) (metainfo.PointerDB, error) {
-				return &pointerDBWithLookupLimit{2, pointerdb}, nil
-			},
-		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
 
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
-
-		totalObjects := 5 // 3 pages
+		// TODO change internal listing limit for test to avoid large number of objects
+		// current satellite default limit is 1000
+		totalObjects := 1010
 		expectedObjects := map[string]bool{}
 
 		for i := 0; i < totalObjects; i++ {
 			key := fmt.Sprintf("%d/%d.dat", i, i)
 			expectedObjects[key] = true
 			uploadObject(t, ctx, project, "testbucket", key, 1)
-
-			defer func(key string) {
-				_, err := project.DeleteObject(ctx, "testbucket", key)
-				require.NoError(t, err)
-			}(key)
 		}
 
 		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
