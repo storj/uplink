@@ -28,7 +28,8 @@ Examples of Release Candidates:
 
 1. Clone or fetch latest main of these Git repositories:
   - https://github.com/storj/storj
-  - https://github.com/storj/gateway
+  - https://github.com/storj/gateway-st
+  - https://github.com/storj/gateway-mt
   - https://github.com/storj/uplink-c
   - https://github.com/storj/linksharing
 2. For each of them update, `go.mod` and `testsuite/go.mod` to latest main (or the specific Git commit that will be tagged as a new version) of `storj.io/uplink`. Makefile target `bump-dependencies` (available in all listed repositories) can bo used to do this automatically.
