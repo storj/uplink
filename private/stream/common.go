@@ -8,4 +8,4 @@ import (
 )
 
 // Error is the errs class of stream errors.
-var Error = errs.Class("stream error")
+var Error = errs.Class("stream")

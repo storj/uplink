@@ -25,7 +25,7 @@ var (
 	mon = monkit.Package()
 
 	// Error is the errs class of standard metainfo errors.
-	Error = errs.Class("metainfo error")
+	Error = errs.Class("metainfo")
 )
 
 // Client creates a grpcClient.

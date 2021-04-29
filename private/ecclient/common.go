@@ -8,4 +8,4 @@ import (
 )
 
 // Error is the errs class of standard Ranger errors.
-var Error = errs.Class("ecclient error")
+var Error = errs.Class("ecclient")

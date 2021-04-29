@@ -8,4 +8,4 @@ import (
 )
 
 // Error is the default eestream errs class.
-var Error = errs.Class("eestream error")
+var Error = errs.Class("eestream")

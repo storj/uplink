@@ -162,15 +162,15 @@ func TestNewRedundancyStrategy(t *testing.T) {
 		errString string
 	}{
 		{0, 0, 4, 4, ""},
-		{-1, 0, 0, 0, "eestream error: negative repair threshold"},
-		{1, 0, 0, 0, "eestream error: repair threshold less than required count"},
-		{5, 0, 0, 0, "eestream error: repair threshold greater than total count"},
-		{0, -1, 0, 0, "eestream error: negative optimal threshold"},
-		{0, 1, 0, 0, "eestream error: optimal threshold less than required count"},
-		{0, 5, 0, 0, "eestream error: optimal threshold greater than total count"},
+		{-1, 0, 0, 0, "eestream: negative repair threshold"},
+		{1, 0, 0, 0, "eestream: repair threshold less than required count"},
+		{5, 0, 0, 0, "eestream: repair threshold greater than total count"},
+		{0, -1, 0, 0, "eestream: negative optimal threshold"},
+		{0, 1, 0, 0, "eestream: optimal threshold less than required count"},
+		{0, 5, 0, 0, "eestream: optimal threshold greater than total count"},
 		{3, 4, 3, 4, ""},
-		{0, 3, 0, 0, "eestream error: repair threshold greater than optimal threshold"},
-		{4, 3, 0, 0, "eestream error: repair threshold greater than optimal threshold"},
+		{0, 3, 0, 0, "eestream: repair threshold greater than optimal threshold"},
+		{4, 3, 0, 0, "eestream: repair threshold greater than optimal threshold"},
 		{4, 4, 4, 4, ""},
 	} {
 		errTag := fmt.Sprintf("Test case #%d", i)
