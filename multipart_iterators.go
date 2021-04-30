@@ -13,7 +13,7 @@ import (
 
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // ListUploadsOptions options for listing uncommitted uploads.
@@ -36,20 +36,20 @@ type UploadIterator struct {
 	ctx           context.Context
 	project       *Project
 	bucket        string
-	options       metainfo.ListOptions
+	options       metaclient.ListOptions
 	uploadOptions ListUploadsOptions
-	list          *metainfo.ObjectList
+	list          *metaclient.ObjectList
 	position      int
 	completed     bool
 	err           error
-	listObjects   func(tx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error)
+	listObjects   func(tx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error)
 }
 
-func listObjects(ctx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error) {
+func listObjects(ctx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error) {
 	return db.ListObjects(ctx, bucket, options)
 }
 
-func listPendingObjectStreams(ctx context.Context, db *metainfo.DB, bucket string, options metainfo.ListOptions) (metainfo.ObjectList, error) {
+func listPendingObjectStreams(ctx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error) {
 	return db.ListPendingObjectStreams(ctx, bucket, options)
 }
 
@@ -150,7 +150,7 @@ func (uploads *UploadIterator) Item() *UploadInfo {
 	return &obj
 }
 
-func (uploads *UploadIterator) item() *metainfo.Object {
+func (uploads *UploadIterator) item() *metaclient.Object {
 	if uploads.completed {
 		return nil
 	}
@@ -182,7 +182,7 @@ type PartIterator struct {
 	bucket    string
 	key       string
 	uploadID  string
-	options   metainfo.ListSegmentsParams
+	options   metaclient.ListSegmentsParams
 	items     []*Part
 	more      bool
 	position  int
@@ -306,7 +306,7 @@ func (parts *PartIterator) Err() error {
 	return packageError.Wrap(parts.err)
 }
 
-func decryptETag(project *Project, bucket, key string, encryptionParameters storj.EncryptionParameters, segment metainfo.SegmentListItem) ([]byte, error) {
+func decryptETag(project *Project, bucket, key string, encryptionParameters storj.EncryptionParameters, segment metaclient.SegmentListItem) ([]byte, error) {
 	if segment.EncryptedETag == nil {
 		return nil, nil
 	}

@@ -15,7 +15,7 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 var mon = monkit.Package()
@@ -36,13 +36,13 @@ func convertKnownErrors(err error, bucket, key string) error {
 	switch {
 	case err == io.EOF:
 		return err
-	case metainfo.ErrNoBucket.Has(err):
+	case metaclient.ErrNoBucket.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
-	case metainfo.ErrNoPath.Has(err):
+	case metaclient.ErrNoPath.Has(err):
 		return errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-	case metainfo.ErrBucketNotFound.Has(err):
+	case metaclient.ErrBucketNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
-	case metainfo.ErrObjectNotFound.Has(err):
+	case metaclient.ErrObjectNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrObjectNotFound, key)
 	case encryption.ErrMissingEncryptionBase.Has(err):
 		return errwrapf("%w (%q)", ErrPermissionDenied, key)
@@ -58,9 +58,9 @@ func convertKnownErrors(err error, bucket, key string) error {
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		message := errs.Unwrap(err).Error()
-		if strings.HasPrefix(message, metainfo.ErrBucketNotFound.New("").Error()) {
+		if strings.HasPrefix(message, metaclient.ErrBucketNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
-		} else if strings.HasPrefix(message, metainfo.ErrObjectNotFound.New("").Error()) {
+		} else if strings.HasPrefix(message, metaclient.ErrObjectNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 	case errs2.IsRPC(err, rpcstatus.PermissionDenied):

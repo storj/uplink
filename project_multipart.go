@@ -12,7 +12,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/eestream"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // dialMetainfoClient is exposing project.dialMetainfoClient method.
@@ -22,7 +22,7 @@ import (
 //
 //lint:ignore U1000, used with linkname
 //nolint: deadcode,unused
-func dialMetainfoClient(ctx context.Context, project *Project) (_ *metainfo.Client, err error) {
+func dialMetainfoClient(ctx context.Context, project *Project) (_ *metaclient.Client, err error) {
 	return project.dialMetainfoClient(ctx)
 }
 
@@ -93,6 +93,6 @@ func ecPutSingleResult(ctx context.Context, project *Project, limits []*pb.Addre
 //
 //lint:ignore U1000, used with linkname
 //nolint: deadcode,unused
-func dialMetainfoDB(ctx context.Context, project *Project) (_ *metainfo.DB, err error) {
+func dialMetainfoDB(ctx context.Context, project *Project) (_ *metaclient.DB, err error) {
 	return project.dialMetainfoDB(ctx)
 }

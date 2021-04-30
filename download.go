@@ -10,7 +10,7 @@ import (
 
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -35,29 +35,29 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
 	}
 
-	var opts metainfo.DownloadOptions
+	var opts metaclient.DownloadOptions
 	switch {
 	case options == nil:
-		opts.Range = metainfo.StreamRange{
-			Mode: metainfo.StreamRangeAll,
+		opts.Range = metaclient.StreamRange{
+			Mode: metaclient.StreamRangeAll,
 		}
 	case options.Offset < 0:
 		if options.Length >= 0 {
 			return nil, packageError.New("suffix requires length to be negative, got %v", options.Length)
 		}
-		opts.Range = metainfo.StreamRange{
-			Mode:   metainfo.StreamRangeSuffix,
+		opts.Range = metaclient.StreamRange{
+			Mode:   metaclient.StreamRangeSuffix,
 			Suffix: -options.Offset,
 		}
 	case options.Length < 0:
-		opts.Range = metainfo.StreamRange{
-			Mode:  metainfo.StreamRangeStart,
+		opts.Range = metaclient.StreamRange{
+			Mode:  metaclient.StreamRangeStart,
 			Start: options.Offset,
 		}
 
 	default:
-		opts.Range = metainfo.StreamRange{
-			Mode:  metainfo.StreamRangeStartLimit,
+		opts.Range = metaclient.StreamRange{
+			Mode:  metaclient.StreamRangeStartLimit,
 			Start: options.Offset,
 			Limit: options.Offset + options.Length,
 		}

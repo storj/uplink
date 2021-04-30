@@ -24,7 +24,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -32,18 +32,18 @@ import (
 const TestFile = "test-file"
 
 func TestCreateObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
 		for i, tt := range []struct {
-			create *metainfo.CreateObject
+			create *metaclient.CreateObject
 		}{
 			{
 				create: nil,
 			},
 			{
-				create: &metainfo.CreateObject{},
+				create: &metaclient.CreateObject{},
 			},
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
@@ -61,22 +61,22 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestGetObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
 
 		_, err = db.GetObject(ctx, "", "")
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "")
-		assert.True(t, metainfo.ErrNoPath.Has(err))
+		assert.True(t, metaclient.ErrNoPath.Has(err))
 
 		_, err = db.GetObject(ctx, "non-existing-bucket", TestFile)
-		assert.True(t, metainfo.ErrObjectNotFound.Has(err))
+		assert.True(t, metaclient.ErrObjectNotFound.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "non-existing-file")
-		assert.True(t, metainfo.ErrObjectNotFound.Has(err))
+		assert.True(t, metaclient.ErrObjectNotFound.Has(err))
 
 		object, err := db.GetObject(ctx, bucket.Name, TestFile)
 		if assert.NoError(t, err) {
@@ -87,7 +87,7 @@ func TestGetObject(t *testing.T) {
 }
 
 func TestDownloadObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		data := testrand.Bytes(32 * memory.KiB)
 
 		bucket, err := db.CreateBucket(ctx, TestBucket)
@@ -98,10 +98,10 @@ func TestDownloadObject(t *testing.T) {
 		upload(ctx, t, db, streams, bucket.Name, "large-file", data)
 
 		_, err = db.GetObject(ctx, "", "")
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
 		_, err = db.GetObject(ctx, bucket.Name, "")
-		assert.True(t, metainfo.ErrNoPath.Has(err))
+		assert.True(t, metaclient.ErrNoPath.Has(err))
 
 		assertData(ctx, t, db, streams, bucket.Name, "empty-file", []byte{})
 		assertData(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
@@ -122,7 +122,7 @@ func TestDownloadObject(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucket, key string, data []byte) {
+func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *streams.Store, bucket, key string, data []byte) {
 	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 
@@ -138,8 +138,8 @@ func upload(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams
 	require.NoError(t, err)
 }
 
-func assertData(ctx context.Context, t *testing.T, db *metainfo.DB, streams *streams.Store, bucketName, objectKey string, content []byte) {
-	info, err := db.DownloadObject(ctx, bucketName, objectKey, metainfo.DownloadOptions{})
+func assertData(ctx context.Context, t *testing.T, db *metaclient.DB, streams *streams.Store, bucketName, objectKey string, content []byte) {
+	info, err := db.DownloadObject(ctx, bucketName, objectKey, metaclient.DownloadOptions{})
 	if errs2.IsRPC(err, rpcstatus.Unimplemented) {
 		t.Skip("unimplemented DownloadObject")
 	}
@@ -188,10 +188,10 @@ func TestDeleteObject(t *testing.T) {
 			}
 
 			_, err = db.DeleteObject(ctx, "", "")
-			assert.True(t, metainfo.ErrNoBucket.Has(err))
+			assert.True(t, metaclient.ErrNoBucket.Has(err))
 
 			_, err = db.DeleteObject(ctx, bucket.Name, "")
-			assert.True(t, metainfo.ErrNoPath.Has(err))
+			assert.True(t, metaclient.ErrNoPath.Has(err))
 
 			_, err = db.DeleteObject(ctx, bucket.Name+"-not-exist", TestFile)
 			assert.Nil(t, err)
@@ -208,22 +208,22 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestListObjectsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		_, err = db.ListObjects(ctx, "", metainfo.ListOptions{})
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		_, err = db.ListObjects(ctx, "", metaclient.ListOptions{})
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
-		_, err = db.ListObjects(ctx, testBucketInfo.Name, metainfo.ListOptions{})
+		_, err = db.ListObjects(ctx, testBucketInfo.Name, metaclient.ListOptions{})
 		assert.EqualError(t, err, "metainfo: invalid direction 0")
 
 		// TODO for now we are supporting only metainfo.After
-		for _, direction := range []metainfo.ListDirection{
+		for _, direction := range []metaclient.ListDirection{
 			// metainfo.Forward,
-			metainfo.After,
+			metaclient.After,
 		} {
-			list, err := db.ListObjects(ctx, testBucketInfo.Name, metainfo.ListOptions{Direction: direction})
+			list, err := db.ListObjects(ctx, testBucketInfo.Name, metaclient.ListOptions{Direction: direction})
 			if assert.NoError(t, err) {
 				assert.False(t, list.More)
 				assert.Equal(t, 0, len(list.Items))
@@ -300,7 +300,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 }
 
 func TestListObjects(t *testing.T) {
-	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
@@ -320,7 +320,7 @@ func TestListObjects(t *testing.T) {
 		upload(ctx, t, db, streams, otherBucket.Name, "file-in-other-bucket", nil)
 
 		for i, tt := range []struct {
-			options metainfo.ListOptions
+			options metaclient.ListOptions
 			more    bool
 			result  []string
 		}{
@@ -434,20 +434,20 @@ func TestListObjects(t *testing.T) {
 	})
 }
 
-func options(prefix, cursor string, limit int) metainfo.ListOptions {
-	return metainfo.ListOptions{
+func options(prefix, cursor string, limit int) metaclient.ListOptions {
+	return metaclient.ListOptions{
 		Prefix:    prefix,
 		Cursor:    cursor,
-		Direction: metainfo.After,
+		Direction: metaclient.After,
 		Limit:     limit,
 	}
 }
 
-func optionsRecursive(prefix, cursor string, limit int) metainfo.ListOptions {
-	return metainfo.ListOptions{
+func optionsRecursive(prefix, cursor string, limit int) metaclient.ListOptions {
+	return metaclient.ListOptions{
 		Prefix:    prefix,
 		Cursor:    cursor,
-		Direction: metainfo.After,
+		Direction: metaclient.After,
 		Limit:     limit,
 		Recursive: true,
 	}

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package metainfo
+package metaclient
 
 import (
 	"bytes"
@@ -25,7 +25,7 @@ var (
 	mon = monkit.Package()
 
 	// Error is the errs class of standard metainfo errors.
-	Error = errs.Class("metainfo")
+	Error = errs.Class("metaclient")
 )
 
 // Client creates a grpcClient.

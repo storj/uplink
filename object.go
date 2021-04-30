@@ -13,7 +13,7 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // ErrObjectKeyInvalid is returned when the object key is invalid.
@@ -114,7 +114,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 }
 
 // convertObject converts metainfo.Object to uplink.Object.
-func convertObject(obj *metainfo.Object) *Object {
+func convertObject(obj *metaclient.Object) *Object {
 	if obj.Bucket.Name == "" { // zero object
 		return nil
 	}

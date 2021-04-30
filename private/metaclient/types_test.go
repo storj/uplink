@@ -1,42 +1,42 @@
 // Copyright (C) 2020 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package metainfo_test
+package metaclient_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 func TestListOptions(t *testing.T) {
-	opts := metainfo.ListOptions{
+	opts := metaclient.ListOptions{
 		Prefix:    "alpha/",
 		Cursor:    "a",
 		Delimiter: '/',
 		Recursive: true,
-		Direction: metainfo.After,
+		Direction: metaclient.After,
 		Limit:     30,
 	}
 
-	list := metainfo.ObjectList{
+	list := metaclient.ObjectList{
 		Bucket: "hello",
 		Prefix: "alpha/",
 		More:   true,
-		Items: []metainfo.Object{
+		Items: []metaclient.Object{
 			{Path: "alpha/xyz"},
 		},
 	}
 
 	newopts := opts.NextPage(list)
-	require.Equal(t, metainfo.ListOptions{
+	require.Equal(t, metaclient.ListOptions{
 		Prefix:    "alpha/",
 		Cursor:    "alpha/xyz",
 		Delimiter: '/',
 		Recursive: true,
-		Direction: metainfo.After,
+		Direction: metaclient.After,
 		Limit:     30,
 	}, newopts)
 }

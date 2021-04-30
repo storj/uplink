@@ -23,7 +23,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -63,7 +63,7 @@ type ETag interface {
 // Store is a store for streams. It implements typedStore as part of an ongoing migration
 // to use typed paths. See the shim for the store that the rest of the world interacts with.
 type Store struct {
-	metainfo             *metainfo.Client
+	metainfo             *metaclient.Client
 	ec                   ecclient.Client
 	segmentSize          int64
 	encStore             *encryption.Store
@@ -75,7 +75,7 @@ type Store struct {
 }
 
 // NewStreamStore constructs a stream store.
-func NewStreamStore(metainfo *metainfo.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int) (*Store, error) {
+func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int) (*Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
@@ -116,7 +116,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		return Meta{}, err
 	}
 
-	beginObjectReq := &metainfo.BeginObjectParams{
+	beginObjectReq := &metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedPath:        []byte(encPath.Raw()),
 		ExpiresAt:            expiration,
@@ -134,7 +134,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		keyNonce            storj.Nonce
 		objectRS, segmentRS eestream.RedundancyStrategy
 
-		requestsToBatch = make([]metainfo.BatchItem, 0, 2)
+		requestsToBatch = make([]metaclient.BatchItem, 0, 2)
 	)
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
@@ -181,9 +181,9 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			return Meta{}, err
 		}
 
-		segmentEncryption := metainfo.SegmentEncryption{}
+		segmentEncryption := metaclient.SegmentEncryption{}
 		if s.encryptionParameters.CipherSuite != storj.EncNull {
-			segmentEncryption = metainfo.SegmentEncryption{
+			segmentEncryption = metaclient.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: keyNonce,
 			}
@@ -198,14 +198,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
-			beginSegment := &metainfo.BeginSegmentParams{
+			beginSegment := &metaclient.BeginSegmentParams{
 				MaxOrderLimit: maxEncryptedSegmentSize,
-				Position: metainfo.SegmentPosition{
+				Position: metaclient.SegmentPosition{
 					Index: int32(currentSegment),
 				},
 			}
 
-			var responses []metainfo.BatchResponse
+			var responses []metaclient.BatchResponse
 			if currentSegment == 0 {
 				responses, err = s.metainfo.Batch(ctx, beginObjectReq, beginSegment)
 				if err != nil {
@@ -249,7 +249,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				plainSize = 0
 			}
 
-			requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
+			requestsToBatch = append(requestsToBatch, &metaclient.CommitSegmentParams{
 				SegmentID:         segmentID,
 				SizeEncryptedData: encSizedReader.Size(),
 				PlainSize:         plainSize,
@@ -272,8 +272,8 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				plainSize = 0
 			}
 
-			makeInlineSegment := &metainfo.MakeInlineSegmentParams{
-				Position: metainfo.SegmentPosition{
+			makeInlineSegment := &metaclient.MakeInlineSegmentParams{
+				Position: metaclient.SegmentPosition{
 					Index: int32(currentSegment),
 				},
 				Encryption:          segmentEncryption,
@@ -346,7 +346,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		return Meta{}, err
 	}
 
-	commitObject := metainfo.CommitObjectParams{
+	commitObject := metaclient.CommitObjectParams{
 		StreamID:          streamID,
 		EncryptedMetadata: objectMetadata,
 	}
@@ -385,7 +385,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		contentKey     storj.Key
 
 		// requests to send in a single call, in this case it will be always CommitSegment or MakeInlineSegment
-		requestsToBatch []metainfo.BatchItem
+		requestsToBatch []metaclient.BatchItem
 	)
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
@@ -439,9 +439,9 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			return Part{}, err
 		}
 
-		segmentEncryption := metainfo.SegmentEncryption{}
+		segmentEncryption := metaclient.SegmentEncryption{}
 		if s.encryptionParameters.CipherSuite != storj.EncNull {
-			segmentEncryption = metainfo.SegmentEncryption{
+			segmentEncryption = metaclient.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
 				EncryptedKeyNonce: encryptedKeyNonce,
 			}
@@ -456,16 +456,16 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
-			beginSegment := metainfo.BeginSegmentParams{
+			beginSegment := metaclient.BeginSegmentParams{
 				StreamID:      streamID,
 				MaxOrderLimit: maxEncryptedSegmentSize,
-				Position: metainfo.SegmentPosition{
+				Position: metaclient.SegmentPosition{
 					PartNumber: int32(partNumber),
 					Index:      int32(currentSegment),
 				},
 			}
 
-			var beginResponse metainfo.BeginSegmentResponse
+			var beginResponse metaclient.BeginSegmentResponse
 			if len(requestsToBatch) == 0 {
 				beginResponse, err = s.metainfo.BeginSegment(ctx, beginSegment)
 				if err != nil {
@@ -494,7 +494,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 
 			plainSegmentSize := sizeReader.Size()
 			if plainSegmentSize > 0 {
-				requestsToBatch = append(requestsToBatch, &metainfo.CommitSegmentParams{
+				requestsToBatch = append(requestsToBatch, &metaclient.CommitSegmentParams{
 					SegmentID:         beginResponse.SegmentID,
 					SizeEncryptedData: encSizedReader.Size(),
 					PlainSize:         plainSegmentSize,
@@ -514,9 +514,9 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 					return Part{}, err
 				}
 
-				requestsToBatch = append(requestsToBatch, &metainfo.MakeInlineSegmentParams{
+				requestsToBatch = append(requestsToBatch, &metaclient.MakeInlineSegmentParams{
 					StreamID: streamID,
-					Position: metainfo.SegmentPosition{
+					Position: metaclient.SegmentPosition{
 						PartNumber: int32(partNumber),
 						Index:      int32(currentSegment),
 					},
@@ -537,9 +537,9 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	if len(requestsToBatch) > 0 {
 		// take last segment in a part and set ETag
 		switch singleRequest := requestsToBatch[len(requestsToBatch)-1].(type) {
-		case *metainfo.MakeInlineSegmentParams:
+		case *metaclient.MakeInlineSegmentParams:
 			singleRequest.EncryptedTag = encryptedTag
-		case *metainfo.CommitSegmentParams:
+		case *metaclient.CommitSegmentParams:
 			singleRequest.EncryptedTag = encryptedTag
 		default:
 			return Part{}, errs.New("unsupported request type")
@@ -586,7 +586,7 @@ func deriveETagKey(key *storj.Key) (*storj.Key, error) {
 // Get returns a ranger that knows what the overall size is (from l/<key>)
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
-func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metainfo.DownloadInfo) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	object := info.Object
@@ -608,7 +608,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				cursor = last.Position
 			}
 
-			result, err := s.metainfo.ListSegments(ctx, metainfo.ListSegmentsParams{
+			result, err := s.metainfo.ListSegments(ctx, metaclient.ListSegmentsParams{
 				StreamID: object.ID,
 				Cursor:   cursor,
 				Range:    info.Range,
@@ -761,10 +761,10 @@ func calculatePlain(pos storj.SegmentPosition, rawOffset, rawSize int64, object 
 
 type lazySegmentRanger struct {
 	ranger               ranger.Ranger
-	metainfo             *metainfo.Client
+	metainfo             *metaclient.Client
 	streams              *Store
 	streamID             storj.StreamID
-	position             metainfo.SegmentPosition
+	position             metaclient.SegmentPosition
 	plainSize            int64
 	derivedKey           *storj.Key
 	startingNonce        *storj.Nonce
@@ -781,9 +781,9 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 	defer mon.Task()(&ctx)(&err)
 
 	if lr.ranger == nil {
-		downloadResponse, err := lr.metainfo.DownloadSegmentWithRS(ctx, metainfo.DownloadSegmentParams{
+		downloadResponse, err := lr.metainfo.DownloadSegmentWithRS(ctx, metaclient.DownloadSegmentParams{
 			StreamID: lr.streamID,
-			Position: metainfo.SegmentPosition{
+			Position: metaclient.SegmentPosition{
 				PartNumber: lr.position.PartNumber,
 				Index:      lr.position.Index,
 			},
@@ -845,7 +845,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
-func (s *Store) Ranger(ctx context.Context, response metainfo.DownloadSegmentWithRSResponse) (rr ranger.Ranger, err error) {
+func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentWithRSResponse) (rr ranger.Ranger, err error) {
 	info := response.Info
 	limits := response.Limits
 

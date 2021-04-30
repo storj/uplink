@@ -12,7 +12,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
@@ -33,7 +33,7 @@ func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
 
 		// RedundancySchemePerSegment == false means that GetObject SHOULD
 		// return redundancy scheme
-		object, err := metainfoClient.GetObject(ctx, metainfo.GetObjectParams{
+		object, err := metainfoClient.GetObject(ctx, metaclient.GetObjectParams{
 			Bucket:                     []byte("super-bucket"),
 			EncryptedPath:              []byte(objects[0].ObjectKey),
 			RedundancySchemePerSegment: false,
@@ -43,7 +43,7 @@ func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
 
 		// RedundancySchemePerSegment == true means that GetObject SHOULDN'T
 		// return redundancy scheme
-		object, err = metainfoClient.GetObject(ctx, metainfo.GetObjectParams{
+		object, err = metainfoClient.GetObject(ctx, metaclient.GetObjectParams{
 			Bucket:                     []byte("super-bucket"),
 			EncryptedPath:              []byte(objects[0].ObjectKey),
 			RedundancySchemePerSegment: true,

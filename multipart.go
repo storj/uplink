@@ -18,7 +18,7 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -84,7 +84,7 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	response, err := metainfoClient.BeginObject(ctx, metainfo.BeginObjectParams{
+	response, err := metainfoClient.BeginObject(ctx, metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedPath:        []byte(encPath.Raw()),
 		ExpiresAt:            options.Expires,
@@ -194,7 +194,7 @@ func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID 
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	err = metainfoClient.CommitObject(ctx, metainfo.CommitObjectParams{
+	err = metainfoClient.CommitObject(ctx, metaclient.CommitObjectParams{
 		StreamID:                      id,
 		EncryptedMetadata:             streamMetaBytes,
 		EncryptedMetadataEncryptedKey: encryptedKey,
@@ -290,7 +290,7 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	_, err = metainfoClient.BeginDeleteObject(ctx, metainfo.BeginDeleteObjectParams{
+	_, err = metainfoClient.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
 		Bucket:        []byte(bucket),
 		EncryptedPath: []byte(encPath.Raw()),
 		// TODO remove it or set to 0 when satellite side will be fixed
@@ -305,10 +305,10 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 func (project *Project) ListUploadParts(ctx context.Context, bucket, key, uploadID string, options *ListUploadPartsOptions) *PartIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := metainfo.ListSegmentsParams{}
+	opts := metaclient.ListSegmentsParams{}
 
 	if options != nil {
-		opts.Cursor = metainfo.SegmentPosition{
+		opts.Cursor = metaclient.SegmentPosition{
 			PartNumber: int32(options.Cursor),
 		}
 	}
@@ -348,8 +348,8 @@ func (project *Project) ListUploadParts(ctx context.Context, bucket, key, upload
 func (project *Project) ListUploads(ctx context.Context, bucket string, options *ListUploadsOptions) *UploadIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := metainfo.ListOptions{
-		Direction: metainfo.After,
+	opts := metaclient.ListOptions{
+		Direction: metaclient.After,
 		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
 	}
 

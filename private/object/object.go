@@ -10,14 +10,14 @@ import (
 
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // Error is default error class for uplink.
 var packageError = errs.Class("object")
 
 // IPSummary contains information about the object IP-s.
-type IPSummary = metainfo.GetObjectIPsResponse
+type IPSummary = metaclient.GetObjectIPsResponse
 
 // GetObjectIPs returns the IP-s for a given object.
 //
@@ -38,14 +38,14 @@ func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplin
 	}
 	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
 
-	metainfoClient, err := metainfo.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
+	metainfoClient, err := metaclient.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	db := metainfo.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
+	db := metaclient.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
 
-	summary, err := db.GetObjectIPs(ctx, metainfo.Bucket{Name: bucket}, key)
+	summary, err := db.GetObjectIPs(ctx, metaclient.Bucket{Name: bucket}, key)
 	return summary, packageError.Wrap(err)
 }

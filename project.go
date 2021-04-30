@@ -15,7 +15,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink/internal/telemetryclient"
 	"storj.io/uplink/private/ecclient"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/testuplink"
 	"storj.io/uplink/private/version"
@@ -180,7 +180,7 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 	return streamStore, nil
 }
 
-func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metainfo.DB, err error) {
+func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metaclient.DB, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
@@ -188,13 +188,13 @@ func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metainfo.DB, err
 		return nil, packageError.Wrap(err)
 	}
 
-	return metainfo.New(metainfoClient, project.access.encAccess.Store), nil
+	return metaclient.New(metainfoClient, project.access.encAccess.Store), nil
 }
 
-func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metainfo.Client, err error) {
+func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.Client, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	metainfoClient, err := metainfo.DialNodeURL(ctx,
+	metainfoClient, err := metaclient.DialNodeURL(ctx,
 		project.dialer,
 		project.access.satelliteURL.String(),
 		project.access.apiKey,

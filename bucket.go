@@ -12,7 +12,7 @@ import (
 
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // ErrBucketNameInvalid is returned when the bucket name is invalid.
@@ -68,7 +68,7 @@ func (project *Project) CreateBucket(ctx context.Context, bucket string) (create
 
 	b, err := db.CreateBucket(ctx, bucket)
 	if err != nil {
-		if metainfo.ErrNoBucket.Has(err) {
+		if metaclient.ErrNoBucket.Has(err) {
 			return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
 		}
 		if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
@@ -125,7 +125,7 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 		return nil, convertKnownErrors(err, bucket, "")
 	}
 
-	if existing == (metainfo.Bucket{}) {
+	if existing == (metaclient.Bucket{}) {
 		return nil, nil
 	}
 
@@ -150,7 +150,7 @@ func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket stri
 		return nil, convertKnownErrors(err, bucket, "")
 	}
 
-	if existing == (metainfo.Bucket{}) {
+	if existing == (metaclient.Bucket{}) {
 		return nil, nil
 	}
 

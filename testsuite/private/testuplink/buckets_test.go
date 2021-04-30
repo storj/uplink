@@ -22,7 +22,7 @@ import (
 	"storj.io/storj/satellite/console"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 )
 
@@ -32,7 +32,7 @@ const (
 )
 
 func TestBucketsBasic(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -40,7 +40,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Check that bucket list include the new bucket
-		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
+		bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 1, len(bucketList.Items))
@@ -60,7 +60,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Check that the bucket list is empty
-		bucketList, err = db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
+		bucketList, err = db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -68,12 +68,12 @@ func TestBucketsBasic(t *testing.T) {
 
 		// Check that the bucket cannot be get explicitly
 		bucket, err = db.GetBucket(ctx, TestBucket)
-		assert.True(t, metainfo.ErrBucketNotFound.Has(err))
+		assert.True(t, metaclient.ErrBucketNotFound.Has(err))
 	})
 }
 
 func TestBucketsReadWrite(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -81,7 +81,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Check that bucket list include the new bucket
-		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
+		bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 1, len(bucketList.Items))
@@ -101,7 +101,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Check that the bucket list is empty
-		bucketList, err = db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.After})
+		bucketList, err = db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.After})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -109,25 +109,25 @@ func TestBucketsReadWrite(t *testing.T) {
 
 		// Check that the bucket cannot be get explicitly
 		bucket, err = db.GetBucket(ctx, TestBucket)
-		assert.True(t, metainfo.ErrBucketNotFound.Has(err))
+		assert.True(t, metaclient.ErrBucketNotFound.Has(err))
 	})
 }
 
 func TestErrNoBucket(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
 		_, err = db.GetBucket(ctx, "")
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
 		_, err = db.DeleteBucket(ctx, "", false)
-		assert.True(t, metainfo.ErrNoBucket.Has(err))
+		assert.True(t, metaclient.ErrNoBucket.Has(err))
 	})
 }
 
 func TestBucketDeleteAll(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
@@ -151,8 +151,8 @@ func TestBucketDeleteAll(t *testing.T) {
 }
 
 func TestListBucketsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
-		bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{Direction: metainfo.Forward})
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+		bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.Forward})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
 			assert.Equal(t, 0, len(bucketList.Items))
@@ -161,7 +161,7 @@ func TestListBucketsEmpty(t *testing.T) {
 }
 
 func TestListBuckets(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metainfo.DB, streams *streams.Store) {
+	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
 		for _, name := range bucketNames {
@@ -171,31 +171,31 @@ func TestListBuckets(t *testing.T) {
 
 		for i, tt := range []struct {
 			cursor string
-			dir    metainfo.ListDirection
+			dir    metaclient.ListDirection
 			limit  int
 			more   bool
 			result []string
 		}{
-			{cursor: "", dir: metainfo.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
-			{cursor: "`", dir: metainfo.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
-			{cursor: "b00", dir: metainfo.Forward, limit: 0, more: false, result: []string{"b00", "bb0", "c00"}},
-			{cursor: "c00", dir: metainfo.Forward, limit: 0, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: metainfo.Forward, limit: 0, more: false, result: []string{}},
-			{cursor: "", dir: metainfo.Forward, limit: 1, more: true, result: []string{"a00"}},
-			{cursor: "`", dir: metainfo.Forward, limit: 1, more: true, result: []string{"a00"}},
-			{cursor: "aa0", dir: metainfo.Forward, limit: 1, more: true, result: []string{"aa0"}},
-			{cursor: "c00", dir: metainfo.Forward, limit: 1, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: metainfo.Forward, limit: 1, more: false, result: []string{}},
-			{cursor: "", dir: metainfo.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
-			{cursor: "`", dir: metainfo.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
-			{cursor: "aa0", dir: metainfo.Forward, limit: 2, more: true, result: []string{"aa0", "b00"}},
-			{cursor: "bb0", dir: metainfo.Forward, limit: 2, more: false, result: []string{"bb0", "c00"}},
-			{cursor: "c00", dir: metainfo.Forward, limit: 2, more: false, result: []string{"c00"}},
-			{cursor: "ca", dir: metainfo.Forward, limit: 2, more: false, result: []string{}},
+			{cursor: "", dir: metaclient.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
+			{cursor: "`", dir: metaclient.Forward, limit: 0, more: false, result: []string{"a00", "aa0", "b00", "bb0", "c00"}},
+			{cursor: "b00", dir: metaclient.Forward, limit: 0, more: false, result: []string{"b00", "bb0", "c00"}},
+			{cursor: "c00", dir: metaclient.Forward, limit: 0, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metaclient.Forward, limit: 0, more: false, result: []string{}},
+			{cursor: "", dir: metaclient.Forward, limit: 1, more: true, result: []string{"a00"}},
+			{cursor: "`", dir: metaclient.Forward, limit: 1, more: true, result: []string{"a00"}},
+			{cursor: "aa0", dir: metaclient.Forward, limit: 1, more: true, result: []string{"aa0"}},
+			{cursor: "c00", dir: metaclient.Forward, limit: 1, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metaclient.Forward, limit: 1, more: false, result: []string{}},
+			{cursor: "", dir: metaclient.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
+			{cursor: "`", dir: metaclient.Forward, limit: 2, more: true, result: []string{"a00", "aa0"}},
+			{cursor: "aa0", dir: metaclient.Forward, limit: 2, more: true, result: []string{"aa0", "b00"}},
+			{cursor: "bb0", dir: metaclient.Forward, limit: 2, more: false, result: []string{"bb0", "c00"}},
+			{cursor: "c00", dir: metaclient.Forward, limit: 2, more: false, result: []string{"c00"}},
+			{cursor: "ca", dir: metaclient.Forward, limit: 2, more: false, result: []string{}},
 		} {
 			errTag := fmt.Sprintf("%d. %+v", i, tt)
 
-			bucketList, err := db.ListBuckets(ctx, metainfo.BucketListOptions{
+			bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{
 				Cursor:    tt.cursor,
 				Direction: tt.dir,
 				Limit:     tt.limit,
@@ -209,7 +209,7 @@ func TestListBuckets(t *testing.T) {
 	})
 }
 
-func getBucketNames(bucketList metainfo.BucketList) []string {
+func getBucketNames(bucketList metaclient.BucketList) []string {
 	names := make([]string, len(bucketList.Items))
 
 	for i, item := range bucketList.Items {
@@ -219,11 +219,11 @@ func getBucketNames(bucketList metainfo.BucketList) []string {
 	return names
 }
 
-func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, *streams.Store)) {
+func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
 	runTestWithPathCipher(t, storj.EncAESGCM, test)
 }
 
-func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metainfo.DB, *streams.Store)) {
+func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -248,7 +248,7 @@ func newTestEncStore(keyStr string) *encryption.Store {
 	return store
 }
 
-func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ *metainfo.DB, _ *streams.Store, _ func() error, err error) {
+func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ *metaclient.DB, _ *streams.Store, _ func() error, err error) {
 	// TODO(kaloyan): We should have a better way for configuring the Satellite's API Key
 	// add project to satisfy constraint
 	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{
@@ -307,5 +307,5 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return metainfo.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
+	return metaclient.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
 }

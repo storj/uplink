@@ -17,7 +17,7 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // An Access Grant contains everything to access a project and specific buckets.
@@ -169,7 +169,7 @@ func (config Config) requestAccessWithPassphraseAndConcurrency(ctx context.Conte
 	}
 	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
 
-	metainfo, err := metainfo.DialNodeURL(ctx, dialer, satelliteURL.String(), parsedAPIKey, config.UserAgent)
+	metainfo, err := metaclient.DialNodeURL(ctx, dialer, satelliteURL.String(), parsedAPIKey, config.UserAgent)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -281,7 +281,7 @@ func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err e
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	err = metainfoClient.RevokeAPIKey(ctx, metainfo.RevokeAPIKeyParams{
+	err = metainfoClient.RevokeAPIKey(ctx, metaclient.RevokeAPIKeyParams{
 		APIKey: access.apiKey.SerializeRaw(),
 	})
 	return convertKnownErrors(err, "", "")

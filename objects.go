@@ -9,7 +9,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
-	"storj.io/uplink/private/metainfo"
+	"storj.io/uplink/private/metaclient"
 )
 
 // ListObjectsOptions defines object listing options.
@@ -31,9 +31,9 @@ type ListObjectsOptions struct {
 func (project *Project) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) *ObjectIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	b := metainfo.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
-	opts := metainfo.ListOptions{
-		Direction: metainfo.After,
+	b := metaclient.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
+	opts := metaclient.ListOptions{
+		Direction: metaclient.After,
 	}
 
 	if options != nil {
@@ -60,10 +60,10 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 type ObjectIterator struct {
 	ctx        context.Context
 	project    *Project
-	bucket     metainfo.Bucket
-	options    metainfo.ListOptions
+	bucket     metaclient.Bucket
+	options    metaclient.ListOptions
 	objOptions ListObjectsOptions
-	list       *metainfo.ObjectList
+	list       *metaclient.ObjectList
 	position   int
 	completed  bool
 	err        error
@@ -165,7 +165,7 @@ func (objects *ObjectIterator) Item() *Object {
 	return &obj
 }
 
-func (objects *ObjectIterator) item() *metainfo.Object {
+func (objects *ObjectIterator) item() *metaclient.Object {
 	if objects.completed {
 		return nil
 	}
