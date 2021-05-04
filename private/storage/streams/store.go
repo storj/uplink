@@ -15,7 +15,9 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
+	"go.uber.org/zap"
 
+	"storj.io/common/context2"
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
 	"storj.io/common/pb"
@@ -124,6 +126,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	var streamID storj.StreamID
+	defer func() {
+		if err != nil && !streamID.IsZero() {
+			s.deleteCancelledObject(context2.WithoutCancellation(ctx), bucket, unencryptedKey, encPath.Raw(), streamID)
+			return
+		}
+	}()
 
 	var (
 		currentSegment      int64
@@ -842,6 +850,24 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 		return nil, err
 	}
 	return encryption.Unpad(rd, int(rd.Size()-plainSize))
+}
+
+// deleteCancelledObject handles clean up of segments on receiving CTRL+C or context cancellation.
+func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, unencryptedPath, encryptedPath string, streamID storj.StreamID) {
+	var err error
+	defer mon.Task()(&ctx)(&err)
+
+	_, err = s.metainfo.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
+		Bucket:        []byte(bucketName),
+		EncryptedPath: []byte(encryptedPath),
+		// TODO remove it or set to 0 when satellite side will be fixed
+		Version:  1,
+		StreamID: streamID,
+		Status:   int32(pb.Object_UPLOADING),
+	})
+	if err != nil {
+		zap.L().Warn("failed deleting cancelled object", zap.String("bucket", bucketName), zap.String("key", unencryptedPath), zap.Error(err))
+	}
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.

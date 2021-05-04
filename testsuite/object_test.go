@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -166,8 +167,7 @@ func TestAbortUpload(t *testing.T) {
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		randData := testrand.Bytes(10 * memory.KiB)
-		source := bytes.NewBuffer(randData)
-		_, err = io.Copy(upload, source)
+		_, err = upload.Write(randData)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
@@ -182,6 +182,165 @@ func TestAbortUpload(t *testing.T) {
 
 		err = upload.Abort()
 		require.True(t, errors.Is(err, uplink.ErrUploadDone))
+
+		uploads := project.ListUploads(ctx, "testbucket", nil)
+		for uploads.Next() {
+			item := uploads.Item()
+			require.Fail(t, "expected no pending uploads", item)
+		}
+		require.NoError(t, uploads.Err())
+	})
+}
+
+func TestContextCancelUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		uploadctx, uploadcancel := context.WithCancel(ctx)
+
+		upload, err := project.UploadObject(uploadctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		randData := testrand.Bytes(10 * memory.KiB)
+		_, err = upload.Write(randData)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
+
+		uploadcancel()
+		_, err = upload.Write(randData)
+		require.Error(t, err)
+
+		err = upload.Abort()
+		require.NoError(t, err)
+
+		err = upload.Commit()
+		require.Error(t, err)
+
+		_, err = project.StatObject(ctx, "testbucket", "test.dat")
+		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
+
+		err = upload.Abort()
+		require.True(t, errors.Is(err, uplink.ErrUploadDone))
+
+		uploads := project.ListUploads(ctx, "testbucket", nil)
+		for uploads.Next() {
+			item := uploads.Item()
+			require.Fail(t, "expected no pending uploads", item)
+		}
+		require.NoError(t, uploads.Err())
+	})
+}
+
+func TestConcurrentUploadAndCommit(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// start upload
+		upload1, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
+
+		randData := testrand.Bytes(30 * memory.KiB)
+		_, err = upload1.Write(randData)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
+
+		// start second upload to the same path,
+		// this will currently delete the first upload.
+		upload2, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload2.Info(), "test.dat")
+
+		_, err = upload2.Write(randData)
+		require.NoError(t, err)
+
+		err = upload2.Commit()
+		require.NoError(t, err)
+
+		// Try to commit the first object, but this will fail because it was deleted.
+		err = upload1.Commit()
+		require.Error(t, err)
+
+		_, err = project.StatObject(ctx, "testbucket", "test.dat")
+		require.NoError(t, err)
+
+		uploads := project.ListUploads(ctx, "testbucket", nil)
+		for uploads.Next() {
+			item := uploads.Item()
+			require.Fail(t, "expected no pending uploads", item)
+		}
+		require.NoError(t, uploads.Err())
+	})
+}
+
+func TestConcurrentUploadAndCancel(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// start upload
+		upload1, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
+
+		randData := testrand.Bytes(30 * memory.KiB)
+		_, err = upload1.Write(randData)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
+
+		// start second upload to the same path,
+		// this will currently delete the first upload.
+		upload2, err := project.UploadObject(ctx, "testbucket", "test.dat", nil)
+		require.NoError(t, err)
+		assertObjectEmptyCreated(t, upload2.Info(), "test.dat")
+
+		_, err = upload2.Write(randData)
+		require.NoError(t, err)
+
+		err = upload2.Commit()
+		require.NoError(t, err)
+
+		// Try to abort the first object, but this will fail because it was deleted.
+		// It shouldn't also delete the existing object.
+		err = upload1.Abort()
+		require.NoError(t, err)
+
+		_, err = project.StatObject(ctx, "testbucket", "test.dat")
+		require.NoError(t, err)
+
+		uploads := project.ListUploads(ctx, "testbucket", nil)
+		for uploads.Next() {
+			item := uploads.Item()
+			require.Fail(t, "expected no pending uploads", item)
+		}
+		require.NoError(t, uploads.Err())
 	})
 }
 
