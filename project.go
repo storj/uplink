@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/memory"
@@ -120,7 +119,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	}
 
 	// TODO: What is the correct way to derive a named zap.Logger from config.Log?
-	ec := ecclient.NewClient(zap.L().Named("ecclient"), dialer, 0)
+	ec := ecclient.NewClient(nil, dialer, 0)
 
 	return &Project{
 		config:               config,

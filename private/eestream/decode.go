@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 
 	"storj.io/common/encryption"
 	"storj.io/common/errs2"
@@ -19,7 +18,6 @@ import (
 )
 
 type decodedReader struct {
-	log             *zap.Logger
 	ctx             context.Context
 	cancel          context.CancelFunc
 	readers         map[int]io.ReadCloser
@@ -42,7 +40,7 @@ type decodedReader struct {
 // set to 0, the minimum possible memory will be used.
 // if forceErrorDetection is set to true then k+1 pieces will be always
 // required for decoding, so corrupted pieces can be detected.
-func DecodeReaders(ctx context.Context, cancel func(), log *zap.Logger, rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
+func DecodeReaders(ctx context.Context, cancel func(), _ interface{}, rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
 	defer mon.Task()(&ctx)(nil)
 	if expectedSize < 0 {
 		return readcloser.FatalReadCloser(Error.New("negative expected size"))
@@ -56,7 +54,6 @@ func DecodeReaders(ctx context.Context, cancel func(), log *zap.Logger, rs map[i
 		return readcloser.FatalReadCloser(err)
 	}
 	dr := &decodedReader{
-		log:             log,
 		readers:         rs,
 		scheme:          es,
 		stripeReader:    NewStripeReader(rs, es, mbm, forceErrorDetection),
@@ -131,13 +128,12 @@ func (dr *decodedReader) Close() (err error) {
 		return dr.closeErr
 	}
 	if dr.closeErr != nil {
-		dr.log.Debug("decode close non fatal error: ", zap.Error(dr.closeErr))
+		mon.Event("close failed")
 	}
 	return nil
 }
 
 type decodedRanger struct {
-	log                 *zap.Logger
 	es                  ErasureScheme
 	rrs                 map[int]ranger.Ranger
 	inSize              int64
@@ -153,7 +149,7 @@ type decodedRanger struct {
 // set to 0, the minimum possible memory will be used.
 // if forceErrorDetection is set to true then k+1 pieces will be always
 // required for decoding, so corrupted pieces can be detected.
-func Decode(log *zap.Logger, rrs map[int]ranger.Ranger, es ErasureScheme, mbm int, forceErrorDetection bool) (ranger.Ranger, error) {
+func Decode(_ interface{}, rrs map[int]ranger.Ranger, es ErasureScheme, mbm int, forceErrorDetection bool) (ranger.Ranger, error) {
 	if err := checkMBM(mbm); err != nil {
 		return nil, err
 	}
@@ -165,8 +161,7 @@ func Decode(log *zap.Logger, rrs map[int]ranger.Ranger, es ErasureScheme, mbm in
 		if size == -1 {
 			size = rr.Size()
 		} else if size != rr.Size() {
-			return nil, Error.New(
-				"decode failure: range reader sizes don't all match")
+			return nil, Error.New("decode failure: range reader sizes don't all match")
 		}
 	}
 	if size == -1 {
@@ -178,7 +173,6 @@ func Decode(log *zap.Logger, rrs map[int]ranger.Ranger, es ErasureScheme, mbm in
 			size, es.ErasureShareSize())
 	}
 	return &decodedRanger{
-		log:                 log,
 		es:                  es,
 		rrs:                 rrs,
 		inSize:              size,
@@ -212,7 +206,7 @@ func (dr *decodedRanger) Range(ctx context.Context, offset, length int64) (_ io.
 	}
 
 	// decode from all those ranges
-	r := DecodeReaders(ctx, cancel, dr.log, readers, dr.es, blockCount*int64(dr.es.StripeSize()), dr.mbm, dr.forceErrorDetection)
+	r := DecodeReaders(ctx, cancel, nil, readers, dr.es, blockCount*int64(dr.es.StripeSize()), dr.mbm, dr.forceErrorDetection)
 	// offset might start a few bytes in, potentially discard the initial bytes
 	_, err = io.CopyN(ioutil.Discard, r, offset-firstBlock*int64(dr.es.StripeSize()))
 	if err != nil {

@@ -8,12 +8,12 @@ import (
 	"io"
 	"io/ioutil"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 
 	"storj.io/common/encryption"
 	"storj.io/common/errs2"
@@ -40,16 +40,14 @@ type Client interface {
 type dialPiecestoreFunc func(context.Context, storj.NodeURL) (*piecestore.Client, error)
 
 type ecClient struct {
-	log                 *zap.Logger
 	dialer              rpc.Dialer
 	memoryLimit         int
 	forceErrorDetection bool
 }
 
 // NewClient from the given identity and max buffer memory.
-func NewClient(log *zap.Logger, dialer rpc.Dialer, memoryLimit int) Client {
+func NewClient(_ interface{}, dialer rpc.Dialer, memoryLimit int) Client {
 	return &ecClient{
-		log:         log,
 		dialer:      dialer,
 		memoryLimit: memoryLimit,
 	}
@@ -61,8 +59,7 @@ func (ec *ecClient) WithForceErrorDetection(force bool) Client {
 }
 
 func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piecestore.Client, error) {
-	logger := ec.log.Named(n.ID.String())
-	return piecestore.DialNodeURL(ctx, ec.dialer, n, logger, piecestore.DefaultConfig)
+	return piecestore.DialNodeURL(ctx, ec.dialer, n, nil, piecestore.DefaultConfig)
 }
 
 func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
@@ -92,7 +89,12 @@ func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedO
 }
 
 func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
-	defer mon.Task()(&ctx)(&err)
+	defer mon.Task()(&ctx,
+		"erasure:"+strconv.Itoa(rs.ErasureShareSize()),
+		"stripe:"+strconv.Itoa(rs.StripeSize()),
+		"repair:"+strconv.Itoa(rs.RepairThreshold()),
+		"optimal:"+strconv.Itoa(rs.OptimalThreshold()),
+	)(&err)
 
 	pieceCount := len(limits)
 	if pieceCount != rs.TotalCount() {
@@ -108,15 +110,8 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		return nil, nil, Error.New("duplicated nodes are not allowed")
 	}
 
-	ec.log.Debug("Uploading to storage nodes",
-		zap.Int("Erasure Share Size", rs.ErasureShareSize()),
-		zap.Int("Stripe Size", rs.StripeSize()),
-		zap.Int("Repair Threshold", rs.RepairThreshold()),
-		zap.Int("Optimal Threshold", rs.OptimalThreshold()),
-	)
-
 	padded := encryption.PadReader(ioutil.NopCloser(data), rs.StripeSize())
-	readers, err := eestream.EncodeReader(ctx, ec.log, padded, rs)
+	readers, err := eestream.EncodeReader(ctx, nil, padded, rs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -128,12 +123,12 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	}
 	infos := make(chan info, pieceCount)
 
-	psCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	piecesCtx, piecesCancel := context.WithCancel(ctx)
+	defer piecesCancel()
 
 	for i, addressedLimit := range limits {
 		go func(i int, addressedLimit *pb.AddressedOrderLimit) {
-			hash, _, err := ec.PutPiece(psCtx, ctx, addressedLimit, privateKey, readers[i])
+			hash, _, err := ec.PutPiece(piecesCtx, ctx, addressedLimit, privateKey, readers[i])
 			infos <- info{i: i, err: err, hash: hash}
 		}(i, addressedLimit)
 	}
@@ -154,10 +149,6 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 			} else {
 				cancellationCount++
 			}
-			ec.log.Debug("Upload to storage node failed",
-				zap.Stringer("Node ID", limits[info.i].GetLimit().StorageNodeId),
-				zap.Error(info.err),
-			)
 			continue
 		}
 
@@ -169,10 +160,8 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 
 		successfulCount++
 		if int(successfulCount) >= rs.OptimalThreshold() {
-			ec.log.Debug("Success threshold reached. Cancelling remaining uploads.",
-				zap.Int("Optimal Threshold", rs.OptimalThreshold()),
-			)
-			cancel()
+			// cancelling remaining uploads
+			piecesCancel()
 		}
 	}
 
@@ -215,27 +204,18 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	}
 
 	storageNodeID := limit.GetLimit().StorageNodeId
-	pieceID := limit.GetLimit().PieceId
 	ps, err := ec.dialPiecestore(ctx, storj.NodeURL{
 		ID:      storageNodeID,
 		Address: limit.GetStorageNodeAddress().Address,
 	})
 	if err != nil {
-		ec.log.Debug("Failed dialing for putting piece to node",
-			zap.Stringer("Piece ID", pieceID),
-			zap.Stringer("Node ID", storageNodeID),
-			zap.Error(err),
-		)
-		return nil, nil, err
+		return nil, nil, Error.New("failed to dial (node:%v): %w", storageNodeID, err)
 	}
 	defer func() { err = errs.Combine(err, ps.Close()) }()
 
 	peerID, err = ps.GetPeerIdentity()
 	if err != nil {
-		ec.log.Debug("Failed getting peer identity from node connection",
-			zap.Stringer("Node ID", storageNodeID),
-			zap.Error(err),
-		)
+		err = Error.New("failed getting peer identity (node:%v): %w", storageNodeID, err)
 		return nil, nil, err
 	}
 
@@ -245,27 +225,20 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 			// Canceled context means the piece upload was interrupted by user or due
 			// to slow connection. No error logging for this case.
 			if parent.Err() == context.Canceled { //nolint: goerr113
-				ec.log.Info("Upload to node canceled by user", zap.Stringer("Node ID", storageNodeID))
+				err = Error.New("upload canceled by user: %w", err)
 			} else {
-				ec.log.Debug("Node cut from upload due to slow connection", zap.Stringer("Node ID", storageNodeID))
+				err = Error.New("upload cut due to slow connection (node:%v): %w", storageNodeID, err)
 			}
 
 			// make sure context.Canceled is the primary error in the error chain
 			// for later errors.Is/errs2.IsCanceled checking
 			err = errs.Combine(context.Canceled, err)
-
 		} else {
 			nodeAddress := ""
 			if limit.GetStorageNodeAddress() != nil {
 				nodeAddress = limit.GetStorageNodeAddress().GetAddress()
 			}
-
-			ec.log.Debug("Failed uploading piece to node",
-				zap.Stringer("Piece ID", pieceID),
-				zap.Stringer("Node ID", storageNodeID),
-				zap.String("Node Address", nodeAddress),
-				zap.Error(err),
-			)
+			err = Error.New("upload failed (node:%v, address:%v): %w", storageNodeID, nodeAddress, err)
 		}
 
 		return nil, nil, err
@@ -302,7 +275,7 @@ func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		}
 	}
 
-	rr, err = eestream.Decode(ec.log, rrs, es, ec.memoryLimit, ec.forceErrorDetection)
+	rr, err = eestream.Decode(nil, rrs, es, ec.memoryLimit, ec.forceErrorDetection)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}

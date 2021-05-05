@@ -33,3 +33,8 @@ if go list -deps . | grep -q "testing"; then
     echo "uplink must not have a dependency to testing";
     exit -1;
 fi
+
+if go list -deps . | grep -q "zap"; then
+    echo "uplink must not have a dependency to zap";
+    exit -1;
+fi

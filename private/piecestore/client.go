@@ -8,7 +8,6 @@ import (
 	"io"
 
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 
 	"storj.io/common/identity"
 	"storj.io/common/memory"
@@ -38,21 +37,19 @@ var DefaultConfig = Config{
 
 // Client implements uploading, downloading and deleting content from a piecestore.
 type Client struct {
-	log    *zap.Logger
 	client pb.DRPCPiecestoreClient
 	conn   *rpc.Conn
 	config Config
 }
 
 // DialNodeURL dials the target piecestore endpoint.
-func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, log *zap.Logger, config Config) (*Client, error) {
+func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, _ interface{}, config Config) (*Client, error) {
 	conn, err := dialer.DialNodeURL(ctx, nodeURL)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
 	return &Client{
-		log:    log,
 		client: pb.NewDRPCPiecestoreClient(conn),
 		conn:   conn,
 		config: config,

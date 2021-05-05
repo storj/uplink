@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/vivint/infectious"
-	"go.uber.org/zap"
 
 	"storj.io/common/encryption"
 	"storj.io/common/fpath"
@@ -138,7 +137,7 @@ type encodedReader struct {
 
 // EncodeReader takes a Reader and a RedundancyStrategy and returns a slice of
 // io.ReadClosers.
-func EncodeReader(ctx context.Context, log *zap.Logger, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
+func EncodeReader(ctx context.Context, _ interface{}, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	er := &encodedReader{
@@ -243,21 +242,19 @@ func (ep *encodedPiece) Close() (err error) {
 // multiple Ranged sub-Readers. EncodedRanger does not match the normal Ranger
 // interface.
 type EncodedRanger struct {
-	log *zap.Logger
-	rr  ranger.Ranger
-	rs  RedundancyStrategy
+	rr ranger.Ranger
+	rs RedundancyStrategy
 }
 
 // NewEncodedRanger from the given Ranger and RedundancyStrategy. See the
 // comments for EncodeReader about the repair and success thresholds.
-func NewEncodedRanger(log *zap.Logger, rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
+func NewEncodedRanger(_ interface{}, rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
 	if rr.Size()%int64(rs.StripeSize()) != 0 {
 		return nil, Error.New("invalid erasure encoder and range reader combo. range reader size must be a multiple of erasure encoder block size")
 	}
 	return &EncodedRanger{
-		log: log,
-		rs:  rs,
-		rr:  rr,
+		rs: rs,
+		rr: rr,
 	}, nil
 }
 
@@ -282,7 +279,7 @@ func (er *EncodedRanger) Range(ctx context.Context, offset, length int64) (_ []i
 	if err != nil {
 		return nil, err
 	}
-	readers, err := EncodeReader(ctx, er.log, r, er.rs)
+	readers, err := EncodeReader(ctx, nil, r, er.rs)
 	if err != nil {
 		return nil, err
 	}

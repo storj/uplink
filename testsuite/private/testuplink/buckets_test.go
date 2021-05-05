@@ -285,7 +285,7 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 		}
 	}()
 
-	ec := ecclient.NewClient(planet.Uplinks[0].Log.Named("ecclient"), planet.Uplinks[0].Dialer, 0)
+	ec := ecclient.NewClient(nil, planet.Uplinks[0].Dialer, 0)
 	fc, err := infectious.NewFEC(2, 4)
 	if err != nil {
 		return nil, nil, nil, err

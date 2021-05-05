@@ -15,7 +15,6 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
-	"go.uber.org/zap"
 
 	"storj.io/common/context2"
 	"storj.io/common/encryption"
@@ -128,7 +127,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	var streamID storj.StreamID
 	defer func() {
 		if err != nil && !streamID.IsZero() {
-			s.deleteCancelledObject(context2.WithoutCancellation(ctx), bucket, unencryptedKey, encPath.Raw(), streamID)
+			s.deleteCancelledObject(context2.WithoutCancellation(ctx), bucket, encPath.Raw(), streamID)
 			return
 		}
 	}()
@@ -853,7 +852,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 }
 
 // deleteCancelledObject handles clean up of segments on receiving CTRL+C or context cancellation.
-func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, unencryptedPath, encryptedPath string, streamID storj.StreamID) {
+func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encryptedPath string, streamID storj.StreamID) {
 	var err error
 	defer mon.Task()(&ctx)(&err)
 
@@ -866,7 +865,7 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, unencrypt
 		Status:   int32(pb.Object_UPLOADING),
 	})
 	if err != nil {
-		zap.L().Warn("failed deleting cancelled object", zap.String("bucket", bucketName), zap.String("key", unencryptedPath), zap.Error(err))
+		mon.Event("failed to delete cancelled object")
 	}
 }
 
