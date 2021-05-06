@@ -46,7 +46,14 @@ type ecClient struct {
 }
 
 // NewClient from the given identity and max buffer memory.
+//
+// Deprecated: Use New.
 func NewClient(_ interface{}, dialer rpc.Dialer, memoryLimit int) Client {
+	return New(dialer, memoryLimit)
+}
+
+// New creates a client from the given dialer and max buffer memory.
+func New(dialer rpc.Dialer, memoryLimit int) Client {
 	return &ecClient{
 		dialer:      dialer,
 		memoryLimit: memoryLimit,
@@ -59,7 +66,7 @@ func (ec *ecClient) WithForceErrorDetection(force bool) Client {
 }
 
 func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piecestore.Client, error) {
-	return piecestore.DialNodeURL(ctx, ec.dialer, n, nil, piecestore.DefaultConfig)
+	return piecestore.Dial(ctx, ec.dialer, n, piecestore.DefaultConfig)
 }
 
 func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
@@ -111,7 +118,7 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	}
 
 	padded := encryption.PadReader(ioutil.NopCloser(data), rs.StripeSize())
-	readers, err := eestream.EncodeReader(ctx, nil, padded, rs)
+	readers, err := eestream.EncodeReader2(ctx, padded, rs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -275,7 +282,7 @@ func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		}
 	}
 
-	rr, err = eestream.Decode(nil, rrs, es, ec.memoryLimit, ec.forceErrorDetection)
+	rr, err = eestream.Decode(rrs, es, ec.memoryLimit, ec.forceErrorDetection)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}

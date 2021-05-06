@@ -1,7 +1,7 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package eestream
+package eestream_test
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
+	"storj.io/uplink/private/eestream"
 )
 
 func TestRS(t *testing.T) {
@@ -36,12 +37,12 @@ func TestRS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	es := NewRSScheme(fc, 8*1024)
-	rs, err := NewRedundancyStrategy(es, 0, 0)
+	es := eestream.NewRSScheme(fc, 8*1024)
+	rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := EncodeReader(ctx, nil, bytes.NewReader(data), rs)
+	readers, err := eestream.EncodeReader2(ctx, bytes.NewReader(data), rs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestRS(t *testing.T) {
 		readerMap[i] = reader
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	decoder := DecodeReaders(ctx, cancel, nil, readerMap, rs, 32*1024, 0, false)
+	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, 32*1024, 0, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
 	data2, err := ioutil.ReadAll(decoder)
 	if err != nil {
@@ -60,7 +61,7 @@ func TestRS(t *testing.T) {
 }
 
 // Check that io.ReadFull will return io.ErrUnexpectedEOF
-// if DecodeReaders return less data than expected.
+// if DecodeReaders2 return less data than expected.
 func TestRSUnexpectedEOF(t *testing.T) {
 	ctx := context.Background()
 	data := testrand.Bytes(32 * 1024)
@@ -68,12 +69,12 @@ func TestRSUnexpectedEOF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	es := NewRSScheme(fc, 8*1024)
-	rs, err := NewRedundancyStrategy(es, 0, 0)
+	es := eestream.NewRSScheme(fc, 8*1024)
+	rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := EncodeReader(ctx, nil, bytes.NewReader(data), rs)
+	readers, err := eestream.EncodeReader2(ctx, bytes.NewReader(data), rs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,9 +83,9 @@ func TestRSUnexpectedEOF(t *testing.T) {
 		readerMap[i] = reader
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	decoder := DecodeReaders(ctx, cancel, nil, readerMap, rs, 32*1024, 0, false)
+	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, 32*1024, 0, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
-	// Try ReadFull more data from DecodeReaders than available
+	// Try ReadFull more data from eestream.DecodeReaders2 than available
 	data2 := make([]byte, len(data)+1024)
 	_, err = io.ReadFull(decoder, data2)
 	assert.EqualError(t, err, io.ErrUnexpectedEOF.Error())
@@ -97,8 +98,8 @@ func TestRSRanger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	es := NewRSScheme(fc, 8*1024)
-	rs, err := NewRedundancyStrategy(es, 0, 0)
+	es := eestream.NewRSScheme(fc, 8*1024)
+	rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestRSRanger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := EncodeReader(ctx, nil, encryption.TransformReader(encryption.PadReader(ioutil.NopCloser(
+	readers, err := eestream.EncodeReader2(ctx, encryption.TransformReader(encryption.PadReader(ioutil.NopCloser(
 		bytes.NewReader(data)), encrypter.InBlockSize()), encrypter, 0), rs)
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +128,7 @@ func TestRSRanger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rc, err := Decode(nil, rrs, rs, 0, false)
+	rc, err := eestream.Decode(rrs, rs, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,8 +178,8 @@ func TestNewRedundancyStrategy(t *testing.T) {
 		if !assert.NoError(t, err, errTag) {
 			continue
 		}
-		es := NewRSScheme(fc, 8*1024)
-		rs, err := NewRedundancyStrategy(es, tt.rep, tt.opt)
+		es := eestream.NewRSScheme(fc, 8*1024)
+		rs, err := eestream.NewRedundancyStrategy(es, tt.rep, tt.opt)
 		if tt.errString != "" {
 			assert.EqualError(t, err, tt.errString, errTag)
 			continue
@@ -383,12 +384,12 @@ func testRSProblematic(t *testing.T, tt testCase, i int, fn problematicReadClose
 	if !assert.NoError(t, err, errTag) {
 		return
 	}
-	es := NewRSScheme(fc, tt.blockSize)
-	rs, err := NewRedundancyStrategy(es, 0, 0)
+	es := eestream.NewRSScheme(fc, tt.blockSize)
+	rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 	if !assert.NoError(t, err, errTag) {
 		return
 	}
-	readers, err := EncodeReader(ctx, nil, bytes.NewReader(data), rs)
+	readers, err := eestream.EncodeReader2(ctx, bytes.NewReader(data), rs)
 	if !assert.NoError(t, err, errTag) {
 		return
 	}
@@ -408,7 +409,7 @@ func testRSProblematic(t *testing.T, tt testCase, i int, fn problematicReadClose
 		readerMap[i] = ioutil.NopCloser(bytes.NewReader(pieces[i]))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	decoder := DecodeReaders(ctx, cancel, nil, readerMap, rs, int64(tt.dataSize), 3*1024, false)
+	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, int64(tt.dataSize), 3*1024, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
 	data2, err := ioutil.ReadAll(decoder)
 	if tt.fail {
@@ -460,12 +461,12 @@ func TestEncoderStalledReaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	es := NewRSScheme(fc, 1024)
-	rs, err := NewRedundancyStrategy(es, 35, 50)
+	es := eestream.NewRSScheme(fc, 1024)
+	rs, err := eestream.NewRedundancyStrategy(es, 35, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := EncodeReader(ctx, nil, bytes.NewReader(data), rs)
+	readers, err := eestream.EncodeReader2(ctx, bytes.NewReader(data), rs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,12 +507,12 @@ func TestDecoderErrorWithStalledReaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	es := NewRSScheme(fc, 1024)
-	rs, err := NewRedundancyStrategy(es, 0, 0)
+	es := eestream.NewRSScheme(fc, 1024)
+	rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := EncodeReader(ctx, nil, bytes.NewReader(data), rs)
+	readers, err := eestream.EncodeReader2(ctx, bytes.NewReader(data), rs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +536,7 @@ func TestDecoderErrorWithStalledReaders(t *testing.T) {
 		readerMap[i] = readcloser.FatalReadCloser(errors.New("I am an error piece"))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	decoder := DecodeReaders(ctx, cancel, nil, readerMap, rs, int64(10*1024), 0, false)
+	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, int64(10*1024), 0, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
 	// record the time for reading the data from the decoder
 	start := time.Now()
@@ -587,7 +588,7 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 			dataSize := (expDataSize / configuration.required) * configuration.required
 			testname := bytesToStr(dataSize)
 			forwardErrorCode, _ := infectious.NewFEC(configuration.required, configuration.total)
-			erasureScheme := NewRSScheme(forwardErrorCode, 8*1024)
+			erasureScheme := eestream.NewRSScheme(forwardErrorCode, 8*1024)
 
 			b.Run("Encode/"+confname+testname, func(b *testing.B) {
 				b.SetBytes(int64(dataSize))
@@ -661,14 +662,14 @@ func TestCalcPieceSize(t *testing.T) {
 
 		fc, err := infectious.NewFEC(2, 4)
 		require.NoError(t, err, errTag)
-		es := NewRSScheme(fc, 1*memory.KiB.Int())
-		rs, err := NewRedundancyStrategy(es, 0, 0)
+		es := eestream.NewRSScheme(fc, 1*memory.KiB.Int())
+		rs, err := eestream.NewRedundancyStrategy(es, 0, 0)
 		require.NoError(t, err, errTag)
 
-		calculatedSize := CalcPieceSize(dataSize, es)
+		calculatedSize := eestream.CalcPieceSize(dataSize, es)
 
 		randReader := ioutil.NopCloser(io.LimitReader(testrand.Reader(), dataSize))
-		readers, err := EncodeReader(ctx, nil, encryption.PadReader(randReader, es.StripeSize()), rs)
+		readers, err := eestream.EncodeReader2(ctx, encryption.PadReader(randReader, es.StripeSize()), rs)
 		require.NoError(t, err, errTag)
 
 		for _, reader := range readers {

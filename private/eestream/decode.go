@@ -40,7 +40,22 @@ type decodedReader struct {
 // set to 0, the minimum possible memory will be used.
 // if forceErrorDetection is set to true then k+1 pieces will be always
 // required for decoding, so corrupted pieces can be detected.
+//
+// Deprecated: Use DecodeReaders2.
 func DecodeReaders(ctx context.Context, cancel func(), _ interface{}, rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
+	return DecodeReaders2(ctx, cancel, rs, es, expectedSize, mbm, forceErrorDetection)
+}
+
+// DecodeReaders2 takes a map of readers and an ErasureScheme returning a
+// combined Reader.
+//
+// rs is a map of erasure piece numbers to erasure piece streams.
+// expectedSize is the number of bytes expected to be returned by the Reader.
+// mbm is the maximum memory (in bytes) to be allocated for read buffers. If
+// set to 0, the minimum possible memory will be used.
+// if forceErrorDetection is set to true then k+1 pieces will be always
+// required for decoding, so corrupted pieces can be detected.
+func DecodeReaders2(ctx context.Context, cancel func(), rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
 	defer mon.Task()(&ctx)(nil)
 	if expectedSize < 0 {
 		return readcloser.FatalReadCloser(Error.New("negative expected size"))
@@ -149,7 +164,7 @@ type decodedRanger struct {
 // set to 0, the minimum possible memory will be used.
 // if forceErrorDetection is set to true then k+1 pieces will be always
 // required for decoding, so corrupted pieces can be detected.
-func Decode(_ interface{}, rrs map[int]ranger.Ranger, es ErasureScheme, mbm int, forceErrorDetection bool) (ranger.Ranger, error) {
+func Decode(rrs map[int]ranger.Ranger, es ErasureScheme, mbm int, forceErrorDetection bool) (ranger.Ranger, error) {
 	if err := checkMBM(mbm); err != nil {
 		return nil, err
 	}

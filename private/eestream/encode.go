@@ -137,7 +137,15 @@ type encodedReader struct {
 
 // EncodeReader takes a Reader and a RedundancyStrategy and returns a slice of
 // io.ReadClosers.
+//
+// Deprecated: Use EncodeReader2.
 func EncodeReader(ctx context.Context, _ interface{}, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
+	return EncodeReader2(ctx, r, rs)
+}
+
+// EncodeReader2 takes a Reader and a RedundancyStrategy and returns a slice of
+// io.ReadClosers.
+func EncodeReader2(ctx context.Context, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	er := &encodedReader{
@@ -248,7 +256,7 @@ type EncodedRanger struct {
 
 // NewEncodedRanger from the given Ranger and RedundancyStrategy. See the
 // comments for EncodeReader about the repair and success thresholds.
-func NewEncodedRanger(_ interface{}, rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
+func NewEncodedRanger(rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
 	if rr.Size()%int64(rs.StripeSize()) != 0 {
 		return nil, Error.New("invalid erasure encoder and range reader combo. range reader size must be a multiple of erasure encoder block size")
 	}
