@@ -31,21 +31,6 @@ type decodedReader struct {
 	closeErr        error
 }
 
-// DecodeReaders takes a map of readers and an ErasureScheme returning a
-// combined Reader.
-//
-// rs is a map of erasure piece numbers to erasure piece streams.
-// expectedSize is the number of bytes expected to be returned by the Reader.
-// mbm is the maximum memory (in bytes) to be allocated for read buffers. If
-// set to 0, the minimum possible memory will be used.
-// if forceErrorDetection is set to true then k+1 pieces will be always
-// required for decoding, so corrupted pieces can be detected.
-//
-// Deprecated: Use DecodeReaders2.
-func DecodeReaders(ctx context.Context, cancel func(), _ interface{}, rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
-	return DecodeReaders2(ctx, cancel, rs, es, expectedSize, mbm, forceErrorDetection)
-}
-
 // DecodeReaders2 takes a map of readers and an ErasureScheme returning a
 // combined Reader.
 //
@@ -221,7 +206,7 @@ func (dr *decodedRanger) Range(ctx context.Context, offset, length int64) (_ io.
 	}
 
 	// decode from all those ranges
-	r := DecodeReaders(ctx, cancel, nil, readers, dr.es, blockCount*int64(dr.es.StripeSize()), dr.mbm, dr.forceErrorDetection)
+	r := DecodeReaders2(ctx, cancel, readers, dr.es, blockCount*int64(dr.es.StripeSize()), dr.mbm, dr.forceErrorDetection)
 	// offset might start a few bytes in, potentially discard the initial bytes
 	_, err = io.CopyN(ioutil.Discard, r, offset-firstBlock*int64(dr.es.StripeSize()))
 	if err != nil {

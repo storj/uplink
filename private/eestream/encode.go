@@ -135,14 +135,6 @@ type encodedReader struct {
 	pieces map[int]*encodedPiece
 }
 
-// EncodeReader takes a Reader and a RedundancyStrategy and returns a slice of
-// io.ReadClosers.
-//
-// Deprecated: Use EncodeReader2.
-func EncodeReader(ctx context.Context, _ interface{}, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
-	return EncodeReader2(ctx, r, rs)
-}
-
 // EncodeReader2 takes a Reader and a RedundancyStrategy and returns a slice of
 // io.ReadClosers.
 func EncodeReader2(ctx context.Context, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
@@ -287,7 +279,7 @@ func (er *EncodedRanger) Range(ctx context.Context, offset, length int64) (_ []i
 	if err != nil {
 		return nil, err
 	}
-	readers, err := EncodeReader(ctx, nil, r, er.rs)
+	readers, err := EncodeReader2(ctx, r, er.rs)
 	if err != nil {
 		return nil, err
 	}

@@ -45,13 +45,6 @@ type ecClient struct {
 	forceErrorDetection bool
 }
 
-// NewClient from the given identity and max buffer memory.
-//
-// Deprecated: Use New.
-func NewClient(_ interface{}, dialer rpc.Dialer, memoryLimit int) Client {
-	return New(dialer, memoryLimit)
-}
-
 // New creates a client from the given dialer and max buffer memory.
 func New(dialer rpc.Dialer, memoryLimit int) Client {
 	return &ecClient{

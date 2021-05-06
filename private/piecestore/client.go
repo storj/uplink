@@ -56,13 +56,6 @@ func Dial(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config 
 	}, nil
 }
 
-// DialNodeURL dials the target piecestore endpoint.
-//
-// Deprecated: Use Dial.
-func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, _ interface{}, config Config) (*Client, error) {
-	return Dial(ctx, dialer, nodeURL, config)
-}
-
 // Retain uses a bloom filter to tell the piece store which pieces to keep.
 func (client *Client) Retain(ctx context.Context, req *pb.RetainRequest) (err error) {
 	defer mon.Task()(&ctx)(&err)
