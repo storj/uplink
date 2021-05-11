@@ -170,6 +170,7 @@ pipeline {
                         sh 'GOOS=windows GOARCH=amd64 go vet ./...'
                         sh 'GOOS=windows GOARCH=386   go vet ./...'
                         sh 'GOOS=darwin  GOARCH=amd64 go vet ./...'
+                        sh 'GOOS=darwin  GOARCH=arm64 go vet ./...'
 
                         sh 'GOOS=linux   GOARCH=amd64 go1.14 vet ./...'
                         sh 'GOOS=linux   GOARCH=386   go1.14 vet ./...'
@@ -178,6 +179,7 @@ pipeline {
                         sh 'GOOS=windows GOARCH=amd64 go1.14 vet ./...'
                         sh 'GOOS=windows GOARCH=386   go1.14 vet ./...'
                         sh 'GOOS=darwin  GOARCH=amd64 go1.14 vet ./...'
+                        sh 'GOOS=darwin  GOARCH=arm64 go1.14 vet ./...'
                     }
                 }
             }
