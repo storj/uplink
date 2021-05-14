@@ -307,8 +307,8 @@ func TestRSLateEOF(t *testing.T) {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// extend the input with random number of random bytes
 			random := testrand.BytesInt(1 + testrand.Intn(10000))
-			extended := append(in, random...)
-			return ioutil.NopCloser(bytes.NewReader(extended))
+			in = append(in, random...)
+			return ioutil.NopCloser(bytes.NewReader(in))
 		})
 	}
 }

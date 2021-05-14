@@ -5,6 +5,7 @@ package ecclient
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"sort"
@@ -221,10 +222,10 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 
 	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
 	if err != nil {
-		if ctx.Err() == context.Canceled { //nolint: goerr113
+		if errors.Is(ctx.Err(), context.Canceled) {
 			// Canceled context means the piece upload was interrupted by user or due
 			// to slow connection. No error logging for this case.
-			if parent.Err() == context.Canceled { //nolint: goerr113
+			if errors.Is(parent.Err(), context.Canceled) {
 				err = Error.New("upload canceled by user: %w", err)
 			} else {
 				err = Error.New("upload cut due to slow connection (node:%v): %w", storageNodeID, err)

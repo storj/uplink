@@ -16,7 +16,7 @@ import (
 func AppendVersionToUserAgent(useragentStr string) (string, error) {
 	version, err := version.FromBuild("storj.io/uplink")
 	if err != nil {
-		return useragentStr, nil
+		return useragentStr, nil //nolint: nilerr // passthrough
 	}
 	entries := []useragent.Entry{}
 	if len(useragentStr) > 0 {

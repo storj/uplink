@@ -5,6 +5,7 @@ package piecestore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -239,7 +240,7 @@ func (client *Download) closeAndTryFetchError() {
 	client.closed = true
 
 	client.closingError = client.stream.CloseSend()
-	if client.closingError == nil || client.closingError == io.EOF {
+	if client.closingError == nil || errors.Is(client.closingError, io.EOF) {
 		_, client.closingError = client.stream.Recv()
 	}
 }

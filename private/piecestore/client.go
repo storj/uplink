@@ -5,6 +5,7 @@ package piecestore
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/zeebo/errs"
@@ -85,7 +86,7 @@ func (client *Client) nextAllocationStep(previous int64) int64 {
 
 // ignoreEOF is an utility func for ignoring EOF error, when it's not important.
 func ignoreEOF(err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil
 	}
 	return err

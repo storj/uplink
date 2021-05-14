@@ -54,7 +54,7 @@ func segmentSize(project *Project) int64 {
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: deadcode,unused
+//nolint: unused
 func encryptPath(project *Project, bucket, key string) (paths.Encrypted, error) {
 	encStore := project.access.encAccess.Store
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), encStore)
@@ -67,7 +67,7 @@ func encryptPath(project *Project, bucket, key string) (paths.Encrypted, error) 
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: deadcode,unused
+//nolint: unused
 func deriveContentKey(project *Project, bucket, key string) (*storj.Key, error) {
 	encStore := project.access.encAccess.Store
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), encStore)
@@ -92,7 +92,7 @@ func ecPutSingleResult(ctx context.Context, project *Project, limits []*pb.Addre
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: deadcode,unused
+//nolint: unused
 func dialMetainfoDB(ctx context.Context, project *Project) (_ *metaclient.DB, err error) {
 	return project.dialMetainfoDB(ctx)
 }

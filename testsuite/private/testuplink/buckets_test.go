@@ -67,7 +67,7 @@ func TestBucketsBasic(t *testing.T) {
 		}
 
 		// Check that the bucket cannot be get explicitly
-		bucket, err = db.GetBucket(ctx, TestBucket)
+		_, err = db.GetBucket(ctx, TestBucket)
 		assert.True(t, metaclient.ErrBucketNotFound.Has(err))
 	})
 }
@@ -108,7 +108,7 @@ func TestBucketsReadWrite(t *testing.T) {
 		}
 
 		// Check that the bucket cannot be get explicitly
-		bucket, err = db.GetBucket(ctx, TestBucket)
+		_, err = db.GetBucket(ctx, TestBucket)
 		assert.True(t, metaclient.ErrBucketNotFound.Has(err))
 	})
 }

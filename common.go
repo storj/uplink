@@ -34,7 +34,7 @@ var ErrPermissionDenied = errors.New("permission denied")
 
 func convertKnownErrors(err error, bucket, key string) error {
 	switch {
-	case err == io.EOF:
+	case errors.Is(err, io.EOF):
 		return err
 	case metaclient.ErrNoBucket.Has(err):
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)

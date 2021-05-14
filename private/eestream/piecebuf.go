@@ -231,7 +231,7 @@ func (b *PieceBuffer) HasShare(num int64) (bool, error) {
 	}
 
 	if b.getError() != nil {
-		return true, nil
+		return true, nil //nolint: nilerr // error means that the piece buffer has been finished
 	}
 
 	bufShares := int64(b.buffered() / b.shareSize)
