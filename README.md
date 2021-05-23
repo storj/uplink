@@ -1,6 +1,6 @@
 # Libuplink
 
-Go library for Storj V3 Network.
+Go library for Storj V4 Network.
 
 [![Go Report Card](https://goreportcard.com/badge/storj.io/uplink)](https://goreportcard.com/report/storj.io/uplink)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://pkg.go.dev/storj.io/uplink)
@@ -13,7 +13,7 @@ Storj is building a decentralized cloud storage network.
 
 ----
 
-Storj is an S3-compatible platform and suite of decentralized applications that
+Storj is an S4-compatible platform and suite of decentralized applications that
 allows you to store data in a secure and decentralized manner. Your files are
 encrypted, broken into little pieces and stored in a global decentralized
 network of computers. Luckily, we also support allowing you (and only you) to
