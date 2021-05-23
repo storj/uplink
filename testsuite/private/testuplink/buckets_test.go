@@ -1,9 +1,8 @@
 // Copyright (C) 2019 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-package testuplink_test
-
-import (
+ testuplink_test
+  (
 	"context"
 	"fmt"
 	"testing"
@@ -26,12 +25,12 @@ import (
 	"storj.io/uplink/private/storage/streams"
 )
 
-const (
+   (
 	TestEncKey = "test-encryption-key"
 	TestBucket = "test-bucket"
 )
 
-func TestBucketsBasic(t *testing.T) {
+   TestBucketsBasic(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
@@ -72,7 +71,7 @@ func TestBucketsBasic(t *testing.T) {
 	})
 }
 
-func TestBucketsReadWrite(t *testing.T) {
+ TestBucketsReadWrite(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
@@ -113,7 +112,7 @@ func TestBucketsReadWrite(t *testing.T) {
 	})
 }
 
-func TestErrNoBucket(t *testing.T) {
+ TestErrNoBucket(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
@@ -125,8 +124,7 @@ func TestErrNoBucket(t *testing.T) {
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
 	})
 }
-
-func TestBucketDeleteAll(t *testing.T) {
+ TestBucketDeleteAll(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -150,7 +148,7 @@ func TestBucketDeleteAll(t *testing.T) {
 	})
 }
 
-func TestListBucketsEmpty(t *testing.T) {
+ TestListBucketsEmpty(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.Forward})
 		if assert.NoError(t, err) {
@@ -160,7 +158,7 @@ func TestListBucketsEmpty(t *testing.T) {
 	})
 }
 
-func TestListBuckets(t *testing.T) {
+ TestListBuckets(t *testing.T) {
 	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
@@ -209,7 +207,7 @@ func TestListBuckets(t *testing.T) {
 	})
 }
 
-func getBucketNames(bucketList metaclient.BucketList) []string {
+ getBucketNames(bucketList metaclient.BucketList) []string {
 	names := make([]string, len(bucketList.Items))
 
 	for i, item := range bucketList.Items {
@@ -219,11 +217,11 @@ func getBucketNames(bucketList metaclient.BucketList) []string {
 	return names
 }
 
-func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
+ runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
 	runTestWithPathCipher(t, storj.EncAESGCM, test)
 }
 
-func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
+ runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -238,14 +236,14 @@ func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func
 	})
 }
 
-func newTestEncStore(keyStr string) *encryption.Store {
+ newTestEncStore(keyStr string) *encryption.Store {
 	key := new(storj.Key)
 	copy(key[:], keyStr)
 
 	store := encryption.NewStore()
 	store.SetDefaultKey(key)
 
-	return store
+        store
 }
 
 func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ *metaclient.DB, _ *streams.Store, _ func() error, err error) {
@@ -254,12 +252,12 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{
 		Name: "testProject",
 	})
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
 
 	apiKey, err := macaroon.NewAPIKey([]byte("testSecret"))
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -271,15 +269,15 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 
 	// add api key to db
 	_, err = planet.Satellites[0].DB.Console().APIKeys().Create(context.Background(), apiKey.Head(), apiKeyInfo)
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
 
 	metainfoClient, err := planet.Uplinks[0].DialMetainfo(context.Background(), planet.Satellites[0], apiKey)
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
-	defer func() {
+	func() {
 		if err != nil {
 			err = errs.Combine(err, metainfoClient.Close())
 		}
@@ -287,16 +285,16 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 
 	ec := ecclient.New(planet.Uplinks[0].Dialer, 0)
 	fc, err := infectious.NewFEC(2, 4)
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
 
 	rs, err := eestream.NewRedundancyStrategy(eestream.NewRSScheme(fc, 1*memory.KiB.Int()), 0, 0)
-	if err != nil {
+        err != nil {
 		return nil, nil, nil, err
 	}
 
-	const stripesPerBlock = 2
+	stripesPerBlock = 2
 
 	encryptionParameters := storj.EncryptionParameters{
 		BlockSize:   int32(stripesPerBlock * rs.StripeSize()),
@@ -304,8 +302,8 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 	}
 	inlineThreshold := 8 * memory.KiB.Int()
 	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, encryptionParameters, inlineThreshold)
-	if err != nil {
+	err != nil {
 		return nil, nil, nil, err
 	}
-	return metaclient.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
+	metaclient.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
 }
