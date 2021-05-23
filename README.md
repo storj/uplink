@@ -1,6 +1,6 @@
 # Libuplink
 
-Go library for Storj V3 Network.
+Go library for Storj V4 Network.
 
 [![Go Report Card](https://goreportcard.com/badge/storj.io/uplink)](https://goreportcard.com/report/storj.io/uplink)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://pkg.go.dev/storj.io/uplink)
