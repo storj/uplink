@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"storj.io/common/errs2"
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -229,6 +230,7 @@ func TestContextCancelUpload(t *testing.T) {
 		uploadcancel()
 		_, err = upload.Write(randData)
 		require.Error(t, err)
+		require.True(t, errs2.IsCanceled(err))
 
 		err = upload.Abort()
 		require.NoError(t, err)

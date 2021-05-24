@@ -169,7 +169,9 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	defer func() {
 		select {
 		case <-ctx.Done():
-			err = Error.New("upload cancelled by user")
+			// make sure context.Canceled is the primary error in the error chain
+			// for later errors.Is/errs2.IsCanceled checking
+			err = errs.Combine(context.Canceled, Error.New("upload cancelled by user"))
 		default:
 		}
 	}()
