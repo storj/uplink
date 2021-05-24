@@ -83,6 +83,8 @@ func TestObject(t *testing.T) {
 				var tests = []*uplink.DownloadOptions{
 					nil,
 					{Offset: 0, Length: -1},
+					{Offset: 1, Length: 7408},
+					{Offset: 1, Length: 7423},
 					{Offset: objectSize / 2, Length: -1},
 					{Offset: objectSize, Length: -1},
 					{Offset: 0, Length: 0},
