@@ -17,12 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/errs2"
+	"storj.io/common/fpath"
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/storagenode"
 	"storj.io/uplink"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestObject(t *testing.T) {
@@ -151,6 +153,38 @@ func TestObject(t *testing.T) {
 			})
 		}
 
+	})
+}
+
+func TestInmemoryUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.EnsureBucket(ctx, "testbucket")
+		require.NoError(t, err)
+
+		inmemCtx := fpath.WithTempData(ctx, "", true)
+		sizedCtx := testuplink.WithMaxSegmentSize(inmemCtx, memory.MiB)
+		expected := testrand.Bytes(2 * memory.MiB)
+
+		upload, err := project.UploadObject(sizedCtx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(expected)
+		require.NoError(t, err)
+		require.NoError(t, upload.Commit())
+
+		down, err := project.DownloadObject(sizedCtx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		downloaded, err := ioutil.ReadAll(down)
+		require.NoError(t, err)
+		require.NoError(t, down.Close())
+
+		require.Equal(t, expected, downloaded)
 	})
 }
 
