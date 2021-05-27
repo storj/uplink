@@ -101,12 +101,16 @@ func (client *Client) header() *pb.RequestHeader {
 }
 
 // GetProjectInfo gets the ProjectInfo for the api key associated with the metainfo client.
-func (client *Client) GetProjectInfo(ctx context.Context) (resp *pb.ProjectInfoResponse, err error) {
+func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectInfoResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	return client.client.ProjectInfo(ctx, &pb.ProjectInfoRequest{
-		Header: client.header(),
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.ProjectInfo(ctx, &pb.ProjectInfoRequest{
+			Header: client.header(),
+		})
+		return err
 	})
+	return response, err
 }
 
 // CreateBucketParams parameters for CreateBucket method.
@@ -174,7 +178,11 @@ func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketRes
 func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParams) (respBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.CreateBucket(ctx, params.toRequest(client.header()))
+	var response *pb.BucketCreateResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.CreateBucket(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return Bucket{}, Error.Wrap(err)
 	}
@@ -226,7 +234,12 @@ func newGetBucketResponse(response *pb.BucketGetResponse) (GetBucketResponse, er
 func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (respBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	resp, err := client.client.GetBucket(ctx, params.toRequest(client.header()))
+	var response *pb.BucketGetResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		// TODO(moby) make sure bucket not found is properly handled
+		response, err = client.client.GetBucket(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return Bucket{}, ErrBucketNotFound.Wrap(err)
@@ -234,7 +247,7 @@ func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (re
 		return Bucket{}, Error.Wrap(err)
 	}
 
-	respBucket, err = convertProtoToBucket(resp.Bucket)
+	respBucket, err = convertProtoToBucket(response.Bucket)
 	if err != nil {
 		return Bucket{}, Error.Wrap(err)
 	}
@@ -267,7 +280,13 @@ func (params *DeleteBucketParams) BatchItem() *pb.BatchRequestItem {
 // DeleteBucket deletes a bucket.
 func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
-	resp, err := client.client.DeleteBucket(ctx, params.toRequest(client.header()))
+
+	var response *pb.BucketDeleteResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		// TODO(moby) make sure bucket not found is properly handled
+		response, err = client.client.DeleteBucket(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return Bucket{}, ErrBucketNotFound.Wrap(err)
@@ -275,7 +294,7 @@ func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParam
 		return Bucket{}, Error.Wrap(err)
 	}
 
-	respBucket, err := convertProtoToBucket(resp.Bucket)
+	respBucket, err := convertProtoToBucket(response.Bucket)
 	if err != nil {
 		return Bucket{}, Error.Wrap(err)
 	}
@@ -330,15 +349,20 @@ func newListBucketsResponse(response *pb.BucketListResponse) ListBucketsResponse
 func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams) (_ BucketList, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	resp, err := client.client.ListBuckets(ctx, params.toRequest(client.header()))
+	var response *pb.BucketListResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.ListBuckets(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return BucketList{}, Error.Wrap(err)
 	}
+
 	resultBucketList := BucketList{
-		More: resp.GetMore(),
+		More: response.GetMore(),
 	}
-	resultBucketList.Items = make([]Bucket, len(resp.GetItems()))
-	for i, item := range resp.GetItems() {
+	resultBucketList.Items = make([]Bucket, len(response.GetItems()))
+	for i, item := range response.GetItems() {
 		resultBucketList.Items[i] = Bucket{
 			Name:    string(item.GetName()),
 			Created: item.GetCreatedAt(),
@@ -426,7 +450,11 @@ func newBeginObjectResponse(response *pb.ObjectBeginResponse, redundancyStrategy
 func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams) (_ BeginObjectResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.BeginObject(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectBeginResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.BeginObject(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return BeginObjectResponse{}, Error.Wrap(err)
 	}
@@ -474,8 +502,10 @@ func (params *CommitObjectParams) BatchItem() *pb.BatchRequestItem {
 func (client *Client) CommitObject(ctx context.Context, params CommitObjectParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	_, err = client.client.CommitObject(ctx, params.toRequest(client.header()))
-
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.CommitObject(ctx, params.toRequest(client.header()))
+		return err
+	})
 	return Error.Wrap(err)
 }
 
@@ -559,7 +589,11 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.GetObject(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectGetResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetObject(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return RawObjectItem{}, ErrObjectNotFound.Wrap(err)
@@ -599,7 +633,11 @@ func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.Object
 func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParams) (r *GetObjectIPsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.GetObjectIPs(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectGetIPsResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetObjectIPs(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return nil, ErrObjectNotFound.Wrap(err)
@@ -656,8 +694,12 @@ func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginD
 func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	// response.StreamID is not processed because satellite will always return nil
-	response, err := client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectBeginDeleteResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		// response.StreamID is not processed because satellite will always return nil
+		response, err = client.client.BeginDeleteObject(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return RawObjectItem{}, ErrObjectNotFound.Wrap(err)
@@ -747,7 +789,11 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []RawObjectListItem, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.ListObjects(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectListResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.ListObjects(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return []RawObjectListItem{}, false, Error.Wrap(err)
 	}
@@ -822,7 +868,11 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListPendingObjectStreamsParams) (_ ListPendingObjectStreamsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.ListPendingObjectStreams(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectListPendingStreamsResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.ListPendingObjectStreams(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return ListPendingObjectStreamsResponse{}, Error.Wrap(err)
 	}
@@ -914,7 +964,11 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParams) (_ ListSegmentsResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.ListSegments(ctx, params.toRequest(client.header()))
+	var response *pb.SegmentListResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.ListSegments(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return ListSegmentsResponse{}, Error.Wrap(err)
 	}
@@ -979,7 +1033,11 @@ func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentRes
 func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ BeginSegmentResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.BeginSegment(ctx, params.toRequest(client.header()))
+	var response *pb.SegmentBeginResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.BeginSegment(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		return BeginSegmentResponse{}, Error.Wrap(err)
 	}
@@ -1025,7 +1083,10 @@ func (params *CommitSegmentParams) BatchItem() *pb.BatchRequestItem {
 func (client *Client) CommitSegment(ctx context.Context, params CommitSegmentParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	_, err = client.client.CommitSegment(ctx, params.toRequest(client.header()))
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.CommitSegment(ctx, params.toRequest(client.header()))
+		return err
+	})
 
 	return Error.Wrap(err)
 }
@@ -1069,7 +1130,10 @@ func (params *MakeInlineSegmentParams) BatchItem() *pb.BatchRequestItem {
 func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSegmentParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	_, err = client.client.MakeInlineSegment(ctx, params.toRequest(client.header()))
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.MakeInlineSegment(ctx, params.toRequest(client.header()))
+		return err
+	})
 
 	return Error.Wrap(err)
 }
@@ -1204,7 +1268,11 @@ func newDownloadObjectResponse(response *pb.ObjectDownloadResponse) DownloadObje
 func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.DownloadObject(ctx, params.toRequest(client.header()))
+	var response *pb.ObjectDownloadResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.DownloadObject(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return DownloadObjectResponse{}, storj.ErrObjectNotFound.Wrap(err)
@@ -1282,7 +1350,11 @@ func newDownloadSegmentResponse(response *pb.SegmentDownloadResponse) DownloadSe
 func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmentParams) (_ SegmentDownloadResponseInfo, _ []*pb.AddressedOrderLimit, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+	var response *pb.SegmentDownloadResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return SegmentDownloadResponseInfo{}, nil, ErrObjectNotFound.Wrap(err)
@@ -1362,7 +1434,11 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) Down
 func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ DownloadSegmentWithRSResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	response, err := client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+	var response *pb.SegmentDownloadResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+		return err
+	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return DownloadSegmentWithRSResponse{}, ErrObjectNotFound.Wrap(err)
@@ -1376,7 +1452,10 @@ func (client *Client) DownloadSegmentWithRS(ctx context.Context, params Download
 // RevokeAPIKey revokes the APIKey provided in the params.
 func (client *Client) RevokeAPIKey(ctx context.Context, params RevokeAPIKeyParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
-	_, err = client.client.RevokeAPIKey(ctx, params.toRequest(client.header()))
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.RevokeAPIKey(ctx, params.toRequest(client.header()))
+		return err
+	})
 	return Error.Wrap(err)
 }
 
