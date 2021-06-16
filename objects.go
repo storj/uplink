@@ -14,9 +14,12 @@ import (
 
 // ListObjectsOptions defines object listing options.
 type ListObjectsOptions struct {
-	// Prefix allows to filter objects by a key prefix. If not empty, it must end with slash.
+	// Prefix allows to filter objects by a key prefix.
+	// If not empty, it must end with slash.
 	Prefix string
-	// Cursor sets the starting position of the iterator. The first item listed will be the one after the cursor.
+	// Cursor sets the starting position of the iterator.
+	// The first item listed will be the one after the cursor.
+	// Cursor is relative to Prefix.
 	Cursor string
 	// Recursive iterates the objects without collapsing prefixes.
 	Recursive bool
