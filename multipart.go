@@ -245,7 +245,7 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 
 	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, bucket, key)
 	}
 
 	upload.streams = streams
@@ -406,7 +406,8 @@ type PartUpload struct {
 // It returns the number of bytes written from p (0 <= n <= len(p))
 // and any error encountered that caused the write to stop early.
 func (upload *PartUpload) Write(p []byte) (int, error) {
-	return upload.upload.Write(p)
+	n, err := upload.upload.Write(p)
+	return n, convertKnownErrors(err, upload.bucket, upload.key)
 }
 
 // SetETag sets ETag for a part.
