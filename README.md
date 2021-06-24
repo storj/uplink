@@ -41,6 +41,10 @@ cost. This is not the case with our downstream repo,
 This library is distributed under the
 [MIT license](https://opensource.org/licenses/MIT) (also known as the Expat license).
 
+# Contributing
+
+We request that contributors sign our [Contributor License Agreement (CLA)](https://docs.google.com/forms/d/e/1FAIpQLSdVzD5W8rx-J_jLaPuG31nbOzS8yhNIIu4yHvzonji6NeZ4ig/viewform).
+
 # Support
 
 If you have any questions or suggestions please reach out to us on [our community forum](https://forum.storj.io/) or file a support ticket at https://support.storj.io.
