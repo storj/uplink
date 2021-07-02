@@ -319,6 +319,8 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		return Meta{}, err
 	}
 
+	// TODO: Do we still need to set SegmentsSize and LastSegmentSize
+	// for backward compatibility with old uplinks?
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
 		SegmentsSize:    s.segmentSize,
 		LastSegmentSize: lastSegmentSize,
@@ -341,6 +343,8 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		EncryptionBlockSize: s.encryptionParameters.BlockSize,
 	}
 
+	// TODO: Do we still need to set LastSegmentMeta
+	// for backward compatibility with old uplinks?
 	if s.encryptionParameters.CipherSuite != storj.EncNull {
 		streamMeta.LastSegmentMeta = &pb.SegmentMeta{
 			EncryptedKey: encryptedKey,

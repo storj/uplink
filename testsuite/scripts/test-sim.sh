@@ -22,6 +22,7 @@ go install storj.io/storj/cmd/satellite@$VERSION
 go install storj.io/storj/cmd/storagenode@$VERSION
 go install storj.io/storj/cmd/versioncontrol@$VERSION
 go install storj.io/storj/cmd/storj-sim@$VERSION
+go install storj.io/storj/cmd/multinode@$VERSION
 go install storj.io/gateway@latest
 
 echo "Used version: $VERSION"

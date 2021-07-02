@@ -654,6 +654,48 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParam
 	}, nil
 }
 
+// UpdateObjectMetadataParams are params for the UpdateObjectMetadata request.
+type UpdateObjectMetadataParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	Version            int32
+	StreamID           storj.StreamID
+
+	EncryptedMetadataNonce        storj.Nonce
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
+}
+
+func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.ObjectUpdateMetadataRequest {
+	return &pb.ObjectUpdateMetadataRequest{
+		Header:                        header,
+		Bucket:                        params.Bucket,
+		EncryptedObjectKey:            params.EncryptedObjectKey,
+		Version:                       params.Version,
+		StreamId:                      params.StreamID,
+		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		EncryptedMetadata:             params.EncryptedMetadata,
+		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+	}
+}
+
+// UpdateObjectMetadata replaces objects metadata.
+func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObjectMetadataParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.UpdateObjectMetadata(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return ErrObjectNotFound.Wrap(err)
+		}
+	}
+
+	return Error.Wrap(err)
+}
+
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.
 type BeginDeleteObjectParams struct {
 	Bucket        []byte

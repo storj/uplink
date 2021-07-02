@@ -113,6 +113,30 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	return convertObject(&obj), nil
 }
 
+// UploadObjectMetadataOptions contains additional options for updating object's metadata.
+// Reserved for future use.
+type UploadObjectMetadataOptions struct {
+}
+
+// UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
+// Any existing custom metadata will be deleted.
+func (project *Project) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata CustomMetadata, options *UploadObjectMetadataOptions) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := project.dialMetainfoDB(ctx)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone())
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+
+	return nil
+}
+
 // convertObject converts metainfo.Object to uplink.Object.
 func convertObject(obj *metaclient.Object) *Object {
 	if obj.Bucket.Name == "" { // zero object

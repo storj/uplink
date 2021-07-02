@@ -5,6 +5,7 @@ package metaclient
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"strings"
 	"time"
@@ -85,6 +86,111 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return nil, errors.New("not implemented")
+}
+
+// UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
+// Any existing custom metadata will be deleted.
+func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata map[string]string) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return ErrNoBucket.New("")
+	}
+
+	if key == "" {
+		return ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return err
+	}
+
+	// TODO: check if we could avoid this round-trip to satellite
+	// At the moment, we need to get the object for two reason:
+	//   1. Retrieve the backward-compatibility metadata
+	//      (max segment size and last segment size)
+	//      and copy it to the new metadata.
+	//   2. Retrieve the object's encryption parameters
+	//      and use them for encrypting the new metadata.
+	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
+		Bucket:                     []byte(bucket),
+		EncryptedPath:              []byte(encPath.Raw()),
+		RedundancySchemePerSegment: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	object, err := db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
+	if err != nil {
+		return err
+	}
+
+	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
+		UserDefined: newMetadata,
+	})
+	if err != nil {
+		return err
+	}
+
+	streamInfo, err := pb.Marshal(&pb.StreamInfo{
+		SegmentsSize:    object.FixedSegmentSize,
+		LastSegmentSize: object.LastSegment.Size,
+		Metadata:        metadataBytes,
+	})
+	if err != nil {
+		return err
+	}
+
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return err
+	}
+
+	var metadataKey storj.Key
+	// generate random key for encrypting the segment's content
+	_, err = rand.Read(metadataKey[:])
+	if err != nil {
+		return err
+	}
+
+	var encryptedKeyNonce storj.Nonce
+	// generate random nonce for encrypting the metadata key
+	_, err = rand.Read(encryptedKeyNonce[:])
+	if err != nil {
+		return err
+	}
+
+	encryptionParameters := objectInfo.EncryptionParameters
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+	if err != nil {
+		return err
+	}
+
+	// encrypt metadata with the content encryption key and zero nonce.
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
+	if err != nil {
+		return err
+	}
+
+	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
+	streamMetaBytes, err := pb.Marshal(&pb.StreamMeta{
+		EncryptedStreamInfo: encryptedStreamInfo,
+	})
+	if err != nil {
+		return err
+	}
+
+	return db.metainfo.UpdateObjectMetadata(ctx, UpdateObjectMetadataParams{
+		Bucket:                        []byte(bucket),
+		EncryptedObjectKey:            []byte(encPath.Raw()),
+		Version:                       int32(object.Version),
+		StreamID:                      object.Stream.ID,
+		EncryptedMetadata:             streamMetaBytes,
+		EncryptedMetadataEncryptedKey: encryptedKey,
+		EncryptedMetadataNonce:        encryptedKeyNonce,
+	})
 }
 
 // DeleteObject deletes an object from database.

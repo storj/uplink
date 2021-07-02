@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"io/ioutil"
 	"strconv"
 	"testing"
 
@@ -235,6 +236,73 @@ func TestSetMetadataAfterAbort(t *testing.T) {
 		err = upload.SetCustomMetadata(ctx, uplink.CustomMetadata{})
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrUploadDone))
+	})
+}
+
+func TestUpdateMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.EnsureBucket(ctx, "testbucket")
+		require.NoError(t, err)
+
+		expected := testrand.Bytes(1 * memory.KiB)
+
+		// upload object with no custom metadata
+		upload, err := project.UploadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(expected)
+		require.NoError(t, err)
+		require.NoError(t, upload.Commit())
+
+		// check that there is no custom metadata after the upload
+		object, err := project.StatObject(ctx, "testbucket", "obj")
+		require.NoError(t, err)
+		require.Empty(t, object.Custom)
+
+		newMetadata := uplink.CustomMetadata{
+			"key1": "value1",
+			"key2": "value2",
+		}
+
+		// update the object's metadata
+		err = project.UpdateObjectMetadata(ctx, "testbucket", "obj", newMetadata, nil)
+		require.NoError(t, err)
+
+		// check that the metadata has been updated as expected
+		object, err = project.StatObject(ctx, "testbucket", "obj")
+		require.NoError(t, err)
+		require.Equal(t, newMetadata, object.Custom)
+
+		// confirm that the object is still downloadable
+		download, err := project.DownloadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		downloaded, err := ioutil.ReadAll(download)
+		require.NoError(t, err)
+		require.NoError(t, download.Close())
+		require.Equal(t, expected, downloaded)
+
+		// remove the object's metadata
+		err = project.UpdateObjectMetadata(ctx, "testbucket", "obj", nil, nil)
+		require.NoError(t, err)
+
+		// check that the metadata has been removed
+		object, err = project.StatObject(ctx, "testbucket", "obj")
+		require.NoError(t, err)
+		require.Empty(t, object.Custom)
+
+		// confirm that the object is still downloadable
+		download, err = project.DownloadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		downloaded, err = ioutil.ReadAll(download)
+		require.NoError(t, err)
+		require.NoError(t, download.Close())
+		require.Equal(t, expected, downloaded)
 	})
 }
 
