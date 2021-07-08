@@ -403,7 +403,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 	}
 
 	object := Object{
-		Version:  0, // TODO:
+		Version:  objectInfo.Version,
 		Bucket:   Bucket{Name: bucket},
 		Path:     key,
 		IsPrefix: false,
@@ -453,7 +453,7 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
 	object := Object{
-		Version:  0, // TODO:
+		Version:  uint32(listItem.Version),
 		Bucket:   Bucket{Name: bucket},
 		Path:     path,
 		IsPrefix: listItem.IsPrefix,

@@ -79,10 +79,10 @@ func TestGetObject(t *testing.T) {
 		assert.True(t, metaclient.ErrObjectNotFound.Has(err))
 
 		object, err := db.GetObject(ctx, bucket.Name, TestFile)
-		if assert.NoError(t, err) {
-			assert.Equal(t, TestFile, object.Path)
-			assert.Equal(t, TestBucket, object.Bucket.Name)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, TestFile, object.Path)
+		assert.Equal(t, TestBucket, object.Bucket.Name)
+		assert.Equal(t, uint32(1), object.Version)
 	})
 }
 
@@ -427,6 +427,11 @@ func TestListObjects(t *testing.T) {
 					for i, item := range list.Items {
 						assert.Equal(t, tt.result[i], item.Path, errTag)
 						assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
+						if item.IsPrefix {
+							assert.Equal(t, uint32(0), item.Version, errTag)
+						} else {
+							assert.Equal(t, uint32(1), item.Version, errTag)
+						}
 					}
 				}
 			}
