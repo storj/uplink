@@ -481,6 +481,10 @@ func assertObjectEmptyCreated(t *testing.T, obj *uplink.Object, expectedKey stri
 }
 
 func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string, objectSize memory.Size) *uplink.Object {
+	return uploadObjectWithMetadata(t, ctx, project, bucket, key, objectSize, uplink.CustomMetadata{})
+}
+
+func uploadObjectWithMetadata(t *testing.T, ctx *testcontext.Context, project *uplink.Project, bucket, key string, objectSize memory.Size, metadata uplink.CustomMetadata) *uplink.Object {
 	upload, err := project.UploadObject(ctx, bucket, key, nil)
 	require.NoError(t, err)
 	assertObjectEmptyCreated(t, upload.Info(), key)
@@ -490,6 +494,11 @@ func uploadObject(t *testing.T, ctx *testcontext.Context, project *uplink.Projec
 	_, err = io.Copy(upload, source)
 	require.NoError(t, err)
 	assertObjectEmptyCreated(t, upload.Info(), key)
+
+	if len(metadata) > 0 {
+		err = upload.SetCustomMetadata(ctx, metadata)
+		require.NoError(t, err)
+	}
 
 	err = upload.Commit()
 	require.NoError(t, err)

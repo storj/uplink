@@ -813,12 +813,10 @@ sourcegraph.com/sourcegraph/go-diff v0.5.0/go.mod h1:kuch7UrkMzY0X+p9CRK03kfuPQ2
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=
 storj.io/common v0.0.0-20200424175742-65ac59022f4f/go.mod h1:pZyXiIE7bGETIRXtfs0nICqMwp7PM8HqnDuyUeldNA0=
 storj.io/common v0.0.0-20201026135900-1aaeec90670b/go.mod h1:GqdmNf3fLm2UZX/7Zr0BLFCJ4gFjgm6eHrk/fnmr5jQ=
-storj.io/common v0.0.0-20210708125041-4882a3ae3eda/go.mod h1:SN7WwEhNC2PTSuIJDj8184eeBmq+VEDwGqJzrlPera4=
 storj.io/common v0.0.0-20210805073808-8e0feb09e92a h1:NXO/ZnLMWD67eYu2DPxGix5HVFzpv8teGexyR5xURjI=
 storj.io/common v0.0.0-20210805073808-8e0feb09e92a/go.mod h1:mhZYWpTojKsACxWE66RfXNz19zbyr/uEDVWHJH8dHog=
 storj.io/drpc v0.0.11/go.mod h1:TiFc2obNjL9/3isMW1Rpxjy8V9uE0B2HMeMFGiiI7Iw=
 storj.io/drpc v0.0.14/go.mod h1:82nfl+6YwRwF6UG31cEWWUqv/FaKvP5SGqUvoqTxCMA=
-storj.io/drpc v0.0.23/go.mod h1:OSJH7wvH3yKlhnMHwblKJioaaeyI6X8xbXT1SG9woe8=
 storj.io/drpc v0.0.24 h1:9WgD+q8WWDIz7XCMib+U6xX9SjblMqOz9R6sU7rJnS8=
 storj.io/drpc v0.0.24/go.mod h1:ofQUDPQbbIymRDKE0tms48k8bLP5Y+dsI9CbXGv3gko=
 storj.io/monkit-jaeger v0.0.0-20210225162224-66fb37637bf6/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
@@ -826,5 +824,5 @@ storj.io/monkit-jaeger v0.0.0-20210426161729-debb1cbcbbd7 h1:zi0w9zoBfvuqysSAqxJ
 storj.io/monkit-jaeger v0.0.0-20210426161729-debb1cbcbbd7/go.mod h1:gj4vuCeyCRjRmH8LIrgoyU9Dc9uR6H+/GcDUXmTbf80=
 storj.io/private v0.0.0-20210625132526-af46b647eda5 h1:U07CKRc/FceT4V6FNXIEKYpiurx4hqV5RjzAA2EilbA=
 storj.io/private v0.0.0-20210625132526-af46b647eda5/go.mod h1:+p0XLkdbH7/Fl2UhIRVNaj82U9Z8K1MaUu9cpgi80xc=
-storj.io/storj v0.12.1-0.20210805144330-f87ad240ed10 h1:4qZlAzt4tiib7gP64+eQXuUOGAY1wwwIcbbHrJvplVw=
-storj.io/storj v0.12.1-0.20210805144330-f87ad240ed10/go.mod h1:yH1ToGv7K1rG6HekX/EumP8ZWA2NsjoyWhOqOptd0tk=
+storj.io/storj v0.12.1-0.20210806100525-a60e836baa0a h1:mhZDXH5Ri/jJ0XDh+UvGw7zwcjRIGnXhMGMYGN3at6M=
+storj.io/storj v0.12.1-0.20210806100525-a60e836baa0a/go.mod h1:yH1ToGv7K1rG6HekX/EumP8ZWA2NsjoyWhOqOptd0tk=

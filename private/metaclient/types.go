@@ -118,7 +118,32 @@ const (
 )
 
 // ListOptions lists objects.
-type ListOptions = storj.ListOptions
+type ListOptions struct {
+	Prefix          storj.Path
+	Cursor          storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
+	Delimiter       rune
+	Recursive       bool
+	Direction       ListDirection
+	Limit           int
+	IncludeMetadata bool
+	Status          int32
+}
+
+// NextPage returns options for listing the next page.
+func (opts ListOptions) NextPage(list ObjectList) ListOptions {
+	if !list.More || len(list.Items) == 0 {
+		return ListOptions{}
+	}
+
+	return ListOptions{
+		Prefix:    opts.Prefix,
+		Cursor:    list.Items[len(list.Items)-1].Path,
+		Delimiter: opts.Delimiter,
+		Recursive: opts.Recursive,
+		Direction: After,
+		Limit:     opts.Limit,
+	}
+}
 
 // ObjectList is a list of objects.
 type ObjectList = storj.ObjectList

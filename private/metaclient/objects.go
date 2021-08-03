@@ -359,6 +359,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		EncryptedPrefix: []byte(pi.ParentEnc.Raw()),
 		EncryptedCursor: []byte(startAfter),
 		Limit:           int32(options.Limit),
+		IncludeMetadata: options.IncludeMetadata,
 		Recursive:       options.Recursive,
 		Status:          options.Status,
 	})

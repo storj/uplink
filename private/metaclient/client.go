@@ -774,8 +774,9 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 		ObjectIncludes: &pb.ObjectListItemIncludes{
 			Metadata: params.IncludeMetadata,
 		},
-		Recursive: params.Recursive,
-		Status:    pb.Object_Status(params.Status),
+		UseObjectIncludes: true,
+		Recursive:         params.Recursive,
+		Status:            pb.Object_Status(params.Status),
 	}
 }
 

@@ -91,6 +91,42 @@ func TestListObjects_SingleObject(t *testing.T) {
 	})
 }
 
+func TestListObjects_IncludeMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		expectedMetadata := uplink.CustomMetadata{
+			"testtag": "testtag",
+		}
+		uploadObjectWithMetadata(t, ctx, project, "testbucket", "test.dat", 1*memory.KiB, expectedMetadata)
+
+		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+			Custom: true, // include metadata
+		})
+		assert.True(t, list.Next())
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.Equal(t, expectedMetadata, list.Item().Custom)
+
+		list = listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+			Custom: false, // don't include metadata
+		})
+		assert.True(t, list.Next())
+		require.NoError(t, list.Err())
+		require.NotNil(t, list.Item())
+		require.Equal(t, uplink.CustomMetadata(nil), list.Item().Custom)
+
+		assertNoNextObject(t, list)
+	})
+}
+
 func TestListObjects_TwoObjects(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
