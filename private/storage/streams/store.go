@@ -409,6 +409,12 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		return Part{}, err
 	}
 
+	defer func() {
+		if err != nil && !streamID.IsZero() {
+			s.deleteAbortedPart(context2.WithoutCancellation(ctx), streamID, partNumber)
+		}
+	}()
+
 	eofReader := NewEOFReader(data)
 	for !eofReader.IsEOF() && !eofReader.HasError() {
 
@@ -870,6 +876,20 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encrypted
 	})
 	if err != nil {
 		mon.Event("failed to delete cancelled object")
+	}
+}
+
+// deleteCancelledObject handles clean up of segments on receiving CTRL+C or context cancellation.
+func (s *Store) deleteAbortedPart(ctx context.Context, streamID storj.StreamID, partNumber uint32) {
+	var err error
+	defer mon.Task()(&ctx)(&err)
+
+	err = s.metainfo.DeletePart(ctx, metaclient.DeletePartParams{
+		StreamID:   streamID,
+		PartNumber: partNumber,
+	})
+	if err != nil {
+		mon.Event("failed to delete aborted part")
 	}
 }
 

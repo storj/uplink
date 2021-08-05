@@ -165,8 +165,11 @@ func TestUploadPart(t *testing.T) {
 		}
 
 		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
-		remoteInlineSource := randData[:51*memory.KiB.Int()]
+		// inline segment
+		remoteInlineSource := randData[:3*memory.KiB.Int()]
+		// single segment
 		remoteSource1 := randData[len(remoteInlineSource) : len(remoteInlineSource)+10*memory.KiB.Int()]
+		// multiple segments
 		remoteSource2 := randData[len(remoteInlineSource)+len(remoteSource1):]
 
 		upload, err := project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 1)
@@ -176,20 +179,31 @@ func TestUploadPart(t *testing.T) {
 		err = upload.Commit()
 		require.NoError(t, err)
 
+		segmentsBefore, err := planet.Satellites[0].Metainfo.Metabase.TestingAllSegments(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(segmentsBefore))
+
+		// start uploading part but abort before committing
+		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 2)
+		require.NoError(t, err)
+		_, err = upload.Write(remoteSource2)
+		require.NoError(t, err)
+		err = upload.Abort()
+		require.NoError(t, err)
+
+		// verify that no additional segment left after aborting part upload
+		segmentsAfter, err := planet.Satellites[0].Metainfo.Metabase.TestingAllSegments(ctx)
+		require.NoError(t, err)
+		require.Equal(t, len(segmentsBefore), len(segmentsAfter))
+
+		// if abort from previous upload will fail we will see here error that segment already exists
+		// but that should not happen
 		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 2)
 		require.NoError(t, err)
 		_, err = upload.Write(remoteSource2)
 		require.NoError(t, err)
 		err = upload.Commit()
 		require.NoError(t, err)
-
-		// TODO aborting is not working correctly yet
-		// upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 3)
-		// require.NoError(t, err)
-		// _, err = upload.Write(remoteInlineSource)
-		// require.NoError(t, err)
-		// err = upload.Abort()
-		// require.NoError(t, err)
 
 		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 0)
 		require.NoError(t, err)
