@@ -1578,3 +1578,133 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 func (client *Client) SetRawAPIKey(key []byte) {
 	client.apiKeyRaw = key
 }
+
+// Server side move.
+
+// BeginMoveObjectParams parameters for BeginMoveObject method.
+type BeginMoveObjectParams struct {
+	StreamID []byte
+	Cursor   SegmentPosition
+	Limit    int32
+	Range    StreamRange
+
+	ProjectID  []byte
+	BucketName []byte
+	ObjectKey  []byte
+	Version    int32
+}
+
+// BeginMoveObjectItem represents listed segment.
+type BeginMoveObjectItem struct {
+	//Position          SegmentPosition
+	//PlainSize         int64
+	//PlainOffset       int64
+	//CreatedAt         time.Time
+	//EncryptedETag     []byte
+	EncryptedKeyNonce storj.Nonce
+	EncryptedKey      []byte
+}
+
+// BeginMoveObjectResponse response for BeginMoveObjectResponse request.
+type BeginMoveObjectResponse struct {
+	Items                []SegmentsKeyList
+	More                 bool
+	EncryptionParameters storj.EncryptionParameters
+}
+
+// SegmentsKeyList holds single segment encrypted key.
+type SegmentsKeyList struct {
+	EncryptedKeyNonce storj.Nonce
+	EncryptedKey      []byte
+}
+
+func (params *BeginMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.BeginMoveObjectRequest {
+	return &pb.BeginMoveObjectRequest{
+		Header:   header,
+		StreamId: params.StreamID,
+		CursorPosition: &pb.SegmentPosition{
+			PartNumber: params.Cursor.PartNumber,
+			Index:      params.Cursor.Index,
+		},
+		Limit:     params.Limit,
+		Range:     params.Range.toProto(),
+		ProjectId: params.ProjectID,
+		ObjectKey: params.ObjectKey,
+		Bucket:    params.BucketName,
+		Version:   params.Version,
+	}
+}
+
+func newBeginMoveObjectResponse(response *pb.BeginMoveObjectResponse) BeginMoveObjectResponse {
+	segments := make([]SegmentsKeyList, len(response.Items))
+	for i, segment := range response.Items {
+		segments[i] = SegmentsKeyList{
+			EncryptedKeyNonce: segment.EncryptedKeyNonce,
+			EncryptedKey:      segment.EncryptedKey,
+		}
+	}
+
+	ep := storj.EncryptionParameters{}
+	if response.EncryptionParameters != nil {
+		ep = storj.EncryptionParameters{
+			CipherSuite: storj.CipherSuite(response.EncryptionParameters.CipherSuite),
+			BlockSize:   int32(response.EncryptionParameters.BlockSize),
+		}
+	}
+
+	return BeginMoveObjectResponse{
+		Items:                segments,
+		More:                 response.More,
+		EncryptionParameters: ep,
+	}
+}
+
+// BeginMoveObject ... .
+func (client *Client) BeginMoveObject(ctx context.Context, params BeginMoveObjectParams) (_ BeginMoveObjectResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.BeginMoveObjectResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.BeginMoveObject(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return BeginMoveObjectResponse{}, Error.Wrap(err)
+	}
+
+	return newBeginMoveObjectResponse(response), nil
+}
+
+type FinishMoveObjectParams struct {
+	Items                []SegmentsKeyList
+	More                 bool
+	EncryptionParameters storj.EncryptionParameters
+}
+
+func (params *FinishMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.FinishMoveObjectRequest {
+	keys := make([]*pb.SegmentsKeyList, 0)
+	for _, key := range params.Items {
+		keys = append(keys, &pb.SegmentsKeyList{
+			EncryptedKeyNonce:    key.EncryptedKeyNonce,
+			EncryptedKey:         key.EncryptedKey,
+		})
+	}
+	return &pb.FinishMoveObjectRequest{
+		Header:               header,
+		Items:                keys,
+		More:                 false,
+		EncryptionParameters: nil,
+	}
+}
+
+// FinishMoveObject ... .
+func (client *Client) FinishMoveObject(ctx context.Context, params FinishMoveObjectParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	_, err = client.client.FinishMoveObject(ctx, params.toRequest(client.header()))
+	if err != nil {
+		return Error.Wrap(err)
+	}
+
+	return nil
+}
