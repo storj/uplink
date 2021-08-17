@@ -203,3 +203,19 @@ func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.C
 
 	return metainfoClient, nil
 }
+
+//nolint:deadcode
+//lint:ignore U1000 its used in private/object package
+func dialMetainfoDBWithProject(ctx context.Context, project *Project) (_ *metaclient.DB, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	return project.dialMetainfoDB(ctx)
+}
+
+//nolint:deadcode
+//lint:ignore U1000 its used in private/object package
+func getStreamsStoreWithProject(ctx context.Context, project *Project) (_ *streams.Store, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	return project.getStreamsStore(ctx)
+}

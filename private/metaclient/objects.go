@@ -475,6 +475,15 @@ func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response 
 	}, nil
 }
 
+// ListSegments returns paged segments list.
+func (db *DB) ListSegments(ctx context.Context, params ListSegmentsParams) (response ListSegmentsResponse, err error) {
+	result, err := db.metainfo.ListSegments(ctx, params)
+	if err != nil {
+		return ListSegmentsResponse{}, err
+	}
+	return result, nil
+}
+
 // GetObject returns information about an object.
 func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)
