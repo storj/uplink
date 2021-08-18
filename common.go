@@ -20,7 +20,9 @@ import (
 
 var mon = monkit.Package()
 
-// Error is default error class for uplink.
+// We use packageError.Wrap/New instead of plain errs.Wrap/New to add a prefix "uplink" to every error
+// message emitted by the Uplink library.
+// It is private because it's not intended to be part of the public API.
 var packageError = errs.Class("uplink")
 
 // ErrTooManyRequests is returned when user has sent too many requests in a given amount of time.
