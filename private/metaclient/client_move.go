@@ -12,8 +12,10 @@ import (
 
 // BeginMoveObjectParams parameters for BeginMoveObject method.
 type BeginMoveObjectParams struct {
-	Bucket             []byte
-	EncryptedObjectKey []byte
+	Bucket                []byte
+	EncryptedObjectKey    []byte
+	NewBucket             []byte
+	NewEncryptedObjectKey []byte
 }
 
 // EncryptedKeyAndNonce holds single segment encrypted key.
@@ -33,9 +35,11 @@ type BeginMoveObjectResponse struct {
 
 func (params *BeginMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginMoveRequest {
 	return &pb.ObjectBeginMoveRequest{
-		Header:             header,
-		Bucket:             params.Bucket,
-		EncryptedObjectKey: params.EncryptedObjectKey,
+		Header:                header,
+		Bucket:                params.Bucket,
+		EncryptedObjectKey:    params.EncryptedObjectKey,
+		NewBucket:             params.NewBucket,
+		NewEncryptedObjectKey: params.NewEncryptedObjectKey,
 	}
 }
 
@@ -90,6 +94,7 @@ func (client *Client) BeginMoveObject(ctx context.Context, params BeginMoveObjec
 // FinishMoveObjectParams parameters for FinishMoveObject method.
 type FinishMoveObjectParams struct {
 	StreamID                     storj.StreamID
+	NewBucket                    []byte
 	NewEncryptedObjectKey        []byte
 	NewEncryptedMetadataKeyNonce storj.Nonce
 	NewEncryptedMetadataKey      []byte
@@ -100,6 +105,10 @@ func (params *FinishMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 	keys := make([]*pb.EncryptedKeyAndNonce, len(params.NewSegmentKeys))
 	for i, keyAndNonce := range params.NewSegmentKeys {
 		keys[i] = &pb.EncryptedKeyAndNonce{
+			Position: &pb.SegmentPosition{
+				PartNumber: keyAndNonce.Position.PartNumber,
+				Index:      keyAndNonce.Position.Index,
+			},
 			EncryptedKeyNonce: keyAndNonce.EncryptedKeyNonce,
 			EncryptedKey:      keyAndNonce.EncryptedKey,
 		}
@@ -107,6 +116,7 @@ func (params *FinishMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 	return &pb.ObjectFinishMoveRequest{
 		Header:                       header,
 		StreamId:                     params.StreamID,
+		NewBucket:                    params.NewBucket,
 		NewEncryptedObjectKey:        params.NewEncryptedObjectKey,
 		NewEncryptedMetadataKeyNonce: params.NewEncryptedMetadataKeyNonce,
 		NewEncryptedMetadataKey:      params.NewEncryptedMetadataKey,

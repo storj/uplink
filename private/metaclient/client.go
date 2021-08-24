@@ -560,11 +560,13 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 
 		StreamID: object.StreamId,
 
-		Created:           object.CreatedAt,
-		Modified:          object.CreatedAt,
-		PlainSize:         object.PlainSize,
-		Expires:           object.ExpiresAt,
-		EncryptedMetadata: object.EncryptedMetadata,
+		Created:                       object.CreatedAt,
+		Modified:                      object.CreatedAt,
+		PlainSize:                     object.PlainSize,
+		Expires:                       object.ExpiresAt,
+		EncryptedMetadata:             object.EncryptedMetadata,
+		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 
 		EncryptionParameters: storj.EncryptionParameters{
 			CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),

@@ -286,7 +286,9 @@ func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawOb
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
-		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc, item.EncryptedMetadata, db.encStore)
+		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc,
+			// TODO list response doesn't return yet both key and nonce for metadata
+			item.EncryptedMetadata, nil, storj.Nonce{}, db.encStore)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -400,7 +402,9 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			unencKey = paths.NewUnencrypted(unencItem)
 		}
 
-		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, unencKey, item.EncryptedMetadata, db.encStore)
+		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, unencKey,
+			// TODO list response doesn't return yet both key and nonce for metadata
+			item.EncryptedMetadata, nil, storj.Nonce{}, db.encStore)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -538,7 +542,8 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		},
 	}
 
-	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key), objectInfo.EncryptedMetadata, db.encStore)
+	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key),
+		objectInfo.EncryptedMetadata, objectInfo.EncryptedMetadataEncryptedKey, objectInfo.EncryptedMetadataNonce, db.encStore)
 	if err != nil {
 		return Object{}, err
 	}
@@ -656,7 +661,8 @@ func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata S
 }
 
 // TypedDecryptStreamInfo decrypts stream info.
-func TypedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted, streamMetaBytes []byte, encStore *encryption.Store) (
+func TypedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted, streamMetaBytes,
+	metadataKey []byte, metadataNonce storj.Nonce, encStore *encryption.Store) (
 	_ *pb.StreamInfo, streamMeta pb.StreamMeta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
@@ -675,7 +681,7 @@ func TypedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey p
 	}
 
 	cipher := storj.CipherSuite(streamMeta.EncryptionType)
-	encryptedKey, keyNonce := getEncryptedKeyAndNonce(streamMeta.LastSegmentMeta)
+	encryptedKey, keyNonce := getEncryptedKeyAndNonce(metadataKey, metadataNonce, streamMeta.LastSegmentMeta)
 	contentKey, err := encryption.DecryptKey(encryptedKey, cipher, derivedKey, keyNonce)
 	if err != nil {
 		return nil, pb.StreamMeta{}, err
@@ -695,7 +701,12 @@ func TypedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey p
 	return &stream, streamMeta, nil
 }
 
-func getEncryptedKeyAndNonce(m *pb.SegmentMeta) (storj.EncryptedPrivateKey, *storj.Nonce) {
+// getEncryptedKeyAndNonce returns key and nonce directly if exists, otherwise try to get them from SegmentMeta.
+func getEncryptedKeyAndNonce(metadataKey []byte, metadataNonce storj.Nonce, m *pb.SegmentMeta) (storj.EncryptedPrivateKey, *storj.Nonce) {
+	if len(metadataKey) > 0 {
+		return storj.EncryptedPrivateKey(metadataKey), &metadataNonce
+	}
+
 	if m == nil {
 		return nil, nil
 	}

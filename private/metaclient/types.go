@@ -23,8 +23,9 @@ type RawObjectItem struct {
 
 	PlainSize int64
 
-	EncryptedMetadataNonce storj.Nonce
-	EncryptedMetadata      []byte
+	EncryptedMetadataNonce        storj.Nonce
+	EncryptedMetadataEncryptedKey []byte
+	EncryptedMetadata             []byte
 
 	EncryptionParameters storj.EncryptionParameters
 	RedundancyScheme     storj.RedundancyScheme
@@ -40,9 +41,10 @@ type RawObjectListItem struct {
 	ExpiresAt              time.Time
 	PlainSize              int64
 	EncryptedMetadataNonce storj.Nonce
-	EncryptedMetadata      []byte
-	StreamID               storj.StreamID
-	IsPrefix               bool
+	// TODO add EncryptedMetadataEncryptedKey
+	EncryptedMetadata []byte
+	StreamID          storj.StreamID
+	IsPrefix          bool
 }
 
 // SegmentPosition segment position in object.
