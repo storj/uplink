@@ -2,7 +2,8 @@ pipeline {
     agent {
         docker {
             label 'main'
-            image docker.build("storj-ci", "--pull git://github.com/storj/ci.git#main").id
+            image 'storjlabs/ci:latest'
+            alwaysPull true
             args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod'
         }
     }
@@ -169,6 +170,7 @@ pipeline {
                         sh 'GOOS=linux   GOARCH=arm   go vet ./...'
                         sh 'GOOS=windows GOARCH=amd64 go vet ./...'
                         sh 'GOOS=windows GOARCH=386   go vet ./...'
+                        sh 'GOOS=windows GOARCH=arm64 go vet ./...'
                         sh 'GOOS=darwin  GOARCH=amd64 go vet ./...'
                         sh 'GOOS=darwin  GOARCH=arm64 go vet ./...'
 
