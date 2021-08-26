@@ -157,11 +157,12 @@ func TestUploadPart(t *testing.T) {
 			_, err = project.UploadPart(newCtx, "testbucket", "multipart-object", "", 1)
 			require.Error(t, err)
 
-			// empty input data reader
+			// empty input data reader: committing objects with zero-byte part
+			// sizes shouldn't return an error.
 			upload, err := project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 0)
 			require.NoError(t, err)
 			err = upload.Commit()
-			require.Error(t, err)
+			require.NoError(t, err)
 		}
 
 		randData := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)

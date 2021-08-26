@@ -567,10 +567,6 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		}
 	}
 
-	if streamSize == 0 {
-		return Part{}, errs.New("input data reader was empty")
-	}
-
 	return Part{
 		PartNumber: partNumber,
 		Size:       streamSize,
