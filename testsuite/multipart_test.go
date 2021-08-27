@@ -213,6 +213,12 @@ func TestUploadPart(t *testing.T) {
 		err = upload.Commit()
 		require.NoError(t, err)
 
+		// it should be possible to upload zero-byte part as a last one
+		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 3)
+		require.NoError(t, err)
+		err = upload.Commit()
+		require.NoError(t, err)
+
 		// all requests after committing should return errors
 		_, err = upload.Write([]byte{1})
 		require.Error(t, err)
