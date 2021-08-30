@@ -70,7 +70,7 @@ pipeline {
                     }
                     steps {
                         sh 'go vet ./...'
-                        sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
+                        sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee .build/tests.json | xunit -out .build/tests.xml'
                         // TODO enable this later
                         // sh 'check-clean-directory'
                     }
@@ -104,7 +104,7 @@ pipeline {
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         dir('testsuite'){
                             sh 'go vet ./...'
-                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
                         // TODO enable this later
                         // sh 'check-clean-directory'
@@ -132,7 +132,7 @@ pipeline {
                         dir('testsuite'){
                             sh 'cp go.mod go-temp.mod'
                             sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
                         }
                     }
 
