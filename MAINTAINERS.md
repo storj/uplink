@@ -31,7 +31,6 @@ Examples of Release Candidates:
   - https://github.com/storj/gateway-st
   - https://github.com/storj/gateway-mt
   - https://github.com/storj/uplink-c
-  - https://github.com/storj/linksharing
 2. For each of them update, `go.mod` and `testsuite/go.mod` to latest main (or the specific Git commit that will be tagged as a new version) of `storj.io/uplink`. Makefile target `bump-dependencies` (available in all listed repositories) can bo used to do this automatically.
 3. Use `go mod tidy` to update the respective `go.sum` files.
 4. Push a change to Gerrit with the updated `go.mod` and `go.sum` files for each of the Git repositories.
