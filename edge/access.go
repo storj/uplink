@@ -44,7 +44,8 @@ type RegisterAccessOptions struct {
 // RegisterAccess gets credentials for the Storj-hosted Gateway and linkshare service.
 // All files accessible under the Access are then also accessible via those services.
 // If you call this function a lot, and the use case allows it,
-// please set Permission.NotAfter when creating the Access.
+// please limit the lifetime of the credentials
+// by setting Permission.NotAfter when creating the Access.
 func (config *Config) RegisterAccess(
 	ctx context.Context,
 	access *uplink.Access,

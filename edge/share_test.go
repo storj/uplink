@@ -12,17 +12,17 @@ import (
 )
 
 func TestCreateURL(t *testing.T) {
-	testValidCase := func(description, baseURL, accessID, bucket, key string, expected string) {
+	testValidCase := func(description, baseURL, accessID, bucket, key string, options *edge.ShareURLOptions, expected string) {
 		t.Run(description, func(t *testing.T) {
-			url, err := edge.JoinShareURL(baseURL, accessID, bucket, key)
+			url, err := edge.JoinShareURL(baseURL, accessID, bucket, key, options)
 			require.Nil(t, err)
 			require.Equal(t, expected, url)
 		})
 	}
 
-	testInvalidCase := func(description, baseURL, accessID, bucket, key string, expectedErr string) {
+	testInvalidCase := func(description, baseURL, accessID, bucket, key string, options *edge.ShareURLOptions, expectedErr string) {
 		t.Run(description, func(t *testing.T) {
-			url, err := edge.JoinShareURL(baseURL, accessID, bucket, key)
+			url, err := edge.JoinShareURL(baseURL, accessID, bucket, key, options)
 			require.NotNil(t, err)
 			require.Equal(t, expectedErr, err.Error())
 			require.Equal(t, "", url)
@@ -35,6 +35,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"",
 		"",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	)
 
@@ -44,6 +45,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"mybucket",
 		"",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa/mybucket",
 	)
 
@@ -53,6 +55,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"mybucket",
 		"my/prefix/",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa/mybucket/my/prefix/",
 	)
 
@@ -62,6 +65,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"mybucket",
 		"my/object",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa/mybucket/my/object",
 	)
 
@@ -71,6 +75,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"",
 		"",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	)
 
@@ -80,7 +85,20 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"mybucket",
 		"a\x00a",
+		nil,
 		"https://linksharing.test/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaa/mybucket/a%00a",
+	)
+
+	testValidCase(
+		"raw download link",
+		"https://linksharing.test",
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"mybucket",
+		"myobject",
+		&edge.ShareURLOptions{
+			Raw: true,
+		},
+		"https://linksharing.test/raw/aaaaaaaaaaaaaaaaaaaaaaaaaaaa/mybucket/myobject",
 	)
 
 	testInvalidCase(
@@ -89,6 +107,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"",
 		"",
+		nil,
 		"uplink: invalid base url: \"\"",
 	)
 
@@ -98,6 +117,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"",
 		"",
+		nil,
 		"uplink: invalid base url: \"linksharing.test\"",
 	)
 
@@ -107,6 +127,7 @@ func TestCreateURL(t *testing.T) {
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"",
 		"myobject",
+		nil,
 		"uplink: bucket is required if key is specified",
 	)
 
@@ -116,6 +137,31 @@ func TestCreateURL(t *testing.T) {
 		"",
 		"",
 		"",
+		nil,
 		"uplink: accessKeyID is required",
+	)
+
+	testInvalidCase(
+		"missing key for raw download link",
+		"https://linksharing.test",
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"mybucket",
+		"",
+		&edge.ShareURLOptions{
+			Raw: true,
+		},
+		"uplink: key is required for a raw download link",
+	)
+
+	testInvalidCase(
+		"prefix instead of object for raw download link",
+		"https://linksharing.test",
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"mybucket",
+		"myprefix/",
+		&edge.ShareURLOptions{
+			Raw: true,
+		},
+		"uplink: a raw download link can not be a prefix",
 	)
 }
