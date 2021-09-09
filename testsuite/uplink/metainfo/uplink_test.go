@@ -37,11 +37,11 @@ func TestMultisegmentUploadWithLastInline(t *testing.T) {
 		require.Equal(t, expectedData, downloaded)
 
 		// verify that object has 3 segments, 2 remote + 1 inline
-		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "testbucket")
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "testbucket")
 		require.NoError(t, err)
 		require.Len(t, objects, 1)
 
-		segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
 			ProjectID:  planet.Uplinks[0].Projects[0].ID,
 			BucketName: "testbucket",
 			ObjectKey:  objects[0].ObjectKey,

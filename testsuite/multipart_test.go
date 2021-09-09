@@ -180,7 +180,7 @@ func TestUploadPart(t *testing.T) {
 		err = upload.Commit()
 		require.NoError(t, err)
 
-		segmentsBefore, err := planet.Satellites[0].Metainfo.Metabase.TestingAllSegments(ctx)
+		segmentsBefore, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(segmentsBefore))
 
@@ -193,7 +193,7 @@ func TestUploadPart(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify that no additional segment left after aborting part upload
-		segmentsAfter, err := planet.Satellites[0].Metainfo.Metabase.TestingAllSegments(ctx)
+		segmentsAfter, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
 		require.Equal(t, len(segmentsBefore), len(segmentsAfter))
 
@@ -349,11 +349,11 @@ func TestUploadPart_CheckNoEmptyInlineSegment(t *testing.T) {
 		require.Equal(t, expectedData, data)
 
 		// verify that part has 3 segments and no empty inline segment at the end
-		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, bucket)
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, bucket)
 		require.NoError(t, err)
 		require.Len(t, objects, 1)
 
-		segments, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
 			ProjectID:  planet.Uplinks[0].Projects[0].ID,
 			BucketName: bucket,
 			ObjectKey:  objects[0].ObjectKey,

@@ -12,6 +12,6 @@ require (
 	storj.io/common v0.0.0-20210830144612-749c41c36e30
 	storj.io/drpc v0.0.24
 	storj.io/private v0.0.0-20210719004409-d6bcdddb82e0 // indirect
-	storj.io/storj v1.37.2
-	storj.io/uplink v1.5.0-rc.1.0.20210827115050-6827e2032248
+	storj.io/storj v0.12.1-0.20210909071551-c258f4bbac77
+	storj.io/uplink v1.5.0-rc.1.0.20210908131054-2c4f221fe461
 )

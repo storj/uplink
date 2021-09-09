@@ -209,7 +209,7 @@ func TestAbortUpload(t *testing.T) {
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		// we should have one pending object
-		objects, err := planet.Satellites[0].Metainfo.Metabase.TestingAllObjects(ctx)
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
 		require.NoError(t, err)
 		require.Len(t, objects, 1)
 
@@ -217,7 +217,7 @@ func TestAbortUpload(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should have NO objects after abort
-		objects, err = planet.Satellites[0].Metainfo.Metabase.TestingAllObjects(ctx)
+		objects, err = planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
 		require.NoError(t, err)
 		require.Len(t, objects, 0)
 
