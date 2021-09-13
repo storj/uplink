@@ -241,9 +241,13 @@ func (parts *PartIterator) tryLoadNext() (ok bool, err error) {
 
 	partsMap := make(map[uint32]*Part)
 	for _, item := range list.Items {
-		etag, err := decryptETag(parts.project, parts.bucket, parts.key, list.EncryptionParameters, item)
-		if err != nil {
-			return false, convertKnownErrors(err, parts.bucket, parts.key)
+		var etag []byte
+		if item.EncryptedETag != nil {
+			// ETag will be only with last segment in a part
+			etag, err = decryptETag(parts.project, parts.bucket, parts.key, list.EncryptionParameters, item)
+			if err != nil {
+				return false, convertKnownErrors(err, parts.bucket, parts.key)
+			}
 		}
 
 		partNumber := uint32(item.Position.PartNumber)

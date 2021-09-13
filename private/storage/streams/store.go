@@ -391,9 +391,9 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	defer mon.Task()(&ctx)(&err)
 
 	var (
-		currentSegment int64
-		streamSize     int64
-		contentKey     storj.Key
+		currentSegment        int64
+		streamSize            int64
+		lastSegmentContentKey storj.Key
 
 		// requests to send in a single call, in this case it will be always CommitSegment or MakeInlineSegment
 		requestsToBatch []metaclient.BatchItem
@@ -419,6 +419,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	for !eofReader.IsEOF() && !eofReader.HasError() {
 
 		// generate random key for encrypting the segment's content
+		var contentKey storj.Key
 		_, err := rand.Read(contentKey[:])
 		if err != nil {
 			return Part{}, err
@@ -511,6 +512,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 
 			plainSegmentSize := sizeReader.Size()
 			if plainSegmentSize > 0 {
+				lastSegmentContentKey = contentKey
 				requestsToBatch = append(requestsToBatch, &metaclient.CommitSegmentParams{
 					SegmentID:         beginResponse.SegmentID,
 					SizeEncryptedData: encSizedReader.Size(),
@@ -526,6 +528,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			}
 
 			if len(data) > 0 {
+				lastSegmentContentKey = contentKey
 				cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 				if err != nil {
 					return Part{}, err
@@ -547,7 +550,8 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		currentSegment++
 	}
 
-	encryptedTag, err := encryptETag(eTag.ETag(), s.encryptionParameters, &contentKey)
+	// store ETag only for last segment in a part
+	encryptedTag, err := encryptETag(eTag.ETag(), s.encryptionParameters, &lastSegmentContentKey)
 	if err != nil {
 		return Part{}, err
 	}

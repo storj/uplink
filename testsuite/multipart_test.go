@@ -262,7 +262,8 @@ func TestUploadPart_ETag(t *testing.T) {
 		StorageNodeCount: 4,
 		UplinkCount:      1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+		segmentSize := 10 * memory.KiB
+		newCtx := testuplink.WithMaxSegmentSize(ctx, segmentSize)
 
 		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
 		require.NoError(t, err)
@@ -307,6 +308,50 @@ func TestUploadPart_ETag(t *testing.T) {
 		require.True(t, iterator.Next())
 		item := iterator.Item()
 		require.Equal(t, etag[:], item.ETag)
+
+		// verify that ETags from last segments in parts are decrypted correctly
+		objectKey := "multipart-object-many-parts"
+		info, err = project.BeginUpload(newCtx, "testbucket", objectKey, nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		testCases := []int{
+			1 * segmentSize.Int(),
+			2 * segmentSize.Int(),
+			3 * segmentSize.Int(),
+			4 * segmentSize.Int(),
+			// + 1KiB to have last segment not equal to maximum segment size
+			5*segmentSize.Int() + memory.KiB.Int(),
+
+			// TODO currently we are not supporting zero-byte part at the end
+			// 0,
+		}
+
+		for i, partSize := range testCases {
+			part := i + 1
+			randData := testrand.BytesInt(partSize)
+			upload, err := project.UploadPart(newCtx, "testbucket", objectKey, info.UploadID, uint32(part))
+			require.NoError(t, err)
+			_, err = upload.Write(randData)
+			require.NoError(t, err)
+
+			err = upload.SetETag([]byte{33, byte(part)})
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+		}
+
+		iterator = project.ListUploadParts(ctx, "testbucket", objectKey, info.UploadID, nil)
+
+		parts := 0
+		for iterator.Next() {
+			item := iterator.Item()
+			require.Equal(t, []byte{33, byte(item.PartNumber)}, item.ETag)
+			parts++
+		}
+		require.NoError(t, iterator.Err())
+		require.Equal(t, len(testCases), parts)
 
 		// TODO add more cases
 	})
