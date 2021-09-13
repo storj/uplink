@@ -308,8 +308,6 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		currentSegment++
 	}
 
-	totalSegments := currentSegment
-
 	if eofReader.HasError() {
 		return Meta{}, eofReader.err
 	}
@@ -337,19 +335,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	streamMeta := pb.StreamMeta{
-		NumberOfSegments:    totalSegments,
 		EncryptedStreamInfo: encryptedStreamInfo,
-		EncryptionType:      int32(s.encryptionParameters.CipherSuite),
-		EncryptionBlockSize: s.encryptionParameters.BlockSize,
-	}
-
-	// TODO: Do we still need to set LastSegmentMeta
-	// for backward compatibility with old uplinks?
-	if s.encryptionParameters.CipherSuite != storj.EncNull {
-		streamMeta.LastSegmentMeta = &pb.SegmentMeta{
-			EncryptedKey: encryptedKey,
-			KeyNonce:     keyNonce[:],
-		}
 	}
 
 	objectMetadata, err := pb.Marshal(&streamMeta)
@@ -360,6 +346,10 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	commitObject := metaclient.CommitObjectParams{
 		StreamID:          streamID,
 		EncryptedMetadata: objectMetadata,
+	}
+	if s.encryptionParameters.CipherSuite != storj.EncNull {
+		commitObject.EncryptedMetadataEncryptedKey = encryptedKey
+		commitObject.EncryptedMetadataNonce = keyNonce
 	}
 	if len(requestsToBatch) > 0 {
 		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
