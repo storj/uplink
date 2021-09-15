@@ -320,7 +320,7 @@ honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.0-20190106161140-3f1c8253044a/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 sourcegraph.com/sourcegraph/go-diff v0.5.0/go.mod h1:kuch7UrkMzY0X+p9CRK03kfuPQ2zzQcaEFbx8wA8rck=
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=
-storj.io/common v0.0.0-20210830144612-749c41c36e30 h1:jq2gNVt25EAMiq0FZxcHBPoMmqtUI/6UCYitJsLBwFU=
-storj.io/common v0.0.0-20210830144612-749c41c36e30/go.mod h1:hK0ykFYEolCalWZ+od8AzpxwQrZ72WkqwhxmH4rQYAY=
-storj.io/drpc v0.0.24 h1:9WgD+q8WWDIz7XCMib+U6xX9SjblMqOz9R6sU7rJnS8=
-storj.io/drpc v0.0.24/go.mod h1:ofQUDPQbbIymRDKE0tms48k8bLP5Y+dsI9CbXGv3gko=
+storj.io/common v0.0.0-20210915201516-56ad343b6a7e h1:oakUxrgZIk08wV/C+D0jsnU14JkGCVDh0LN10pYkVKk=
+storj.io/common v0.0.0-20210915201516-56ad343b6a7e/go.mod h1:i35B7Zr9WpXWSePOUAQXffRgvt0fWKpdfiB5mtbBbaA=
+storj.io/drpc v0.0.25 h1:Crey+clfi7zAjwvTDg65dMOwTZRhKwghqM6OwEp/+zE=
+storj.io/drpc v0.0.25/go.mod h1:ofQUDPQbbIymRDKE0tms48k8bLP5Y+dsI9CbXGv3gko=
