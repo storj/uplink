@@ -46,6 +46,7 @@ Examples of Release Candidates:
   - If there are new commits in main since you executed step 1, do not include them in the release. Change the `Target` from `main` to the specific Git commit used in step 1.
   - Describe the changes since the previous release in a human-readable way. Only those changes that affect users. No need to describe refactorings, etc.
   - If you are releasing a new Release Candidate, select the `This is a pre-release` checkbox.
+  - Save a draft and paste release link into the #libuplink Slack channel for review and wait for approval.
   - Click the `Publish release` button.
 10. Update the Gerrit changes from step 1 with the new official version number.
 11. Wait for the build to finish again and merge them.
