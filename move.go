@@ -37,8 +37,6 @@ func (project *Project) MoveObject(ctx context.Context, oldbucket, oldkey, newbu
 		return errwrapf("%w (%q)", ErrObjectKeyInvalid, newkey)
 	case strings.HasSuffix(newkey, "/"):
 		return packageError.New("newkey cannot be a prefix")
-	case oldbucket != newbucket:
-		return packageError.New("moving between buckets is not supported yet")
 	}
 
 	oldEncKey, err := encryptPath(project, oldbucket, oldkey)

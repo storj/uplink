@@ -28,6 +28,9 @@ func TestMoveObject(t *testing.T) {
 		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
 
+		createBucket(t, ctx, project, "testbucket")
+		createBucket(t, ctx, project, "new-testbucket")
+
 		testCases := []struct {
 			Bucket     string
 			Key        string
@@ -35,6 +38,7 @@ func TestMoveObject(t *testing.T) {
 			NewKey     string
 			ObjectSize memory.Size
 		}{
+			// the same bucket
 			{"testbucket", "empty", "testbucket", "new-empty", 0},
 			{"testbucket", "inline", "testbucket", "new-inline", memory.KiB},
 			{"testbucket", "remote", "testbucket", "new-remote", 9 * memory.KiB},
@@ -45,8 +49,18 @@ func TestMoveObject(t *testing.T) {
 			{"testbucket", "multiple-remote-segments", "testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
 			{"testbucket", "remote-with-prefix", "testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
 
+			// different bucket
+			{"testbucket", "empty", "new-testbucket", "new-empty", 0},
+			{"testbucket", "inline", "new-testbucket", "new-inline", memory.KiB},
+			{"testbucket", "remote", "new-testbucket", "new-remote", 9 * memory.KiB},
+			// one remote segment and one inline segment
+			{"testbucket", "remote-segment-size", "new-testbucket", "new-remote-segment-size", 10 * memory.KiB},
+			{"testbucket", "remote+inline", "new-testbucket", "new-remote+inline", 11 * memory.KiB},
+			// 3 remote segment
+			{"testbucket", "multiple-remote-segments", "new-testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
+			{"testbucket", "remote-with-prefix", "new-testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
+
 			// TODO write tests to move to existing key
-			// TODO write tests moving between buckets
 		}
 
 		for _, tc := range testCases {
