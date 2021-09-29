@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -75,6 +76,7 @@ func TestSetMetadata(t *testing.T) {
 			obj, err := project.StatObject(ctx, bucket.Name, key)
 			require.NoError(t, err)
 
+			require.Equal(t, key, obj.Key)
 			require.Equal(t, memory.KiB.Int64(), obj.System.ContentLength)
 			require.Equal(t, expectedCustomMetadata, obj.Custom)
 		}
@@ -90,6 +92,8 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
+			require.Equal(t, key, listObject.Key)
+			require.WithinDuration(t, time.Now(), listObject.System.Created, 1*time.Minute)
 			require.Equal(t, memory.KiB.Int64(), listObject.System.ContentLength)
 			require.Equal(t, expectedCustomMetadata, listObject.Custom)
 		}
@@ -105,8 +109,44 @@ func TestSetMetadata(t *testing.T) {
 			require.True(t, found)
 
 			listObject := objects.Item()
+			require.Equal(t, key, listObject.Key)
+			require.True(t, listObject.System.Created.IsZero())
 			require.Equal(t, int64(0), listObject.System.ContentLength)
 			require.Equal(t, uplink.CustomMetadata(nil), listObject.Custom)
+		}
+		{ // test system metadata from ListObjects without custom metadata
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
+				System: true,
+				Custom: false,
+			})
+			require.NoError(t, objects.Err())
+
+			found := objects.Next()
+			require.NoError(t, objects.Err())
+			require.True(t, found)
+
+			listObject := objects.Item()
+			require.Equal(t, key, listObject.Key)
+			require.WithinDuration(t, time.Now(), listObject.System.Created, 1*time.Minute)
+			require.Equal(t, memory.KiB.Int64(), listObject.System.ContentLength)
+			require.Equal(t, uplink.CustomMetadata(nil), listObject.Custom)
+		}
+		{ // test custom system metadata from ListObjects without system metadata
+			objects := project.ListObjects(ctx, bucket.Name, &uplink.ListObjectsOptions{
+				System: false,
+				Custom: true,
+			})
+			require.NoError(t, objects.Err())
+
+			found := objects.Next()
+			require.NoError(t, objects.Err())
+			require.True(t, found)
+
+			listObject := objects.Item()
+			require.Equal(t, key, listObject.Key)
+			require.True(t, listObject.System.Created.IsZero())
+			require.Equal(t, int64(0), listObject.System.ContentLength)
+			require.Equal(t, expectedCustomMetadata, listObject.Custom)
 		}
 	})
 }

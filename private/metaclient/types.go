@@ -121,14 +121,15 @@ const (
 
 // ListOptions lists objects.
 type ListOptions struct {
-	Prefix          storj.Path
-	Cursor          storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
-	Delimiter       rune
-	Recursive       bool
-	Direction       ListDirection
-	Limit           int
-	IncludeMetadata bool
-	Status          int32
+	Prefix                storj.Path
+	Cursor                storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
+	Delimiter             rune
+	Recursive             bool
+	Direction             ListDirection
+	Limit                 int
+	IncludeCustomMetadata bool
+	IncludeSystemMetadata bool
+	Status                int32
 }
 
 // NextPage returns options for listing the next page.

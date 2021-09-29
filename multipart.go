@@ -357,6 +357,8 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		opts.Prefix = options.Prefix
 		opts.Cursor = options.Cursor
 		opts.Recursive = options.Recursive
+		opts.IncludeSystemMetadata = options.System
+		opts.IncludeCustomMetadata = options.Custom
 	}
 
 	uploads := UploadIterator{

@@ -357,13 +357,14 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	}
 
 	items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
-		Bucket:          []byte(bucket),
-		EncryptedPrefix: []byte(pi.ParentEnc.Raw()),
-		EncryptedCursor: []byte(startAfter),
-		Limit:           int32(options.Limit),
-		IncludeMetadata: options.IncludeMetadata,
-		Recursive:       options.Recursive,
-		Status:          options.Status,
+		Bucket:                []byte(bucket),
+		EncryptedPrefix:       []byte(pi.ParentEnc.Raw()),
+		EncryptedCursor:       []byte(startAfter),
+		Limit:                 int32(options.Limit),
+		IncludeCustomMetadata: options.IncludeCustomMetadata,
+		IncludeSystemMetadata: options.IncludeSystemMetadata,
+		Recursive:             options.Recursive,
+		Status:                options.Status,
 	})
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)

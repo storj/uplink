@@ -757,13 +757,14 @@ func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteO
 
 // ListObjectsParams parameters for ListObjects method.
 type ListObjectsParams struct {
-	Bucket          []byte
-	EncryptedPrefix []byte
-	EncryptedCursor []byte
-	Limit           int32
-	IncludeMetadata bool
-	Recursive       bool
-	Status          int32
+	Bucket                []byte
+	EncryptedPrefix       []byte
+	EncryptedCursor       []byte
+	Limit                 int32
+	IncludeCustomMetadata bool
+	IncludeSystemMetadata bool
+	Recursive             bool
+	Status                int32
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -774,7 +775,8 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 		EncryptedCursor: params.EncryptedCursor,
 		Limit:           params.Limit,
 		ObjectIncludes: &pb.ObjectListItemIncludes{
-			Metadata: params.IncludeMetadata,
+			Metadata:              params.IncludeCustomMetadata,
+			ExcludeSystemMetadata: !params.IncludeSystemMetadata,
 		},
 		UseObjectIncludes: true,
 		Recursive:         params.Recursive,

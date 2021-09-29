@@ -43,7 +43,8 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 		opts.Prefix = options.Prefix
 		opts.Cursor = options.Cursor
 		opts.Recursive = options.Recursive
-		opts.IncludeMetadata = options.Custom
+		opts.IncludeCustomMetadata = options.Custom
+		opts.IncludeSystemMetadata = options.System
 	}
 
 	objects := ObjectIterator{
