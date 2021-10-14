@@ -22,7 +22,6 @@ import (
 
 	"storj.io/common/pb"
 	"storj.io/common/testcontext"
-	"storj.io/drpc/drpcmigrate"
 	"storj.io/drpc/drpcmux"
 	"storj.io/drpc/drpcserver"
 	"storj.io/uplink"
@@ -44,7 +43,7 @@ func (g *DRPCServerMock) RegisterAccess(context.Context, *pb.EdgeRegisterAccessR
 }
 
 func TestRegisterAccess(t *testing.T) {
-	ctx := testcontext.NewWithTimeout(t, 5*time.Second)
+	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
 	defer ctx.Cleanup()
 
 	certificatePEM, privateKeyPEM := createSelfSignedCertificate(t, "localhost")
@@ -89,12 +88,7 @@ func startMockAuthService(cancelCtx context.Context, testCtx *testcontext.Contex
 	require.NoError(t, err)
 	port = tcpListener.Addr().(*net.TCPAddr).Port
 
-	listenMux := drpcmigrate.NewListenMux(tcpListener, len(drpcmigrate.DRPCHeader))
-	testCtx.Go(func() error {
-		return listenMux.Run(cancelCtx)
-	})
-
-	drpcListener := tls.NewListener(listenMux.Route(drpcmigrate.DRPCHeader), serverTLSConfig)
+	drpcListener := tls.NewListener(tcpListener, serverTLSConfig)
 	testCtx.Go(func() error {
 		<-cancelCtx.Done()
 		return drpcListener.Close()
