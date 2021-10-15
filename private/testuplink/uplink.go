@@ -14,6 +14,9 @@ type segmentSizeKey struct{}
 type plainSizeKey struct{}
 
 // WithMaxSegmentSize creates context with max segment size for testing purposes.
+//
+// Created context needs to be used with uplink.OpenProject to manipulate default
+// segment size.
 func WithMaxSegmentSize(ctx context.Context, segmentSize memory.Size) context.Context {
 	return context.WithValue(ctx, segmentSizeKey{}, segmentSize)
 }
