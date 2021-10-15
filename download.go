@@ -8,8 +8,6 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/errs2"
-	"storj.io/common/rpc/rpcstatus"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
@@ -77,17 +75,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	//       currently this code is rather disjoint.
 
 	objectDownload, err := db.DownloadObject(ctx, bucket, key, opts)
-	if errs2.IsRPC(err, rpcstatus.Unimplemented) {
-		objectDownload.Object, err = db.GetObject(ctx, bucket, key)
-		if err != nil {
-			return nil, convertKnownErrors(err, bucket, key)
-		}
-		objectDownload.Range = opts.Range.Normalize(objectDownload.Object.Size)
-		if objectDownload.Object.Size > 0 {
-			objectDownload.ListSegments.More = true
-		}
-		objectDownload.ListSegments.EncryptionParameters = objectDownload.Object.EncryptionParameters
-	} else if err != nil {
+	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
