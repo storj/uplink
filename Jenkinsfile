@@ -66,13 +66,11 @@ pipeline {
 
                 stage('Tests') {
                     environment {
-                        COVERFLAGS = "${ env.BRANCH_NAME != 'main' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                        COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=.build/coverprofile -coverpkg=./...' : ''}"
                     }
                     steps {
                         sh 'go vet ./...'
                         sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee .build/tests.json | xunit -out .build/tests.xml'
-                        // TODO enable this later
-                        // sh 'check-clean-directory'
                     }
 
                     post {
@@ -97,7 +95,7 @@ pipeline {
                     environment {
                         STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
                         STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
-                        COVERFLAGS = "${ env.BRANCH_NAME != 'main' ? '' : '-coverprofile=.build/coverprofile -coverpkg=./...'}"
+                        COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
                     }
                     steps {
                         sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
@@ -106,8 +104,6 @@ pipeline {
                             sh 'go vet ./...'
                             sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                         }
-                        // TODO enable this later
-                        // sh 'check-clean-directory'
                     }
 
                     post {
@@ -115,6 +111,15 @@ pipeline {
                             sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
                             archiveArtifacts artifacts: '.build/testsuite.json'
                             junit '.build/testsuite.xml'
+
+                            script {
+                                if(fileExists(".build/testsuite_coverprofile")){
+                                    sh script: 'filter-cover-profile < .build/testsuite_coverprofile > .build/clean.testsuite_coverprofile', returnStatus: true
+                                    sh script: 'gocov convert .build/clean.testsuite_coverprofile > .build/testsuite_cover.json', returnStatus: true
+                                    sh script: 'gocov-xml  < .build/testsuite_cover.json > .build/testsuite_cobertura.xml', returnStatus: true
+                                    cobertura coberturaReportFile: '.build/testsuite_cobertura.xml'
+                                }
+                            }
                         }
                     }
                 }
