@@ -15,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/errs2"
 	"storj.io/common/fpath"
@@ -22,6 +23,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite"
 	"storj.io/storj/storagenode"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
@@ -185,6 +187,129 @@ func TestInmemoryUpload(t *testing.T) {
 		require.NoError(t, down.Close())
 
 		require.Equal(t, expected, downloaded)
+	})
+}
+
+func TestUploadObjectWithOverMaxParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.MaxNumberOfParts = 2
+				config.Metainfo.MinPartSize = 5 * memory.MiB
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := project.BeginUpload(ctx, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.UploadID)
+
+		t.Run("parts in default order", func(t *testing.T) {
+			expectedData := testrand.Bytes(30 * memory.KiB)
+			for i := 0; i < 3; i++ {
+				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i))
+				require.NoError(t, err)
+				_, err = upload.Write(expectedData)
+				require.NoError(t, err)
+				err = upload.Commit()
+				require.NoError(t, err)
+			}
+
+			_, err = project.CommitUpload(ctx, bucket, objectKey, info.UploadID, nil)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "exceeded maximum number of parts: 2")
+		})
+
+		t.Run("parts in random order", func(t *testing.T) {
+			expectedData := testrand.Bytes(30 * memory.KiB)
+			for i := 0; i < 3; i++ {
+				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i+3))
+				require.NoError(t, err)
+				_, err = upload.Write(expectedData)
+				require.NoError(t, err)
+				err = upload.Commit()
+				require.NoError(t, err)
+			}
+
+			_, err = project.CommitUpload(ctx, bucket, objectKey, info.UploadID, nil)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "exceeded maximum number of parts: 2")
+		})
+	})
+}
+
+func TestUploadObjectWithSmallParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.MaxNumberOfParts = 10
+				config.Metainfo.MinPartSize = 5 * memory.MiB
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := project.BeginUpload(ctx, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.UploadID)
+
+		t.Run("parts less then minimum threshold", func(t *testing.T) {
+			expectedData := testrand.Bytes(30 * memory.KiB)
+			for i := 1; i < 3; i++ {
+				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i))
+				require.NoError(t, err)
+				_, err = upload.Write(expectedData)
+				require.NoError(t, err)
+				err = upload.Commit()
+				require.NoError(t, err)
+			}
+
+			_, err = project.CommitUpload(ctx, bucket, objectKey, info.UploadID, nil)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "size of part number 1 is below minimum threshold, got: 30.0 KiB, min: 5.0 MiB")
+		})
+
+		t.Run("only last part less then minimum threshold", func(t *testing.T) {
+			info, err = project.BeginUpload(ctx, bucket, objectKey, nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, info.UploadID)
+
+			parts := []memory.Size{5 * memory.MiB, 30 * memory.KiB}
+			for i, size := range parts {
+				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i))
+				require.NoError(t, err)
+				_, err = upload.Write(testrand.Bytes(size))
+				require.NoError(t, err)
+				err = upload.Commit()
+				require.NoError(t, err)
+			}
+
+			_, err = project.CommitUpload(ctx, bucket, objectKey, info.UploadID, nil)
+			require.NoError(t, err)
+		})
 	})
 }
 
