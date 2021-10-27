@@ -15,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/errs2"
 	"storj.io/common/fpath"
@@ -22,6 +23,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite"
 	"storj.io/storj/storagenode"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
@@ -153,6 +155,141 @@ func TestObject(t *testing.T) {
 			})
 		}
 
+	})
+}
+
+func TestUploadObjectWithOverMaxParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.MaxNumberOfParts = 0
+				config.Metainfo.MinPartSize = 5 * memory.MiB
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+
+		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := project.BeginUpload(newCtx, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.UploadID)
+
+		expectedData := testrand.Bytes(30 * memory.KiB)
+		upload, err := project.UploadPart(newCtx, bucket, objectKey, info.UploadID, 1)
+		require.NoError(t, err)
+		_, err = upload.Write(expectedData)
+		require.NoError(t, err)
+		err = upload.Commit()
+		require.NoError(t, err)
+
+		_, err = project.CommitUpload(newCtx, bucket, objectKey, info.UploadID, nil)
+		require.Error(t, err)
+	})
+}
+
+func TestUploadObjectWithSmallParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.MaxNumberOfParts = 10
+				config.Metainfo.MinPartSize = 5 * memory.MiB
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+
+		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := project.BeginUpload(newCtx, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.UploadID)
+
+		expectedData := testrand.Bytes(30 * memory.KiB)
+		upload, err := project.UploadPart(newCtx, bucket, objectKey, info.UploadID, 1)
+		require.NoError(t, err)
+		_, err = upload.Write(expectedData)
+		require.NoError(t, err)
+		err = upload.Commit()
+		require.NoError(t, err)
+
+		upload2, err := project.UploadPart(newCtx, bucket, objectKey, info.UploadID, 2)
+		require.NoError(t, err)
+		_, err = upload2.Write(expectedData)
+		require.NoError(t, err)
+		err = upload2.Commit()
+		require.NoError(t, err)
+
+		_, err = project.CommitUpload(newCtx, bucket, objectKey, info.UploadID, nil)
+		require.Error(t, err)
+	})
+}
+
+func TestUploadObjectWithSmallLastPart(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.MaxNumberOfParts = 10
+				config.Metainfo.MinPartSize = 5 * memory.MiB
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+
+		project, err := planet.Uplinks[0].OpenProject(newCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := "testbucket"
+		objectKey := "multipart-object"
+
+		createBucket(t, ctx, project, bucket)
+
+		info, err := project.BeginUpload(newCtx, bucket, objectKey, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.UploadID)
+
+		smallData := testrand.Bytes(30 * memory.KiB)
+		data := testrand.Bytes(5*memory.MiB)
+		upload, err := project.UploadPart(newCtx, bucket, objectKey, info.UploadID, 1)
+		require.NoError(t, err)
+		_, err = upload.Write(data)
+		require.NoError(t, err)
+		err = upload.Commit()
+		require.NoError(t, err)
+
+		upload2, err := project.UploadPart(newCtx, bucket, objectKey, info.UploadID, 2)
+		require.NoError(t, err)
+		_, err = upload2.Write(smallData)
+		require.NoError(t, err)
+		err = upload2.Commit()
+		require.NoError(t, err)
+
+		_, err = project.CommitUpload(newCtx, bucket, objectKey, info.UploadID, nil)
+		require.NoError(t, err)
 	})
 }
 
