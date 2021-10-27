@@ -13,6 +13,8 @@ type segmentSizeKey struct{}
 
 type plainSizeKey struct{}
 
+type listLimitKey struct{}
+
 // WithMaxSegmentSize creates context with max segment size for testing purposes.
 //
 // Created context needs to be used with uplink.OpenProject to manipulate default
@@ -38,4 +40,17 @@ func WithoutPlainSize(ctx context.Context) context.Context {
 func IsWithoutPlainSize(ctx context.Context) bool {
 	withoutPlainSize, _ := ctx.Value(plainSizeKey{}).(bool)
 	return withoutPlainSize
+}
+
+// WithListLimit creates context with information about list limit that will be used with request.
+// Only for testing purposes.
+func WithListLimit(ctx context.Context, limit int) context.Context {
+	return context.WithValue(ctx, listLimitKey{}, limit)
+}
+
+// GetListLimit returns value for list limit if exists in context.
+// Only for testing purposes.
+func GetListLimit(ctx context.Context) int {
+	limit, _ := ctx.Value(listLimitKey{}).(int)
+	return limit
 }
