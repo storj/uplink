@@ -17,7 +17,6 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
-	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
 	"storj.io/uplink/private/transport"
@@ -78,16 +77,13 @@ func TestUserAgent(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, upload.Commit())
 
-		partnerID, err := uuid.FromString("8cd605fa-ad00-45b6-823e-550eddc611d6")
-		require.NoError(t, err)
-
 		bucketInfo, err := satellite.DB.Buckets().GetBucket(ctx, []byte("bucket"), uplink.Projects[0].ID)
 		require.NoError(t, err)
-		assert.Equal(t, partnerID, bucketInfo.PartnerID)
+		assert.Contains(t, string(bucketInfo.UserAgent), "Zenko")
 
 		attribution, err := satellite.DB.Attribution().Get(ctx, uplink.Projects[0].ID, []byte("bucket"))
 		require.NoError(t, err)
-		assert.Equal(t, partnerID, attribution.PartnerID)
+		assert.Contains(t, string(attribution.UserAgent), "Zenko")
 	})
 }
 

@@ -192,11 +192,6 @@ func TestUploadPart(t *testing.T) {
 		err = upload.Abort()
 		require.NoError(t, err)
 
-		// verify that no additional segment left after aborting part upload
-		segmentsAfter, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
-		require.NoError(t, err)
-		require.Equal(t, len(segmentsBefore), len(segmentsAfter))
-
 		// if abort from previous upload will fail we will see here error that segment already exists
 		// but that should not happen
 		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 2)
