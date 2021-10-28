@@ -19,6 +19,8 @@ encrypted, broken into little pieces and stored in a global decentralized
 network of computers. Luckily, we also support allowing you (and only you) to
 retrieve those files!
 
+[![Introducing Storj DCS—Decentralized Cloud Storage for Developers](https://img.youtube.com/vi/JgKdBRIyIps/hqdefault.jpg)](https://www.youtube.com/watch?v=JgKdBRIyIps)
+
 ### A Note about Versioning
 
 Our versioning in this repo is intended to primarily support the expectations of the
