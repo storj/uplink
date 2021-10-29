@@ -122,6 +122,11 @@ func TestMoveObject_Errors(t *testing.T) {
 		err = project.MoveObject(ctx, "testbucket", "key", "testbucket", "new-key", nil)
 		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 
+		// move to non existing bucket
+		err = project.MoveObject(ctx, "testbucket", "key", "non-existing-bucket", "key", nil)
+		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
+		require.Contains(t, err.Error(), "(\"non-existing-bucket\")")
+
 		err = project.MoveObject(ctx, "testbucket", "prefix/", "testbucket", "new-key", nil)
 		require.Error(t, err)
 

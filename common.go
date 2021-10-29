@@ -59,6 +59,9 @@ func convertKnownErrors(err error, bucket, key string) error {
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		message := errs.Unwrap(err).Error()
 		if strings.HasPrefix(message, metaclient.ErrBucketNotFound.New("").Error()) {
+			prefixLength := len(metaclient.ErrBucketNotFound.New("").Error())
+			// remove error prefix + ": " from message
+			bucket := message[prefixLength+2:]
 			return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
 		} else if strings.HasPrefix(message, metaclient.ErrObjectNotFound.New("").Error()) {
 			return errwrapf("%w (%q)", ErrObjectNotFound, key)
