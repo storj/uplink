@@ -24,8 +24,7 @@ retrieve those files!
 Our versioning in this repo is intended to primarily support the expectations of the
 [Go modules](https://blog.golang.org/using-go-modules) system, so you can expect that
 within a major version release, backwards-incompatible changes will be avoided at high
-cost. This is not the case with our downstream repo,
-[storj/common](https://github.com/storj/common/).
+cost.
 
 # Documentation
 
