@@ -6,6 +6,7 @@ package stream
 import (
 	"context"
 	"io"
+	"io/ioutil"
 
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
@@ -75,6 +76,43 @@ func (download *Download) Read(data []byte) (n int, err error) {
 		data = data[:download.length]
 	}
 	n, err = download.reader.Read(data)
+	download.length -= int64(n)
+	download.offset += int64(n)
+
+	return n, err
+}
+
+// ReadAt reads len(p) bytes into p starting at offset off in the
+// underlying input source. It returns the number of bytes
+// read (0 <= n <= len(p)) and any error encountered.
+func (download *Download) ReadAt(p []byte, off int64) (n int, err error) {
+	if download.closed {
+		return 0, Error.New("already closed")
+	}
+
+	if download.reader == nil {
+		err = download.resetReader()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if download.length <= 0 {
+		return 0, io.EOF
+	}
+
+	if off < download.offset {
+		return 0, Error.New("invalid offset")
+	}
+
+	diff := off - download.offset
+	written, err := io.CopyN(ioutil.Discard, download.reader, diff)
+	download.offset += written
+	if err != nil {
+		return 0, err
+	}
+
+	n, err = download.reader.Read(p)
 	download.length -= int64(n)
 	download.offset += int64(n)
 
