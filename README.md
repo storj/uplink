@@ -20,6 +20,18 @@ retrieve those files!
 
 [![Introducing Storj DCS—Decentralized Cloud Storage for Developers](https://img.youtube.com/vi/JgKdBRIyIps/hqdefault.jpg)](https://www.youtube.com/watch?v=JgKdBRIyIps)
 
+### Installation
+
+```
+go get storj.io/uplink
+```
+
+### Example
+
+Ready to use example can be found here: https://github.com/storj/uplink/blob/main/examples/walkthrough/main.go
+
+Provided example requires Access Grant as an input parameter. Access Grant can be obtain from Satellite UI. [See our documentation](https://docs.storj.io/dcs/getting-started/quickstart-uplink-cli/uploading-your-first-object/create-first-access-grant).
+
 ### A Note about Versioning
 
 Our versioning in this repo is intended to primarily support the expectations of the
