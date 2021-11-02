@@ -14,12 +14,10 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
-	"storj.io/common/macaroon"
 	"storj.io/common/memory"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/satellite/console"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metaclient"
@@ -32,7 +30,7 @@ const (
 )
 
 func TestBucketsBasic(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -73,7 +71,7 @@ func TestBucketsBasic(t *testing.T) {
 }
 
 func TestBucketsReadWrite(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		// Create new bucket
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
@@ -114,7 +112,7 @@ func TestBucketsReadWrite(t *testing.T) {
 }
 
 func TestErrNoBucket(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		_, err := db.CreateBucket(ctx, "")
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
@@ -127,7 +125,7 @@ func TestErrNoBucket(t *testing.T) {
 }
 
 func TestBucketDeleteAll(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		if assert.NoError(t, err) {
 			assert.Equal(t, TestBucket, bucket.Name)
@@ -151,7 +149,7 @@ func TestBucketDeleteAll(t *testing.T) {
 }
 
 func TestListBucketsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucketList, err := db.ListBuckets(ctx, metaclient.BucketListOptions{Direction: metaclient.Forward})
 		if assert.NoError(t, err) {
 			assert.False(t, bucketList.More)
@@ -161,7 +159,7 @@ func TestListBucketsEmpty(t *testing.T) {
 }
 
 func TestListBuckets(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucketNames := []string{"a00", "aa0", "b00", "bb0", "c00"}
 
 		for _, name := range bucketNames {
@@ -220,12 +218,16 @@ func getBucketNames(bucketList metaclient.BucketList) []string {
 }
 
 func runTest(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
-	runTestWithPathCipher(t, storj.EncAESGCM, test)
+	runTestWithPathCipher(t, 4, storj.EncAESGCM, test)
 }
 
-func runTestWithPathCipher(t *testing.T, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
+func runTestWithoutSN(t *testing.T, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
+	runTestWithPathCipher(t, 0, storj.EncAESGCM, test)
+}
+
+func runTestWithPathCipher(t *testing.T, storageNodeCount int, pathCipher storj.CipherSuite, test func(*testing.T, context.Context, *testplanet.Planet, *metaclient.DB, *streams.Store)) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		SatelliteCount: 1, StorageNodeCount: storageNodeCount, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encAccess := newTestEncStore(TestEncKey)
 		encAccess.SetDefaultPathCipher(pathCipher)
@@ -249,32 +251,7 @@ func newTestEncStore(keyStr string) *encryption.Store {
 }
 
 func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ *metaclient.DB, _ *streams.Store, _ func() error, err error) {
-	// TODO(kaloyan): We should have a better way for configuring the Satellite's API Key
-	// add project to satisfy constraint
-	project, err := planet.Satellites[0].DB.Console().Projects().Insert(context.Background(), &console.Project{
-		Name: "testProject",
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	apiKey, err := macaroon.NewAPIKey([]byte("testSecret"))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	apiKeyInfo := console.APIKeyInfo{
-		ProjectID: project.ID,
-		Name:      "testKey",
-		Secret:    []byte("testSecret"),
-	}
-
-	// add api key to db
-	_, err = planet.Satellites[0].DB.Console().APIKeys().Create(context.Background(), apiKey.Head(), apiKeyInfo)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
+	apiKey := planet.Uplinks[0].APIKey[planet.Satellites[0].ID()]
 	metainfoClient, err := planet.Uplinks[0].DialMetainfo(context.Background(), planet.Satellites[0], apiKey)
 	if err != nil {
 		return nil, nil, nil, err

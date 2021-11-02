@@ -16,10 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/encryption"
-	"storj.io/common/errs2"
 	"storj.io/common/memory"
 	"storj.io/common/paths"
-	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -32,7 +30,7 @@ import (
 const TestFile = "test-file"
 
 func TestCreateObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
@@ -61,7 +59,7 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestGetObject(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
@@ -140,9 +138,6 @@ func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *strea
 
 func assertData(ctx context.Context, t *testing.T, db *metaclient.DB, streams *streams.Store, bucketName, objectKey string, content []byte) {
 	info, err := db.DownloadObject(ctx, bucketName, objectKey, metaclient.DownloadOptions{})
-	if errs2.IsRPC(err, rpcstatus.Unimplemented) {
-		t.Skip("unimplemented DownloadObject")
-	}
 	require.NoError(t, err)
 
 	download := stream.NewDownload(ctx, info, streams)
@@ -161,7 +156,7 @@ func assertData(ctx context.Context, t *testing.T, db *metaclient.DB, streams *s
 
 func TestDeleteObject(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encStore := newTestEncStore(TestEncKey)
 		encStore.SetDefaultPathCipher(storj.EncAESGCM)
@@ -208,7 +203,7 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestListObjectsEmpty(t *testing.T) {
-	runTest(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		testBucketInfo, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
@@ -234,7 +229,7 @@ func TestListObjectsEmpty(t *testing.T) {
 
 func TestListObjects_EncryptionBypass(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		encStore := newTestEncStore(TestEncKey)
 		encStore.SetDefaultPathCipher(storj.EncAESGCM)
@@ -300,7 +295,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 }
 
 func TestListObjects(t *testing.T) {
-	runTestWithPathCipher(t, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
+	runTestWithPathCipher(t, 0, storj.EncNull, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
