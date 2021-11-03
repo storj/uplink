@@ -28,7 +28,7 @@ go get storj.io/uplink
 
 ### Example
 
-Ready to use example can be found here: https://github.com/storj/uplink/blob/main/examples/walkthrough/main.go
+Ready to use example can be found here: [examples/walkthrough/main.go](examples/walkthrough/main.go)
 
 Provided example requires Access Grant as an input parameter. Access Grant can be obtained from Satellite UI. [See our documentation](https://docs.storj.io/dcs/getting-started/quickstart-uplink-cli/uploading-your-first-object/create-first-access-grant).
 
