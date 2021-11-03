@@ -37,8 +37,7 @@ Provided example requires Access Grant as an input parameter. Access Grant can b
 Our versioning in this repo is intended to primarily support the expectations of the
 [Go modules](https://blog.golang.org/using-go-modules) system, so you can expect that
 within a major version release, backwards-incompatible changes will be avoided at high
-cost. This is not the case with our downstream repo,
-[storj/storj](https://github.com/storj/storj/).
+cost.
 
 # Documentation
 

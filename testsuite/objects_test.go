@@ -16,6 +16,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestListObjects_NonExistingBucket(t *testing.T) {
@@ -311,9 +312,7 @@ func TestListObjects_Paging(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 
-		// TODO change internal listing limit for test to avoid large number of objects
-		// current satellite default limit is 1000
-		totalObjects := 1010
+		totalObjects := 17
 		expectedObjects := map[string]bool{}
 
 		for i := 0; i < totalObjects; i++ {
@@ -322,7 +321,8 @@ func TestListObjects_Paging(t *testing.T) {
 			uploadObject(t, ctx, project, "testbucket", key, 1)
 		}
 
-		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
+		newCtx := testuplink.WithListLimit(ctx, 3)
+		list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
 			Recursive: true,
 		})
 

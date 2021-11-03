@@ -10,6 +10,7 @@ import (
 
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/testuplink"
 )
 
 // ListObjectsOptions defines object listing options.
@@ -46,6 +47,8 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
 	}
+
+	opts.Limit = testuplink.GetListLimit(ctx)
 
 	objects := ObjectIterator{
 		ctx:     ctx,
