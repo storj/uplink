@@ -9,10 +9,10 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20211021003554-f155346ccc11
+	storj.io/common v0.0.0-20211102144601-401a79f0706a
 	storj.io/drpc v0.0.26
-	storj.io/storj v0.12.1-0.20211026150352-1951450c57c7
-	storj.io/uplink v1.7.1-0.20211012154306-65bb87992c7c
+	storj.io/storj v0.12.1-0.20211103092656-bd2448bc4df9
+	storj.io/uplink v1.7.1-0.20211103081336-a1ae98e0c4cb
 )
 
 require (
@@ -77,6 +77,7 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
@@ -89,5 +90,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 	storj.io/monkit-jaeger v0.0.0-20210426161729-debb1cbcbbd7 // indirect
-	storj.io/private v0.0.0-20211022095408-ad8a59190f12 // indirect
+	storj.io/private v0.0.0-20211029202355-a7eae71c382a // indirect
 )
