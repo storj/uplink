@@ -16,6 +16,9 @@ import (
 
 // Config defines configuration for using uplink library.
 type Config struct {
+	// UserAgent defines a registered partner's Value Attribution Code, and is used by the satellite to associate
+	// a bucket with the partner at the time of bucket creation.
+	// See https://docs.storj.io/dcs/how-tos/configure-tools-for-the-partner-program for info on the Partner Program
 	UserAgent string
 
 	// DialTimeout defines how long client should wait for establishing
