@@ -116,37 +116,12 @@ func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectI
 // CreateBucketParams parameters for CreateBucket method.
 type CreateBucketParams struct {
 	Name []byte
-
-	// TODO remove those values when satellite will be adjusted
-	PathCipher                  storj.CipherSuite
-	PartnerID                   []byte
-	DefaultSegmentsSize         int64
-	DefaultRedundancyScheme     storj.RedundancyScheme
-	DefaultEncryptionParameters storj.EncryptionParameters
 }
 
 func (params *CreateBucketParams) toRequest(header *pb.RequestHeader) *pb.BucketCreateRequest {
-	defaultRS := params.DefaultRedundancyScheme
-	defaultEP := params.DefaultEncryptionParameters
-
 	return &pb.BucketCreateRequest{
-		Header:             header,
-		Name:               params.Name,
-		PathCipher:         pb.CipherSuite(params.PathCipher),
-		PartnerId:          params.PartnerID,
-		DefaultSegmentSize: params.DefaultSegmentsSize,
-		DefaultRedundancyScheme: &pb.RedundancyScheme{
-			Type:             pb.RedundancyScheme_SchemeType(defaultRS.Algorithm),
-			MinReq:           int32(defaultRS.RequiredShares),
-			Total:            int32(defaultRS.TotalShares),
-			RepairThreshold:  int32(defaultRS.RepairShares),
-			SuccessThreshold: int32(defaultRS.OptimalShares),
-			ErasureShareSize: defaultRS.ShareSize,
-		},
-		DefaultEncryptionParameters: &pb.EncryptionParameters{
-			CipherSuite: pb.CipherSuite(defaultEP.CipherSuite),
-			BlockSize:   int64(defaultEP.BlockSize),
-		},
+		Header: header,
+		Name:   params.Name,
 	}
 }
 
