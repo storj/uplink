@@ -357,7 +357,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket Bucket, err error) {
 	}, nil
 }
 
-// BeginObjectParams parmaters for BeginObject method.
+// BeginObjectParams parameters for BeginObject method.
 type BeginObjectParams struct {
 	Bucket               []byte
 	EncryptedPath        []byte
@@ -585,9 +585,9 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 
 // GetObjectIPsParams are params for the GetObjectIPs request.
 type GetObjectIPsParams struct {
-	Bucket        []byte
-	EncryptedPath []byte
-	Version       int32
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	Version            int32
 }
 
 // GetObjectIPsResponse is the response from GetObjectIPs.
@@ -602,7 +602,7 @@ func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.Object
 	return &pb.ObjectGetIPsRequest{
 		Header:        header,
 		Bucket:        params.Bucket,
-		EncryptedPath: params.EncryptedPath,
+		EncryptedPath: params.EncryptedObjectKey,
 		Version:       params.Version,
 	}
 }
@@ -777,9 +777,9 @@ type ListObjectsResponse struct {
 func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []byte, recursive bool) ListObjectsResponse {
 	objects := make([]RawObjectListItem, len(response.Items))
 	for i, object := range response.Items {
-		encryptedPath := object.EncryptedPath
+		encryptedObjectKey := object.EncryptedPath
 		isPrefix := false
-		if !recursive && len(encryptedPath) != 0 && encryptedPath[len(encryptedPath)-1] == '/' && !bytes.Equal(encryptedPath, encryptedPrefix) {
+		if !recursive && len(encryptedObjectKey) != 0 && encryptedObjectKey[len(encryptedObjectKey)-1] == '/' && !bytes.Equal(encryptedObjectKey, encryptedPrefix) {
 			isPrefix = true
 		}
 

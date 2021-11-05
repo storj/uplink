@@ -852,13 +852,13 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 }
 
 // deleteCancelledObject handles clean up of segments on receiving CTRL+C or context cancellation.
-func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encryptedPath string, streamID storj.StreamID) {
+func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encryptedObjectKey string, streamID storj.StreamID) {
 	var err error
 	defer mon.Task()(&ctx)(&err)
 
 	_, err = s.metainfo.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
 		Bucket:        []byte(bucketName),
-		EncryptedPath: []byte(encryptedPath),
+		EncryptedPath: []byte(encryptedObjectKey),
 		// TODO remove it or set to 0 when satellite side will be fixed
 		Version:  1,
 		StreamID: streamID,

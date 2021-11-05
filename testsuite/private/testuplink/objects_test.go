@@ -170,11 +170,11 @@ func TestDeleteObject(t *testing.T) {
 			return
 		}
 
-		unencryptedPath := paths.NewUnencrypted(TestFile)
-		encryptedPath, err := encryption.EncryptPathWithStoreCipher(bucket.Name, unencryptedPath, encStore)
+		unencryptedObjectKey := paths.NewUnencrypted(TestFile)
+		encryptedObjectKey, err := encryption.EncryptPathWithStoreCipher(bucket.Name, unencryptedObjectKey, encStore)
 		require.NoError(t, err)
 
-		for i, key := range []string{unencryptedPath.String(), encryptedPath.String()} {
+		for i, key := range []string{unencryptedObjectKey.String(), encryptedObjectKey.String()} {
 			upload(ctx, t, db, streams, bucket.Name, key, nil)
 
 			if i < 0 {
@@ -274,9 +274,9 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 				decoded += string(decodedNextBytes) + "/"
 			}
 			decoded = strings.TrimRight(decoded, "/")
-			encryptedPath := paths.NewEncrypted(decoded)
+			encryptedObjectKey := paths.NewEncrypted(decoded)
 
-			decryptedPath, err := encryption.DecryptPathWithStoreCipher(bucket.Name, encryptedPath, encStore)
+			decryptedPath, err := encryption.DecryptPathWithStoreCipher(bucket.Name, encryptedObjectKey, encStore)
 			require.NoError(t, err)
 
 			// NB: require decrypted path is a member of `filePaths`.

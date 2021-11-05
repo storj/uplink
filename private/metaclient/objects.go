@@ -44,8 +44,8 @@ func (db *DB) GetObjectIPs(ctx context.Context, bucket Bucket, key string) (_ *G
 	}
 
 	return db.metainfo.GetObjectIPs(ctx, GetObjectIPsParams{
-		Bucket:        []byte(bucket.Name),
-		EncryptedPath: []byte(encPath.Raw()),
+		Bucket:             []byte(bucket.Name),
+		EncryptedObjectKey: []byte(encPath.Raw()),
 	})
 }
 
