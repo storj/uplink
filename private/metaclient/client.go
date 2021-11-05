@@ -1472,38 +1472,6 @@ func (client *Client) DownloadSegmentWithRS(ctx context.Context, params Download
 	return newDownloadSegmentResponseWithRS(response), nil
 }
 
-// DeletePartParams contains information needed to delete part.
-type DeletePartParams struct {
-	StreamID   storj.StreamID
-	PartNumber uint32
-}
-
-func (params *DeletePartParams) toRequest(header *pb.RequestHeader) *pb.PartDeleteRequest {
-	return &pb.PartDeleteRequest{
-		Header: header,
-
-		StreamId:   params.StreamID,
-		PartNumber: int32(params.PartNumber),
-	}
-}
-
-// BatchItem returns single item for batch request.
-func (params *DeletePartParams) BatchItem() *pb.BatchRequestItem {
-	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_PartDelete{
-			PartDelete: params.toRequest(nil),
-		},
-	}
-}
-
-// DeletePart deletes single part.
-func (client *Client) DeletePart(ctx context.Context, params DeletePartParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	_, err = client.client.DeletePart(ctx, params.toRequest(client.header()))
-	return err
-}
-
 // RevokeAPIKey revokes the APIKey provided in the params.
 func (client *Client) RevokeAPIKey(ctx context.Context, params RevokeAPIKeyParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
