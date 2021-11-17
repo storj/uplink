@@ -110,11 +110,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	beginObjectReq := &metaclient.BeginObjectParams{
@@ -146,7 +146,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	eofReader := NewEOFReader(data)
@@ -154,7 +154,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		// generate random key for encrypting the segment's content
 		_, err := rand.Read(contentKey[:])
 		if err != nil {
-			return Meta{}, err
+			return Meta{}, errs.Wrap(err)
 		}
 
 		// Initialize the content nonce with the current total segment incremented
@@ -165,18 +165,18 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		contentNonce := storj.Nonce{}
 		_, err = encryption.Increment(&contentNonce, currentSegment+1)
 		if err != nil {
-			return Meta{}, err
+			return Meta{}, errs.Wrap(err)
 		}
 
 		// generate random nonce for encrypting the content key
 		_, err = rand.Read(keyNonce[:])
 		if err != nil {
-			return Meta{}, err
+			return Meta{}, errs.Wrap(err)
 		}
 
 		encryptedKey, err = encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &keyNonce)
 		if err != nil {
-			return Meta{}, err
+			return Meta{}, errs.Wrap(err)
 		}
 
 		sizeReader := SizeReader(eofReader)
@@ -185,7 +185,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		// If the data is larger than the inline threshold size, then it will be a remote segment
 		isRemote, err := peekReader.IsLargerThan(s.inlineThreshold)
 		if err != nil {
-			return Meta{}, err
+			return Meta{}, errs.Wrap(err)
 		}
 
 		segmentEncryption := metaclient.SegmentEncryption{}
@@ -199,7 +199,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		if isRemote {
 			encrypter, err := encryption.NewEncrypter(s.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(s.encryptionParameters.BlockSize))
 			if err != nil {
-				return Meta{}, err
+				return Meta{}, errs.Wrap(err)
 			}
 
 			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
@@ -216,11 +216,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			if currentSegment == 0 {
 				responses, err = s.metainfo.Batch(ctx, beginObjectReq, beginSegment)
 				if err != nil {
-					return Meta{}, err
+					return Meta{}, errs.Wrap(err)
 				}
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
-					return Meta{}, err
+					return Meta{}, errs.Wrap(err)
 				}
 				streamID = objResponse.StreamID
 				objectRS = objResponse.RedundancyStrategy
@@ -229,13 +229,13 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
 				requestsToBatch = requestsToBatch[:0]
 				if err != nil {
-					return Meta{}, err
+					return Meta{}, errs.Wrap(err)
 				}
 			}
 
 			segResponse, err := responses[1].BeginSegment()
 			if err != nil {
-				return Meta{}, err
+				return Meta{}, errs.Wrap(err)
 			}
 			segmentID := segResponse.SegmentID
 			limits := segResponse.Limits
@@ -248,7 +248,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			encSizedReader := SizeReader(transformedReader)
 			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader)
 			if err != nil {
-				return Meta{}, err
+				return Meta{}, errs.Wrap(err)
 			}
 
 			plainSize := sizeReader.Size()
@@ -266,12 +266,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
 			if err != nil {
-				return Meta{}, err
+				return Meta{}, errs.Wrap(err)
 			}
 
 			cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 			if err != nil {
-				return Meta{}, err
+				return Meta{}, errs.Wrap(err)
 			}
 
 			plainSize := int64(len(data))
@@ -290,11 +290,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			if currentSegment == 0 {
 				responses, err := s.metainfo.Batch(ctx, beginObjectReq, makeInlineSegment)
 				if err != nil {
-					return Meta{}, err
+					return Meta{}, errs.Wrap(err)
 				}
 				objResponse, err := responses[0].BeginObject()
 				if err != nil {
-					return Meta{}, err
+					return Meta{}, errs.Wrap(err)
 				}
 				streamID = objResponse.StreamID
 			} else {
@@ -309,12 +309,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	if eofReader.HasError() {
-		return Meta{}, eofReader.err
+		return Meta{}, errs.Wrap(eofReader.err)
 	}
 
 	metadataBytes, err := metadata.Metadata()
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	// TODO: Do we still need to set SegmentsSize and LastSegmentSize
@@ -325,13 +325,13 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		Metadata:        metadataBytes,
 	})
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
 	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, s.encryptionParameters.CipherSuite, &contentKey, &storj.Nonce{})
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	streamMeta := pb.StreamMeta{
@@ -340,7 +340,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 	objectMetadata, err := pb.Marshal(&streamMeta)
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	commitObject := metaclient.CommitObjectParams{
@@ -357,13 +357,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		err = s.metainfo.CommitObject(ctx, commitObject)
 	}
 	if err != nil {
-		return Meta{}, err
+		return Meta{}, errs.Wrap(err)
 	}
 
 	satStreamID := &pb.SatStreamID{}
-	err = pb.Unmarshal(streamID, satStreamID)
-	if err != nil {
-		return Meta{}, err
+	if err := pb.Unmarshal(streamID, satStreamID); err != nil {
+		return Meta{}, errs.Wrap(err)
 	}
 
 	resultMeta := Meta{
@@ -391,12 +390,12 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 
 	maxEncryptedSegmentSize, err := encryption.CalcEncryptedSize(s.segmentSize, s.encryptionParameters)
 	if err != nil {
-		return Part{}, err
+		return Part{}, errs.Wrap(err)
 	}
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
-		return Part{}, err
+		return Part{}, errs.Wrap(err)
 	}
 
 	eofReader := NewEOFReader(data)
@@ -406,7 +405,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		var contentKey storj.Key
 		_, err := rand.Read(contentKey[:])
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 
 		// Initialize the content nonce with the current total segment incremented
@@ -417,19 +416,19 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		contentNonce := storj.Nonce{}
 		_, err = encryption.Increment(&contentNonce, (int64(partNumber)<<32)|(currentSegment+1))
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 
 		var encryptedKeyNonce storj.Nonce
 		// generate random nonce for encrypting the content key
 		_, err = rand.Read(encryptedKeyNonce[:])
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 
 		encryptedKey, err := encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 
 		sizeReader := SizeReader(eofReader)
@@ -438,7 +437,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		// If the data is larger than the inline threshold size, then it will be a remote segment
 		isRemote, err := peekReader.IsLargerThan(s.inlineThreshold)
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 
 		segmentEncryption := metaclient.SegmentEncryption{}
@@ -452,7 +451,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		if isRemote {
 			encrypter, err := encryption.NewEncrypter(s.encryptionParameters.CipherSuite, &contentKey, &contentNonce, int(s.encryptionParameters.BlockSize))
 			if err != nil {
-				return Part{}, err
+				return Part{}, errs.Wrap(err)
 			}
 
 			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
@@ -471,19 +470,19 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			if len(requestsToBatch) == 0 {
 				beginResponse, err = s.metainfo.BeginSegment(ctx, beginSegment)
 				if err != nil {
-					return Part{}, err
+					return Part{}, errs.Wrap(err)
 				}
 			} else {
 				responses, err := s.metainfo.Batch(ctx, append(requestsToBatch, &beginSegment)...)
 				if err != nil {
-					return Part{}, err
+					return Part{}, errs.Wrap(err)
 				}
 
 				requestsToBatch = requestsToBatch[:0]
 
 				beginResponse, err = responses[1].BeginSegment()
 				if err != nil {
-					return Part{}, err
+					return Part{}, errs.Wrap(err)
 				}
 			}
 
@@ -491,7 +490,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 			uploadResults, err := s.ec.PutSingleResult(ctx, beginResponse.Limits, beginResponse.PiecePrivateKey,
 				beginResponse.RedundancyStrategy, encSizedReader)
 			if err != nil {
-				return Part{}, err
+				return Part{}, errs.Wrap(err)
 			}
 
 			plainSegmentSize := sizeReader.Size()
@@ -508,14 +507,14 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
 			if err != nil {
-				return Part{}, err
+				return Part{}, errs.Wrap(err)
 			}
 
 			if len(data) > 0 {
 				lastSegmentContentKey = contentKey
 				cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 				if err != nil {
-					return Part{}, err
+					return Part{}, errs.Wrap(err)
 				}
 
 				requestsToBatch = append(requestsToBatch, &metaclient.MakeInlineSegmentParams{
@@ -537,7 +536,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	// store ETag only for last segment in a part
 	encryptedTag, err := encryptETag(eTag.ETag(), s.encryptionParameters, &lastSegmentContentKey)
 	if err != nil {
-		return Part{}, err
+		return Part{}, errs.Wrap(err)
 	}
 	if len(requestsToBatch) > 0 {
 		// take last segment in a part and set ETag
@@ -551,7 +550,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		}
 		_, err = s.metainfo.Batch(ctx, requestsToBatch...)
 		if err != nil {
-			return Part{}, err
+			return Part{}, errs.Wrap(err)
 		}
 	}
 
@@ -597,7 +596,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(err)
 	}
 
 	// download all missing segments
@@ -615,7 +614,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				Range:    info.Range,
 			})
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err)
 			}
 
 			info.ListSegments.Items = append(info.ListSegments.Items, result.Items...)
@@ -681,18 +680,18 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 
 			encryptedRanger, err := s.Ranger(ctx, segment)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err)
 			}
 
 			contentNonce, err := deriveContentNonce(*segment.Info.Position)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err)
 			}
 
 			enc := segment.Info.SegmentEncryption
 			decrypted, err := decryptRanger(ctx, encryptedRanger, segment.Info.PlainSize, object.EncryptionParameters, derivedKey, enc.EncryptedKey, &enc.EncryptedKeyNonce, &contentNonce)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err)
 			}
 
 			rangers = append(rangers, decrypted)
@@ -704,7 +703,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 
 			contentNonce, err := deriveContentNonce(segment.Position)
 			if err != nil {
-				return nil, err
+				return nil, errs.Wrap(err)
 			}
 
 			rangers = append(rangers, &lazySegmentRanger{
