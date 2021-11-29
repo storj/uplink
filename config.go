@@ -14,6 +14,8 @@ import (
 	"storj.io/common/useragent"
 )
 
+const defaultDialTimeout = 10 * time.Second
+
 // Config defines configuration for using uplink library.
 type Config struct {
 	// UserAgent defines a registered partner's Value Attribution Code, and is used by the satellite to associate
@@ -24,6 +26,7 @@ type Config struct {
 
 	// DialTimeout defines how long client should wait for establishing
 	// a connection to peers.
+	// No explicit value or 0 means default 10s will be used. Value lower than 0 means there is no timeout.
 	DialTimeout time.Duration
 
 	// DialContext is how sockets are opened and is called to establish

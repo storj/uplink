@@ -53,6 +53,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.New("access grant is nil")
 	}
 
+	switch {
+	case config.DialTimeout < 0:
+		config.DialTimeout = 0 // no timeout
+	case config.DialTimeout == 0:
+		config.DialTimeout = defaultDialTimeout
+	}
+
 	if err := config.validateUserAgent(ctx); err != nil {
 		return nil, packageError.New("invalid user agent: %w", err)
 	}
