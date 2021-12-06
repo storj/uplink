@@ -9,9 +9,9 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20211102144601-401a79f0706a
+	storj.io/common v0.0.0-20211111143956-15b749504e31
 	storj.io/drpc v0.0.26
-	storj.io/storj v0.12.1-0.20211105125355-b314559a132d
+	storj.io/storj v0.12.1-0.20211210084137-c33d2f58cf27
 	storj.io/uplink v1.7.1-0.20211103081336-a1ae98e0c4cb
 )
 
@@ -33,7 +33,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.5.5 // indirect
-	github.com/google/pprof v0.0.0-20211008130755-947d60d73cc0 // indirect
+	github.com/google/pprof v0.0.0-20211108044417-e9b028704de0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/graphql-go/graphql v0.7.9 // indirect
@@ -55,6 +55,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.8 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo v1.16.4 // indirect
+	github.com/oschwald/maxminddb-golang v1.8.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/otp v1.3.0 // indirect
@@ -67,7 +68,7 @@ require (
 	github.com/stripe/stripe-go/v72 v72.51.0 // indirect
 	github.com/xtgo/uuid v0.0.0-20140804021211-a0b114877d4c // indirect
 	github.com/yuin/gopher-lua v0.0.0-20191220021717-ab39c6098bdb // indirect
-	github.com/zeebo/admission/v3 v3.0.2 // indirect
+	github.com/zeebo/admission/v3 v3.0.3 // indirect
 	github.com/zeebo/float16 v0.1.0 // indirect
 	github.com/zeebo/incenc v0.0.0-20180505221441-0d92902eec54 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
@@ -76,12 +77,12 @@ require (
 	go.opentelemetry.io/otel/trace v0.18.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa // indirect
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20211020064051-0ec99a608a1b // indirect
+	golang.org/x/sys v0.0.0-20211109065445-02f5c0300f6e // indirect
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.1.1 // indirect

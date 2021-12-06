@@ -19,7 +19,7 @@ import (
 	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
-	satmetainfo "storj.io/storj/satellite/metainfo"
+	"storj.io/storj/satellite/buckets"
 	"storj.io/uplink"
 )
 
@@ -163,10 +163,10 @@ type satelliteDBWithBucketsListLimit struct {
 
 type bucketsDBWithListLimit struct {
 	limit int
-	satmetainfo.BucketsDB
+	buckets.DB
 }
 
-func (db *satelliteDBWithBucketsListLimit) Buckets() satmetainfo.BucketsDB {
+func (db *satelliteDBWithBucketsListLimit) Buckets() buckets.DB {
 	return &bucketsDBWithListLimit{db.limit, db.DB.Buckets()}
 }
 
@@ -178,7 +178,7 @@ func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID uui
 		listOpts.Limit = db.limit
 	}
 
-	return db.BucketsDB.ListBuckets(ctx, projectID, listOpts, allowedBuckets)
+	return db.DB.ListBuckets(ctx, projectID, listOpts, allowedBuckets)
 }
 
 func TestListBuckets_AutoPaging(t *testing.T) {
