@@ -400,22 +400,12 @@ func (params *BeginObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // BeginObjectResponse response for BeginObject request.
 type BeginObjectResponse struct {
-	StreamID             storj.StreamID
-	EncryptionParameters storj.EncryptionParameters
+	StreamID storj.StreamID
 }
 
 func newBeginObjectResponse(response *pb.ObjectBeginResponse) BeginObjectResponse {
-	ep := storj.EncryptionParameters{}
-	if response.EncryptionParameters != nil {
-		ep = storj.EncryptionParameters{
-			CipherSuite: storj.CipherSuite(response.EncryptionParameters.CipherSuite),
-			BlockSize:   int32(response.EncryptionParameters.BlockSize),
-		}
-	}
-
 	return BeginObjectResponse{
-		StreamID:             response.StreamId,
-		EncryptionParameters: ep,
+		StreamID: response.StreamId,
 	}
 }
 
