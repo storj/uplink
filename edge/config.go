@@ -30,16 +30,18 @@ type Config struct {
 }
 
 func (config *Config) createDialer() rpc.Dialer {
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(config.CertificatePEM)
-
 	connector := rpc.NewDefaultTCPConnector(nil)
 	connector.SendDRPCMuxHeader = false
 
 	dialer := rpc.NewDefaultDialer(nil)
 	dialer.Connector = connector
-	dialer.HostnameTLSConfig = &tls.Config{
-		RootCAs: certPool,
+	dialer.HostnameTLSConfig = &tls.Config{}
+
+	if len(config.CertificatePEM) > 0 {
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(config.CertificatePEM)
+
+		dialer.HostnameTLSConfig.RootCAs = certPool
 	}
 
 	return dialer
