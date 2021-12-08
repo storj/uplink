@@ -133,13 +133,13 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}()
 
 	var (
-		currentSegment      int64
-		contentKey          storj.Key
-		streamSize          int64
-		lastSegmentSize     int64
-		encryptedKey        []byte
-		keyNonce            storj.Nonce
-		objectRS, segmentRS eestream.RedundancyStrategy
+		currentSegment  int64
+		contentKey      storj.Key
+		streamSize      int64
+		lastSegmentSize int64
+		encryptedKey    []byte
+		keyNonce        storj.Nonce
+		segmentRS       eestream.RedundancyStrategy
 
 		requestsToBatch = make([]metaclient.BatchItem, 0, 2)
 	)
@@ -223,7 +223,6 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 					return Meta{}, errs.Wrap(err)
 				}
 				streamID = objResponse.StreamID
-				objectRS = objResponse.RedundancyStrategy
 			} else {
 				beginSegment.StreamID = streamID
 				responses, err = s.metainfo.Batch(ctx, append(requestsToBatch, beginSegment)...)
@@ -242,9 +241,6 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			piecePrivateKey := segResponse.PiecePrivateKey
 			segmentRS = segResponse.RedundancyStrategy
 
-			if segmentRS == (eestream.RedundancyStrategy{}) {
-				segmentRS = objectRS
-			}
 			encSizedReader := SizeReader(transformedReader)
 			uploadResults, err := s.ec.PutSingleResult(ctx, limits, piecePrivateKey, segmentRS, encSizedReader)
 			if err != nil {

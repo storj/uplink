@@ -401,11 +401,10 @@ func (params *BeginObjectParams) BatchItem() *pb.BatchRequestItem {
 // BeginObjectResponse response for BeginObject request.
 type BeginObjectResponse struct {
 	StreamID             storj.StreamID
-	RedundancyStrategy   eestream.RedundancyStrategy
 	EncryptionParameters storj.EncryptionParameters
 }
 
-func newBeginObjectResponse(response *pb.ObjectBeginResponse, redundancyStrategy eestream.RedundancyStrategy) BeginObjectResponse {
+func newBeginObjectResponse(response *pb.ObjectBeginResponse) BeginObjectResponse {
 	ep := storj.EncryptionParameters{}
 	if response.EncryptionParameters != nil {
 		ep = storj.EncryptionParameters{
@@ -416,7 +415,6 @@ func newBeginObjectResponse(response *pb.ObjectBeginResponse, redundancyStrategy
 
 	return BeginObjectResponse{
 		StreamID:             response.StreamId,
-		RedundancyStrategy:   redundancyStrategy,
 		EncryptionParameters: ep,
 	}
 }
@@ -434,15 +432,7 @@ func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams)
 		return BeginObjectResponse{}, Error.Wrap(err)
 	}
 
-	rs := eestream.RedundancyStrategy{}
-	if response.RedundancyScheme != nil {
-		rs, err = eestream.NewRedundancyStrategyFromProto(response.RedundancyScheme)
-		if err != nil {
-			return BeginObjectResponse{}, Error.Wrap(err)
-		}
-	}
-
-	return newBeginObjectResponse(response, rs), nil
+	return newBeginObjectResponse(response), nil
 }
 
 // CommitObjectParams parmaters for CommitObject method.
