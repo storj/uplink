@@ -4,7 +4,8 @@ go 1.13
 
 require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/dvyukov/go-fuzz v0.0.0-20210602112143-b1f3d6f4ef4e // indirect
+	github.com/dvyukov/go-fuzz v0.0.0-20210914135545-4980593459a1 // indirect
+	github.com/dvyukov/go-fuzz-corpus v0.0.0-20190920191254-c42c1b2914c7 // indirect
 	github.com/elazarl/go-bindata-assetfs v1.0.1 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -16,7 +17,7 @@ require (
 	github.com/zeebo/errs v1.2.2
 	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211103235746-7861aae1554b // indirect
-	golang.org/x/tools v0.1.7 // indirect
+	golang.org/x/sys v0.0.0-20211205182925-97ca703d548d // indirect
+	golang.org/x/tools v0.1.8 // indirect
 	storj.io/common v0.0.0-20210708125041-4882a3ae3eda
 )
