@@ -89,11 +89,6 @@ func startMockAuthService(cancelCtx context.Context, testCtx *testcontext.Contex
 	port = tcpListener.Addr().(*net.TCPAddr).Port
 
 	drpcListener := tls.NewListener(tcpListener, serverTLSConfig)
-	testCtx.Go(func() error {
-		<-cancelCtx.Done()
-		return drpcListener.Close()
-	})
-
 	mux := drpcmux.New()
 	err = pb.DRPCRegisterEdgeAuth(mux, &DRPCServerMock{})
 	require.NoError(t, err)
