@@ -360,7 +360,7 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket Bucket, err error) {
 // BeginObjectParams parameters for BeginObject method.
 type BeginObjectParams struct {
 	Bucket               []byte
-	EncryptedPath        []byte
+	EncryptedObjectKey   []byte
 	Version              int32
 	Redundancy           storj.RedundancyScheme
 	EncryptionParameters storj.EncryptionParameters
@@ -371,7 +371,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 	return &pb.ObjectBeginRequest{
 		Header:        header,
 		Bucket:        params.Bucket,
-		EncryptedPath: params.EncryptedPath,
+		EncryptedPath: params.EncryptedObjectKey,
 		Version:       params.Version,
 		ExpiresAt:     params.ExpiresAt,
 		RedundancyScheme: &pb.RedundancyScheme{
@@ -466,9 +466,9 @@ func (client *Client) CommitObject(ctx context.Context, params CommitObjectParam
 
 // GetObjectParams parameters for GetObject method.
 type GetObjectParams struct {
-	Bucket        []byte
-	EncryptedPath []byte
-	Version       int32
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	Version            int32
 
 	RedundancySchemePerSegment bool
 }
@@ -477,7 +477,7 @@ func (params *GetObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectGet
 	return &pb.ObjectGetRequest{
 		Header:                     header,
 		Bucket:                     params.Bucket,
-		EncryptedPath:              params.EncryptedPath,
+		EncryptedPath:              params.EncryptedObjectKey,
 		Version:                    params.Version,
 		RedundancySchemePerSegment: params.RedundancySchemePerSegment,
 	}
@@ -509,9 +509,9 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 	}
 
 	info := RawObjectItem{
-		Bucket:        string(object.Bucket),
-		EncryptedPath: object.EncryptedPath,
-		Version:       uint32(object.Version),
+		Bucket:             string(object.Bucket),
+		EncryptedObjectKey: object.EncryptedPath,
+		Version:            uint32(object.Version),
 
 		StreamID: object.StreamId,
 
@@ -655,18 +655,18 @@ func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObj
 
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.
 type BeginDeleteObjectParams struct {
-	Bucket        []byte
-	EncryptedPath []byte
-	Version       int32
-	StreamID      storj.StreamID
-	Status        int32
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	Version            int32
+	StreamID           storj.StreamID
+	Status             int32
 }
 
 func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginDeleteRequest {
 	return &pb.ObjectBeginDeleteRequest{
 		Header:        header,
 		Bucket:        params.Bucket,
-		EncryptedPath: params.EncryptedPath,
+		EncryptedPath: params.EncryptedObjectKey,
 		Version:       params.Version,
 		StreamId:      &params.StreamID,
 		Status:        params.Status,
@@ -764,7 +764,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 		}
 
 		objects[i] = RawObjectListItem{
-			EncryptedPath:                 object.EncryptedPath,
+			EncryptedObjectKey:            object.EncryptedPath,
 			Version:                       object.Version,
 			Status:                        int32(object.Status),
 			StatusAt:                      object.StatusAt,
@@ -808,17 +808,17 @@ func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams)
 
 // ListPendingObjectStreamsParams parameters for ListPendingObjectStreams method.
 type ListPendingObjectStreamsParams struct {
-	Bucket          []byte
-	EncryptedPath   []byte
-	EncryptedCursor []byte
-	Limit           int32
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	EncryptedCursor    []byte
+	Limit              int32
 }
 
 func (params *ListPendingObjectStreamsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListPendingStreamsRequest {
 	return &pb.ObjectListPendingStreamsRequest{
 		Header:         header,
 		Bucket:         params.Bucket,
-		EncryptedPath:  params.EncryptedPath,
+		EncryptedPath:  params.EncryptedObjectKey,
 		StreamIdCursor: params.EncryptedCursor,
 		Limit:          params.Limit,
 	}
@@ -844,7 +844,7 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 	for i, object := range response.Items {
 
 		objects[i] = RawObjectListItem{
-			EncryptedPath:          object.EncryptedPath,
+			EncryptedObjectKey:     object.EncryptedPath,
 			Version:                object.Version,
 			Status:                 int32(object.Status),
 			StatusAt:               object.StatusAt,

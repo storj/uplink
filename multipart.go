@@ -86,7 +86,7 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 
 	response, err := metainfoClient.BeginObject(ctx, metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
-		EncryptedPath:        []byte(encPath.Raw()),
+		EncryptedObjectKey:   []byte(encPath.Raw()),
 		ExpiresAt:            options.Expires,
 		EncryptionParameters: project.encryptionParameters,
 	})
@@ -291,8 +291,8 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
 	_, err = metainfoClient.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
-		Bucket:        []byte(bucket),
-		EncryptedPath: []byte(encPath.Raw()),
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
 		// TODO remove it or set to 0 when satellite side will be fixed
 		Version:  1,
 		StreamID: id,

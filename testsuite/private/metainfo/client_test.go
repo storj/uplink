@@ -35,7 +35,7 @@ func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
 		// return redundancy scheme
 		object, err := metainfoClient.GetObject(ctx, metaclient.GetObjectParams{
 			Bucket:                     []byte("super-bucket"),
-			EncryptedPath:              []byte(objects[0].ObjectKey),
+			EncryptedObjectKey:         []byte(objects[0].ObjectKey),
 			RedundancySchemePerSegment: false,
 		})
 		require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
 		// return redundancy scheme
 		object, err = metainfoClient.GetObject(ctx, metaclient.GetObjectParams{
 			Bucket:                     []byte("super-bucket"),
-			EncryptedPath:              []byte(objects[0].ObjectKey),
+			EncryptedObjectKey:         []byte(objects[0].ObjectKey),
 			RedundancySchemePerSegment: true,
 		})
 		require.NoError(t, err)

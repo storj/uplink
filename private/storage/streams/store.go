@@ -119,7 +119,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 	beginObjectReq := &metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
-		EncryptedPath:        []byte(encPath.Raw()),
+		EncryptedObjectKey:   []byte(encPath.Raw()),
 		ExpiresAt:            expiration,
 		EncryptionParameters: s.encryptionParameters,
 	}
@@ -845,8 +845,8 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encrypted
 	defer mon.Task()(&ctx)(&err)
 
 	_, err = s.metainfo.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
-		Bucket:        []byte(bucketName),
-		EncryptedPath: []byte(encryptedObjectKey),
+		Bucket:             []byte(bucketName),
+		EncryptedObjectKey: []byte(encryptedObjectKey),
 		// TODO remove it or set to 0 when satellite side will be fixed
 		Version:  1,
 		StreamID: streamID,

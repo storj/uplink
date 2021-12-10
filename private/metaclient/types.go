@@ -11,9 +11,9 @@ import (
 
 // RawObjectItem represents raw object item from get request.
 type RawObjectItem struct {
-	Version       uint32
-	Bucket        string
-	EncryptedPath []byte
+	Version            uint32
+	Bucket             string
+	EncryptedObjectKey []byte
 
 	StreamID storj.StreamID
 
@@ -33,7 +33,7 @@ type RawObjectItem struct {
 
 // RawObjectListItem represents raw object item from list objects request.
 type RawObjectListItem struct {
-	EncryptedPath                 []byte
+	EncryptedObjectKey            []byte
 	Version                       int32
 	Status                        int32
 	CreatedAt                     time.Time

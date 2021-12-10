@@ -11,7 +11,7 @@ require (
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20211217122906-6be0b96ce7e0
 	storj.io/drpc v0.0.26
-	storj.io/storj v0.12.1-0.20220103174748-5351c43757d0
+	storj.io/storj v0.12.1-0.20220110154632-332b673a05ed
 	storj.io/uplink v1.7.2-0.20211214105548-e4a9fb937129
 )
 
@@ -91,5 +91,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 	storj.io/monkit-jaeger v0.0.0-20210426161729-debb1cbcbbd7 // indirect
-	storj.io/private v0.0.0-20211029202355-a7eae71c382a // indirect
+	storj.io/private v0.0.0-20211209191323-6595d4aa0cfe // indirect
 )

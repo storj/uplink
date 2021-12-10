@@ -115,7 +115,7 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 	//      and use them for encrypting the new metadata.
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
 		Bucket:                     []byte(bucket),
-		EncryptedPath:              []byte(encPath.Raw()),
+		EncryptedObjectKey:         []byte(encPath.Raw()),
 		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
@@ -211,8 +211,8 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, e
 	}
 
 	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
-		Bucket:        []byte(bucket),
-		EncryptedPath: []byte(encPath.Raw()),
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
 	})
 	if err != nil {
 		return Object{}, err
@@ -260,10 +260,10 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 	}
 
 	resp, err := db.metainfo.ListPendingObjectStreams(ctx, ListPendingObjectStreamsParams{
-		Bucket:          []byte(bucket),
-		EncryptedPath:   []byte(pi.PathEnc.Raw()),
-		EncryptedCursor: []byte(startAfter),
-		Limit:           int32(options.Limit),
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(pi.PathEnc.Raw()),
+		EncryptedCursor:    []byte(startAfter),
+		Limit:              int32(options.Limit),
 	})
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
@@ -389,7 +389,7 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
-		unencItem, err := encryption.DecryptPathRaw(string(item.EncryptedPath), pi.Cipher, &pi.ParentKey)
+		unencItem, err := encryption.DecryptPathRaw(string(item.EncryptedObjectKey), pi.Cipher, &pi.ParentKey)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -512,7 +512,7 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, e
 
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
 		Bucket:                     []byte(bucket),
-		EncryptedPath:              []byte(encPath.Raw()),
+		EncryptedObjectKey:         []byte(encPath.Raw()),
 		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
