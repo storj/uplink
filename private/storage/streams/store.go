@@ -133,13 +133,13 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}()
 
 	var (
-		currentSegment  int64
-		contentKey      storj.Key
-		streamSize      int64
-		lastSegmentSize int64
-		encryptedKey    []byte
-		keyNonce        storj.Nonce
-		segmentRS       eestream.RedundancyStrategy
+		currentSegment    uint32
+		contentKey        storj.Key
+		streamSize        int64
+		lastSegmentSize   int64
+		encryptedKey      []byte
+		encryptedKeyNonce storj.Nonce
+		segmentRS         eestream.RedundancyStrategy
 
 		requestsToBatch = make([]metaclient.BatchItem, 0, 2)
 	)
@@ -163,25 +163,24 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		// The increment by 1 is to avoid nonce reuse with the metadata encryption,
 		// which is encrypted with the zero nonce.
 		contentNonce := storj.Nonce{}
-		_, err = encryption.Increment(&contentNonce, currentSegment+1)
+		_, err = encryption.Increment(&contentNonce, int64(currentSegment)+1)
 		if err != nil {
 			return Meta{}, errs.Wrap(err)
 		}
 
 		// generate random nonce for encrypting the content key
-		_, err = rand.Read(keyNonce[:])
+		_, err = rand.Read(encryptedKeyNonce[:])
 		if err != nil {
 			return Meta{}, errs.Wrap(err)
 		}
 
-		encryptedKey, err = encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &keyNonce)
+		encryptedKey, err = encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 		if err != nil {
 			return Meta{}, errs.Wrap(err)
 		}
 
 		sizeReader := SizeReader(eofReader)
-		segmentReader := io.LimitReader(sizeReader, s.segmentSize)
-		peekReader := NewPeekThresholdReader(segmentReader)
+		peekReader := NewPeekThresholdReader(io.LimitReader(sizeReader, s.segmentSize))
 		// If the data is larger than the inline threshold size, then it will be a remote segment
 		isRemote, err := peekReader.IsLargerThan(s.inlineThreshold)
 		if err != nil {
@@ -192,7 +191,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		if s.encryptionParameters.CipherSuite != storj.EncNull {
 			segmentEncryption = metaclient.SegmentEncryption{
 				EncryptedKey:      encryptedKey,
-				EncryptedKeyNonce: keyNonce,
+				EncryptedKeyNonce: encryptedKeyNonce,
 			}
 		}
 
@@ -345,7 +344,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 	if s.encryptionParameters.CipherSuite != storj.EncNull {
 		commitObject.EncryptedMetadataEncryptedKey = encryptedKey
-		commitObject.EncryptedMetadataNonce = keyNonce
+		commitObject.EncryptedMetadataNonce = encryptedKeyNonce
 	}
 	if len(requestsToBatch) > 0 {
 		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
@@ -376,7 +375,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	defer mon.Task()(&ctx)(&err)
 
 	var (
-		currentSegment        int64
+		currentSegment        uint32
 		streamSize            int64
 		lastSegmentContentKey storj.Key
 
@@ -410,7 +409,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		// The increment by 1 is to avoid nonce reuse with the metadata encryption,
 		// which is encrypted with the zero nonce.
 		contentNonce := storj.Nonce{}
-		_, err = encryption.Increment(&contentNonce, (int64(partNumber)<<32)|(currentSegment+1))
+		_, err = encryption.Increment(&contentNonce, (int64(partNumber)<<32)|(int64(currentSegment)+1))
 		if err != nil {
 			return Part{}, errs.Wrap(err)
 		}
