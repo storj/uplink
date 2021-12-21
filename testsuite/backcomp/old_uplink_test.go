@@ -50,10 +50,11 @@ func TestOldUplink(t *testing.T) {
 		access, err := planet.Uplinks[0].Access[planet.Satellites[0].ID()].Serialize()
 		require.NoError(t, err)
 
-		runBinary := func(args ...string) {
-			output, err = exec.Command(ctx.File("binary", "uplink"), args...).CombinedOutput()
+		runBinary := func(args ...string) string {
+			output, err := exec.Command(ctx.File("binary", "uplink"), args...).CombinedOutput()
 			t.Log(string(output))
 			require.NoError(t, err)
+			return string(output)
 		}
 
 		// upload with old uplink
@@ -80,6 +81,10 @@ func TestOldUplink(t *testing.T) {
 		newData, err := ioutil.ReadFile(dstNewFile)
 		require.NoError(t, err)
 		require.Equal(t, newExpectedData, newData)
+
+		cmdResult := runBinary("ls", "sj://bucket/", "--access", access)
+		require.Contains(t, cmdResult, "5120 old-uplink")
+		require.Contains(t, cmdResult, "5120 new-uplink")
 	})
 }
 

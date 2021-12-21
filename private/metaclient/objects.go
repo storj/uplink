@@ -286,9 +286,11 @@ func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawOb
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
-		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc,
-			// TODO list response doesn't return yet both key and nonce for metadata
-			item.EncryptedMetadata, nil, storj.Nonce{}, db.encStore)
+		stream, streamMeta, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc,
+			item.EncryptedMetadata,
+			item.EncryptedMetadataEncryptedKey,
+			item.EncryptedMetadataNonce,
+		)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -403,9 +405,11 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			unencKey = paths.NewUnencrypted(unencItem)
 		}
 
-		stream, streamMeta, err := TypedDecryptStreamInfo(ctx, pi.Bucket, unencKey,
-			// TODO list response doesn't return yet both key and nonce for metadata
-			item.EncryptedMetadata, nil, storj.Nonce{}, db.encStore)
+		stream, streamMeta, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, unencKey,
+			item.EncryptedMetadata,
+			item.EncryptedMetadataEncryptedKey,
+			item.EncryptedMetadataNonce,
+		)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -543,8 +547,11 @@ func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		},
 	}
 
-	streamInfo, streamMeta, err := TypedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key),
-		objectInfo.EncryptedMetadata, objectInfo.EncryptedMetadataEncryptedKey, objectInfo.EncryptedMetadataNonce, db.encStore)
+	streamInfo, streamMeta, err := db.typedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key),
+		objectInfo.EncryptedMetadata,
+		objectInfo.EncryptedMetadataEncryptedKey,
+		objectInfo.EncryptedMetadataNonce,
+	)
 	if err != nil {
 		return Object{}, err
 	}
@@ -661,22 +668,22 @@ func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata S
 	}, nil
 }
 
-// TypedDecryptStreamInfo decrypts stream info.
-func TypedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted, streamMetaBytes,
-	metadataKey []byte, metadataNonce storj.Nonce, encStore *encryption.Store) (
-	_ *pb.StreamInfo, streamMeta pb.StreamMeta, err error) {
+// typedDecryptStreamInfo decrypts stream info.
+func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted,
+	streamMetaBytes, metadataKey []byte, metadataNonce storj.Nonce) (_ *pb.StreamInfo, _ pb.StreamMeta, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	streamMeta := pb.StreamMeta{}
 	err = pb.Unmarshal(streamMetaBytes, &streamMeta)
 	if err != nil {
 		return nil, pb.StreamMeta{}, err
 	}
 
-	if encStore.EncryptionBypass {
+	if db.encStore.EncryptionBypass {
 		return nil, streamMeta, nil
 	}
 
-	derivedKey, err := encryption.DeriveContentKey(bucket, unencryptedKey, encStore)
+	derivedKey, err := encryption.DeriveContentKey(bucket, unencryptedKey, db.encStore)
 	if err != nil {
 		return nil, pb.StreamMeta{}, err
 	}

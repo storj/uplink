@@ -764,15 +764,16 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 		}
 
 		objects[i] = RawObjectListItem{
-			EncryptedPath:          object.EncryptedPath,
-			Version:                object.Version,
-			Status:                 int32(object.Status),
-			StatusAt:               object.StatusAt,
-			CreatedAt:              object.CreatedAt,
-			ExpiresAt:              object.ExpiresAt,
-			PlainSize:              object.PlainSize,
-			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
-			EncryptedMetadata:      object.EncryptedMetadata,
+			EncryptedPath:                 object.EncryptedPath,
+			Version:                       object.Version,
+			Status:                        int32(object.Status),
+			StatusAt:                      object.StatusAt,
+			CreatedAt:                     object.CreatedAt,
+			ExpiresAt:                     object.ExpiresAt,
+			PlainSize:                     object.PlainSize,
+			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+			EncryptedMetadata:             object.EncryptedMetadata,
 
 			IsPrefix: isPrefix,
 		}
