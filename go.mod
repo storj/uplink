@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
+	github.com/dvyukov/go-fuzz v0.0.0-20210914135545-4980593459a1 // indirect
 	github.com/spacemonkeygo/monkit/v3 v3.0.12
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
