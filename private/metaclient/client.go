@@ -1348,27 +1348,6 @@ func newDownloadSegmentResponse(response *pb.SegmentDownloadResponse) DownloadSe
 	}
 }
 
-// DownloadSegment gets information for downloading remote segment or data
-// from an inline segment.
-func (client *Client) DownloadSegment(ctx context.Context, params DownloadSegmentParams) (_ SegmentDownloadResponseInfo, _ []*pb.AddressedOrderLimit, err error) {
-	defer mon.Task()(&ctx)(&err)
-
-	var response *pb.SegmentDownloadResponse
-	err = WithRetry(ctx, func(ctx context.Context) error {
-		response, err = client.client.DownloadSegment(ctx, params.toRequest(client.header()))
-		return err
-	})
-	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return SegmentDownloadResponseInfo{}, nil, ErrObjectNotFound.Wrap(err)
-		}
-		return SegmentDownloadResponseInfo{}, nil, Error.Wrap(err)
-	}
-
-	downloadResponse := newDownloadSegmentResponse(response)
-	return downloadResponse.Info, downloadResponse.Limits, nil
-}
-
 // DownloadSegmentWithRSResponse contains information for downloading remote segment or data from an inline segment.
 type DownloadSegmentWithRSResponse struct {
 	Info   SegmentDownloadInfo
