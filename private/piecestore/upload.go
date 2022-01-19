@@ -8,15 +8,18 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/context2"
 	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/pkcrypto"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
+	"storj.io/common/sync2"
 )
 
 var mon = monkit.Package()
@@ -39,7 +42,7 @@ type upload struct {
 
 type uploadStream interface {
 	Context() context.Context
-	CloseSend() error
+	Close() error
 	Send(*pb.PieceUploadRequest) error
 	CloseAndRecv() (*pb.PieceUploadResponse, error)
 }
@@ -53,9 +56,20 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 		return nil, ErrInternal.Wrap(err)
 	}
 
-	stream, err := client.client.Upload(ctx)
+	ctx, cancel := context2.WithCustomCancel(ctx)
+	defer cancel(context.Canceled)
+
+	var underlyingStream uploadStream
+	sync2.WithTimeout(client.config.MessageTimeout, func() {
+		underlyingStream, err = client.client.Upload(ctx)
+	}, func() { cancel(errMessageTimeout) })
 	if err != nil {
 		return nil, err
+	}
+	stream := &timedUploadStream{
+		timeout: client.config.MessageTimeout,
+		stream:  underlyingStream,
+		cancel:  cancel,
 	}
 
 	err = stream.Send(&pb.PieceUploadRequest{
@@ -74,12 +88,11 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	}
 
 	upload := &upload{
-		client:     client,
-		limit:      limit,
-		privateKey: piecePrivateKey,
-		peer:       peer,
-		stream:     stream,
-
+		client:         client,
+		limit:          limit,
+		privateKey:     piecePrivateKey,
+		peer:           peer,
+		stream:         stream,
 		hash:           pkcrypto.NewHash(),
 		offset:         0,
 		allocationStep: client.config.InitialStep,
@@ -166,7 +179,7 @@ func (client *upload) cancel(ctx context.Context) (err error) {
 		return io.EOF
 	}
 	client.finished = true
-	return Error.Wrap(client.stream.CloseSend())
+	return Error.Wrap(client.stream.Close())
 }
 
 // commit finishes uploading by sending the piece-hash and retrieving the piece-hash.
@@ -185,8 +198,8 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 		Timestamp: client.limit.OrderCreation,
 	})
 	if err != nil {
-		// failed to sign, let's close the sending side, no need to wait for a response
-		closeErr := client.stream.CloseSend()
+		// failed to sign, let's close, no need to wait for a response
+		closeErr := client.stream.Close()
 		// closeErr being io.EOF doesn't inform us about anything
 		return nil, Error.Wrap(errs.Combine(err, ignoreEOF(closeErr)))
 	}
@@ -207,7 +220,7 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 	}
 
 	// verification
-	verifyErr := client.client.VerifyPieceHash(client.stream.Context(), client.peer, client.limit, response.Done, uplinkHash.Hash)
+	verifyErr := client.client.VerifyPieceHash(ctx, client.peer, client.limit, response.Done, uplinkHash.Hash)
 
 	// combine all the errors from before
 	// sendErr is io.EOF when we failed to send
@@ -228,4 +241,41 @@ func tryReadFull(ctx context.Context, r io.Reader, buf []byte) (n int, err error
 	}
 
 	return n, err
+}
+
+// timedUploadStream wraps uploadStream and adds timeouts
+// to all operations.
+type timedUploadStream struct {
+	timeout time.Duration
+	stream  uploadStream
+	cancel  func(error)
+}
+
+func (stream *timedUploadStream) Context() context.Context {
+	return stream.stream.Context()
+}
+
+func (stream *timedUploadStream) cancelTimeout() {
+	stream.cancel(errMessageTimeout)
+}
+
+func (stream *timedUploadStream) Close() (err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		err = stream.stream.Close()
+	}, stream.cancelTimeout)
+	return err
+}
+
+func (stream *timedUploadStream) Send(req *pb.PieceUploadRequest) (err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		err = stream.stream.Send(req)
+	}, stream.cancelTimeout)
+	return err
+}
+
+func (stream *timedUploadStream) CloseAndRecv() (resp *pb.PieceUploadResponse, err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		resp, err = stream.stream.CloseAndRecv()
+	}, stream.cancelTimeout)
+	return resp, err
 }

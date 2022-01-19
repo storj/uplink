@@ -159,8 +159,9 @@ func (r *StripeReader) pendingReaders() bool {
 // hasEnoughShares check if there are enough erasure shares read to attempt
 // a decode.
 func (r *StripeReader) hasEnoughShares() bool {
-	return len(r.inmap) >= r.scheme.RequiredCount()+1 ||
-		(!r.forceErrorDetection && len(r.inmap) == r.scheme.RequiredCount() && !r.pendingReaders())
+	hasRequired := len(r.inmap) >= r.scheme.RequiredCount()+1
+	hasMinimum := !r.forceErrorDetection && len(r.inmap) == r.scheme.RequiredCount() && !r.pendingReaders()
+	return hasRequired || hasMinimum
 }
 
 // shouldWaitForMore checks the returned decode error if it makes sense to wait

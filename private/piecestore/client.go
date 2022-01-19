@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/zeebo/errs"
 
@@ -17,6 +18,8 @@ import (
 	"storj.io/common/storj"
 )
 
+var errMessageTimeout = errors.New("message timeout")
+
 // Error is the default error class for piecestore client.
 var Error = errs.Class("piecestore")
 
@@ -26,6 +29,8 @@ type Config struct {
 
 	InitialStep int64
 	MaximumStep int64
+
+	MessageTimeout time.Duration
 }
 
 // DefaultConfig are the default params used for upload and download.
@@ -34,6 +39,8 @@ var DefaultConfig = Config{
 
 	InitialStep: 64 * memory.KiB.Int64(),
 	MaximumStep: 256 * memory.KiB.Int64(),
+
+	MessageTimeout: 1 * time.Minute,
 }
 
 // Client implements uploading, downloading and deleting content from a piecestore.

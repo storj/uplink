@@ -8,14 +8,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/context2"
 	"storj.io/common/errs2"
 	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
+	"storj.io/common/sync2"
 )
 
 // Downloader is interface that can be used for downloading content.
@@ -35,6 +38,7 @@ type Download struct {
 	peer       *identity.PeerIdentity
 	stream     downloadStream
 	ctx        context.Context
+	cancelCtx  func(error)
 
 	read         int64 // how much data we have read so far
 	allocated    int64 // how far have we sent orders
@@ -55,7 +59,7 @@ type Download struct {
 }
 
 type downloadStream interface {
-	CloseSend() error
+	Close() error
 	Send(*pb.PieceDownloadRequest) error
 	Recv() (*pb.PieceDownloadResponse, error)
 }
@@ -69,9 +73,22 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		return nil, ErrInternal.Wrap(err)
 	}
 
-	stream, err := client.client.Download(ctx)
+	ctx, cancel := context2.WithCustomCancel(ctx)
+
+	var underlyingStream downloadStream
+	sync2.WithTimeout(client.config.MessageTimeout, func() {
+		underlyingStream, err = client.client.Download(ctx)
+	}, func() {
+		cancel(errMessageTimeout)
+	})
 	if err != nil {
+		cancel(context.Canceled)
 		return nil, err
+	}
+	stream := &timedDownloadStream{
+		timeout: client.config.MessageTimeout,
+		stream:  underlyingStream,
+		cancel:  cancel,
 	}
 
 	err = stream.Send(&pb.PieceDownloadRequest{
@@ -83,6 +100,8 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 	})
 	if err != nil {
 		_, recvErr := stream.Recv()
+		_ = stream.Close()
+		cancel(context.Canceled)
 		return nil, ErrProtocol.Wrap(errs.Combine(err, recvErr))
 	}
 
@@ -93,6 +112,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		peer:       peer,
 		stream:     stream,
 		ctx:        ctx,
+		cancelCtx:  cancel,
 
 		read: 0,
 
@@ -229,7 +249,7 @@ func (client *Download) closeWithError(err error) {
 		return
 	}
 	client.closed = true
-	client.closingError = errs.Combine(err, client.stream.CloseSend())
+	client.closingError = errs.Combine(err, client.stream.Close())
 }
 
 // closeAndTryFetchError closes the stream and also tries to fetch the actual error from the stream.
@@ -239,24 +259,26 @@ func (client *Download) closeAndTryFetchError() {
 	}
 	client.closed = true
 
-	client.closingError = client.stream.CloseSend()
+	client.closingError = client.stream.Close()
 	if client.closingError == nil || errors.Is(client.closingError, io.EOF) {
+		// note, although, we close the stream, we'll try to fetch the error
+		// from the current buffer.
 		_, client.closingError = client.stream.Recv()
 	}
 }
 
 // Close closes the downloading.
-func (client *Download) Close() (err error) {
-	defer func() {
-		if err != nil {
-			details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.peer.ID.String(), client.limit.PieceId.String()))
-			err = details.Wrap(err)
-			err = Error.Wrap(err)
-		}
-	}()
-
+func (client *Download) Close() error {
 	client.closeWithError(nil)
-	return client.closingError
+	client.cancelCtx(context.Canceled)
+
+	err := client.closingError
+	if err != nil {
+		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.peer.ID.String(), client.limit.PieceId.String()))
+		err = details.Wrap(Error.Wrap(err))
+	}
+
+	return err
 }
 
 // GetHashAndLimit gets the download's hash and original order limit.
@@ -304,4 +326,37 @@ func (buffer *ReadBuffer) Read(data []byte) (n int, err error) {
 	}
 
 	return 0, nil
+}
+
+// timedDownloadStream wraps downloadStream and adds timeouts
+// to all operations.
+type timedDownloadStream struct {
+	timeout time.Duration
+	stream  downloadStream
+	cancel  func(error)
+}
+
+func (stream *timedDownloadStream) cancelTimeout() {
+	stream.cancel(errMessageTimeout)
+}
+
+func (stream *timedDownloadStream) Close() (err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		err = stream.stream.Close()
+	}, stream.cancelTimeout)
+	return err
+}
+
+func (stream *timedDownloadStream) Send(req *pb.PieceDownloadRequest) (err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		err = stream.stream.Send(req)
+	}, stream.cancelTimeout)
+	return err
+}
+
+func (stream *timedDownloadStream) Recv() (resp *pb.PieceDownloadResponse, err error) {
+	sync2.WithTimeout(stream.timeout, func() {
+		resp, err = stream.stream.Recv()
+	}, stream.cancelTimeout)
+	return resp, err
 }
