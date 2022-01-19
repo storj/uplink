@@ -251,6 +251,51 @@ func TestUploadPart(t *testing.T) {
 	})
 }
 
+func TestCheckMetadataWhileUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1,
+		UplinkCount:    1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		obs, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Nil(t, obs[0].EncryptedMetadataNonce)
+		require.Nil(t, obs[0].EncryptedMetadataNonce)
+		require.Nil(t, obs[0].EncryptedMetadataNonce)
+
+		_, err = project.DeleteObject(ctx, "testbucket", "multipart-object")
+		require.NoError(t, err)
+
+		info2, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+
+		metadata := make(map[string]string)
+		metadata["key1"] = "value1"
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info2.UploadID, &uplink.CommitUploadOptions{CustomMetadata: metadata})
+		require.NoError(t, err)
+
+		obs, err = planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, obs[0].EncryptedMetadataNonce)
+		require.NotNil(t, obs[0].EncryptedMetadata)
+		require.NotNil(t, obs[0].EncryptedMetadataEncryptedKey)
+	})
+}
+
 func TestUploadPart_ETag(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
