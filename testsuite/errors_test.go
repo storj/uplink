@@ -75,24 +75,11 @@ func TestErrResourceExhausted(t *testing.T) {
 		err := satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, projectInfo.ID, 0)
 		require.NoError(t, err)
 
-		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
-		require.NoError(t, err)
-		defer ctx.Check(project.Close)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test-bucket", "object", testrand.Bytes(1*memory.KiB))
 
-		_, err = project.CreateBucket(ctx, "test-bucket")
-		require.NoError(t, err)
-
-		upload, err := project.UploadObject(ctx, "test-bucket", "file", nil)
-		require.NoError(t, err)
-
-		randData := testrand.Bytes(1 * memory.KiB)
-		source := bytes.NewBuffer(randData)
-		_, err = io.Copy(upload, source)
-		require.NoError(t, err)
-
-		err = upload.Commit()
 		require.Error(t, err)
-		require.True(t, errors.Is(err, uplink.ErrBandwidthLimitExceeded))
+		// TODO expose this as an uplink error
+		require.Contains(t, err.Error(), "Exceeded Storage Limit")
 	})
 }
 
