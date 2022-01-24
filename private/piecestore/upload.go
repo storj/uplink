@@ -108,9 +108,9 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 	for !done {
 		// try our best to read up to the next allocation step
 		sendData := backingArray[:client.allocationStep]
-		n, readErr := io.ReadFull(cancelingReader(ctx, data), sendData)
+		n, readErr := tryReadFull(ctx, data, sendData)
 		if readErr != nil {
-			if !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
+			if !errors.Is(readErr, io.EOF) {
 				return nil, ErrInternal.Wrap(readErr)
 			}
 			done = true
@@ -215,17 +215,17 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 	return response.Done, errs.Combine(verifyErr, ignoreEOF(sendErr), ignoreEOF(closeErr))
 }
 
-func cancelingReader(ctx context.Context, r io.Reader) io.Reader {
-	return readerFunc(func(p []byte) (n int, err error) {
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		default:
-			return r.Read(p)
+func tryReadFull(ctx context.Context, r io.Reader, buf []byte) (n int, err error) {
+	total := len(buf)
+
+	for n < total && err == nil {
+		if ctx.Err() != nil {
+			return n, ctx.Err()
 		}
-	})
+		var nn int
+		nn, err = r.Read(buf[n:])
+		n += nn
+	}
+
+	return n, err
 }
-
-type readerFunc func(p []byte) (n int, err error)
-
-func (rf readerFunc) Read(p []byte) (n int, err error) { return rf(p) }
