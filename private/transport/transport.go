@@ -24,3 +24,8 @@ func SetConnectionPool(ctx context.Context, config *uplink.Config, pool *rpcpool
 func SetConnector(config *uplink.Config, connector rpc.Connector) {
 	expose.ConfigSetConnector(config, connector)
 }
+
+// SetMaximumBufferSize sets maximumBufferSize in config.
+func SetMaximumBufferSize(config *uplink.Config, maximumBufferSize int) {
+	expose.ConfigSetMaximumBufferSize(config, maximumBufferSize)
+}

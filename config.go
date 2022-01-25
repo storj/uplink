@@ -35,6 +35,10 @@ type Config struct {
 
 	pool      *rpcpool.Pool
 	connector rpc.Connector
+
+	// maximumBufferSize is used to set the maximum buffer size for DRPC
+	// connections/streams.
+	maximumBufferSize int
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
@@ -67,6 +71,8 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
 	}
 
+	dialer.ConnectionOptions.Manager.Stream.MaximumBufferSize = config.maximumBufferSize
+
 	return dialer, nil
 }
 
@@ -88,6 +94,17 @@ func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool
 //nolint: unused
 func (config *Config) setConnector(connector rpc.Connector) {
 	config.connector = connector
+}
+
+// setMaximumBufferSize exposes setting maximumBufferSize.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint: unused
+func (config *Config) setMaximumBufferSize(maximumBufferSize int) {
+	config.maximumBufferSize = maximumBufferSize
 }
 
 func (config Config) validateUserAgent(ctx context.Context) error {

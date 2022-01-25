@@ -19,6 +19,7 @@ import (
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/transport"
 )
 
@@ -149,4 +150,18 @@ type fakeConnector struct{}
 
 func (c fakeConnector) DialContext(ctx context.Context, tlsConfig *tls.Config, address string) (rpc.ConnectorConn, error) {
 	return nil, errfakeConnector
+}
+
+func TestSettingMaximumBufferSize(t *testing.T) {
+	var config uplink.Config
+
+	transport.SetMaximumBufferSize(&config, 1)
+
+	ctx := testcontext.New(t)
+	defer ctx.Cleanup()
+
+	d, err := expose.ConfigGetDialer(config, ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, d.ConnectionOptions.Manager.Stream.MaximumBufferSize)
 }
