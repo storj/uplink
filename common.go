@@ -29,6 +29,12 @@ var ErrTooManyRequests = errors.New("too many requests")
 // ErrBandwidthLimitExceeded is returned when project will exceeded bandwidth limit.
 var ErrBandwidthLimitExceeded = errors.New("bandwidth limit exceeded")
 
+// ErrStorageLimitExceeded is returned when project will exceeded storage limit.
+var ErrStorageLimitExceeded = errors.New("storage limit exceeded")
+
+// ErrSegmentsLimitExceeded is returned when project will exceeded segments limit.
+var ErrSegmentsLimitExceeded = errors.New("segments limit exceeded")
+
 // ErrPermissionDenied is returned when the request is denied due to invalid permissions.
 var ErrPermissionDenied = errors.New("permission denied")
 
@@ -55,6 +61,12 @@ func convertKnownErrors(err error, bucket, key string) error {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrBandwidthLimitExceeded))
 		} else if strings.HasSuffix(message, "Too Many Requests") {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrTooManyRequests))
+		} else if strings.Contains(message, "Exceeded Storage Limit") {
+			// contains used to have some flexibility in constructing error message on server-side
+			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrStorageLimitExceeded))
+		} else if strings.Contains(message, "Exceeded Segments Limit") {
+			// contains used to have some flexibility in constructing error message on server-side
+			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrSegmentsLimitExceeded))
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		message := errs.Unwrap(err).Error()

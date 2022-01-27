@@ -58,28 +58,43 @@ func TestErrRateLimitExceeded(t *testing.T) {
 
 func TestErrResourceExhausted(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount:   1,
-		StorageNodeCount: 0,
-		UplinkCount:      1,
+		SatelliteCount: 1,
+		UplinkCount:    1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Console.UsageLimits.Storage.Free = 0
 				config.Console.UsageLimits.Bandwidth.Free = 0
+				config.Metainfo.ProjectLimits.ValidateSegmentLimit = true
+				// disable live accounting cache
+				config.LiveAccounting.BandwidthCacheTTL = -1
+				// disable AOST
+				config.LiveAccounting.AsOfSystemInterval = 0
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
 		projectInfo := planet.Uplinks[0].Projects[0]
 
-		// set project limit to 0
+		// set project storage limit to 0
 		err := satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, projectInfo.ID, 0)
 		require.NoError(t, err)
 
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test-bucket", "object", testrand.Bytes(1*memory.KiB))
-
 		require.Error(t, err)
-		// TODO expose this as an uplink error
-		require.Contains(t, err.Error(), "Exceeded Storage Limit")
+		require.True(t, errors.Is(err, uplink.ErrStorageLimitExceeded), err.Error())
+
+		// set storage limit to test segment limit
+		err = satellite.DB.ProjectAccounting().UpdateProjectUsageLimit(ctx, projectInfo.ID, 2*memory.KiB)
+		require.NoError(t, err)
+
+		// set project segment limit to 0
+		err = satellite.DB.ProjectAccounting().UpdateProjectSegmentLimit(ctx, projectInfo.ID, 0)
+		require.NoError(t, err)
+
+		// verify that segment limit error is triggered while upload
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test-bucket", "object", testrand.Bytes(1*memory.KiB))
+		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrSegmentsLimitExceeded), err.Error())
 	})
 }
 

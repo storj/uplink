@@ -11,8 +11,8 @@ require (
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20220131120956-e74f624a3d55
 	storj.io/drpc v0.0.29
-	storj.io/storj v0.12.1-0.20220124115750-4be84c3a6c3e
-	storj.io/uplink v1.7.2-0.20220110164813-03e4f59f7af2
+	storj.io/storj v0.12.1-0.20220201095529-2ae78db66060
+	storj.io/uplink v1.7.2-0.20220131124001-c1db742c840d
 )
 
 require (
@@ -89,6 +89,6 @@ require (
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
-	storj.io/monkit-jaeger v0.0.0-20210426161729-debb1cbcbbd7 // indirect
-	storj.io/private v0.0.0-20211209191323-6595d4aa0cfe // indirect
+	storj.io/monkit-jaeger v0.0.0-20220131130547-dc4cb5a0d97a // indirect
+	storj.io/private v0.0.0-20220131131751-c913260b9ec2 // indirect
 )
