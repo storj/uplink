@@ -174,6 +174,8 @@ func (uploads *UploadIterator) item() *metaclient.Object {
 
 // ListUploadPartsOptions options for listing upload parts.
 type ListUploadPartsOptions struct {
+	// Cursor sets the starting position of the iterator.
+	// The first item listed will be the one after the cursor.
 	Cursor uint32
 }
 
