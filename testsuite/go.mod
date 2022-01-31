@@ -9,7 +9,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.2.2
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20220127102642-e151b90f6765
+	storj.io/common v0.0.0-20220131120956-e74f624a3d55
 	storj.io/drpc v0.0.29
 	storj.io/storj v0.12.1-0.20220124115750-4be84c3a6c3e
 	storj.io/uplink v1.7.2-0.20220110164813-03e4f59f7af2
@@ -21,7 +21,6 @@ require (
 	github.com/apache/thrift v0.12.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
-	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/calebcase/tmpfile v1.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect

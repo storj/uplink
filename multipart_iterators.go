@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/btcsuite/btcutil/base58"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/base58"
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
