@@ -488,24 +488,24 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 				return Part{}, errs.Wrap(err)
 			}
 
-			plainSegmentSize := sizeReader.Size()
-			if plainSegmentSize > 0 {
-				lastSegmentContentKey = contentKey
-				requestsToBatch = append(requestsToBatch, &metaclient.CommitSegmentParams{
-					SegmentID:         beginResponse.SegmentID,
-					SizeEncryptedData: encSizedReader.Size(),
-					PlainSize:         plainSegmentSize,
-					Encryption:        segmentEncryption,
-					UploadResult:      uploadResults,
-				})
-			}
+			lastSegmentContentKey = contentKey
+			requestsToBatch = append(requestsToBatch, &metaclient.CommitSegmentParams{
+				SegmentID:         beginResponse.SegmentID,
+				SizeEncryptedData: encSizedReader.Size(),
+				PlainSize:         sizeReader.Size(),
+				Encryption:        segmentEncryption,
+				UploadResult:      uploadResults,
+			})
 		} else {
 			data, err := ioutil.ReadAll(peekReader)
 			if err != nil {
 				return Part{}, errs.Wrap(err)
 			}
 
-			if len(data) > 0 {
+			// if it's first segment then we still need to create is even
+			// if it's zero size because it can be last part while upload
+			// and we need to allow it for S3 compatibility
+			if len(data) > 0 || currentSegment == 0 {
 				lastSegmentContentKey = contentKey
 				cipherData, err := encryption.Encrypt(data, s.encryptionParameters.CipherSuite, &contentKey, &contentNonce)
 				if err != nil {

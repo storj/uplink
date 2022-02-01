@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"io/ioutil"
+	"strconv"
 	"testing"
 	"time"
 
@@ -182,7 +183,7 @@ func TestUploadPart(t *testing.T) {
 
 		segmentsBefore, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(segmentsBefore))
+		require.Equal(t, 2, len(segmentsBefore))
 
 		// start uploading part but abort before committing
 		upload, err = project.UploadPart(newCtx, "testbucket", "multipart-object", info.UploadID, 2)
@@ -759,6 +760,105 @@ func TestListUploadParts(t *testing.T) {
 
 		// TODO: this should pass once we correctly handle the maxParts parameter
 		// require.Equal(t, false, parts.More)
+	})
+}
+
+// TestListUploadParts_EnsureLastEmptyPart tests if the last part of multipart
+// upload doesn't get discarded while listing objects if it doesn't hold bytes
+// (but has, e.g., ETag).
+func TestListUploadParts_EnsureLastEmptyPart(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(50 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := testrand.BucketName()
+		createBucket(t, ctx, project, bucket)
+
+		type part struct {
+			partID uint32
+			data   []byte
+			etag   []byte
+		}
+
+		for i, tt := range []struct {
+			parts []part
+		}{
+			{[]part{
+				{0, []byte("data"), []byte("etag1")},
+				{1, nil, []byte("etag2")},
+			}},
+
+			{[]part{
+				{1, []byte("data"), []byte("etag1")},
+				{2, nil, []byte("etag2")},
+			}},
+
+			{[]part{
+				{1, []byte("data1"), []byte("etag1")},
+				{2, []byte("data2"), []byte("etag2")},
+				{3, nil, []byte("etag3")},
+			}},
+
+			{[]part{
+				{1, []byte("data1"), []byte("etag1")},
+				{2, []byte("data2"), nil},
+				{3, []byte("data3"), []byte("etag3")},
+			}},
+
+			// second/last part have empty inline segment at the end
+			// when size is multiplication of max segment size
+			{[]part{
+				{1, []byte("data1"), []byte("etag1")},
+				{2, testrand.Bytes(50 * memory.KiB), []byte("etag2")},
+			}},
+
+			{[]part{
+				{1431655765, []byte("data"), []byte("etag1")},
+				{1431655766, nil, []byte("etag2")},
+			}},
+		} {
+			key := "test-" + strconv.Itoa(i)
+
+			info, err := project.BeginUpload(ctx, bucket, key, nil)
+			require.NoError(t, err)
+
+			for _, part := range tt.parts {
+				upload, err := project.UploadPart(ctx, bucket, key, info.UploadID, part.partID)
+				require.NoError(t, err, i)
+
+				if part.data != nil {
+					_, err = upload.Write(part.data)
+					require.NoError(t, err, i)
+				}
+
+				if part.etag != nil {
+					err = upload.SetETag(part.etag)
+					require.NoError(t, err, i)
+				}
+
+				require.NoError(t, upload.Commit())
+			}
+
+			iterator := project.ListUploadParts(ctx, bucket, key, info.UploadID, nil)
+
+			index := 0
+			for iterator.Next() {
+				part := iterator.Item()
+				require.Equal(t, tt.parts[index].partID, part.PartNumber, i)
+				require.Equal(t, tt.parts[index].etag, part.ETag, i)
+				require.EqualValues(t, len(tt.parts[index].data), part.Size, i)
+				index++
+			}
+			require.NoError(t, iterator.Err())
+			// compare number of parts uploaded and returned by iterator
+			require.Equal(t, len(tt.parts), index)
+		}
 	})
 }
 
