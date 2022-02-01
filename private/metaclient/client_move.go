@@ -18,13 +18,6 @@ type BeginMoveObjectParams struct {
 	NewEncryptedObjectKey []byte
 }
 
-// EncryptedKeyAndNonce holds single segment encrypted key.
-type EncryptedKeyAndNonce struct {
-	Position          SegmentPosition
-	EncryptedKeyNonce storj.Nonce
-	EncryptedKey      []byte
-}
-
 // BeginMoveObjectResponse response for BeginMoveObjectResponse request.
 type BeginMoveObjectResponse struct {
 	StreamID                  storj.StreamID
@@ -53,19 +46,7 @@ func (params *BeginMoveObjectParams) BatchItem() *pb.BatchRequestItem {
 }
 
 func newBeginMoveObjectResponse(response *pb.ObjectBeginMoveResponse) BeginMoveObjectResponse {
-	keys := make([]EncryptedKeyAndNonce, len(response.SegmentKeys))
-	for i, key := range response.SegmentKeys {
-		keys[i] = EncryptedKeyAndNonce{
-			EncryptedKeyNonce: key.EncryptedKeyNonce,
-			EncryptedKey:      key.EncryptedKey,
-		}
-		if key.Position != nil {
-			keys[i].Position = storj.SegmentPosition{
-				PartNumber: key.Position.PartNumber,
-				Index:      key.Position.Index,
-			}
-		}
-	}
+	keys := convertKeys(response.SegmentKeys)
 
 	return BeginMoveObjectResponse{
 		StreamID:                  response.StreamId,
