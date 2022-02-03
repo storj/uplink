@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"sync"
+	"time"
 
 	"github.com/zeebo/errs"
 
@@ -103,8 +104,6 @@ func (dr *decodedReader) Read(p []byte) (n int, err error) {
 func (dr *decodedReader) Close() (err error) {
 	ctx := dr.ctx
 	defer mon.Task()(&ctx)(&err)
-	// cancel the context to terminate reader goroutines
-	dr.cancel()
 	errorThreshold := len(dr.readers) - dr.scheme.RequiredCount()
 	var closeGroup errs2.Group
 	// avoid double close of readers
@@ -119,10 +118,23 @@ func (dr *decodedReader) Close() (err error) {
 		// close the stripe reader
 		closeGroup.Go(dr.stripeReader.Close)
 
+		// We'll add a separate cancellation, just in case the Closing for some reason
+		// does not finish in time. However, we don't want to call `dr.cancel` them
+		// immediately, because this would not allow the connections to be pooled.
+		ctxDelay, ctxDelayCancel := context.WithTimeout(ctx, time.Millisecond)
+		defer ctxDelayCancel()
+		go func() {
+			<-ctxDelay.Done()
+			dr.cancel()
+		}()
+
 		allErrors := closeGroup.Wait()
 		errorThreshold -= len(allErrors)
 		dr.closeErr = errs.Combine(allErrors...)
 	})
+	// ensure readers are definitely closed.
+	dr.cancel()
+
 	// TODO this is workaround, we need reorganize to return multiple errors or divide into fatal, non fatal
 	if errorThreshold < 0 {
 		return dr.closeErr
