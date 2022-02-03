@@ -66,6 +66,8 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = underlyingStream.Close() }()
+
 	stream := &timedUploadStream{
 		timeout: client.config.MessageTimeout,
 		stream:  underlyingStream,
