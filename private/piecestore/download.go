@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -20,15 +21,6 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
 )
-
-// Downloader is interface that can be used for downloading content.
-// It matches signature of `io.ReadCloser`, with one extra function,
-// GetHashAndLimit(), used for accessing information during GET_REPAIR.
-type Downloader interface {
-	Read([]byte) (int, error)
-	Close() error
-	GetHashAndLimit() (*pb.PieceHash, *pb.OrderLimit)
-}
 
 // Download implements downloading from a piecestore.
 type Download struct {
@@ -54,8 +46,8 @@ type Download struct {
 	hash        *pb.PieceHash
 	originLimit *pb.OrderLimit
 
-	closed       bool
-	closingError error
+	close        sync.Once
+	closingError syncError
 }
 
 type downloadStream interface {
@@ -65,7 +57,7 @@ type downloadStream interface {
 }
 
 // Download starts a new download using the specified order limit at the specified offset and size.
-func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, offset, size int64) (_ Downloader, err error) {
+func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, offset, size int64) (_ *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	peer, err := client.conn.PeerIdentity()
@@ -105,7 +97,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		return nil, ErrProtocol.Wrap(errs.Combine(err, recvErr))
 	}
 
-	download := &Download{
+	return &Download{
 		client:     client,
 		limit:      limit,
 		privateKey: piecePrivateKey,
@@ -121,9 +113,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		downloadSize: size,
 
 		allocationStep: client.config.InitialStep,
-	}
-
-	return &LockingDownload{download: download}, nil
+	}, nil
 }
 
 // Read downloads data from the storage node allocating as necessary.
@@ -131,7 +121,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 	ctx := client.ctx
 	defer mon.Task()(&ctx, "node: "+client.peer.ID.String()[0:8])(&err)
 
-	if client.closed {
+	if client.closingError.IsSet() {
 		return 0, io.ErrClosedPipe
 	}
 
@@ -236,35 +226,32 @@ func (client *Download) Read(data []byte) (read int, err error) {
 
 // handleClosingError should be used for an error that also closed the stream.
 func (client *Download) handleClosingError(err error) {
-	if client.closed {
-		return
-	}
-	client.closed = true
-	client.closingError = err
+	client.close.Do(func() {
+		client.closingError.Set(err)
+		// ensure we close the connection
+		_ = client.stream.Close()
+	})
 }
 
 // closeWithError is used when we include the err in the closing error and also close the stream.
 func (client *Download) closeWithError(err error) {
-	if client.closed {
-		return
-	}
-	client.closed = true
-	client.closingError = errs.Combine(err, client.stream.Close())
+	client.close.Do(func() {
+		err := errs.Combine(err, client.stream.Close())
+		client.closingError.Set(err)
+	})
 }
 
 // closeAndTryFetchError closes the stream and also tries to fetch the actual error from the stream.
 func (client *Download) closeAndTryFetchError() {
-	if client.closed {
-		return
-	}
-	client.closed = true
-
-	client.closingError = client.stream.Close()
-	if client.closingError == nil || errors.Is(client.closingError, io.EOF) {
-		// note, although, we close the stream, we'll try to fetch the error
-		// from the current buffer.
-		_, client.closingError = client.stream.Recv()
-	}
+	client.close.Do(func() {
+		err := client.stream.Close()
+		if err == nil || errors.Is(err, io.EOF) {
+			// note, although, we close the stream, we'll try to fetch the error
+			// from the current buffer.
+			_, err = client.stream.Recv()
+		}
+		client.closingError.Set(err)
+	})
 }
 
 // Close closes the downloading.
@@ -272,7 +259,7 @@ func (client *Download) Close() error {
 	client.closeWithError(nil)
 	client.cancelCtx(context.Canceled)
 
-	err := client.closingError
+	err := client.closingError.Get()
 	if err != nil {
 		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.peer.ID.String(), client.limit.PieceId.String()))
 		err = details.Wrap(Error.Wrap(err))
@@ -359,4 +346,37 @@ func (stream *timedDownloadStream) Recv() (resp *pb.PieceDownloadResponse, err e
 		resp, err = stream.stream.Recv()
 	}, stream.cancelTimeout)
 	return resp, err
+}
+
+// syncError synchronizes access to an error and keeps
+// track whether it has been set, even to nil.
+type syncError struct {
+	mu  sync.Mutex
+	set bool
+	err error
+}
+
+// IsSet returns whether `Set` has been called.
+func (s *syncError) IsSet() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.set
+}
+
+// Set sets the error.
+func (s *syncError) Set(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.set {
+		return
+	}
+	s.set = true
+	s.err = err
+}
+
+// Get gets the error.
+func (s *syncError) Get() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.err
 }

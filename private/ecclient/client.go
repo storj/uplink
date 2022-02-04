@@ -334,9 +334,12 @@ func (lr *lazyPieceRanger) Size() int64 {
 func (lr *lazyPieceRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &lazyPieceReader{
 		ranger: lr,
 		ctx:    ctx,
+		cancel: cancel,
 		offset: offset,
 		length: length,
 	}, nil
@@ -345,37 +348,60 @@ func (lr *lazyPieceRanger) Range(ctx context.Context, offset, length int64) (_ i
 type lazyPieceReader struct {
 	ranger *lazyPieceRanger
 	ctx    context.Context
+	cancel func()
 	offset int64
 	length int64
 
-	mu sync.Mutex
-
+	mu       sync.Mutex
 	isClosed bool
-	piecestore.Downloader
-	client *piecestore.Client
+	download *piecestore.Download
+	client   *piecestore.Client
 }
 
 func (lr *lazyPieceReader) Read(data []byte) (_ int, err error) {
+	if err := lr.dial(); err != nil {
+		return 0, err
+	}
+	return lr.download.Read(data)
+}
+
+func (lr *lazyPieceReader) dial() error {
+	lr.mu.Lock()
+	if lr.isClosed {
+		lr.mu.Unlock()
+		return io.EOF
+	}
+	if lr.download != nil {
+		lr.mu.Unlock()
+		return nil
+	}
+	lr.mu.Unlock()
+
+	client, downloader, err := lr.ranger.dial(lr.ctx, lr.offset, lr.length)
+	if err != nil {
+		return Error.Wrap(err)
+	}
+
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 
 	if lr.isClosed {
-		return 0, io.EOF
-	}
-	if lr.Downloader == nil {
-		client, downloader, err := lr.ranger.dial(lr.ctx, lr.offset, lr.length)
-		if err != nil {
-			return 0, err
-		}
-		lr.Downloader = downloader
-		lr.client = client
+		// Close tried to cancel the dialing, however failed to do so.
+		lr.cancel()
+		_ = downloader.Close()
+		_ = client.Close()
+		return io.ErrClosedPipe
 	}
 
-	return lr.Downloader.Read(data)
+	lr.download = downloader
+	lr.client = client
+
+	return nil
 }
 
-func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *piecestore.Client, _ piecestore.Downloader, err error) {
+func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *piecestore.Client, _ *piecestore.Download, err error) {
 	defer mon.Task()(&ctx)(&err)
+
 	ps, err := lr.dialPiecestore(ctx, storj.NodeURL{
 		ID:      lr.limit.GetLimit().StorageNodeId,
 		Address: lr.limit.GetStorageNodeAddress().Address,
@@ -391,21 +417,30 @@ func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *p
 	return ps, download, nil
 }
 
+// GetHashAndLimit gets the download's hash and original order limit.
+func (lr *lazyPieceReader) GetHashAndLimit() (*pb.PieceHash, *pb.OrderLimit) {
+	if lr.download == nil {
+		return nil, nil
+	}
+	return lr.download.GetHashAndLimit()
+}
+
 func (lr *lazyPieceReader) Close() (err error) {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
-
 	if lr.isClosed {
 		return nil
 	}
 	lr.isClosed = true
 
-	if lr.Downloader != nil {
-		err = errs.Combine(err, lr.Downloader.Close())
+	if lr.download != nil {
+		err = errs.Combine(err, lr.download.Close())
 	}
 	if lr.client != nil {
 		err = errs.Combine(err, lr.client.Close())
 	}
+
+	lr.cancel()
 	return err
 }
 
