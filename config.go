@@ -68,6 +68,11 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 			dialContext = socket.BackgroundDialer().DialContext
 		}
 
+		// N.B.: It is okay to use NewDefaultTCPConnector here because we explicitly don't want
+		// NewHybridConnector. NewHybridConnector would not be able to use the user-provided
+		// DialContext.
+		//lint:ignore SA1019 deprecated okay,
+		//nolint:staticcheck // deprecated okay.
 		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
 	}
 

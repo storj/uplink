@@ -30,8 +30,10 @@ type Config struct {
 }
 
 func (config *Config) createDialer() rpc.Dialer {
+	//lint:ignore SA1019 deprecated okay,
+	//nolint:staticcheck // deprecated okay.
 	connector := rpc.NewDefaultTCPConnector(nil)
-	connector.SendDRPCMuxHeader = false
+	connector.SetSendDRPCMuxHeader(false)
 
 	dialer := rpc.NewDefaultDialer(nil)
 	dialer.Connector = connector
