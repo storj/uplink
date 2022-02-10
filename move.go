@@ -70,7 +70,7 @@ func (project *Project) MoveObject(ctx context.Context, oldbucket, oldkey, newbu
 		return packageError.Wrap(err)
 	}
 
-	newKeys, err := project.reencryptKeys(response.Keys, oldDerivedKey, newDerivedKey)
+	newKeys, err := project.reencryptKeys(response.SegmentKeys, oldDerivedKey, newDerivedKey)
 	if err != nil {
 		return packageError.Wrap(err)
 	}

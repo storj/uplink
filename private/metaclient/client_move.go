@@ -23,7 +23,7 @@ type BeginMoveObjectResponse struct {
 	StreamID                  storj.StreamID
 	EncryptedMetadataKeyNonce storj.Nonce
 	EncryptedMetadataKey      []byte
-	Keys                      []EncryptedKeyAndNonce
+	SegmentKeys               []EncryptedKeyAndNonce
 }
 
 func (params *BeginMoveObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginMoveRequest {
@@ -52,7 +52,7 @@ func newBeginMoveObjectResponse(response *pb.ObjectBeginMoveResponse) BeginMoveO
 		StreamID:                  response.StreamId,
 		EncryptedMetadataKeyNonce: response.EncryptedMetadataKeyNonce,
 		EncryptedMetadataKey:      response.EncryptedMetadataKey,
-		Keys:                      keys,
+		SegmentKeys:               keys,
 	}
 }
 
