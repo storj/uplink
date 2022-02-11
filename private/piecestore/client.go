@@ -40,7 +40,7 @@ var DefaultConfig = Config{
 	InitialStep: 64 * memory.KiB.Int64(),
 	MaximumStep: 256 * memory.KiB.Int64(),
 
-	MessageTimeout: 1 * time.Minute,
+	MessageTimeout: 10 * time.Minute,
 }
 
 // Client implements uploading, downloading and deleting content from a piecestore.
