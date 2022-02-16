@@ -139,12 +139,14 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 	}
 
 	return ListOptions{
-		Prefix:    opts.Prefix,
-		Cursor:    list.Items[len(list.Items)-1].Path,
-		Delimiter: opts.Delimiter,
-		Recursive: opts.Recursive,
-		Direction: After,
-		Limit:     opts.Limit,
+		Prefix:                opts.Prefix,
+		Cursor:                list.Items[len(list.Items)-1].Path,
+		Delimiter:             opts.Delimiter,
+		Recursive:             opts.Recursive,
+		IncludeSystemMetadata: opts.IncludeSystemMetadata,
+		IncludeCustomMetadata: opts.IncludeCustomMetadata,
+		Direction:             After,
+		Limit:                 opts.Limit,
 	}
 }
 

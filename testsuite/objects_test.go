@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -314,30 +315,109 @@ func TestListObjects_Paging(t *testing.T) {
 
 		totalObjects := 17
 		expectedObjects := map[string]bool{}
+		expectedContentSize := memory.Size(3)
+		expectedMetadata := uplink.CustomMetadata{
+			"metadata-key": "metadata-value",
+		}
+
+		now := time.Now()
 
 		for i := 0; i < totalObjects; i++ {
 			key := fmt.Sprintf("%d/%d.dat", i, i)
 			expectedObjects[key] = true
-			uploadObject(t, ctx, project, "testbucket", key, 1)
+			uploadObjectWithMetadata(t, ctx, project, "testbucket", key, expectedContentSize, expectedMetadata)
 		}
 
 		newCtx := testuplink.WithListLimit(ctx, 3)
-		list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
-			Recursive: true,
+
+		t.Run("without system and custom metadata", func(t *testing.T) {
+			list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Recursive: true,
+			})
+
+			numberOfObjects := 0
+			for list.Next() {
+				object := list.Item()
+
+				_, ok := expectedObjects[object.Key]
+				require.True(t, ok)
+
+				numberOfObjects++
+			}
+
+			require.NoError(t, list.Err())
+			require.Equal(t, numberOfObjects, len(expectedObjects))
 		})
 
-		var ok bool
-		for list.Next() {
-			object := list.Item()
+		t.Run("with system metadata", func(t *testing.T) {
+			list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Recursive: true,
+				System:    true,
+			})
 
-			_, ok = expectedObjects[object.Key]
-			require.True(t, ok)
+			numberOfObjects := 0
+			for list.Next() {
+				object := list.Item()
 
-			delete(expectedObjects, object.Key)
-		}
+				_, ok := expectedObjects[object.Key]
+				require.True(t, ok)
 
-		require.NoError(t, list.Err())
-		require.Equal(t, 0, len(expectedObjects))
+				require.Equal(t, expectedContentSize.Int64(), object.System.ContentLength)
+				require.WithinDuration(t, now, object.System.Created, 10*time.Second)
+
+				numberOfObjects++
+			}
+
+			require.NoError(t, list.Err())
+			require.Equal(t, numberOfObjects, len(expectedObjects))
+		})
+
+		t.Run("with custom metadata", func(t *testing.T) {
+			list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Recursive: true,
+				Custom:    true,
+			})
+
+			numberOfObjects := 0
+			for list.Next() {
+				object := list.Item()
+
+				_, ok := expectedObjects[object.Key]
+				require.True(t, ok)
+
+				require.Equal(t, expectedMetadata, object.Custom)
+
+				numberOfObjects++
+			}
+
+			require.NoError(t, list.Err())
+			require.Equal(t, numberOfObjects, len(expectedObjects))
+		})
+
+		t.Run("with system and custom metadata", func(t *testing.T) {
+			list := listObjects(newCtx, t, project, "testbucket", &uplink.ListObjectsOptions{
+				Recursive: true,
+				System:    true,
+				Custom:    true,
+			})
+
+			numberOfObjects := 0
+			for list.Next() {
+				object := list.Item()
+
+				_, ok := expectedObjects[object.Key]
+				require.True(t, ok)
+
+				require.Equal(t, expectedContentSize.Int64(), object.System.ContentLength)
+				require.WithinDuration(t, now, object.System.Created, 10*time.Second)
+				require.Equal(t, expectedMetadata, object.Custom)
+
+				numberOfObjects++
+			}
+
+			require.NoError(t, list.Err())
+			require.Equal(t, numberOfObjects, len(expectedObjects))
+		})
 	})
 }
 
