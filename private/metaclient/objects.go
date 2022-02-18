@@ -122,7 +122,7 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		return err
 	}
 
-	object, err := db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
+	object, err := db.ObjectFromRawObjectItem(ctx, bucket, key, objectInfo)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, e
 		return Object{}, err
 	}
 
-	return db.objectFromRawObjectItem(ctx, bucket, key, object)
+	return db.ObjectFromRawObjectItem(ctx, bucket, key, object)
 }
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
@@ -471,7 +471,7 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options Do
 }
 
 func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response DownloadObjectResponse, streamRange StreamRange) (DownloadInfo, error) {
-	object, err := db.objectFromRawObjectItem(ctx, bucket, key, response.Object)
+	object, err := db.ObjectFromRawObjectItem(ctx, bucket, key, response.Object)
 	if err != nil {
 		return DownloadInfo{}, err
 	}
@@ -519,10 +519,11 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, e
 		return Object{}, err
 	}
 
-	return db.objectFromRawObjectItem(ctx, bucket, key, objectInfo)
+	return db.ObjectFromRawObjectItem(ctx, bucket, key, objectInfo)
 }
 
-func (db *DB) objectFromRawObjectItem(ctx context.Context, bucket, key string, objectInfo RawObjectItem) (Object, error) {
+// ObjectFromRawObjectItem converts RawObjectItem into storj.Object struct.
+func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, objectInfo RawObjectItem) (Object, error) {
 	if objectInfo.Bucket == "" { // zero objectInfo
 		return Object{}, nil
 	}

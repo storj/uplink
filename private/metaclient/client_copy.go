@@ -137,8 +137,11 @@ func (client *Client) FinishCopyObject(ctx context.Context, params FinishCopyObj
 		response, err = client.client.FinishCopyObject(ctx, params.toRequest(client.header()))
 		return err
 	})
+	if err != nil {
+		return FinishCopyObjectResponse{}, Error.Wrap(err)
+	}
 
-	return newFinishCopyObjectResponse(response), Error.Wrap(err)
+	return newFinishCopyObjectResponse(response), nil
 }
 
 func newFinishCopyObjectResponse(response *pb.ObjectFinishCopyResponse) FinishCopyObjectResponse {
