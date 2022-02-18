@@ -597,7 +597,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 	// download all missing segments
 	if info.ListSegments.More {
 		for info.ListSegments.More {
-			var cursor storj.SegmentPosition
+			var cursor metaclient.SegmentPosition
 			if len(info.ListSegments.Items) > 0 {
 				last := info.ListSegments.Items[len(info.ListSegments.Items)-1]
 				cursor = last.Position
@@ -728,7 +728,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 	return ranger.Concat(rangers...), nil
 }
 
-func deriveContentNonce(pos storj.SegmentPosition) (storj.Nonce, error) {
+func deriveContentNonce(pos metaclient.SegmentPosition) (storj.Nonce, error) {
 	// The increment by 1 is to avoid nonce reuse with the metadata encryption,
 	// which is encrypted with the zero nonce.
 	var n storj.Nonce
@@ -737,7 +737,7 @@ func deriveContentNonce(pos storj.SegmentPosition) (storj.Nonce, error) {
 }
 
 // calculatePlain calculates segment plain size, taking into account migrated objects.
-func calculatePlain(pos storj.SegmentPosition, rawOffset, rawSize int64, object storj.Object) (plainOffset, plainSize int64) {
+func calculatePlain(pos metaclient.SegmentPosition, rawOffset, rawSize int64, object metaclient.Object) (plainOffset, plainSize int64) {
 	switch {
 	case object.FixedSegmentSize <= 0:
 		// this is a multipart object and has correct offset and size.

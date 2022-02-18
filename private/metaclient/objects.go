@@ -436,7 +436,7 @@ type DownloadOptions struct {
 
 // DownloadInfo contains response for DownloadObject.
 type DownloadInfo struct {
-	Object             storj.Object
+	Object             Object
 	DownloadedSegments []DownloadSegmentWithRSResponse
 	ListSegments       ListSegmentsResponse
 	Range              StreamRange

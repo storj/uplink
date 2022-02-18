@@ -85,12 +85,6 @@ type Stream = storj.Stream
 // LastSegment contains info about last segment.
 type LastSegment = storj.LastSegment
 
-// Segment is full segment information.
-type Segment = storj.Segment
-
-// Piece is information where a piece is located.
-type Piece = storj.Piece
-
 var (
 	// ErrBucket is an error class for general bucket errors.
 	ErrBucket = storj.ErrBucket
@@ -152,9 +146,6 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 
 // ObjectList is a list of objects.
 type ObjectList = storj.ObjectList
-
-// ObjectListItem represents listed object.
-type ObjectListItem = storj.ObjectListItem
 
 // BucketListOptions lists objects.
 type BucketListOptions = storj.BucketListOptions

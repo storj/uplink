@@ -38,13 +38,6 @@ type Client struct {
 	userAgent string
 }
 
-// ListItem is a single item in a listing.
-type ListItem struct {
-	Path     storj.Path
-	Pointer  *pb.Pointer
-	IsPrefix bool
-}
-
 // NewClient creates Metainfo API client.
 func NewClient(client pb.DRPCMetainfoClient, apiKey *macaroon.APIKey, userAgent string) *Client {
 	return &Client{
@@ -1365,7 +1358,7 @@ type SegmentDownloadInfo struct {
 	PiecePrivateKey     storj.PiecePrivateKey
 	SegmentEncryption   SegmentEncryption
 	RedundancyScheme    storj.RedundancyScheme
-	Position            *storj.SegmentPosition
+	Position            *SegmentPosition
 }
 
 func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) DownloadSegmentWithRSResponse {
@@ -1383,7 +1376,7 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) Down
 	}
 
 	if response.Position != nil {
-		info.Position = &storj.SegmentPosition{
+		info.Position = &SegmentPosition{
 			PartNumber: response.Position.PartNumber,
 			Index:      response.Position.Index,
 		}

@@ -23,7 +23,7 @@ func convertKeys(input []*pb.EncryptedKeyAndNonce) []EncryptedKeyAndNonce {
 			EncryptedKey:      key.EncryptedKey,
 		}
 		if key.Position != nil {
-			keys[i].Position = storj.SegmentPosition{
+			keys[i].Position = SegmentPosition{
 				PartNumber: key.Position.PartNumber,
 				Index:      key.Position.Index,
 			}
