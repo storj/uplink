@@ -11,8 +11,8 @@ require (
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20220215191549-ee3a77cfa9eb
 	storj.io/drpc v0.0.29
-	storj.io/storj v0.12.1-0.20220201095529-2ae78db66060
-	storj.io/uplink v1.7.2-0.20220131124001-c1db742c840d
+	storj.io/storj v0.12.1-0.20220218001353-12b3fb5fb082
+	storj.io/uplink v1.8.0
 )
 
 require (
