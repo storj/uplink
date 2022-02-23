@@ -827,8 +827,8 @@ func (params *ListPendingObjectStreamsParams) toRequest(header *pb.RequestHeader
 // BatchItem returns single item for batch request.
 func (params *ListPendingObjectStreamsParams) BatchItem() *pb.BatchRequestItem {
 	return &pb.BatchRequestItem{
-		Request: &pb.BatchRequestItem_PendingStreams{
-			PendingStreams: params.toRequest(nil),
+		Request: &pb.BatchRequestItem_ObjectListPendingStreams{
+			ObjectListPendingStreams: params.toRequest(nil),
 		},
 	}
 }

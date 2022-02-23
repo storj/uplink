@@ -19,7 +19,6 @@ type Constructor func(satelliteAddress string) (Client, error)
 // Client is the common interface for telemetry.
 type Client interface {
 	Run(ctx context.Context)
-	Stop()
 	Report(ctx context.Context) error
 }
 

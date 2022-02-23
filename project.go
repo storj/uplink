@@ -36,8 +36,9 @@ type Project struct {
 	segmentSize          int64
 	encryptionParameters storj.EncryptionParameters
 
-	eg        *errgroup.Group
-	telemetry telemetryclient.Client
+	eg              *errgroup.Group
+	telemetry       telemetryclient.Client
+	telemetryCancel func()
 }
 
 // OpenProject opens a project with the specific access grant.
@@ -75,12 +76,6 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		if err != nil {
 			return nil, err
 		}
-
-		defer func() {
-			if err != nil {
-				telemetry.Stop()
-			}
-		}()
 	}
 
 	dialer, err := config.getDialer(ctx)
@@ -88,10 +83,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
+	telemetryCtx, telemetryCancel := context.WithCancel(ctx)
 	var eg errgroup.Group
 	if telemetry != nil {
 		eg.Go(func() error {
-			telemetry.Run(ctx)
+			telemetry.Run(telemetryCtx)
 			return nil
 		})
 	}
@@ -116,6 +112,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	if maxSegmentSize != "" {
 		segmentsSize, err = memory.ParseString(maxSegmentSize)
 		if err != nil {
+			telemetryCancel()
 			return nil, packageError.Wrap(err)
 		}
 	} else {
@@ -135,15 +132,16 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		segmentSize:          segmentsSize,
 		encryptionParameters: encryptionParameters,
 
-		eg:        &eg,
-		telemetry: telemetry,
+		eg:              &eg,
+		telemetry:       telemetry,
+		telemetryCancel: telemetryCancel,
 	}, nil
 }
 
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
 	if project.telemetry != nil {
-		project.telemetry.Stop()
+		project.telemetryCancel()
 		err = errs.Combine(
 			project.eg.Wait(),
 			project.telemetry.Report(context.Background()),
