@@ -365,6 +365,10 @@ type BeginObjectParams struct {
 	Redundancy           storj.RedundancyScheme
 	EncryptionParameters storj.EncryptionParameters
 	ExpiresAt            time.Time
+
+	EncryptedMetadataNonce        storj.Nonce
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
 }
 
 func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginRequest {
@@ -386,6 +390,10 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 			CipherSuite: pb.CipherSuite(params.EncryptionParameters.CipherSuite),
 			BlockSize:   int64(params.EncryptionParameters.BlockSize),
 		},
+
+		EncryptedMetadata:             params.EncryptedMetadata,
+		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 	}
 }
 
@@ -432,6 +440,10 @@ type CommitObjectParams struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
+
+	EncryptedETagNonce        storj.Nonce
+	EncryptedETag             []byte
+	EncryptedETagEncryptedKey []byte
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
@@ -441,6 +453,10 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+
+		EncryptedEtag:             params.EncryptedETag,
+		EncryptedEtagNonce:        params.EncryptedETagNonce,
+		EncryptedEtagEncryptedKey: params.EncryptedETagEncryptedKey,
 	}
 }
 
@@ -774,6 +790,10 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 			EncryptedMetadata:             object.EncryptedMetadata,
+
+			EncryptedETagNonce:        object.EncryptedEtagNonce,
+			EncryptedETagEncryptedKey: object.EncryptedEtagEncryptedKey,
+			EncryptedETag:             object.EncryptedEtag,
 
 			IsPrefix: isPrefix,
 		}

@@ -423,6 +423,15 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			return nil, errClass.Wrap(err)
 		}
 
+		etag, err := db.decryptETag(ctx, pi.Bucket, unencKey, item.EncryptedETag, item.EncryptedETagEncryptedKey, item.EncryptedETagNonce, storj.EncAESGCM)
+		if err != nil {
+			return nil, errClass.Wrap(err)
+		}
+
+		if len(etag) != 0 {
+			object.Metadata["s3:etag"] = string(etag)
+		}
+
 		objectList = append(objectList, object)
 	}
 
@@ -707,6 +716,33 @@ func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencry
 	}
 
 	return &stream, streamMeta, nil
+}
+
+func (db *DB) decryptETag(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted,
+	encryptedEtag, etagKey []byte, etagNonce storj.Nonce, cipher storj.CipherSuite) (_ []byte, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	// if db.encStore.EncryptionBypass {
+	// 	return nil, streamMeta, nil
+	// }
+
+	derivedKey, err := encryption.DeriveContentKey(bucket, unencryptedKey, db.encStore)
+	if err != nil {
+		return nil, err
+	}
+
+	contentKey, err := encryption.DecryptKey(etagKey, cipher, derivedKey, &etagNonce)
+	if err != nil {
+		return nil, err
+	}
+
+	// decrypt metadata with the content encryption key and zero nonce
+	etag, err := encryption.Decrypt(encryptedEtag, cipher, contentKey, &storj.Nonce{})
+	if err != nil {
+		return nil, err
+	}
+
+	return etag, nil
 }
 
 // getEncryptedKeyAndNonce returns key and nonce directly if exists, otherwise try to get them from SegmentMeta.

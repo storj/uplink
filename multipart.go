@@ -40,6 +40,8 @@ type UploadInfo struct {
 // CommitUploadOptions options for committing multipart upload.
 type CommitUploadOptions struct {
 	CustomMetadata CustomMetadata
+
+	ETag []byte
 }
 
 type etag struct {
@@ -78,6 +80,11 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 		return UploadInfo{}, packageError.Wrap(err)
 	}
 
+	m, k, n, err := project.encryptMetadata(bucket, key, options.CustomMetadata)
+	if err != nil {
+		return UploadInfo{}, packageError.Wrap(err)
+	}
+
 	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
 		return UploadInfo{}, packageError.Wrap(err)
@@ -89,6 +96,10 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 		EncryptedObjectKey:   []byte(encPath.Raw()),
 		ExpiresAt:            options.Expires,
 		EncryptionParameters: project.encryptionParameters,
+
+		EncryptedMetadata:             m,
+		EncryptedMetadataEncryptedKey: k,
+		EncryptedMetadataNonce:        n,
 	})
 	if err != nil {
 		return UploadInfo{}, convertKnownErrors(err, bucket, key)
@@ -138,6 +149,17 @@ func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID 
 	commitObjParams, err := project.fillMetadata(bucket, key, id, opts.CustomMetadata)
 	if err != nil {
 		return nil, packageError.Wrap(err)
+	}
+
+	if len(opts.ETag) != 0 {
+		etag, etagKey, nonce, err := project.encryptETag(bucket, key, opts.ETag)
+		if err != nil {
+			return nil, packageError.Wrap(err)
+		}
+
+		commitObjParams.EncryptedETag = etag
+		commitObjParams.EncryptedETagEncryptedKey = etagKey
+		commitObjParams.EncryptedETagNonce = nonce
 	}
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
@@ -221,6 +243,107 @@ func (project *Project) fillMetadata(bucket, key string, id storj.StreamID, meta
 	commitObjParams.EncryptedMetadata = streamMetaBytes
 
 	return commitObjParams, nil
+}
+
+func (project *Project) encryptMetadata(bucket, key string, metadata CustomMetadata) ([]byte, []byte, storj.Nonce, error) {
+	if len(metadata) == 0 {
+		return nil, nil, storj.Nonce{}, nil
+	}
+
+	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
+		UserDefined: metadata.Clone(),
+	})
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	streamInfo, err := pb.Marshal(&pb.StreamInfo{
+		Metadata: metadataBytes,
+	})
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	derivedKey, err := deriveContentKey(project, bucket, key)
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	var metadataKey storj.Key
+	// generate random key for encrypting the segment's content
+	_, err = rand.Read(metadataKey[:])
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	var encryptedKeyNonce storj.Nonce
+	// generate random nonce for encrypting the metadata key
+	_, err = rand.Read(encryptedKeyNonce[:])
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	encryptionParameters := project.encryptionParameters
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	// encrypt metadata with the content encryption key and zero nonce.
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
+	streamMetaBytes, err := pb.Marshal(&pb.StreamMeta{
+		EncryptedStreamInfo: encryptedStreamInfo,
+		EncryptionType:      int32(encryptionParameters.CipherSuite),
+		EncryptionBlockSize: encryptionParameters.BlockSize,
+	})
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+	return streamMetaBytes, encryptedKey, encryptedKeyNonce, nil
+}
+
+func (project *Project) encryptETag(bucket, key string, etag []byte) ([]byte, []byte, storj.Nonce, error) {
+	if len(etag) == 0 {
+		return nil, nil, storj.Nonce{}, nil
+	}
+
+	derivedKey, err := deriveContentKey(project, bucket, key)
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	var metadataKey storj.Key
+	// generate random key for encrypting the segment's content
+	_, err = rand.Read(metadataKey[:])
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	var encryptedKeyNonce storj.Nonce
+	// generate random nonce for encrypting the metadata key
+	_, err = rand.Read(encryptedKeyNonce[:])
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	encryptionParameters := project.encryptionParameters
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	// encrypt metadata with the content encryption key and zero nonce.
+	encryptedEtag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
+	if err != nil {
+		return nil, nil, storj.Nonce{}, packageError.Wrap(err)
+	}
+
+	return encryptedEtag, encryptedKey, encryptedKeyNonce, nil
 }
 
 // UploadPart uploads a part with partNumber to a multipart upload started with BeginUpload.

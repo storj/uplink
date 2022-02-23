@@ -23,6 +23,8 @@ var ErrUploadDone = errors.New("upload done")
 type UploadOptions struct {
 	// When Expires is zero, there is no expiration.
 	Expires time.Time
+
+	CustomMetadata CustomMetadata
 }
 
 // UploadObject starts an upload to the specific key.

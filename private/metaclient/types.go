@@ -33,18 +33,24 @@ type RawObjectItem struct {
 
 // RawObjectListItem represents raw object item from list objects request.
 type RawObjectListItem struct {
-	EncryptedObjectKey            []byte
-	Version                       int32
-	Status                        int32
-	CreatedAt                     time.Time
-	StatusAt                      time.Time
-	ExpiresAt                     time.Time
-	PlainSize                     int64
+	EncryptedObjectKey []byte
+	Version            int32
+	Status             int32
+	CreatedAt          time.Time
+	StatusAt           time.Time
+	ExpiresAt          time.Time
+	PlainSize          int64
+
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadata             []byte
-	StreamID                      storj.StreamID
-	IsPrefix                      bool
+
+	EncryptedETagNonce        storj.Nonce
+	EncryptedETagEncryptedKey []byte
+	EncryptedETag             []byte
+
+	StreamID storj.StreamID
+	IsPrefix bool
 }
 
 // SegmentPosition segment position in object.
