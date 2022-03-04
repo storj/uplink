@@ -318,6 +318,8 @@ func FullPermission() Permission {
 
 // OverrideEncryptionKey overrides the root encryption key for the prefix in
 // bucket with encryptionKey.
+// The prefix argument must end with slash, otherwise the method returns an
+// error.
 //
 // This function is useful for overriding the encryption key in user-specific
 // access grants when implementing multitenancy in a single app bucket.
