@@ -467,6 +467,8 @@ func (upload *PartUpload) Commit() error {
 }
 
 // Abort aborts the part upload.
+//
+// Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *PartUpload) Abort() error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
