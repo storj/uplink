@@ -61,7 +61,7 @@ func (project *Project) CopyObject(ctx context.Context, oldBucket, oldKey, newBu
 		return nil, packageError.Wrap(err)
 	}
 
-	newMetadataKeyNonce, newMetadataEncryptedKey, err := project.reencryptMetadata(response.EncryptedMetadataKey, response.EncryptedMetadataKeyNonce, oldDerivedKey, newDerivedKey)
+	newMetadataEncryptedKey, newMetadataKeyNonce, err := project.reencryptMetadataKey(response.EncryptedMetadataKey, response.EncryptedMetadataKeyNonce, oldDerivedKey, newDerivedKey)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

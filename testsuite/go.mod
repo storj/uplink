@@ -11,8 +11,8 @@ require (
 	go.uber.org/zap v1.16.0
 	storj.io/common v0.0.0-20220328200721-dd5c8642e8cf
 	storj.io/drpc v0.0.30
-	storj.io/storj v0.12.1-0.20220225124630-c0297bae7856
-	storj.io/uplink v1.8.1-0.20220223161331-c4e80d7a3a87
+	storj.io/storj v0.12.1-0.20220329052435-19a2555126c2
+	storj.io/uplink v1.8.2-0.20220328201716-2ca4df442232
 )
 
 require (
@@ -28,11 +28,14 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/go-oauth2/oauth2/v4 v4.4.2 // indirect
 	github.com/go-redis/redis/v8 v8.7.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
 	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/google/pprof v0.0.0-20211108044417-e9b028704de0 // indirect
+	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/graphql-go/graphql v0.7.9 // indirect
@@ -89,7 +92,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	storj.io/monkit-jaeger v0.0.0-20220131130547-dc4cb5a0d97a // indirect
-	storj.io/private v0.0.0-20220131131751-c913260b9ec2 // indirect
+	storj.io/private v0.0.0-20220323114243-08c4b5e752f4 // indirect
 )

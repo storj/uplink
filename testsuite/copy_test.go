@@ -162,3 +162,82 @@ func TestCopyObject_Errors(t *testing.T) {
 		// TODO add test cases for lack of access to target location
 	})
 }
+
+func TestCopyObject_Metadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1,
+		UplinkCount:    1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.CreateBucket(ctx, "bucket")
+		require.NoError(t, err)
+
+		expectedMetadata := map[string]uplink.CustomMetadata{
+			"empty": {},
+			"not empty": {
+				"key": "value",
+			},
+		}
+
+		for name, metadata := range expectedMetadata {
+			t.Run("metadata "+name+"/standard upload", func(t *testing.T) {
+				upload, err := project.UploadObject(ctx, "bucket", "non-mpu-"+name, nil)
+				require.NoError(t, err)
+
+				_, err = upload.Write(testrand.Bytes(256))
+				require.NoError(t, err)
+				require.NoError(t, upload.SetCustomMetadata(ctx, metadata))
+				require.NoError(t, upload.Commit())
+
+				copiedObject, err := project.CopyObject(ctx, "bucket", "non-mpu-"+name, "bucket", "copy-non-mpu-"+name, nil)
+				require.NoError(t, err)
+				require.Equal(t, metadata, copiedObject.Custom)
+
+				copiedObject, err = project.StatObject(ctx, "bucket", "copy-non-mpu-"+name)
+				require.NoError(t, err)
+				require.Equal(t, metadata, copiedObject.Custom)
+			})
+			t.Run("metadata "+name+"/MPU upload", func(t *testing.T) {
+				upload, err := project.BeginUpload(ctx, "bucket", "mpu-"+name, nil)
+				require.NoError(t, err)
+
+				uploadPart, err := project.UploadPart(ctx, "bucket", "mpu-"+name, upload.UploadID, 1)
+				require.NoError(t, err)
+
+				_, err = uploadPart.Write(testrand.Bytes(256))
+				require.NoError(t, err)
+				require.NoError(t, uploadPart.Commit())
+
+				_, err = project.CommitUpload(ctx, "bucket", "mpu-"+name, upload.UploadID, &uplink.CommitUploadOptions{
+					CustomMetadata: metadata,
+				})
+				require.NoError(t, err)
+
+				copiedObject, err := project.CopyObject(ctx, "bucket", "mpu-"+name, "bucket", "copy-mpu-"+name, nil)
+				require.NoError(t, err)
+				require.Equal(t, metadata, copiedObject.Custom)
+
+				copiedObject, err = project.StatObject(ctx, "bucket", "copy-mpu-"+name)
+				require.NoError(t, err)
+				require.Equal(t, metadata, copiedObject.Custom)
+			})
+		}
+
+		// verify that if metadata is set then key and nonce are also set
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, len(expectedMetadata)*4) // two cases, each two copies
+
+		for _, object := range objects {
+			if len(object.EncryptedMetadata) == 0 {
+				require.Empty(t, object.EncryptedMetadataEncryptedKey)
+				require.Empty(t, object.EncryptedMetadataNonce)
+			} else {
+				require.NotEmpty(t, object.EncryptedMetadataEncryptedKey)
+				require.NotEmpty(t, object.EncryptedMetadataNonce)
+			}
+		}
+	})
+}

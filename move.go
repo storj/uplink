@@ -65,7 +65,7 @@ func (project *Project) MoveObject(ctx context.Context, oldbucket, oldkey, newbu
 		return packageError.Wrap(err)
 	}
 
-	newMetadataKeyNonce, newMetadataEncryptedKey, err := project.reencryptMetadata(response.EncryptedMetadataKey, response.EncryptedMetadataKeyNonce, oldDerivedKey, newDerivedKey)
+	newMetadataEncryptedKey, newMetadataKeyNonce, err := project.reencryptMetadataKey(response.EncryptedMetadataKey, response.EncryptedMetadataKeyNonce, oldDerivedKey, newDerivedKey)
 	if err != nil {
 		return packageError.Wrap(err)
 	}
@@ -139,21 +139,25 @@ func (project *Project) reencryptKeys(keys []metaclient.EncryptedKeyAndNonce, ol
 	return newKeys, nil
 }
 
-func (project *Project) reencryptMetadata(encryptedMetadataKey []byte, encryptedMetadataKeyNonce storj.Nonce, oldDerivedKey, newDerivedKey *storj.Key) (storj.Nonce, []byte, error) {
+func (project *Project) reencryptMetadataKey(encryptedMetadataKey []byte, encryptedMetadataKeyNonce storj.Nonce, oldDerivedKey, newDerivedKey *storj.Key) ([]byte, storj.Nonce, error) {
+	if len(encryptedMetadataKey) == 0 {
+		return nil, storj.Nonce{}, nil
+	}
+
 	cipherSuite := project.encryptionParameters.CipherSuite
 
 	// decrypt old metadata key
 	metadataContentKey, err := encryption.DecryptKey(encryptedMetadataKey, cipherSuite, oldDerivedKey, &encryptedMetadataKeyNonce)
 	if err != nil {
-		return storj.Nonce{}, nil, packageError.Wrap(err)
+		return nil, storj.Nonce{}, packageError.Wrap(err)
 	}
 
 	// encrypt metadata content key with new derived key and old nonce
 	newMetadataKeyNonce := encryptedMetadataKeyNonce
 	newMetadataEncryptedKey, err := encryption.EncryptKey(metadataContentKey, cipherSuite, newDerivedKey, &newMetadataKeyNonce)
 	if err != nil {
-		return storj.Nonce{}, nil, packageError.Wrap(err)
+		return nil, storj.Nonce{}, packageError.Wrap(err)
 	}
 
-	return newMetadataKeyNonce, newMetadataEncryptedKey, nil
+	return newMetadataEncryptedKey, newMetadataKeyNonce, nil
 }
