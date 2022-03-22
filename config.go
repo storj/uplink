@@ -62,18 +62,26 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 
 	if config.connector != nil {
 		dialer.Connector = config.connector
-	} else {
-		dialContext := config.DialContext
-		if dialContext == nil {
-			dialContext = socket.BackgroundDialer().DialContext
-		}
-
+	} else if config.DialContext != nil {
 		// N.B.: It is okay to use NewDefaultTCPConnector here because we explicitly don't want
 		// NewHybridConnector. NewHybridConnector would not be able to use the user-provided
 		// DialContext.
 		//lint:ignore SA1019 deprecated okay,
 		//nolint:staticcheck // deprecated okay.
-		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: dialContext})
+		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: config.DialContext})
+	} else {
+		connector := rpc.NewHybridConnector()
+		// N.B.: It is okay to use NewDefaultTCPConnector here because we are using it
+		// within the above hybrid connector. Perhaps we should remove the deprecation
+		// status since this seems like a pretty natural usage.
+		//lint:ignore SA1019 deprecated okay,
+		//nolint:staticcheck // deprecated okay.
+		tcpConnector := rpc.NewDefaultTCPConnector(
+			&rpc.ConnectorAdapter{
+				DialContext: socket.BackgroundDialer().DialContext,
+			})
+		connector.AddCandidateConnector("tcp", tcpConnector, rpc.TCPConnectorPriority)
+		dialer.Connector = connector
 	}
 
 	dialer.ConnectionOptions.Manager.Stream.MaximumBufferSize = config.maximumBufferSize

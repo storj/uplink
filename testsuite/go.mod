@@ -7,10 +7,10 @@ replace storj.io/uplink => ../
 require (
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
-	github.com/zeebo/errs v1.2.2
+	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20220317162831-b0b4a044a95f
-	storj.io/drpc v0.0.29
+	storj.io/common v0.0.0-20220323142604-59ee83bf926c
+	storj.io/drpc v0.0.30
 	storj.io/storj v0.12.1-0.20220225124630-c0297bae7856
 	storj.io/uplink v1.8.1-0.20220223161331-c4e80d7a3a87
 )
