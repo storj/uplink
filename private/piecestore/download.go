@@ -15,7 +15,6 @@ import (
 
 	"storj.io/common/context2"
 	"storj.io/common/errs2"
-	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
@@ -27,7 +26,7 @@ type Download struct {
 	client     *Client
 	limit      *pb.OrderLimit
 	privateKey storj.PiecePrivateKey
-	peer       *identity.PeerIdentity
+	nodeID     storj.NodeID
 	stream     downloadStream
 	ctx        context.Context
 	cancelCtx  func(error)
@@ -59,11 +58,6 @@ type downloadStream interface {
 // Download starts a new download using the specified order limit at the specified offset and size.
 func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, offset, size int64) (_ *Download, err error) {
 	defer mon.Task()(&ctx)(&err)
-
-	peer, err := client.conn.PeerIdentity()
-	if err != nil {
-		return nil, ErrInternal.Wrap(err)
-	}
 
 	ctx, cancel := context2.WithCustomCancel(ctx)
 
@@ -101,7 +95,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		client:     client,
 		limit:      limit,
 		privateKey: piecePrivateKey,
-		peer:       peer,
+		nodeID:     limit.StorageNodeId,
 		stream:     stream,
 		ctx:        ctx,
 		cancelCtx:  cancel,
@@ -119,7 +113,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 // Read downloads data from the storage node allocating as necessary.
 func (client *Download) Read(data []byte) (read int, err error) {
 	ctx := client.ctx
-	defer mon.Task()(&ctx, "node: "+client.peer.ID.String()[0:8])(&err)
+	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
 
 	if client.closingError.IsSet() {
 		return 0, io.ErrClosedPipe
@@ -261,7 +255,7 @@ func (client *Download) Close() error {
 
 	err := client.closingError.Get()
 	if err != nil {
-		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.peer.ID.String(), client.limit.PieceId.String()))
+		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.nodeID.String(), client.limit.PieceId.String()))
 		err = details.Wrap(Error.Wrap(err))
 	}
 

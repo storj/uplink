@@ -216,12 +216,6 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	}
 	defer func() { err = errs.Combine(err, ps.Close()) }()
 
-	peerID, err = ps.GetPeerIdentity()
-	if err != nil {
-		err = Error.New("failed getting peer identity (node:%v): %w", storageNodeID, err)
-		return nil, nil, err
-	}
-
 	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) {
@@ -244,6 +238,12 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 			err = Error.New("upload failed (node:%v, address:%v): %w", storageNodeID, nodeAddress, err)
 		}
 
+		return nil, nil, err
+	}
+
+	peerID, err = ps.GetPeerIdentity()
+	if err != nil {
+		err = Error.New("failed getting peer identity (node:%v): %w", storageNodeID, err)
 		return nil, nil, err
 	}
 

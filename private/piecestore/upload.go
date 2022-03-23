@@ -14,7 +14,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
-	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/pkcrypto"
 	"storj.io/common/signing"
@@ -29,7 +28,7 @@ type upload struct {
 	client     *Client
 	limit      *pb.OrderLimit
 	privateKey storj.PiecePrivateKey
-	peer       *identity.PeerIdentity
+	nodeID     storj.NodeID
 	stream     uploadStream
 
 	hash           hash.Hash // TODO: use concrete implementation
@@ -50,11 +49,6 @@ type uploadStream interface {
 // UploadReader uploads to the storage node.
 func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, data io.Reader) (hash *pb.PieceHash, err error) {
 	defer mon.Task()(&ctx, "node: "+limit.StorageNodeId.String()[0:8])(&err)
-
-	peer, err := client.conn.PeerIdentity()
-	if err != nil {
-		return nil, ErrInternal.Wrap(err)
-	}
 
 	ctx, cancel := context2.WithCustomCancel(ctx)
 	defer cancel(context.Canceled)
@@ -93,7 +87,7 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 		client:         client,
 		limit:          limit,
 		privateKey:     piecePrivateKey,
-		peer:           peer,
+		nodeID:         limit.StorageNodeId,
 		stream:         stream,
 		hash:           pkcrypto.NewHash(),
 		offset:         0,
@@ -105,7 +99,7 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 
 // write sends all data to the storagenode allocating as necessary.
 func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.PieceHash, err error) {
-	defer mon.Task()(&ctx, "node: "+client.peer.ID.String()[0:8])(&err)
+	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
 
 	defer func() {
 		if err != nil {
@@ -186,7 +180,7 @@ func (client *upload) cancel(ctx context.Context) (err error) {
 
 // commit finishes uploading by sending the piece-hash and retrieving the piece-hash.
 func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
-	defer mon.Task()(&ctx, "node: "+client.peer.ID.String()[0:8])(&err)
+	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
 	if client.finished {
 		return nil, io.EOF
 	}
@@ -221,8 +215,17 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 		return nil, errs.Combine(ErrProtocol.New("expected piece hash"), ignoreEOF(sendErr), ignoreEOF(closeErr))
 	}
 
+	// now that we have communicated with the peer, we can be sure that we know the peer identity.
+	peer, err := client.client.GetPeerIdentity()
+	if err != nil {
+		return nil, errs.Combine(err, ignoreEOF(sendErr), ignoreEOF(closeErr))
+	}
+	if peer.ID != client.nodeID {
+		return nil, errs.Combine(ErrProtocol.New("mismatch node ids"), ignoreEOF(sendErr), ignoreEOF(closeErr))
+	}
+
 	// verification
-	verifyErr := client.client.VerifyPieceHash(ctx, client.peer, client.limit, response.Done, uplinkHash.Hash)
+	verifyErr := client.client.VerifyPieceHash(ctx, peer, client.limit, response.Done, uplinkHash.Hash)
 
 	// combine all the errors from before
 	// sendErr is io.EOF when we failed to send
