@@ -104,6 +104,75 @@ func TestCopyObject(t *testing.T) {
 	})
 }
 
+func TestDeleteCopiedObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "ancestor-bucket")
+		createBucket(t, ctx, project, "copy-bucket")
+
+		testCases := []struct {
+			Key              string
+			CopyKey          string
+			CopyOfCopyKey    string
+			BucketToDelete   string
+			KeyToDelete      string
+			BucketToDownload string
+			KeyToDownload    string
+			ObjectSize       memory.Size
+		}{
+			{"inline", "copy-inline", "copy2-inline", "copy-bucket", "copy-inline", "ancestor-bucket", "inline", memory.KiB},
+			{"remote", "copy-remote", "copy2-remote", "copy-bucket", "copy-remote", "ancestor-bucket", "remote", 9 * memory.KiB},
+			{"inline2", "copy-inline2", "copy2-inline2", "ancestor-bucket", "inline2", "copy-bucket", "copy-inline2", memory.KiB},
+			{"remote2", "copy-remote2", "copy2-remote2", "ancestor-bucket", "remote2", "copy-bucket", "copy-remote2", 9 * memory.KiB},
+			{"inline3", "copy-inline3", "copy2-inline3", "copy-bucket", "copy-inline3", "copy-bucket", "copy2-inline3", memory.KiB},
+			{"remote3", "copy-remote3", "copy2-remote3", "copy-bucket", "copy-remote3", "copy-bucket", "copy2-remote3", 9 * memory.KiB},
+			{"inline4", "copy-inline4", "copy2-inline4", "ancestor-bucket", "inline4", "copy-bucket", "copy2-inline4", memory.KiB},
+			{"remote4", "copy-remote4", "copy2-remote4", "ancestor-bucket", "remote4", "copy-bucket", "copy2-remote4", 9 * memory.KiB},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run("delete "+tc.KeyToDelete+", download"+tc.KeyToDownload, func(t *testing.T) {
+				testData := testrand.Bytes(10 * memory.KiB)
+				err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "ancestor-bucket", tc.Key, testData)
+				require.NoError(t, err)
+
+				obj, err := project.StatObject(ctx, "ancestor-bucket", tc.Key)
+				require.NoError(t, err)
+				assertObject(t, obj, tc.Key)
+
+				_, err = project.CopyObject(ctx, "ancestor-bucket", tc.Key, "copy-bucket", tc.CopyKey, nil)
+				require.NoError(t, err)
+
+				copiedObj, err := project.StatObject(ctx, "copy-bucket", tc.CopyKey)
+				require.NoError(t, err)
+				assertObject(t, copiedObj, tc.CopyKey)
+
+				_, err = project.CopyObject(ctx, "copy-bucket", tc.CopyKey, "copy-bucket", tc.CopyOfCopyKey, nil)
+				require.NoError(t, err)
+
+				secondCopiedBbj, err := project.StatObject(ctx, "copy-bucket", tc.CopyOfCopyKey)
+				require.NoError(t, err)
+				assertObject(t, secondCopiedBbj, tc.CopyOfCopyKey)
+
+				_, err = project.DeleteObject(ctx, tc.BucketToDelete, tc.KeyToDelete)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(newCtx, planet.Satellites[0], tc.BucketToDownload, tc.KeyToDownload)
+				require.NoError(t, err)
+				require.Equal(t, testData, data)
+			})
+		}
+	})
+}
+
 func TestCopyObject_Errors(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1,
