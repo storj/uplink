@@ -331,7 +331,7 @@ func (stream *timedDownloadStream) Close() (err error) {
 	sync2.WithTimeout(stream.timeout, func() {
 		err = stream.stream.Close()
 	}, stream.cancelTimeout)
-	return err
+	return CloseError.Wrap(err)
 }
 
 func (stream *timedDownloadStream) Send(req *pb.PieceDownloadRequest) (err error) {

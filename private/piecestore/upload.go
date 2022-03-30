@@ -265,7 +265,7 @@ func (stream *timedUploadStream) Close() (err error) {
 	sync2.WithTimeout(stream.timeout, func() {
 		err = stream.stream.Close()
 	}, stream.cancelTimeout)
-	return err
+	return CloseError.Wrap(err)
 }
 
 func (stream *timedUploadStream) Send(req *pb.PieceUploadRequest) (err error) {
