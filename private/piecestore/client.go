@@ -20,8 +20,17 @@ import (
 
 var errMessageTimeout = errors.New("message timeout")
 
-// Error is the default error class for piecestore client.
-var Error = errs.Class("piecestore")
+var (
+	// Error is the default error class for piecestore client.
+	Error = errs.Class("piecestore")
+
+	// CloseError is the error class used for errors generated during a
+	// stream close in a piecestore client.
+	//
+	// Errors of this type should also be wrapped with Error, for backwards
+	// compatibility.
+	CloseError = errs.Class("piecestore close")
+)
 
 // Config defines piecestore client parameters for upload and download.
 type Config struct {
