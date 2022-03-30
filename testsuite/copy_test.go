@@ -241,3 +241,84 @@ func TestCopyObject_Metadata(t *testing.T) {
 		}
 	})
 }
+
+func TestCopyObjectAndMoveObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		objects := map[string]memory.Size{
+			"inline": 1 * memory.KiB,
+			"remote": 10 * memory.KiB,
+		}
+
+		for name, size := range objects {
+			expectedData := testrand.Bytes(size)
+
+			t.Run(name+"/move copy", func(t *testing.T) {
+				_, _ = project.DeleteBucketWithObjects(ctx, "bucket") // ignore error, its just cleanup
+
+				expectedData := testrand.Bytes(size)
+				err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "bucket", "ancestor"+name, expectedData)
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "bucket", "ancestor"+name, "bucket", "copy"+name, nil)
+				require.NoError(t, err)
+
+				err = project.MoveObject(ctx, "bucket", "copy"+name, "bucket", "moved copy"+name, nil)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "bucket", "moved copy"+name)
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+			})
+
+			t.Run(name+"/move ancestor", func(t *testing.T) {
+				_, _ = project.DeleteBucketWithObjects(ctx, "bucket") // ignore error, its just cleanup
+
+				expectedData := testrand.Bytes(size)
+				err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "bucket", "ancestor", expectedData)
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "bucket", "ancestor", "bucket", "copy", nil)
+				require.NoError(t, err)
+
+				err = project.MoveObject(ctx, "bucket", "ancestor", "bucket", "moved ancestor", nil)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "bucket", "copy")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+
+				data, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "bucket", "moved ancestor")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+			})
+
+			t.Run(name+"/copy moved object", func(t *testing.T) {
+				_, _ = project.DeleteBucketWithObjects(ctx, "bucket") // ignore error, its just cleanup
+
+				err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "bucket", "ancestor", expectedData)
+				require.NoError(t, err)
+
+				err = project.MoveObject(ctx, "bucket", "ancestor", "bucket", "moved ancestor", nil)
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "bucket", "moved ancestor", "bucket", "moved ancestor copy", nil)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "bucket", "moved ancestor copy")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+
+				data, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "bucket", "moved ancestor")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+			})
+		}
+	})
+}
