@@ -391,3 +391,76 @@ func TestCopyObjectAndMoveObject(t *testing.T) {
 		}
 	})
 }
+
+func TestDeleteCopiesBetweenBuckets(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.EnsureBucket(ctx, "source-bucket")
+		require.NoError(t, err)
+		_, err = project.EnsureBucket(ctx, "destination-bucket-01")
+		require.NoError(t, err)
+		_, err = project.EnsureBucket(ctx, "destination-bucket-02")
+		require.NoError(t, err)
+
+		assertDownload := func(bucket, key string, expectedData []byte) {
+			data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], bucket, key)
+			require.NoError(t, err)
+			require.Equal(t, expectedData, data)
+		}
+
+		expectedData := testrand.Bytes(50 * memory.KiB)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "source-bucket", "test", expectedData)
+		require.NoError(t, err)
+
+		_, err = project.CopyObject(ctx, "source-bucket", "test", "source-bucket", "test-copy", nil)
+		require.NoError(t, err)
+
+		_, err = project.CopyObject(ctx, "source-bucket", "test", "destination-bucket-01", "test", nil)
+		require.NoError(t, err)
+
+		_, err = project.CopyObject(ctx, "source-bucket", "test", "destination-bucket-02", "test", nil)
+		require.NoError(t, err)
+
+		// copy of copy
+		_, err = project.CopyObject(ctx, "destination-bucket-02", "test", "destination-bucket-02", "test-copy", nil)
+		require.NoError(t, err)
+
+		// we have now:
+		//    source-bucket/test
+		//    source-bucket/test-copy
+		//    destination-bucket-01/test
+		//    destination-bucket-02/test
+		//    destination-bucket-02/test-copy
+
+		assertDownload("source-bucket", "test-copy", expectedData)
+		assertDownload("destination-bucket-01", "test", expectedData)
+		assertDownload("destination-bucket-02", "test", expectedData)
+		assertDownload("destination-bucket-02", "test-copy", expectedData)
+
+		_, err = project.DeleteBucketWithObjects(ctx, "source-bucket")
+		require.NoError(t, err)
+
+		assertDownload("destination-bucket-01", "test", expectedData)
+		assertDownload("destination-bucket-02", "test", expectedData)
+		assertDownload("destination-bucket-02", "test-copy", expectedData)
+
+		_, err = project.DeleteBucketWithObjects(ctx, "destination-bucket-01")
+		require.NoError(t, err)
+
+		assertDownload("destination-bucket-02", "test", expectedData)
+		assertDownload("destination-bucket-02", "test-copy", expectedData)
+
+		_, err = project.DeleteBucketWithObjects(ctx, "destination-bucket-02")
+		require.NoError(t, err)
+
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
+		require.NoError(t, err)
+		require.Empty(t, segments)
+	})
+}
