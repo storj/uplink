@@ -225,8 +225,9 @@ func TestCopyObject_Errors(t *testing.T) {
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "testbucket", "objectB", testrand.Bytes(memory.KiB))
 		require.NoError(t, err)
 
+		// overwriting of existing object is possible
 		_, err = project.CopyObject(ctx, "testbucket", "objectA", "testbucket", "objectB", nil)
-		require.Error(t, err)
+		require.NoError(t, err)
 
 		// TODO add test cases for lack of access to target location
 	})
@@ -462,5 +463,49 @@ func TestDeleteCopiesBetweenBuckets(t *testing.T) {
 		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
 		require.Empty(t, segments)
+	})
+}
+
+func TestOverwriteExistingCopyDestination(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.EnsureBucket(ctx, "source-bucket")
+		require.NoError(t, err)
+
+		sizes := map[string]memory.Size{
+			"inline": 2 * memory.KiB,
+			"remote": 11 * memory.KiB,
+		}
+
+		// TODO add more cases like, like copies between buckets, copies of copies
+
+		for name, size := range sizes {
+			t.Run(name, func(t *testing.T) {
+				expectedData := testrand.Bytes(size)
+				err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "source-bucket", name, expectedData)
+				require.NoError(t, err)
+
+				// input data should be different from ancestor to be sure we replaced it with copy
+				err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "source-bucket", name+"-existing", testrand.Bytes(size))
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "source-bucket", name, "source-bucket", name+"-existing", nil)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "source-bucket", name)
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+
+				data, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "source-bucket", name+"-existing")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+			})
+		}
 	})
 }
