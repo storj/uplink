@@ -358,6 +358,10 @@ type BeginObjectParams struct {
 	Redundancy           storj.RedundancyScheme
 	EncryptionParameters storj.EncryptionParameters
 	ExpiresAt            time.Time
+
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
+	EncryptedMetadataNonce        storj.Nonce
 }
 
 func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginRequest {
@@ -379,6 +383,10 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 			CipherSuite: pb.CipherSuite(params.EncryptionParameters.CipherSuite),
 			BlockSize:   int64(params.EncryptionParameters.BlockSize),
 		},
+
+		EncryptedMetadata:             params.EncryptedMetadata,
+		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 	}
 }
 

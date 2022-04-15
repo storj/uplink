@@ -9,10 +9,10 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20220405183405-ffdc3ab808c6
+	storj.io/common v0.0.0-20220414110316-a5cb7172d6bf
 	storj.io/drpc v0.0.30
 	storj.io/storj v0.12.1-0.20220407062851-3d9329a5b1ae
-	storj.io/uplink v1.8.2-0.20220401124330-4a78b8e6431f
+	storj.io/uplink v1.8.2-0.20220406151905-7305e5b6da85
 )
 
 require (
@@ -94,5 +94,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	storj.io/monkit-jaeger v0.0.0-20220131130547-dc4cb5a0d97a // indirect
-	storj.io/private v0.0.0-20220323114243-08c4b5e752f4 // indirect
+	storj.io/private v0.0.0-20220411161553-f73cd1a48d5f // indirect
 )
