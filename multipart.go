@@ -323,6 +323,10 @@ func (project *Project) ListUploadParts(ctx context.Context, bucket, key, upload
 	if options != nil {
 		opts.Cursor = metaclient.SegmentPosition{
 			PartNumber: int32(options.Cursor),
+			// cursor needs to be last segment in a part
+			// satellite can accept uint32 as segment index
+			// but protobuf is defined as int32 for now
+			Index: math.MaxInt32,
 		}
 	}
 
