@@ -964,6 +964,133 @@ func TestListUploadParts_Cursor(t *testing.T) {
 	})
 }
 
+func TestListUploadParts_CursorAndPaging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// TODO make segment listing limit configurable to test it with smaller number of parts
+		const partCount = 350
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+		testData := testrand.Bytes(46 * memory.KiB)
+
+		for i := 0; i < partCount; i++ {
+			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
+			require.NoError(t, err)
+
+			// will create 3 segments per part
+			_, err = upload.Write(testData)
+			require.NoError(t, err)
+			require.NoError(t, upload.SetETag([]byte(strconv.Itoa(i))))
+			require.NoError(t, upload.Commit())
+		}
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		for i := 0; i < partCount; i++ {
+			require.True(t, iterator.Next(), "part %v", i)
+			item := iterator.Item()
+			require.EqualValues(t, i, item.PartNumber)
+			require.EqualValues(t, []byte(strconv.Itoa(i)), item.ETag)
+			require.EqualValues(t, len(testData), item.Size)
+		}
+
+		// no more entries
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+
+		cursor := 5
+		// list parts with a cursor starting after all parts
+		iterator = project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, &uplink.ListUploadPartsOptions{
+			Cursor: uint32(cursor),
+		})
+		for i := cursor + 1; i < partCount; i++ {
+			require.True(t, iterator.Next())
+			item := iterator.Item()
+			require.EqualValues(t, i, item.PartNumber)
+			require.EqualValues(t, []byte(strconv.Itoa(i)), item.ETag)
+			require.EqualValues(t, len(testData), item.Size)
+		}
+
+		// no more entries
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+}
+
+func TestListUploadParts_SingleObject_CursorAndPaging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		// TODO make segment listing limit configurable to test it with smaller number of segments
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+		require.NotNil(t, info.UploadID)
+		// generate data for more then 1000 segment for single part
+		testData := testrand.Bytes(21 * memory.KiB * 1000)
+
+		upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, 0)
+		require.NoError(t, err)
+
+		// will create 3 segments per part
+		_, err = upload.Write(testData)
+		require.NoError(t, err)
+		require.NoError(t, upload.SetETag([]byte("0")))
+		require.NoError(t, upload.Commit())
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+
+		require.True(t, iterator.Next())
+		item := iterator.Item()
+		require.EqualValues(t, 0, item.PartNumber)
+		require.EqualValues(t, []byte("0"), item.ETag)
+		require.EqualValues(t, len(testData), item.Size)
+
+		// no more entries
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+
+		cursor := 1
+		// list parts with a cursor starting after all parts
+		iterator = project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, &uplink.ListUploadPartsOptions{
+			Cursor: uint32(cursor),
+		})
+		// no more entries
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+}
+
 func assertUploadList(ctx context.Context, t *testing.T, project *uplink.Project, bucket string, options *uplink.ListUploadsOptions, objectKeys ...string) {
 	list := project.ListUploads(ctx, bucket, options)
 	require.NoError(t, list.Err())
