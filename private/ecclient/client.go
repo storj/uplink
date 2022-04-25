@@ -137,6 +137,9 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	successfulNodes = make([]*pb.Node, pieceCount)
 	successfulHashes = make([]*pb.PieceHash, pieceCount)
 	var successfulCount, failureCount, cancellationCount int32
+
+	// all the piece upload errors, combined
+	var pieceErrors errs.Group
 	for range limits {
 		info := <-infos
 
@@ -145,6 +148,7 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		}
 
 		if info.err != nil {
+			pieceErrors.Add(info.err)
 			if !errs2.IsCanceled(info.err) {
 				failureCount++
 			} else {
@@ -183,11 +187,11 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 	mon.IntVal("put_segment_pieces_canceled").Observe(int64(cancellationCount))
 
 	if int(successfulCount) <= rs.RepairThreshold() && int(successfulCount) < rs.OptimalThreshold() {
-		return nil, nil, Error.New("successful puts (%d) less than or equal to repair threshold (%d)", successfulCount, rs.RepairThreshold())
+		return nil, nil, Error.New("successful puts (%d) less than or equal to repair threshold (%d), %w", successfulCount, rs.RepairThreshold(), pieceErrors.Err())
 	}
 
 	if int(successfulCount) < rs.OptimalThreshold() {
-		return nil, nil, Error.New("successful puts (%d) less than success threshold (%d)", successfulCount, rs.OptimalThreshold())
+		return nil, nil, Error.New("successful puts (%d) less than success threshold (%d), %w", successfulCount, rs.OptimalThreshold(), pieceErrors.Err())
 	}
 
 	return successfulNodes, successfulHashes, nil
