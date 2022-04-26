@@ -884,7 +884,6 @@ sourcegraph.com/sourcegraph/go-diff v0.5.0/go.mod h1:kuch7UrkMzY0X+p9CRK03kfuPQ2
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=
 storj.io/common v0.0.0-20220131120956-e74f624a3d55/go.mod h1:m0489td5+rKDdoiYOzCkh3CfGW/cLyntZiYfso+QfMs=
 storj.io/common v0.0.0-20220216094301-b27f3c9d69e1/go.mod h1:xW3PPPGBo4bdMtEP9GREnmxQptmJNuDg1tEHcA4zqog=
-storj.io/common v0.0.0-20220405183405-ffdc3ab808c6/go.mod h1:LBJrpAqL4MNSrhGEwc8SJ+tIVtgfCtFEZqDy6/0j67A=
 storj.io/common v0.0.0-20220414110316-a5cb7172d6bf h1:D5xZTDOlTTQWdAWeKKm2pFLcz1sceH+f/pVAcYB9jL8=
 storj.io/common v0.0.0-20220414110316-a5cb7172d6bf/go.mod h1:LBJrpAqL4MNSrhGEwc8SJ+tIVtgfCtFEZqDy6/0j67A=
 storj.io/drpc v0.0.29/go.mod h1:6rcOyR/QQkSTX/9L5ZGtlZaE2PtXTTZl8d+ulSeeYEg=
@@ -894,5 +893,5 @@ storj.io/monkit-jaeger v0.0.0-20220131130547-dc4cb5a0d97a h1:qads+aZlFKm5gUxobfF
 storj.io/monkit-jaeger v0.0.0-20220131130547-dc4cb5a0d97a/go.mod h1:DGEycSjvzE0JqcD3+6IjwPEK6x30oOus6AApXzl7t0s=
 storj.io/private v0.0.0-20220411161553-f73cd1a48d5f h1:wv4NsI9jAw6ZmM+x/saFEOL9PLVwpY/9as+sIoamZL4=
 storj.io/private v0.0.0-20220411161553-f73cd1a48d5f/go.mod h1:fZ7FSXv/adIc79sF/5qm7zn0PI5+PWa5p+dbqrZQARM=
-storj.io/storj v0.12.1-0.20220423063417-0513d4cf3a8b h1:7yLb7Z2mwGyyFk1gyzULnhg+kYjaz456HYMP2HO7ES4=
-storj.io/storj v0.12.1-0.20220423063417-0513d4cf3a8b/go.mod h1:PcQmysolktWSXZUqUx/kcZ4n9fdCRd652UdRip/s6gk=
+storj.io/storj v0.12.1-0.20220426080427-e66beb242945 h1:keaGX1eoF9GSjR6JAL0DucwqFdw91uUVyWSsiy5MzBY=
+storj.io/storj v0.12.1-0.20220426080427-e66beb242945/go.mod h1:5sPcmIfAQt/nvOjpQtbI4QaAlrcdD3ia5eH5eeeSztc=
