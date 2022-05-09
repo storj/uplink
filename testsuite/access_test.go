@@ -738,3 +738,42 @@ func TestDeleteObject_EncryptionBypass(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestRevoceAccess(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+		access, err := uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
+			Bucket: "testbucket",
+		})
+		require.NoError(t, err)
+
+		restrictedProject, err := uplink.OpenProject(ctx, sharedAccess)
+		require.NoError(t, err)
+		defer ctx.Check(restrictedProject.Close)
+
+		_, err = restrictedProject.CreateBucket(ctx, "testbucket")
+		require.NoError(t, err)
+
+		err = project.RevokeAccess(ctx, sharedAccess)
+		require.NoError(t, err)
+
+		// access was revoked so we cannot delete bucket anymore
+		_, err = restrictedProject.DeleteBucket(ctx, "testbucket")
+		require.Error(t, err)
+
+		// root access cannot revoke itself
+		err = project.RevokeAccess(ctx, access)
+		require.Error(t, err)
+	})
+}
