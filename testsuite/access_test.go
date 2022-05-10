@@ -739,7 +739,7 @@ func TestDeleteObject_EncryptionBypass(t *testing.T) {
 	})
 }
 
-func TestRevoceAccess(t *testing.T) {
+func TestRevokeAccess(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
