@@ -509,3 +509,45 @@ func TestOverwriteExistingCopyDestination(t *testing.T) {
 		}
 	})
 }
+
+func TestOverwriteCopyToSource(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.EnsureBucket(ctx, "source-bucket")
+		require.NoError(t, err)
+
+		sizes := map[string]memory.Size{
+			"empty":  0,
+			"inline": 2 * memory.KiB,
+			"remote": 11 * memory.KiB,
+		}
+
+		for name, size := range sizes {
+			t.Run(name, func(t *testing.T) {
+				expectedData := testrand.Bytes(size)
+				err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "source-bucket", name, expectedData)
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "source-bucket", name, "source-bucket", name+"-copy", nil)
+				require.NoError(t, err)
+
+				_, err = project.CopyObject(ctx, "source-bucket", name+"-copy", "source-bucket", name, nil)
+				require.NoError(t, err)
+
+				data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "source-bucket", name)
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+
+				data, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "source-bucket", name+"-copy")
+				require.NoError(t, err)
+				require.Equal(t, expectedData, data)
+			})
+		}
+	})
+}
