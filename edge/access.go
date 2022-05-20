@@ -18,7 +18,7 @@ import (
 var uplinkError = errs.Class("uplink")
 
 // ErrAuthDialFailed is a network or protocol error.
-var ErrAuthDialFailed = errors.New("dail to auth service failed")
+var ErrAuthDialFailed = errors.New("dial to auth service failed")
 
 // ErrRegisterAccessFailed is an internal error in the auth service.
 var ErrRegisterAccessFailed = errors.New("register access for edge services failed")
