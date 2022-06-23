@@ -8,6 +8,7 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"storj.io/common/pkcrypto"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -15,7 +16,6 @@ import (
 
 	"storj.io/common/context2"
 	"storj.io/common/pb"
-	"storj.io/common/pkcrypto"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
@@ -225,7 +225,7 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 	}
 
 	// verification
-	verifyErr := client.client.VerifyPieceHash(ctx, peer, client.limit, response.Done, uplinkHash.Hash)
+	verifyErr := VerifyPieceHash(ctx, peer, client.limit, response.Done, uplinkHash.Hash)
 
 	// combine all the errors from before
 	// sendErr is io.EOF when we failed to send
