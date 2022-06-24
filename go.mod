@@ -3,12 +3,14 @@ module storj.io/uplink
 go 1.17
 
 require (
+	github.com/pkg/profile v1.6.0
 	github.com/spacemonkeygo/monkit/v3 v3.0.17
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	storj.io/common v0.0.0-20220414110316-a5cb7172d6bf
+	storj.io/drpc v0.0.30
 )
 
 require (
@@ -25,5 +27,6 @@ require (
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
-	storj.io/drpc v0.0.30 // indirect
 )
+
+replace storj.io/common => github.com/elek/common v0.0.0-20220623153449-9629536619d9
