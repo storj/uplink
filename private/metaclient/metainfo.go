@@ -85,3 +85,9 @@ func (db *DB) ListBuckets(ctx context.Context, options BucketListOptions) (bucke
 	})
 	return bucketList, ErrBucket.Wrap(err)
 }
+
+// GetClient expose internal Client.
+// TODO: find better solution
+func (db *DB) GetClient() *Client {
+	return db.metainfo
+}

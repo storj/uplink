@@ -6,6 +6,7 @@ package uplink
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -27,6 +28,14 @@ type UploadOptions struct {
 
 // UploadObject starts an upload to the specific key.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (uploader Uploader, err error) {
+	if os.Getenv("STORJ_UPLINK_UPLOADNG") == "true" {
+		return project.UploadObjectNG(ctx, bucket, key, options)
+	}
+	return project.UploadObjectLegacy(ctx, bucket, key, options)
+}
+
+// UploadObjectLegacy starts an upload to the specific key, in the standard reliable way.
+func (project *Project) UploadObjectLegacy(ctx context.Context, bucket, key string, options *UploadOptions) (uploader Uploader, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -119,34 +128,9 @@ func (project *Project) UploadObjectNG(ctx context.Context, bucket, key string, 
 
 	info := obj.Info()
 
-	ctx, cancel := context.WithCancel(ctx)
+	upload, err := NewUploadNG(ctx, project.dialer, db.GetClient(), project.encryptionParameters, bucket, info)
 
-	upload := &Upload{
-		cancel: cancel,
-		bucket: bucket,
-		object: convertObject(&info),
-	}
-
-	meta := dynamicMetadata{upload.object}
-	mutableStream, err := obj.CreateDynamicStream(ctx, meta, options.Expires)
-	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
-	}
-
-	// Return the connection to the pool as soon as we can.
-	if err := db.Close(); err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
-	}
-
-	streams, err := project.getStreamsStore(ctx)
-	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
-	}
-
-	upload.streams = streams
-	upload.upload = stream.NewUpload(ctx, mutableStream, streams)
-
-	return upload, nil
+	return upload, err
 }
 
 type dynamicMetadata struct{ *Object }
