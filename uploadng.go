@@ -15,8 +15,9 @@ import (
 )
 
 type UploadNG struct {
-	writer *upload.ChunkedWriter
-	info   *Object
+	writer     *upload.ChunkedWriter
+	info       *Object
+	metaClient *metaclient.Client
 }
 
 func (u UploadNG) Info() *Object {
@@ -28,7 +29,7 @@ func (u UploadNG) Write(p []byte) (n int, err error) {
 }
 
 func (u UploadNG) Commit() error {
-	return u.writer.Commit()
+	return errs.Combine(u.writer.Commit(), u.metaClient.Close())
 }
 
 func (u UploadNG) Abort() error {
@@ -116,6 +117,7 @@ func NewUploadNG(ctx context.Context, dialer rpc.Dialer, metaClient *metaclient.
 		Output:      keys,
 		ObjectInfo: func() *upload.StartObject {
 			return &upload.StartObject{
+				Bucket:           object.Bucket.Name,
 				EncryptionParams: encParam,
 			}
 		},
@@ -128,7 +130,8 @@ func NewUploadNG(ctx context.Context, dialer rpc.Dialer, metaClient *metaclient.
 
 	c, err := upload.NewChunkedWriter(ctx, padding, plainBlockSize)
 	return UploadNG{
-		writer: c,
-		info:   convertObject(&object),
+		writer:     c,
+		info:       convertObject(&object),
+		metaClient: metaClient,
 	}, nil
 }

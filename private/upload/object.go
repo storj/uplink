@@ -2,6 +2,7 @@ package upload
 
 import (
 	"context"
+	"fmt"
 	"github.com/zeebo/errs"
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
@@ -39,9 +40,9 @@ func (o *ObjectMeta) EncryptionParams(ctx context.Context, v EncryptionParams) e
 }
 
 type StartObject struct {
-	bucket           string
-	unecryptedKey    string
-	expiration       time.Time
+	Bucket           string
+	UnecryptedKey    string
+	Expiration       time.Time
 	EncryptionParams storj.EncryptionParameters
 }
 
@@ -61,15 +62,15 @@ type EncryptedObjectLayer interface {
 }
 
 func (o *ObjectMeta) StartObject(ctx context.Context, info *StartObject) error {
-	encPath, err := encryption.EncryptPathWithStoreCipher(info.bucket, paths.NewUnencrypted(info.unecryptedKey), o.encStore)
+	encPath, err := encryption.EncryptPathWithStoreCipher(info.Bucket, paths.NewUnencrypted(info.UnecryptedKey), o.encStore)
 	if err != nil {
 		return errs.Wrap(err)
 	}
 
 	o.beginObjectReq = &metaclient.BeginObjectParams{
-		Bucket:               []byte(info.bucket),
+		Bucket:               []byte(info.Bucket),
 		EncryptedObjectKey:   []byte(encPath.Raw()),
-		ExpiresAt:            info.expiration,
+		ExpiresAt:            info.Expiration,
 		EncryptionParameters: info.EncryptionParams,
 	}
 	return nil
@@ -86,6 +87,7 @@ func (o *ObjectMeta) StartSegment(ctx context.Context, index int) error {
 	if o.beginObjectReq != nil {
 		results, err := o.Metaclient.Batch(ctx, o.beginObjectReq, beginSegment)
 		if err != nil {
+			fmt.Printf("%++v", err)
 			return errs.Wrap(err)
 		}
 		o.beginObjectReq = nil

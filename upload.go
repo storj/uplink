@@ -119,7 +119,6 @@ func (project *Project) UploadObjectNG(ctx context.Context, bucket, key string, 
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
-	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	obj, err := db.CreateObject(ctx, bucket, key, nil)
 	if err != nil {
