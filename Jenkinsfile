@@ -95,6 +95,8 @@ pipeline {
                     environment {
                         STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
                         STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
+                        STORJ_TEST_COCKROACH_NODROP = 'true'
+                        STORJ_TEST_LOG_LEVEL = 'info'
                         COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
                     }
                     steps {
