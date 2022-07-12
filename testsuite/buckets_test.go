@@ -13,14 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"storj.io/common/macaroon"
 	"storj.io/common/testcontext"
-	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
-	"storj.io/storj/satellite/buckets"
 	"storj.io/uplink"
-	"storj.io/uplink/private/metaclient"
 )
 
 func TestListBuckets_EmptyProject(t *testing.T) {
@@ -159,26 +155,6 @@ func TestListBuckets_Cursor(t *testing.T) {
 type satelliteDBWithBucketsListLimit struct {
 	limit int
 	satellite.DB
-}
-
-type bucketsDBWithListLimit struct {
-	limit int
-	buckets.DB
-}
-
-func (db *satelliteDBWithBucketsListLimit) Buckets() buckets.DB {
-	return &bucketsDBWithListLimit{db.limit, db.DB.Buckets()}
-}
-
-func (db *bucketsDBWithListLimit) ListBuckets(ctx context.Context, projectID uuid.UUID, listOpts metaclient.BucketListOptions, allowedBuckets macaroon.AllowedBuckets) (bucketList metaclient.BucketList, err error) {
-	if listOpts.Limit < 1 {
-		listOpts.Limit = db.limit
-	}
-	if listOpts.Limit > db.limit {
-		listOpts.Limit = db.limit
-	}
-
-	return db.DB.ListBuckets(ctx, projectID, listOpts, allowedBuckets)
 }
 
 func TestListBuckets_AutoPaging(t *testing.T) {
