@@ -6,8 +6,6 @@ package uplink
 import (
 	"context"
 
-	"github.com/zeebo/errs"
-
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -21,18 +19,17 @@ type ListBucketsOptions struct {
 func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOptions) *BucketIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	opts := metaclient.BucketListOptions{
-		Direction: metaclient.After,
-	}
-
-	if options != nil {
-		opts.Cursor = options.Cursor
+	if options == nil {
+		options = &ListBucketsOptions{}
 	}
 
 	buckets := BucketIterator{
-		ctx:     ctx,
-		project: project,
-		options: opts,
+		iterator: metaclient.IterateBuckets(ctx, metaclient.IterateBucketsOptions{
+			Cursor: options.Cursor,
+			DialClientFunc: func() (*metaclient.Client, error) {
+				return project.dialMetainfoClient(ctx)
+			},
+		}),
 	}
 
 	return &buckets
@@ -40,80 +37,23 @@ func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOpt
 
 // BucketIterator is an iterator over a collection of buckets.
 type BucketIterator struct {
-	ctx       context.Context
-	project   *Project
-	options   metaclient.BucketListOptions
-	list      *metaclient.BucketList
-	position  int
-	completed bool
-	err       error
+	iterator *metaclient.BucketIterator
 }
 
 // Next prepares next Bucket for reading.
 // It returns false if the end of the iteration is reached and there are no more buckets, or if there is an error.
 func (buckets *BucketIterator) Next() bool {
-	if buckets.err != nil {
-		buckets.completed = true
-		return false
-	}
-
-	if buckets.list == nil {
-		more := buckets.loadNext()
-		buckets.completed = !more
-		return more
-	}
-
-	if buckets.position >= len(buckets.list.Items)-1 {
-		if !buckets.list.More {
-			buckets.completed = true
-			return false
-		}
-		more := buckets.loadNext()
-		buckets.completed = !more
-		return more
-	}
-
-	buckets.position++
-
-	return true
-}
-
-func (buckets *BucketIterator) loadNext() bool {
-	ok, err := buckets.tryLoadNext()
-	if err != nil {
-		buckets.err = convertKnownErrors(err, "", "")
-		return false
-	}
-	return ok
-}
-
-func (buckets *BucketIterator) tryLoadNext() (ok bool, err error) {
-	db, err := buckets.project.dialMetainfoDB(buckets.ctx)
-	if err != nil {
-		return false, err
-	}
-	defer func() { err = errs.Combine(err, db.Close()) }()
-
-	list, err := db.ListBuckets(buckets.ctx, buckets.options)
-	if err != nil {
-		return false, err
-	}
-	buckets.list = &list
-	if list.More {
-		buckets.options = buckets.options.NextPage(list)
-	}
-	buckets.position = 0
-	return len(list.Items) > 0, nil
+	return buckets.iterator.Next()
 }
 
 // Err returns error, if one happened during iteration.
 func (buckets *BucketIterator) Err() error {
-	return packageError.Wrap(buckets.err)
+	return convertKnownErrors(buckets.iterator.Err(), "", "")
 }
 
 // Item returns the current bucket in the iterator.
 func (buckets *BucketIterator) Item() *Bucket {
-	item := buckets.item()
+	item := buckets.iterator.Item()
 	if item == nil {
 		return nil
 	}
@@ -121,24 +61,4 @@ func (buckets *BucketIterator) Item() *Bucket {
 		Name:    item.Name,
 		Created: item.Created,
 	}
-}
-
-func (buckets *BucketIterator) item() *metaclient.Bucket {
-	if buckets.completed {
-		return nil
-	}
-
-	if buckets.err != nil {
-		return nil
-	}
-
-	if buckets.list == nil {
-		return nil
-	}
-
-	if len(buckets.list.Items) == 0 {
-		return nil
-	}
-
-	return &buckets.list.Items[buckets.position]
 }
