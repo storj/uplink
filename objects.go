@@ -8,7 +8,6 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/testuplink"
 )
@@ -35,7 +34,7 @@ type ListObjectsOptions struct {
 func (project *Project) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) *ObjectIterator {
 	defer mon.Task()(&ctx)(nil)
 
-	b := metaclient.Bucket{Name: bucket, PathCipher: storj.EncAESGCM}
+	b := metaclient.Bucket{Name: bucket}
 	opts := metaclient.ListOptions{
 		Direction: metaclient.After,
 	}

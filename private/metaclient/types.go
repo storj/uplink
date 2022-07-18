@@ -97,7 +97,11 @@ var (
 )
 
 // Bucket contains information about a specific bucket.
-type Bucket = storj.Bucket
+type Bucket struct {
+	Name        string
+	Created     time.Time
+	Attribution string
+}
 
 // ListDirection specifies listing direction.
 type ListDirection = storj.ListDirection
@@ -147,8 +151,28 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 // ObjectList is a list of objects.
 type ObjectList = storj.ObjectList
 
-// BucketListOptions lists objects.
-type BucketListOptions = storj.BucketListOptions
-
 // BucketList is a list of buckets.
-type BucketList = storj.BucketList
+type BucketList struct {
+	More  bool
+	Items []Bucket
+}
+
+// BucketListOptions lists objects.
+type BucketListOptions struct {
+	Cursor    string
+	Direction ListDirection
+	Limit     int
+}
+
+// NextPage returns options for listing the next page.
+func (opts BucketListOptions) NextPage(list BucketList) BucketListOptions {
+	if !list.More || len(list.Items) == 0 {
+		return BucketListOptions{}
+	}
+
+	return BucketListOptions{
+		Cursor:    list.Items[len(list.Items)-1].Name,
+		Direction: After,
+		Limit:     opts.Limit,
+	}
+}

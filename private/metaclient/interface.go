@@ -22,7 +22,10 @@ type CreateObject struct {
 // Object converts the CreateObject to an object with unitialized values.
 func (create CreateObject) Object(bucket Bucket, path storj.Path) Object {
 	return Object{
-		Bucket:      bucket,
+		Bucket: storj.Bucket{
+			Name:    bucket.Name,
+			Created: bucket.Created,
+		},
 		Path:        path,
 		Metadata:    create.Metadata,
 		ContentType: create.ContentType,

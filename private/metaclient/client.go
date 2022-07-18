@@ -332,8 +332,9 @@ func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams)
 	resultBucketList.Items = make([]Bucket, len(response.GetItems()))
 	for i, item := range response.GetItems() {
 		resultBucketList.Items[i] = Bucket{
-			Name:    string(item.GetName()),
-			Created: item.GetCreatedAt(),
+			Name:        string(item.GetName()),
+			Created:     item.GetCreatedAt(),
+			Attribution: string(item.GetUserAgent()),
 		}
 	}
 	return resultBucketList, nil
