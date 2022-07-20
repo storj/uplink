@@ -777,3 +777,60 @@ func TestRevokeAccess(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestImmutableUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 4,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
+
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "testbucket")
+		require.NoError(t, err)
+
+		sharedAccess, err := access.Share(uplink.Permission{
+			AllowDownload: true,
+			AllowUpload:   true,
+		}, uplink.SharePrefix{
+			Bucket: "testbucket",
+			Prefix: "object1",
+		})
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, sharedAccess)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := project.UploadObject(ctx, "testbucket", "object1", nil)
+		require.NoError(t, err)
+		testData := testrand.Bytes(5 * memory.KiB)
+		_, err = upload.Write(testData)
+		require.NoError(t, err)
+		require.NoError(t, upload.Commit())
+
+		// we shouldn't be able to overwrite object
+		_, err = project.UploadObject(ctx, "testbucket", "object1", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+		require.Error(t, err)
+
+		// we shouldn't be able upload to a different location
+		_, err = project.UploadObject(ctx, "testbucket", "object2", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+		require.Error(t, err)
+
+		// we shouldn't be able to delete
+		_, err = project.DeleteObject(ctx, "testbucket", "object1")
+		require.Error(t, err)
+
+		// but we should be able to download
+		download, err := project.DownloadObject(ctx, "testbucket", "object1", nil)
+		require.NoError(t, err)
+
+		data, err := ioutil.ReadAll(download)
+		require.NoError(t, err)
+		require.Equal(t, testData, data)
+	})
+}
