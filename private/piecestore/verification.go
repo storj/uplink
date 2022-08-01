@@ -29,13 +29,16 @@ var (
 )
 
 // VerifyPieceHash verifies piece hash which is sent by peer.
-func (client *Client) VerifyPieceHash(ctx context.Context, peer *identity.PeerIdentity, limit *pb.OrderLimit, hash *pb.PieceHash, expectedHash []byte) (err error) {
+func (client *Client) VerifyPieceHash(ctx context.Context, peer *identity.PeerIdentity, limit *pb.OrderLimit, hash *pb.PieceHash, expectedHash []byte, algorithm pb.PieceHashAlgorithm) (err error) {
 	defer mon.Task()(&ctx)(&err)
 	if peer == nil || limit == nil || hash == nil || len(expectedHash) == 0 {
 		return ErrProtocol.New("invalid arguments")
 	}
 	if limit.PieceId != hash.PieceId {
 		return ErrProtocol.New("piece id changed") // TODO: report rpc status bad message
+	}
+	if algorithm != hash.HashAlgorithm {
+		return ErrVerifyUntrusted.New("hash algorithms don't match expected: %s got: %s", algorithm, hash.HashAlgorithm)
 	}
 	if !bytes.Equal(hash.Hash, expectedHash) {
 		return ErrVerifyUntrusted.New("hashes don't match") // TODO: report rpc status bad message

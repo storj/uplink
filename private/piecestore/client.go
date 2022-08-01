@@ -54,9 +54,10 @@ var DefaultConfig = Config{
 
 // Client implements uploading, downloading and deleting content from a piecestore.
 type Client struct {
-	client pb.DRPCPiecestoreClient
-	conn   *rpc.Conn
-	config Config
+	client         pb.DRPCPiecestoreClient
+	conn           *rpc.Conn
+	config         Config
+	UploadHashAlgo pb.PieceHashAlgorithm
 }
 
 // Dial dials the target piecestore endpoint.

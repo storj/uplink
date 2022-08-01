@@ -15,7 +15,6 @@ import (
 
 	"storj.io/common/context2"
 	"storj.io/common/pb"
-	"storj.io/common/pkcrypto"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
@@ -32,6 +31,7 @@ type upload struct {
 	stream     uploadStream
 
 	hash           hash.Hash // TODO: use concrete implementation
+	hashAlgorithm  pb.PieceHashAlgorithm
 	offset         int64
 	allocationStep int64
 
@@ -69,7 +69,8 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	}
 
 	err = stream.Send(&pb.PieceUploadRequest{
-		Limit: limit,
+		Limit:         limit,
+		HashAlgorithm: client.UploadHashAlgo,
 	})
 	if err != nil {
 		_, closeErr := stream.CloseAndRecv()
@@ -89,7 +90,8 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 		privateKey:     piecePrivateKey,
 		nodeID:         limit.StorageNodeId,
 		stream:         stream,
-		hash:           pkcrypto.NewHash(),
+		hash:           pb.NewHashFromAlgorithm(client.UploadHashAlgo),
+		hashAlgorithm:  client.UploadHashAlgo,
 		offset:         0,
 		allocationStep: client.config.InitialStep,
 	}
@@ -188,10 +190,11 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 
 	// sign the hash for storage node
 	uplinkHash, err := signing.SignUplinkPieceHash(ctx, client.privateKey, &pb.PieceHash{
-		PieceId:   client.limit.PieceId,
-		PieceSize: client.offset,
-		Hash:      client.hash.Sum(nil),
-		Timestamp: client.limit.OrderCreation,
+		PieceId:       client.limit.PieceId,
+		PieceSize:     client.offset,
+		Hash:          client.hash.Sum(nil),
+		Timestamp:     client.limit.OrderCreation,
+		HashAlgorithm: client.hashAlgorithm,
 	})
 	if err != nil {
 		// failed to sign, let's close, no need to wait for a response
@@ -225,7 +228,7 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 	}
 
 	// verification
-	verifyErr := client.client.VerifyPieceHash(ctx, peer, client.limit, response.Done, uplinkHash.Hash)
+	verifyErr := client.client.VerifyPieceHash(ctx, peer, client.limit, response.Done, uplinkHash.Hash, uplinkHash.HashAlgorithm)
 
 	// combine all the errors from before
 	// sendErr is io.EOF when we failed to send

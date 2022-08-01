@@ -48,6 +48,7 @@ type ecClient struct {
 
 // New creates a client from the given dialer and max buffer memory.
 func New(dialer rpc.Dialer, memoryLimit int) Client {
+
 	return &ecClient{
 		dialer:      dialer,
 		memoryLimit: memoryLimit,
@@ -60,7 +61,13 @@ func (ec *ecClient) WithForceErrorDetection(force bool) Client {
 }
 
 func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piecestore.Client, error) {
-	return piecestore.Dial(ctx, ec.dialer, n, piecestore.DefaultConfig)
+	hashAlgo := piecestore.GetPieceHashAlgo(ctx)
+	client, err := piecestore.Dial(ctx, ec.dialer, n, piecestore.DefaultConfig)
+	if err != nil {
+		return client, err
+	}
+	client.UploadHashAlgo = hashAlgo
+	return client, nil
 }
 
 func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
