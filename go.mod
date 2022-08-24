@@ -3,12 +3,12 @@ module storj.io/uplink
 go 1.17
 
 require (
-	github.com/spacemonkeygo/monkit/v3 v3.0.17
+	github.com/spacemonkeygo/monkit/v3 v3.0.18
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	storj.io/common v0.0.0-20220708152916-e2f08365ed65
+	storj.io/common v0.0.0-20220822090045-1b57fc2bbda1
 )
 
 require (

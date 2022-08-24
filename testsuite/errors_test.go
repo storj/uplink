@@ -64,7 +64,6 @@ func TestErrResourceExhausted(t *testing.T) {
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Console.UsageLimits.Storage.Free = 0
 				config.Console.UsageLimits.Bandwidth.Free = 0
-				config.Metainfo.ProjectLimits.ValidateSegmentLimit = true
 				// disable live accounting cache
 				config.LiveAccounting.BandwidthCacheTTL = -1
 				// disable AOST
