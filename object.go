@@ -97,6 +97,8 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 }
 
 // DeleteObject deletes the object at the specific key.
+// Returned deleted is not nil when the access grant has read permissions and
+// the object was deleted.
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
