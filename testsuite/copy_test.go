@@ -45,20 +45,22 @@ func TestCopyObject(t *testing.T) {
 			// one remote segment and one inline segment
 			{"testbucket", "remote-segment-size", "testbucket", "new-remote-segment-size", 10 * memory.KiB},
 			{"testbucket", "remote+inline", "testbucket", "new-remote+inline", 11 * memory.KiB},
-			//// 3 remote segment
+			//// 3 remote segments
 			{"testbucket", "multiple-remote-segments", "testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
 			{"testbucket", "remote-with-prefix", "testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
 			//
-			//// different bucket
+			//// different buckets
 			{"testbucket", "empty", "new-testbucket", "new-empty", 0},
 			{"testbucket", "inline", "new-testbucket", "new-inline", memory.KiB},
 			{"testbucket", "remote", "new-testbucket", "new-remote", 9 * memory.KiB},
 			//// one remote segment and one inline segment
 			{"testbucket", "remote-segment-size", "new-testbucket", "new-remote-segment-size", 10 * memory.KiB},
 			{"testbucket", "remote+inline", "new-testbucket", "new-remote+inline", 11 * memory.KiB},
-			// 3 remote segment
+			// 3 remote segments
 			{"testbucket", "multiple-remote-segments", "new-testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
 			{"testbucket", "remote-with-prefix", "new-testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
+			// same destination
+			{"testbucket", "same-destination", "testbucket", "same-destination", 10 * memory.KiB},
 		}
 
 		for _, tc := range testCases {
