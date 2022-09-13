@@ -10,6 +10,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
+	"storj.io/common/rpc"
 	"storj.io/uplink"
 )
 
@@ -59,7 +60,14 @@ func (config *Config) RegisterAccess(
 		options = &RegisterAccessOptions{}
 	}
 
-	conn, err := config.createDialer().DialAddressHostnameVerification(ctx, config.AuthServiceAddress)
+	var conn *rpc.Conn
+	var err error
+	if config.InsecureSkipVerify {
+		conn, err = config.createDialer().DialAddressUnencrypted(ctx, config.AuthServiceAddress)
+	} else {
+		conn, err = config.createDialer().DialAddressHostnameVerification(ctx, config.AuthServiceAddress)
+	}
+
 	if err != nil {
 		return nil, uplinkError.New("%w: %v", ErrAuthDialFailed, err)
 	}

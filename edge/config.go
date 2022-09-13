@@ -21,6 +21,9 @@ type Config struct {
 	// In PEM format.
 	// Intended to test against a self-hosted auth service or to improve security.
 	CertificatePEM []byte
+
+	// InsecureSkipVerify makes possible to connect to Authservice without TLS. Don't use in production.
+	InsecureSkipVerify bool
 }
 
 func (config *Config) createDialer() rpc.Dialer {
