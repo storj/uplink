@@ -13,12 +13,7 @@ import (
 // Config contains configuration on how to access edge services.
 type Config struct {
 	// AuthServiceAddress sets a fixed DRPC server including port.
-	// Valid is auth.[eu|ap|us]1.storjshare.io:443
-	// or a third party hosted alternative.
-	//
-	// Theoretically we can select the address based on the region
-	// of the satellite in the access grant but there is no consensus
-	// on the choice of mechanism to achieve that.
+	// Valid is auth.storjshare.io:7777 or a third party hosted alternative.
 	AuthServiceAddress string
 
 	// CertificatePEM contains the root certificate(s) or chain(s) against which
