@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"storj.io/uplink"
 )
 
@@ -79,6 +80,12 @@ func UploadAndDownloadData(ctx context.Context,
 	}
 
 	return nil
+}
+
+func init() {
+	if err := godotenv.Load(".env"); err != nil {
+		log.Fatal("[FATAL] Error loading .env file")
+	}
 }
 
 func main() {
