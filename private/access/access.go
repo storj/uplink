@@ -4,6 +4,7 @@
 package access
 
 import (
+	"storj.io/common/macaroon"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 )
@@ -13,4 +14,9 @@ func EnablePathEncryptionBypass(access *uplink.Access) error {
 	encAccess := expose.AccessGetEncAccess(access)
 	encAccess.Store.EncryptionBypass = true
 	return nil
+}
+
+// APIKey returns the API key.
+func APIKey(access *uplink.Access) *macaroon.APIKey {
+	return expose.AccessGetAPIKey(access)
 }
