@@ -7,12 +7,10 @@ import (
 	"context"
 
 	"github.com/zeebo/errs"
-	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/memory"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/uplink/internal/telemetryclient"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
@@ -35,10 +33,6 @@ type Project struct {
 	ec                   ecclient.Client
 	segmentSize          int64
 	encryptionParameters storj.EncryptionParameters
-
-	eg              *errgroup.Group
-	telemetry       telemetryclient.Client
-	telemetryCancel func()
 }
 
 // OpenProject opens a project with the specific access grant.
@@ -70,26 +64,9 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	var telemetry telemetryclient.Client
-	if ctor, ok := telemetryclient.ConstructorFrom(ctx); ok {
-		telemetry, err = ctor(access.satelliteURL.String())
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
-	}
-
-	telemetryCtx, telemetryCancel := context.WithCancel(ctx)
-	var eg errgroup.Group
-	if telemetry != nil {
-		eg.Go(func() error {
-			telemetry.Run(telemetryCtx)
-			return nil
-		})
 	}
 
 	// TODO: This should come from the EncryptionAccess. For now it's hardcoded to twice the
@@ -112,7 +89,6 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	if maxSegmentSize != "" {
 		segmentsSize, err = memory.ParseString(maxSegmentSize)
 		if err != nil {
-			telemetryCancel()
 			return nil, packageError.Wrap(err)
 		}
 	} else {
@@ -131,23 +107,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		ec:                   ec,
 		segmentSize:          segmentsSize,
 		encryptionParameters: encryptionParameters,
-
-		eg:              &eg,
-		telemetry:       telemetry,
-		telemetryCancel: telemetryCancel,
 	}, nil
 }
 
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
-	if project.telemetry != nil {
-		project.telemetryCancel()
-		err = errs.Combine(
-			project.eg.Wait(),
-			project.telemetry.Report(context.Background()),
-		)
-	}
-
 	// only close the connection pool if it's created through OpenProject
 	if project.config.pool == nil {
 		err = errs.Combine(err, project.dialer.Pool.Close())
