@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jtolio/eventkit"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
@@ -19,6 +20,7 @@ import (
 )
 
 var mon = monkit.Package()
+var evs = eventkit.Package()
 
 // We use packageError.Wrap/New instead of plain errs.Wrap/New to add a prefix "uplink" to every error
 // message emitted by the Uplink library.

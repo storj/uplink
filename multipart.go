@@ -8,10 +8,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"math"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
@@ -226,7 +228,23 @@ func (project *Project) fillMetadata(bucket, key string, id storj.StreamID, meta
 // UploadPart uploads a part with partNumber to a multipart upload started with BeginUpload.
 //
 // uploadID is an upload identifier returned by BeginUpload.
-func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber uint32) (upload *PartUpload, err error) {
+func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID string, partNumber uint32) (_ *PartUpload, err error) {
+	upload := &PartUpload{
+		bucket: bucket,
+		key:    key,
+		part: &Part{
+			PartNumber: partNumber,
+		},
+		stats: newOperationStats(),
+	}
+	upload.task = mon.TaskNamed("PartUpload")(&ctx)
+	defer func() {
+		if err != nil {
+			upload.stats.flagFailure(err)
+			upload.emitEvent(false)
+		}
+	}()
+	defer upload.stats.trackWorking()()
 	defer mon.Task()(&ctx)(&err)
 
 	switch {
@@ -246,15 +264,7 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-
-	upload = &PartUpload{
-		cancel: cancel,
-		bucket: bucket,
-		key:    key,
-		part: &Part{
-			PartNumber: partNumber,
-		},
-	}
+	upload.cancel = cancel
 
 	streams, err := project.getStreamsStore(ctx)
 	if err != nil {
@@ -419,13 +429,22 @@ type PartUpload struct {
 	part    *Part
 	streams *streams.Store
 	etag    []byte
+
+	stats operationStats
+	task  func(*error)
 }
 
 // Write uploads len(p) bytes from p to the object's data stream.
 // It returns the number of bytes written from p (0 <= n <= len(p))
 // and any error encountered that caused the write to stop early.
 func (upload *PartUpload) Write(p []byte) (int, error) {
+	track := upload.stats.trackWorking()
 	n, err := upload.upload.Write(p)
+	upload.mu.Lock()
+	upload.stats.bytes += int64(n)
+	upload.stats.flagFailure(err)
+	track()
+	upload.mu.Unlock()
 	return n, convertKnownErrors(err, upload.bucket, upload.key)
 }
 
@@ -449,6 +468,7 @@ func (upload *PartUpload) SetETag(etag []byte) error {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *PartUpload) Commit() error {
+	track := upload.stats.trackWorking()
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
@@ -466,6 +486,9 @@ func (upload *PartUpload) Commit() error {
 		upload.upload.Close(),
 		upload.streams.Close(),
 	)
+	upload.stats.flagFailure(err)
+	track()
+	upload.emitEvent(false)
 
 	return convertKnownErrors(err, upload.bucket, upload.key)
 }
@@ -474,6 +497,7 @@ func (upload *PartUpload) Commit() error {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *PartUpload) Abort() error {
+	track := upload.stats.trackWorking()
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
@@ -492,6 +516,9 @@ func (upload *PartUpload) Abort() error {
 		upload.upload.Abort(),
 		upload.streams.Close(),
 	)
+	upload.stats.flagFailure(err)
+	track()
+	upload.emitEvent(true)
 
 	return convertKnownErrors(err, upload.bucket, upload.key)
 }
@@ -505,4 +532,23 @@ func (upload *PartUpload) Info() *Part {
 		upload.part.ETag = part.ETag
 	}
 	return upload.part
+}
+
+func (upload *PartUpload) emitEvent(aborted bool) {
+	message, err := upload.stats.err()
+	upload.task(&err)
+
+	evs.Event("part-upload",
+		eventkit.Int64("bytes", upload.stats.bytes),
+		eventkit.Duration("user-elapsed", time.Since(upload.stats.start)),
+		eventkit.Duration("working-elapsed", upload.stats.working),
+		eventkit.Bool("success", err == nil),
+		eventkit.String("error", message),
+		eventkit.Bool("aborted", aborted),
+		eventkit.String("arch", runtime.GOARCH),
+		eventkit.String("os", runtime.GOOS),
+		eventkit.Int64("cpus", int64(runtime.NumCPU())),
+		// segment count
+		// ram available
+	)
 }

@@ -6,9 +6,11 @@ package uplink
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync"
 	"time"
 
+	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
@@ -26,7 +28,19 @@ type UploadOptions struct {
 }
 
 // UploadObject starts an upload to the specific key.
-func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (upload *Upload, err error) {
+func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (_ *Upload, err error) {
+	upload := &Upload{
+		bucket: bucket,
+		stats:  newOperationStats(),
+	}
+	upload.task = mon.TaskNamed("Upload")(&ctx)
+	defer func() {
+		if err != nil {
+			upload.stats.flagFailure(err)
+			upload.emitEvent(false)
+		}
+	}()
+	defer upload.stats.trackWorking()()
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -59,11 +73,8 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	upload = &Upload{
-		cancel: cancel,
-		bucket: bucket,
-		object: convertObject(&info),
-	}
+	upload.cancel = cancel
+	upload.object = convertObject(&info)
 
 	meta := dynamicMetadata{upload.object}
 	mutableStream, err := obj.CreateDynamicStream(ctx, meta, options.Expires)
@@ -105,6 +116,9 @@ type Upload struct {
 	bucket  string
 	object  *Object
 	streams *streams.Store
+
+	stats operationStats
+	task  func(*error)
 }
 
 // Info returns the last information about the uploaded object.
@@ -121,7 +135,13 @@ func (upload *Upload) Info() *Object {
 // It returns the number of bytes written from p (0 <= n <= len(p))
 // and any error encountered that caused the write to stop early.
 func (upload *Upload) Write(p []byte) (n int, err error) {
+	track := upload.stats.trackWorking()
 	n, err = upload.upload.Write(p)
+	upload.mu.Lock()
+	upload.stats.bytes += int64(n)
+	upload.stats.flagFailure(err)
+	track()
+	upload.mu.Unlock()
 	return n, convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
 
@@ -129,6 +149,7 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Commit() error {
+	track := upload.stats.trackWorking()
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
@@ -146,6 +167,9 @@ func (upload *Upload) Commit() error {
 		upload.upload.Close(),
 		upload.streams.Close(),
 	)
+	upload.stats.flagFailure(err)
+	track()
+	upload.emitEvent(false)
 
 	return convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
@@ -154,6 +178,7 @@ func (upload *Upload) Commit() error {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *Upload) Abort() error {
+	track := upload.stats.trackWorking()
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
@@ -173,7 +198,40 @@ func (upload *Upload) Abort() error {
 		upload.streams.Close(),
 	)
 
+	track()
+	upload.stats.flagFailure(err)
+	upload.emitEvent(true)
+
 	return convertKnownErrors(err, upload.bucket, upload.object.Key)
+}
+
+func (upload *Upload) emitEvent(aborted bool) {
+	message, err := upload.stats.err()
+	upload.task(&err)
+
+	expires := false
+	if upload.upload != nil {
+		meta := upload.upload.Meta()
+		if meta != nil && !meta.Expiration.IsZero() {
+			expires = true
+		}
+	}
+
+	evs.Event("upload",
+		eventkit.Int64("bytes", upload.stats.bytes),
+		eventkit.Duration("user-elapsed", time.Since(upload.stats.start)),
+		eventkit.Duration("working-elapsed", upload.stats.working),
+		eventkit.Bool("success", err == nil),
+		eventkit.String("error", message),
+		eventkit.Bool("aborted", aborted),
+		eventkit.String("arch", runtime.GOARCH),
+		eventkit.String("os", runtime.GOOS),
+		eventkit.Int64("cpus", int64(runtime.NumCPU())),
+		eventkit.Bool("expires", expires),
+		// upload.upload.Meta().Expiration
+		// segment count
+		// ram available
+	)
 }
 
 // SetCustomMetadata updates custom metadata to be included with the object.

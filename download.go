@@ -5,7 +5,13 @@ package uplink
 
 import (
 	"context"
+	"errors"
+	"io"
+	"runtime"
+	"sync"
+	"time"
 
+	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/uplink/private/metaclient"
@@ -23,7 +29,19 @@ type DownloadOptions struct {
 }
 
 // DownloadObject starts a download from the specific key.
-func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (download *Download, err error) {
+func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (_ *Download, err error) {
+	download := &Download{
+		bucket: bucket,
+		stats:  newOperationStats(),
+	}
+	download.task = mon.TaskNamed("Download")(&ctx)
+	defer func() {
+		if err != nil {
+			download.stats.flagFailure(err)
+			download.emitEvent()
+		}
+	}()
+	defer download.stats.trackWorking()()
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -79,6 +97,13 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
+	// store this data so even failing events have the best chance of
+	// reporting this.
+	streamRange := objectDownload.Range
+	download.sizes.offset = streamRange.Start
+	download.sizes.length = streamRange.Limit - streamRange.Start
+	download.sizes.total = objectDownload.Object.Size
+
 	// Return the connection to the pool as soon as we can.
 	if err := db.Close(); err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
@@ -88,22 +113,26 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
+	download.streams = streams
 
-	streamRange := objectDownload.Range
-	return &Download{
-		streams:  streams,
-		download: stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start),
-		bucket:   bucket,
-		object:   convertObject(&objectDownload.Object),
-	}, nil
+	download.object = convertObject(&objectDownload.Object)
+	download.download = stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start)
+	return download, nil
 }
 
 // Download is a download from Storj Network.
 type Download struct {
+	mu       sync.Mutex
 	download *stream.Download
 	object   *Object
 	bucket   string
 	streams  *streams.Store
+
+	sizes struct {
+		offset, length, total int64
+	}
+	stats operationStats
+	task  func(*error)
 }
 
 // Info returns the last information about the object.
@@ -114,15 +143,50 @@ func (download *Download) Info() *Object {
 // Read downloads up to len(p) bytes into p from the object's data stream.
 // It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
 func (download *Download) Read(p []byte) (n int, err error) {
+	track := download.stats.trackWorking()
 	n, err = download.download.Read(p)
+	download.mu.Lock()
+	download.stats.bytes += int64(n)
+	if err != nil && !errors.Is(err, io.EOF) {
+		download.stats.flagFailure(err)
+	}
+	track()
+	download.mu.Unlock()
 	return n, convertKnownErrors(err, download.bucket, download.object.Key)
 }
 
 // Close closes the reader of the download.
 func (download *Download) Close() error {
+	track := download.stats.trackWorking()
 	err := errs.Combine(
 		download.download.Close(),
 		download.streams.Close(),
 	)
+	download.mu.Lock()
+	track()
+	download.stats.flagFailure(err)
+	download.emitEvent()
+	download.mu.Unlock()
 	return convertKnownErrors(err, download.bucket, download.object.Key)
+}
+
+func (download *Download) emitEvent() {
+	message, err := download.stats.err()
+	download.task(&err)
+
+	evs.Event("download",
+		eventkit.Int64("bytes", download.stats.bytes),
+		eventkit.Int64("requested_bytes", download.sizes.length),
+		eventkit.Int64("offset", download.sizes.offset),
+		eventkit.Int64("object_size", download.sizes.total),
+		eventkit.Duration("user-elapsed", time.Since(download.stats.start)),
+		eventkit.Duration("working-elapsed", download.stats.working),
+		eventkit.Bool("success", err == nil),
+		eventkit.String("error", message),
+		eventkit.String("arch", runtime.GOARCH),
+		eventkit.String("os", runtime.GOOS),
+		eventkit.Int64("cpus", int64(runtime.NumCPU())),
+		// TODO: segment count
+		// TODO: ram available
+	)
 }
