@@ -490,6 +490,41 @@ func TestDownloadObjectWithManySegments(t *testing.T) {
 	})
 }
 
+func TestMultiPartCorruptionDueToKeyMismatch(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := uplink.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", nil)
+		require.NoError(t, err)
+
+		keys := []string{"multipart-object", "multipart-object-extra"}
+		for i, key := range keys {
+			upload, err := project.UploadPart(ctx, "testbucket", key, info.UploadID, uint32(i))
+			require.NoError(t, err)
+			_, err = upload.Write([]byte{byte(i)})
+			require.NoError(t, err)
+			err = upload.Commit()
+			require.NoError(t, err)
+		}
+
+		_, err = project.CommitUpload(ctx, "testbucket", "multipart-object", info.UploadID, nil)
+		require.NoError(t, err)
+
+		data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "testbucket", "multipart-object")
+		require.NoError(t, err)
+		require.Len(t, data, 2)
+		require.Equal(t, []byte{byte(0), byte(1)}, data)
+	})
+}
+
 func TestAbortUpload_Multipart(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
