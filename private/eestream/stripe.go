@@ -14,6 +14,8 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/vivint/infectious"
+
+	"storj.io/common/rpc/rpctracing"
 )
 
 var (
@@ -95,6 +97,7 @@ var backcompatMon = monkit.ScopeNamed("storj.io/storj/uplink/eestream")
 // return value is the updated byte slice.
 func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ []byte, err error) {
 	defer mon.Task()(&ctx, num)(&err)
+	ctx = rpctracing.WithoutDistributedTracing(ctx)
 
 	for i := range r.inmap {
 		delete(r.inmap, i)
