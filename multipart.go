@@ -235,7 +235,7 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 		part: &Part{
 			PartNumber: partNumber,
 		},
-		stats: newOperationStats(ctx),
+		stats: newOperationStats(ctx, project.access.satelliteURL),
 	}
 	upload.task = mon.TaskNamed("PartUpload")(&ctx)
 	defer func() {
@@ -549,6 +549,7 @@ func (upload *PartUpload) emitEvent(aborted bool) {
 		eventkit.String("os", runtime.GOOS),
 		eventkit.Int64("cpus", int64(runtime.NumCPU())),
 		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
+		eventkit.String("satellite", upload.stats.satellite),
 		// segment count
 		// ram available
 	)

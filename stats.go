@@ -10,6 +10,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/rpc"
+	"storj.io/common/storj"
 )
 
 const eventErrorMessageLimit = 64
@@ -20,11 +21,13 @@ type operationStats struct {
 	bytes       int64
 	working     time.Duration
 	failure     []error
+	satellite   string
 }
 
-func newOperationStats(ctx context.Context) (os operationStats) {
+func newOperationStats(ctx context.Context, satellite storj.NodeURL) (os operationStats) {
 	os.start = time.Now()
 	os.quicRollout = rpc.QUICRolloutPercent(ctx)
+	os.satellite = satellite.String()
 	return os
 }
 

@@ -31,7 +31,7 @@ type UploadOptions struct {
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (_ *Upload, err error) {
 	upload := &Upload{
 		bucket: bucket,
-		stats:  newOperationStats(ctx),
+		stats:  newOperationStats(ctx, project.access.satelliteURL),
 	}
 	upload.task = mon.TaskNamed("Upload")(&ctx)
 	defer func() {
@@ -229,6 +229,7 @@ func (upload *Upload) emitEvent(aborted bool) {
 		eventkit.Int64("cpus", int64(runtime.NumCPU())),
 		eventkit.Bool("expires", expires),
 		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
+		eventkit.String("satellite", upload.stats.satellite),
 		// upload.upload.Meta().Expiration
 		// segment count
 		// ram available
