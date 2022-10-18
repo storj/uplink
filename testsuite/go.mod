@@ -9,10 +9,10 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20220822090045-1b57fc2bbda1
+	storj.io/common v0.0.0-20221018143517-9eb8213fe465
 	storj.io/drpc v0.0.32
-	storj.io/storj v0.12.1-0.20220826093809-7e7198649301
-	storj.io/uplink v1.9.1-0.20220811092921-37dccde06f31
+	storj.io/storj v0.12.1-0.20221018172149-4fd59fb3c9f5
+	storj.io/uplink v1.9.1-0.20221007005717-cc895a51b05d
 )
 
 require (
@@ -51,8 +51,7 @@ require (
 	github.com/jackc/pgx/v4 v4.15.0 // indirect
 	github.com/jtolds/monkit-hw/v2 v2.0.0-20191108235325-141a0da276b3 // indirect
 	github.com/jtolds/tracetagger/v2 v2.0.0-rc5 // indirect
-	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b // indirect
-	github.com/klauspost/compress v1.15.10 // indirect
+	github.com/jtolio/eventkit v0.0.0-20221007130042-690145affff8 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/lucas-clemente/quic-go v0.28.1 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
@@ -97,6 +96,6 @@ require (
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
-	storj.io/monkit-jaeger v0.0.0-20220726162929-c3a9898b5bca // indirect
-	storj.io/private v0.0.0-20220818074142-c354e3e64dd3 // indirect
+	storj.io/monkit-jaeger v0.0.0-20220915074555-d100d7589f41 // indirect
+	storj.io/private v0.0.0-20221011183246-586e5f48357a // indirect
 )

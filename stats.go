@@ -4,22 +4,27 @@
 package uplink
 
 import (
+	"context"
 	"time"
 
 	"github.com/zeebo/errs"
+
+	"storj.io/common/rpc"
 )
 
 const eventErrorMessageLimit = 64
 
 type operationStats struct {
-	start   time.Time
-	bytes   int64
-	working time.Duration
-	failure []error
+	start       time.Time
+	quicRollout int
+	bytes       int64
+	working     time.Duration
+	failure     []error
 }
 
-func newOperationStats() (os operationStats) {
+func newOperationStats(ctx context.Context) (os operationStats) {
 	os.start = time.Now()
+	os.quicRollout = rpc.QUICRolloutPercent(ctx)
 	return os
 }
 

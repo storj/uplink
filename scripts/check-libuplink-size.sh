@@ -7,7 +7,7 @@ SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 go build -v -o $SCRIPTDIR/../.build/build.out $SCRIPTDIR/../examples/walkthrough/main.go
 
 BUILD_SIZE=$(wc -c < $SCRIPTDIR/../.build/build.out)
-CURRENT_SIZE=11568560
+CURRENT_SIZE=11605239
 
 if [ $BUILD_SIZE -gt $CURRENT_SIZE ]; then
     echo "Libuplink size is too big, was $CURRENT_SIZE but now it is $BUILD_SIZE"

@@ -32,7 +32,7 @@ type DownloadOptions struct {
 func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (_ *Download, err error) {
 	download := &Download{
 		bucket: bucket,
-		stats:  newOperationStats(),
+		stats:  newOperationStats(ctx),
 	}
 	download.task = mon.TaskNamed("Download")(&ctx)
 	defer func() {
@@ -186,6 +186,7 @@ func (download *Download) emitEvent() {
 		eventkit.String("arch", runtime.GOARCH),
 		eventkit.String("os", runtime.GOOS),
 		eventkit.Int64("cpus", int64(runtime.NumCPU())),
+		eventkit.Int64("quic-rollout", int64(download.stats.quicRollout)),
 		// TODO: segment count
 		// TODO: ram available
 	)
