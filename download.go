@@ -136,6 +136,7 @@ type Download struct {
 	sizes struct {
 		offset, length, total int64
 	}
+	ttfb  time.Duration
 	stats operationStats
 	task  func(*error)
 }
@@ -154,6 +155,9 @@ func (download *Download) Read(p []byte) (n int, err error) {
 	download.stats.bytes += int64(n)
 	if err != nil && !errors.Is(err, io.EOF) {
 		download.stats.flagFailure(err)
+	}
+	if download.ttfb == 0 && n > 0 {
+		download.ttfb = time.Since(download.stats.start)
 	}
 	track()
 	download.mu.Unlock()
@@ -203,6 +207,7 @@ func (download *Download) emitEvent() {
 		eventkit.Int64("quic-rollout", int64(download.stats.quicRollout)),
 		eventkit.String("satellite", download.stats.satellite),
 		eventkit.Bytes("path-checksum", pathChecksum(download.stats.encPath)),
+		eventkit.Duration("ttfb", download.ttfb),
 		// TODO: segment count
 		// TODO: ram available
 	)
