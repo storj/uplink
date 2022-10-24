@@ -70,11 +70,12 @@ pipeline {
                     }
                     steps {
                         sh 'go vet ./...'
-                        sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee .build/tests.json | xunit -out .build/tests.xml'
+                        sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... > .build/tests.json'
                     }
 
                     post {
                         always {
+                            sh script: 'cat .build/tests.json | xunit -out .build/tests.xml'
                             sh script: 'cat .build/tests.json | tparse -all -top -slow 100', returnStatus: true
                             archiveArtifacts artifacts: '.build/tests.json'
                             junit '.build/tests.xml'
@@ -104,12 +105,15 @@ pipeline {
                         sh 'psql -U postgres -c \'create database teststorj;\''
                         dir('testsuite'){
                             sh 'go vet ./...'
-                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                            sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... > ../.build/testsuite.json'
                         }
                     }
 
                     post {
                         always {
+                            dir('testsuite'){
+                                sh 'cat ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                            }
                             sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
                             archiveArtifacts artifacts: '.build/testsuite.json'
                             junit '.build/testsuite.xml'
@@ -139,12 +143,15 @@ pipeline {
                         dir('testsuite'){
                             sh 'cp go.mod go-temp.mod'
                             sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... > ../.build/testsuite-storj.json'
                         }
                     }
 
                     post {
                         always {
+                            dir('testsuite'){
+                                sh 'cat ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            }
                             sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
                             archiveArtifacts artifacts: '.build/testsuite-storj.json'
                             junit '.build/testsuite-storj.xml'
