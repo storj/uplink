@@ -437,6 +437,7 @@ type DownloadOptions struct {
 // DownloadInfo contains response for DownloadObject.
 type DownloadInfo struct {
 	Object             Object
+	EncPath            paths.Encrypted
 	DownloadedSegments []DownloadSegmentWithRSResponse
 	ListSegments       ListSegmentsResponse
 	Range              StreamRange
@@ -467,10 +468,10 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options Do
 		return DownloadInfo{}, err
 	}
 
-	return db.newDownloadInfo(ctx, bucket, key, resp, options.Range)
+	return db.newDownloadInfo(ctx, bucket, key, encPath, resp, options.Range)
 }
 
-func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response DownloadObjectResponse, streamRange StreamRange) (DownloadInfo, error) {
+func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, encPath paths.Encrypted, response DownloadObjectResponse, streamRange StreamRange) (DownloadInfo, error) {
 	object, err := db.ObjectFromRawObjectItem(ctx, bucket, key, response.Object)
 	if err != nil {
 		return DownloadInfo{}, err
@@ -478,6 +479,7 @@ func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, response 
 
 	return DownloadInfo{
 		Object:             object,
+		EncPath:            encPath,
 		DownloadedSegments: response.DownloadedSegments,
 		ListSegments:       response.ListSegments,
 		Range:              streamRange.Normalize(object.Size),

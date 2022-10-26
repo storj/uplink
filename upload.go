@@ -92,6 +92,11 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
+	// TODO: don't calculate this twice.
+	if encPath, err := encryptPath(project, bucket, key); err == nil {
+		upload.stats.encPath = encPath
+	}
+
 	upload.streams = streams
 	upload.upload = stream.NewUpload(ctx, mutableStream, streams)
 
@@ -230,6 +235,7 @@ func (upload *Upload) emitEvent(aborted bool) {
 		eventkit.Bool("expires", expires),
 		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
 		eventkit.String("satellite", upload.stats.satellite),
+		eventkit.Bytes("path-checksum", pathChecksum(upload.stats.encPath)),
 		// upload.upload.Meta().Expiration
 		// segment count
 		// ram available

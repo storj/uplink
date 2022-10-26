@@ -9,6 +9,7 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/paths"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
 )
@@ -22,6 +23,7 @@ type operationStats struct {
 	working     time.Duration
 	failure     []error
 	satellite   string
+	encPath     paths.Encrypted
 }
 
 func newOperationStats(ctx context.Context, satellite storj.NodeURL) (os operationStats) {

@@ -5,6 +5,8 @@ package uplink
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
 	"errors"
 	"io"
 	"runtime"
@@ -14,6 +16,7 @@ import (
 	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/paths"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
@@ -97,6 +100,8 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
+	download.stats.encPath = objectDownload.EncPath
+
 	// store this data so even failing events have the best chance of
 	// reporting this.
 	streamRange := objectDownload.Range
@@ -170,6 +175,15 @@ func (download *Download) Close() error {
 	return convertKnownErrors(err, download.bucket, download.object.Key)
 }
 
+func pathChecksum(encPath paths.Encrypted) []byte {
+	mac := hmac.New(sha1.New, []byte(encPath.Raw()))
+	_, err := mac.Write([]byte("event"))
+	if err != nil {
+		panic(err)
+	}
+	return mac.Sum(nil)[:16]
+}
+
 func (download *Download) emitEvent() {
 	message, err := download.stats.err()
 	download.task(&err)
@@ -188,6 +202,7 @@ func (download *Download) emitEvent() {
 		eventkit.Int64("cpus", int64(runtime.NumCPU())),
 		eventkit.Int64("quic-rollout", int64(download.stats.quicRollout)),
 		eventkit.String("satellite", download.stats.satellite),
+		eventkit.Bytes("path-checksum", pathChecksum(download.stats.encPath)),
 		// TODO: segment count
 		// TODO: ram available
 	)
