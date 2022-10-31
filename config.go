@@ -95,7 +95,7 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: unused
+//nolint:unused
 func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool }
 
 // setConnector exposes setting a connector used by the dialer.
@@ -104,7 +104,7 @@ func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: unused
+//nolint:unused
 func (config *Config) setConnector(connector rpc.Connector) {
 	config.connector = connector
 }
@@ -115,7 +115,7 @@ func (config *Config) setConnector(connector rpc.Connector) {
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: unused
+//nolint:unused
 func (config *Config) setMaximumBufferSize(maximumBufferSize int) {
 	config.maximumBufferSize = maximumBufferSize
 }

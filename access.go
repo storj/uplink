@@ -36,7 +36,7 @@ type Access struct {
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: unused
+//nolint:unused
 func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
 
 // getEncAccess are exposing the state do private methods.
@@ -45,7 +45,7 @@ func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
-//nolint: unused
+//nolint:unused
 func (access *Access) getEncAccess() *grant.EncryptionAccess { return access.encAccess }
 
 // SharePrefix defines a prefix that will be shared.

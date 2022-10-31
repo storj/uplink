@@ -21,8 +21,8 @@ func ConfigSetConnectionPool(*uplink.Config, *rpcpool.Pool)
 
 // ConfigGetDialer exposes Config.getDialer.
 //
-//nolint: revive
 //go:linkname ConfigGetDialer storj.io/uplink.Config.getDialer
+//nolint:revive
 func ConfigGetDialer(uplink.Config, context.Context) (rpc.Dialer, error)
 
 // ConfigSetConnector exposes Config.setConnector.
@@ -47,6 +47,6 @@ func AccessGetEncAccess(*uplink.Access) *grant.EncryptionAccess
 
 // ConfigRequestAccessWithPassphraseAndConcurrency exposes Config.requestAccessWithPassphraseAndConcurrency.
 //
-//nolint: revive
 //go:linkname ConfigRequestAccessWithPassphraseAndConcurrency storj.io/uplink.Config.requestAccessWithPassphraseAndConcurrency
+//nolint:revive
 func ConfigRequestAccessWithPassphraseAndConcurrency(config uplink.Config, ctx context.Context, satelliteAddress, apiKey, passphrase string, concurrency uint8) (*uplink.Access, error)
