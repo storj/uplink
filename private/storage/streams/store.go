@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
-	"io/ioutil"
 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
 	"sort"
 	"sync"
@@ -201,7 +200,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				return Meta{}, errs.Wrap(err)
 			}
 
-			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
+			paddedReader := encryption.PadReader(io.NopCloser(peekReader), encrypter.InBlockSize())
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
 			beginSegment := &metaclient.BeginSegmentParams{
@@ -259,7 +258,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 				UploadResult:      uploadResults,
 			})
 		} else {
-			data, err := ioutil.ReadAll(peekReader)
+			data, err := io.ReadAll(peekReader)
 			if err != nil {
 				return Meta{}, errs.Wrap(err)
 			}
@@ -449,7 +448,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 				return Part{}, errs.Wrap(err)
 			}
 
-			paddedReader := encryption.PadReader(ioutil.NopCloser(peekReader), encrypter.InBlockSize())
+			paddedReader := encryption.PadReader(io.NopCloser(peekReader), encrypter.InBlockSize())
 			transformedReader := encryption.TransformReader(paddedReader, encrypter, 0)
 
 			beginSegment := metaclient.BeginSegmentParams{
@@ -497,7 +496,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 				UploadResult:      uploadResults,
 			})
 		} else {
-			data, err := ioutil.ReadAll(peekReader)
+			data, err := io.ReadAll(peekReader)
 			if err != nil {
 				return Part{}, errs.Wrap(err)
 			}
@@ -821,7 +820,7 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 			return nil, err
 		}
 		defer func() { err = errs.Combine(err, reader.Close()) }()
-		cipherData, err := ioutil.ReadAll(reader)
+		cipherData, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, err
 		}

@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 	"time"
@@ -53,7 +52,7 @@ func TestRS(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, 32*1024, 0, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
-	data2, err := ioutil.ReadAll(decoder)
+	data2, err := io.ReadAll(decoder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +110,7 @@ func TestRSRanger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers, err := eestream.EncodeReader2(ctx, encryption.TransformReader(encryption.PadReader(ioutil.NopCloser(
+	readers, err := eestream.EncodeReader2(ctx, encryption.TransformReader(encryption.PadReader(io.NopCloser(
 		bytes.NewReader(data)), encrypter.InBlockSize()), encrypter, 0), rs)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +143,7 @@ func TestRSRanger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data2, err := ioutil.ReadAll(r)
+	data2, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +244,7 @@ func TestRSEOF(t *testing.T) {
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			return readcloser.LimitReadCloser(
-				ioutil.NopCloser(bytes.NewReader(in)), 0)
+				io.NopCloser(bytes.NewReader(in)), 0)
 		})
 	}
 }
@@ -276,7 +275,7 @@ func TestRSEarlyEOF(t *testing.T) {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// Read EOF after 500 bytes
 			return readcloser.LimitReadCloser(
-				ioutil.NopCloser(bytes.NewReader(in)), 500)
+				io.NopCloser(bytes.NewReader(in)), 500)
 		})
 	}
 }
@@ -308,7 +307,7 @@ func TestRSLateEOF(t *testing.T) {
 			// extend the input with random number of random bytes
 			random := testrand.BytesInt(1 + testrand.Intn(10000))
 			in = append(in, random...)
-			return ioutil.NopCloser(bytes.NewReader(in))
+			return io.NopCloser(bytes.NewReader(in))
 		})
 	}
 }
@@ -337,7 +336,7 @@ func TestRSRandomData(t *testing.T) {
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// return random data instead of expected one
-			return ioutil.NopCloser(bytes.NewReader(testrand.BytesInt(len(in))))
+			return io.NopCloser(bytes.NewReader(testrand.BytesInt(len(in))))
 		})
 	}
 }
@@ -357,7 +356,7 @@ func TestRSSlow(t *testing.T) {
 		start := time.Now()
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// sleep 1 second before every read
-			return ioutil.NopCloser(SlowReader(bytes.NewReader(in), 1*time.Second))
+			return io.NopCloser(SlowReader(bytes.NewReader(in), 1*time.Second))
 		})
 		if time.Since(start) > 1*time.Second {
 			t.Fatalf("waited for slow reader")
@@ -406,12 +405,12 @@ func testRSProblematic(t *testing.T, tt testCase, i int, fn problematicReadClose
 	}
 	// the rest will operate normally
 	for i := tt.problematic; i < tt.total; i++ {
-		readerMap[i] = ioutil.NopCloser(bytes.NewReader(pieces[i]))
+		readerMap[i] = io.NopCloser(bytes.NewReader(pieces[i]))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, int64(tt.dataSize), 3*1024, false)
 	defer func() { assert.NoError(t, decoder.Close()) }()
-	data2, err := ioutil.ReadAll(decoder)
+	data2, err := io.ReadAll(decoder)
 	if tt.fail {
 		if err == nil && bytes.Equal(data, data2) {
 			assert.Fail(t, "expected to fail, but didn't", errTag)
@@ -427,7 +426,7 @@ func readAll(readers []io.ReadCloser) ([][]byte, error) {
 	for i := range readers {
 		go func(i int) {
 			var err error
-			pieces[i], err = ioutil.ReadAll(readers[i])
+			pieces[i], err = io.ReadAll(readers[i])
 			errors <- errs.Combine(err, readers[i].Close())
 		}(i)
 	}
@@ -487,7 +486,7 @@ func readAllStalled(readers []io.ReadCloser, stalled int) ([][]byte, error) {
 	for i := stalled; i < len(readers); i++ {
 		go func(i int) {
 			var err error
-			pieces[i], err = ioutil.ReadAll(readers[i])
+			pieces[i], err = io.ReadAll(readers[i])
 			errs <- err
 		}(i)
 	}
@@ -525,11 +524,11 @@ func TestDecoderErrorWithStalledReaders(t *testing.T) {
 	readerMap := make(map[int]io.ReadCloser, len(readers))
 	// just a few readers will operate normally
 	for i := 0; i < 4; i++ {
-		readerMap[i] = ioutil.NopCloser(bytes.NewReader(pieces[i]))
+		readerMap[i] = io.NopCloser(bytes.NewReader(pieces[i]))
 	}
 	// some of the readers will be slow
 	for i := 4; i < 7; i++ {
-		readerMap[i] = ioutil.NopCloser(SlowReader(bytes.NewReader(pieces[i]), 1*time.Second))
+		readerMap[i] = io.NopCloser(SlowReader(bytes.NewReader(pieces[i]), 1*time.Second))
 	}
 	// most of the readers will return error
 	for i := 7; i < 20; i++ {
@@ -540,7 +539,7 @@ func TestDecoderErrorWithStalledReaders(t *testing.T) {
 	defer func() { assert.NoError(t, decoder.Close()) }()
 	// record the time for reading the data from the decoder
 	start := time.Now()
-	_, err = ioutil.ReadAll(decoder)
+	_, err = io.ReadAll(decoder)
 	// we expect the decoder to fail with error as there are not enough good
 	// nodes to reconstruct the data
 	assert.Error(t, err)
@@ -668,12 +667,12 @@ func TestCalcPieceSize(t *testing.T) {
 
 		calculatedSize := eestream.CalcPieceSize(dataSize, es)
 
-		randReader := ioutil.NopCloser(io.LimitReader(testrand.Reader(), dataSize))
+		randReader := io.NopCloser(io.LimitReader(testrand.Reader(), dataSize))
 		readers, err := eestream.EncodeReader2(ctx, encryption.PadReader(randReader, es.StripeSize()), rs)
 		require.NoError(t, err, errTag)
 
 		for _, reader := range readers {
-			piece, err := ioutil.ReadAll(reader)
+			piece, err := io.ReadAll(reader)
 			assert.NoError(t, err, errTag)
 			assert.EqualValues(t, calculatedSize, len(piece), errTag)
 		}

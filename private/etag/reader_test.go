@@ -6,7 +6,7 @@ package etag_test
 import (
 	"bytes"
 	"crypto/sha256"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestHashReader(t *testing.T) {
 	expectedETag := sha256.Sum256(inputData)
 
 	reader := etag.NewHashReader(bytes.NewReader(inputData), sha256.New())
-	readData, err := ioutil.ReadAll(reader)
+	readData, err := io.ReadAll(reader)
 	require.NoError(t, err)
 	require.Equal(t, inputData, readData)
 	require.Equal(t, expectedETag[:], reader.CurrentETag())

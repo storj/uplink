@@ -6,7 +6,6 @@ package eestream
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"sync"
 	"time"
 
@@ -220,7 +219,7 @@ func (dr *decodedRanger) Range(ctx context.Context, offset, length int64) (_ io.
 	// decode from all those ranges
 	r := DecodeReaders2(ctx, cancel, readers, dr.es, blockCount*int64(dr.es.StripeSize()), dr.mbm, dr.forceErrorDetection)
 	// offset might start a few bytes in, potentially discard the initial bytes
-	_, err = io.CopyN(ioutil.Discard, r, offset-firstBlock*int64(dr.es.StripeSize()))
+	_, err = io.CopyN(io.Discard, r, offset-firstBlock*int64(dr.es.StripeSize()))
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}

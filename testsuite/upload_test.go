@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strconv"
 	"testing"
 	"time"
@@ -322,7 +321,7 @@ func TestUpdateMetadata(t *testing.T) {
 		// confirm that the object is still downloadable
 		download, err := project.DownloadObject(ctx, "testbucket", "obj", nil)
 		require.NoError(t, err)
-		downloaded, err := ioutil.ReadAll(download)
+		downloaded, err := io.ReadAll(download)
 		require.NoError(t, err)
 		require.NoError(t, download.Close())
 		require.Equal(t, expected, downloaded)
@@ -339,7 +338,7 @@ func TestUpdateMetadata(t *testing.T) {
 		// confirm that the object is still downloadable
 		download, err = project.DownloadObject(ctx, "testbucket", "obj", nil)
 		require.NoError(t, err)
-		downloaded, err = ioutil.ReadAll(download)
+		downloaded, err = io.ReadAll(download)
 		require.NoError(t, err)
 		require.NoError(t, download.Close())
 		require.Equal(t, expected, downloaded)

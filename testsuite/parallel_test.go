@@ -5,7 +5,7 @@ package testsuite_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"testing"
 
@@ -75,7 +75,7 @@ func TestParallelUploadDownload(t *testing.T) {
 					return fmt.Errorf("starting download failed %d: %w", p, err)
 				}
 
-				data, err := ioutil.ReadAll(download)
+				data, err := io.ReadAll(download)
 				if err != nil {
 					return fmt.Errorf("downloading data failed %d: %w", p, err)
 				}

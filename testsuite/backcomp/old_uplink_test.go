@@ -4,7 +4,6 @@
 package backcomp_test
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -44,7 +43,7 @@ func TestOldUplink(t *testing.T) {
 		dstOldFile := ctx.File("dst-old")
 		dstNewFile := ctx.File("dst-new")
 
-		err = ioutil.WriteFile(srcOldFile, oldExpectedData, 0644)
+		err = os.WriteFile(srcOldFile, oldExpectedData, 0644)
 		require.NoError(t, err)
 
 		access, err := planet.Uplinks[0].Access[planet.Satellites[0].ID()].Serialize()
@@ -67,7 +66,7 @@ func TestOldUplink(t *testing.T) {
 		// uploaded with old uplink and downloaded with old uplink
 		runBinary("cp", "sj://bucket/old-uplink", dstOldFile, "--access="+access)
 
-		oldData, err := ioutil.ReadFile(dstOldFile)
+		oldData, err := os.ReadFile(dstOldFile)
 		require.NoError(t, err)
 		require.Equal(t, oldExpectedData, oldData)
 
@@ -78,7 +77,7 @@ func TestOldUplink(t *testing.T) {
 
 		// uploaded with new uplink and downloaded with old uplink
 		runBinary("cp", "sj://bucket/new-uplink", dstNewFile, "--access="+access)
-		newData, err := ioutil.ReadFile(dstNewFile)
+		newData, err := os.ReadFile(dstNewFile)
 		require.NoError(t, err)
 		require.Equal(t, newExpectedData, newData)
 
@@ -110,7 +109,7 @@ func TestMove(t *testing.T) {
 		expectedData := testrand.Bytes(1 * memory.KiB)
 		srcFile := ctx.File("src")
 
-		err = ioutil.WriteFile(srcFile, expectedData, 0644)
+		err = os.WriteFile(srcFile, expectedData, 0644)
 		require.NoError(t, err)
 
 		access, err := planet.Uplinks[0].Access[planet.Satellites[0].ID()].Serialize()

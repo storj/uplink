@@ -6,7 +6,6 @@ package streams_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,7 +33,7 @@ func TestSizeReader(t *testing.T) {
 	assert.EqualValues(t, 4, sr.Size())
 
 	// Read all the rest - Size is now len(data)
-	_, err = io.Copy(ioutil.Discard, sr)
+	_, err = io.Copy(io.Discard, sr)
 	assert.NoError(t, err)
 	assert.EqualValues(t, len(data), sr.Size())
 }

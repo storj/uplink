@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strconv"
 	"sync"
@@ -118,7 +117,7 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		return nil, nil, Error.New("duplicated nodes are not allowed")
 	}
 
-	padded := encryption.PadReader(ioutil.NopCloser(data), rs.StripeSize())
+	padded := encryption.PadReader(io.NopCloser(data), rs.StripeSize())
 	readers, err := eestream.EncodeReader2(ctx, padded, rs)
 	if err != nil {
 		return nil, nil, err
@@ -213,7 +212,7 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	defer func() { err = errs.Combine(err, data.Close()) }()
 
 	if limit == nil {
-		_, _ = io.Copy(ioutil.Discard, data)
+		_, _ = io.Copy(io.Discard, data)
 		return nil, nil, nil
 	}
 

@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -422,7 +421,7 @@ func TestSharePrefix_Download(t *testing.T) {
 				download, err := project.DownloadObject(ctx, "testbucket", "a/b/c/test.dat", nil)
 				require.NoError(t, err)
 
-				downloaded, err := ioutil.ReadAll(download)
+				downloaded, err := io.ReadAll(download)
 				require.NoError(t, err)
 				require.Equal(t, expectedData, downloaded)
 
@@ -492,7 +491,7 @@ func TestSharePrefix_UploadDownload(t *testing.T) {
 			download, err := project.DownloadObject(ctx, "testbucket", "test.dat", nil)
 			require.NoError(t, err)
 
-			downloaded, err := ioutil.ReadAll(download)
+			downloaded, err := io.ReadAll(download)
 			require.NoError(t, err)
 
 			err = download.Close()
@@ -829,7 +828,7 @@ func TestImmutableUpload(t *testing.T) {
 		download, err := project.DownloadObject(ctx, "testbucket", "object1", nil)
 		require.NoError(t, err)
 
-		data, err := ioutil.ReadAll(download)
+		data, err := io.ReadAll(download)
 		require.NoError(t, err)
 		require.Equal(t, testData, data)
 	})

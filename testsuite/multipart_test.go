@@ -7,7 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"testing"
 	"time"
@@ -237,7 +237,7 @@ func TestUploadPart(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(download.Close)
 
-		downloaded, err := ioutil.ReadAll(download)
+		downloaded, err := io.ReadAll(download)
 		require.NoError(t, err)
 		require.Equal(t, len(randData), len(downloaded))
 		require.Equal(t, randData, downloaded)

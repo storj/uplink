@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"testing"
 	"time"
 
@@ -111,7 +110,7 @@ func TestObject(t *testing.T) {
 						require.NoError(t, err)
 						assertObject(t, download.Info(), tc.Name)
 
-						downloaded, err := ioutil.ReadAll(download)
+						downloaded, err := io.ReadAll(download)
 						require.NoError(t, err)
 						require.NoError(t, download.Close())
 
@@ -182,7 +181,7 @@ func TestInmemoryUpload(t *testing.T) {
 
 		down, err := project.DownloadObject(sizedCtx, "testbucket", "obj", nil)
 		require.NoError(t, err)
-		downloaded, err := ioutil.ReadAll(down)
+		downloaded, err := io.ReadAll(down)
 		require.NoError(t, err)
 		require.NoError(t, down.Close())
 

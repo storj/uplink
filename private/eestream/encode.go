@@ -6,7 +6,6 @@ package eestream
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/vivint/infectious"
@@ -286,7 +285,7 @@ func (er *EncodedRanger) Range(ctx context.Context, offset, length int64) (_ []i
 	for i, r := range readers {
 		// the offset might start a few bytes in, so we potentially have to
 		// discard the beginning bytes
-		_, err := io.CopyN(ioutil.Discard, r,
+		_, err := io.CopyN(io.Discard, r,
 			offset-firstBlock*int64(er.rs.ErasureShareSize()))
 		if err != nil {
 			return nil, Error.Wrap(err)

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"io"
-	"io/ioutil"
 	"testing"
 	"time"
 
@@ -205,5 +204,5 @@ func downloadFile(ctx *testcontext.Context, userAccess *uplink.Access, userID, a
 	}
 	defer ctx.Check(download.Close)
 
-	return ioutil.ReadAll(download)
+	return io.ReadAll(download)
 }

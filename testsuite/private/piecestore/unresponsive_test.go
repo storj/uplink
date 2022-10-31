@@ -6,7 +6,7 @@ package piecestore_test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -151,7 +151,7 @@ func TestUnresponsiveStoragenode(t *testing.T) {
 		defer func() { _ = download.Close() }()
 
 		start := time.Now()
-		_, err = ioutil.ReadAll(download)
+		_, err = io.ReadAll(download)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "message timeout")
 		duration := time.Since(start)

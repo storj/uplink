@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -68,7 +67,7 @@ func UploadAndDownloadData(ctx context.Context,
 	defer download.Close()
 
 	// Read everything from the download stream
-	receivedContents, err := ioutil.ReadAll(download)
+	receivedContents, err := io.ReadAll(download)
 	if err != nil {
 		return fmt.Errorf("could not read data: %v", err)
 	}

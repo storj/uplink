@@ -47,19 +47,19 @@ func main() {
 		test("go", "darwin", "arm64"),
 	}
 
-	if _, err := exec.LookPath("go1.14"); err == nil {
+	if _, err := exec.LookPath("go1.17.13"); err == nil {
 		tests = append(tests,
-			test("go1.14", "linux", "amd64"),
-			test("go1.14", "linux", "386"),
-			test("go1.14", "linux", "arm64"),
-			test("go1.14", "linux", "arm"),
-			test("go1.14", "windows", "amd64"),
-			test("go1.14", "windows", "386"),
-			test("go1.14", "darwin", "amd64"),
-			test("go1.14", "darwin", "arm64"),
+			test("go1.17.13", "linux", "amd64"),
+			test("go1.17.13", "linux", "386"),
+			test("go1.17.13", "linux", "arm64"),
+			test("go1.17.13", "linux", "arm"),
+			test("go1.17.13", "windows", "amd64"),
+			test("go1.17.13", "windows", "386"),
+			test("go1.17.13", "darwin", "amd64"),
+			test("go1.17.13", "darwin", "arm64"),
 		)
 	} else {
-		fmt.Fprintf(os.Stderr, "skipping go1.14 tests: %v\n", err)
+		fmt.Fprintf(os.Stderr, "skipping go1.17.13 tests: %v\n", err)
 	}
 
 	type result struct {
