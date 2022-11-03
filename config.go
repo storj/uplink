@@ -7,6 +7,7 @@ import (
 	"context"
 	"net"
 	"time"
+	_ "unsafe" // for go:linkname
 
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
@@ -42,9 +43,6 @@ type Config struct {
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
-//
-// NB: this is used with linkname in internal/expose.
-// It needs to be updated when this is updated.
 func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	tlsOptions, err := getProcessTLSOptions(ctx)
 	if err != nil {
@@ -89,6 +87,16 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 	return dialer, nil
 }
 
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused,revive
+//go:linkname config_getDialer
+func config_getDialer(config Config, ctx context.Context) (_ rpc.Dialer, err error) {
+	return config.getDialer(ctx)
+}
+
 // setConnectionPool exposes setting connection pool.
 //
 // NB: this is used with linkname in internal/expose.
@@ -96,7 +104,8 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool }
+//go:linkname config_setConnectionPool
+func config_setConnectionPool(config *Config, pool *rpcpool.Pool) { config.pool = pool }
 
 // setConnector exposes setting a connector used by the dialer.
 //
@@ -105,7 +114,8 @@ func (config *Config) setConnectionPool(pool *rpcpool.Pool) { config.pool = pool
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-func (config *Config) setConnector(connector rpc.Connector) {
+//go:linkname config_setConnector
+func config_setConnector(config *Config, connector rpc.Connector) {
 	config.connector = connector
 }
 
@@ -116,7 +126,8 @@ func (config *Config) setConnector(connector rpc.Connector) {
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-func (config *Config) setMaximumBufferSize(maximumBufferSize int) {
+//go:linkname config_setMaximumBufferSize
+func config_setMaximumBufferSize(config *Config, maximumBufferSize int) {
 	config.maximumBufferSize = maximumBufferSize
 }
 

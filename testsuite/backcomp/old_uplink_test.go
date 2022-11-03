@@ -88,6 +88,11 @@ func TestOldUplink(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
+	if _, err := exec.LookPath("go1.17.13"); err != nil {
+		// uplink@v1.40.4 reuqires an older compiler due to quic dependency.
+		t.Fatalf("missing suitable compiler go1.17.13: %v", err)
+	}
+
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
@@ -96,7 +101,7 @@ func TestMove(t *testing.T) {
 		// old upling is uploading object and moving it
 		// new uplink should be able to list it
 
-		cmd := exec.Command("go", "install", "storj.io/storj/cmd/uplink@v1.40.4")
+		cmd := exec.Command("go1.17.13", "install", "storj.io/storj/cmd/uplink@v1.40.4")
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "GOBIN="+ctx.Dir("binary"))
 		output, err := cmd.CombinedOutput()

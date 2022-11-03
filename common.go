@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	_ "unsafe" // for go:linkname
 
 	"github.com/jtolio/eventkit"
 	"github.com/spacemonkeygo/monkit/v3"
@@ -42,6 +43,7 @@ var ErrSegmentsLimitExceeded = errors.New("segments limit exceeded")
 // ErrPermissionDenied is returned when the request is denied due to invalid permissions.
 var ErrPermissionDenied = errors.New("permission denied")
 
+//go:linkname convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error {
 	switch {
 	case errors.Is(err, io.EOF):

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	_ "unsafe" // for go:linkname
 
 	"github.com/zeebo/errs"
 
@@ -37,7 +38,8 @@ type Access struct {
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
+//go:linkname access_getAPIKey
+func access_getAPIKey(access *Access) *macaroon.APIKey { return access.apiKey }
 
 // getEncAccess are exposing the state do private methods.
 //
@@ -46,7 +48,8 @@ func (access *Access) getAPIKey() *macaroon.APIKey { return access.apiKey }
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-func (access *Access) getEncAccess() *grant.EncryptionAccess { return access.encAccess }
+//go:linkname access_getEncAccess
+func access_getEncAccess(access *Access) *grant.EncryptionAccess { return access.encAccess }
 
 // SharePrefix defines a prefix that will be shared.
 type SharePrefix struct {
@@ -145,14 +148,17 @@ func RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, 
 // (Argon2). This should be a setup-only step. Most common interactions with the library
 // should be using a serialized access grant through ParseAccess directly.
 func (config Config) RequestAccessWithPassphrase(ctx context.Context, satelliteAddress, apiKey, passphrase string) (*Access, error) {
-	return config.requestAccessWithPassphraseAndConcurrency(ctx, satelliteAddress, apiKey, passphrase, 8)
+	return config_requestAccessWithPassphraseAndConcurrency(config, ctx, satelliteAddress, apiKey, passphrase, 8)
 }
 
 // requestAccessWithPassphraseAndConcurrency requests satellite for a new access grant using a passhprase and specific concurrency for the Argon2 key derivation.
 //
 // NB: this is used with linkname in internal/expose.
 // It needs to be updated when this is updated.
-func (config Config) requestAccessWithPassphraseAndConcurrency(ctx context.Context, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
+//
+//nolint:revive
+//go:linkname config_requestAccessWithPassphraseAndConcurrency
+func config_requestAccessWithPassphraseAndConcurrency(config Config, ctx context.Context, satelliteAddress, apiKey, passphrase string, concurrency uint8) (_ *Access, err error) {
 	parsedAPIKey, err := macaroon.ParseAPIKey(apiKey)
 	if err != nil {
 		return nil, packageError.Wrap(err)
