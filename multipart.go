@@ -28,7 +28,7 @@ import (
 // ErrUploadIDInvalid is returned when the upload ID is invalid.
 var ErrUploadIDInvalid = errors.New("upload ID invalid")
 
-// UploadInfo contains information about multipart upload.
+// UploadInfo contains information about an upload.
 type UploadInfo struct {
 	UploadID string
 	Key      string
@@ -376,6 +376,8 @@ func (project *Project) ListUploadParts(ctx context.Context, bucket, key, upload
 }
 
 // ListUploads returns an iterator over the uncommitted uploads in bucket.
+// Both multipart and regular uploads are returned. An object may not be
+// visible through ListUploads until it has a committed part.
 func (project *Project) ListUploads(ctx context.Context, bucket string, options *ListUploadsOptions) *UploadIterator {
 	defer mon.Task()(&ctx)(nil)
 

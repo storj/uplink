@@ -28,6 +28,8 @@ type UploadOptions struct {
 }
 
 // UploadObject starts an upload to the specific key.
+//
+// It is not guaranteed that the uncommitted object is visible through ListUploads while uploading.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (_ *Upload, err error) {
 	upload := &Upload{
 		bucket: bucket,
