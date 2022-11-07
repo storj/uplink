@@ -53,7 +53,7 @@ func newBeginCopyObjectResponse(response *pb.ObjectBeginCopyResponse) BeginCopyO
 			EncryptedKey:      key.EncryptedKey,
 		}
 		if key.Position != nil {
-			keys[i].Position = storj.SegmentPosition{
+			keys[i].Position = SegmentPosition{
 				PartNumber: key.Position.PartNumber,
 				Index:      key.Position.Index,
 			}

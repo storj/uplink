@@ -47,8 +47,20 @@ type RawObjectListItem struct {
 	IsPrefix                      bool
 }
 
-// SegmentPosition segment position in object.
-type SegmentPosition = storj.SegmentPosition
+// SegmentPosition the segment position within its parent object.
+// It is an identifier for the segment.
+type SegmentPosition struct {
+	// PartNumber indicates the ordinal of the part within an object.
+	// A part contains one or more segments.
+	// PartNumber is defined by the user.
+	// This is only relevant for multipart objects.
+	// A non-multipart object only has one Part, and its number is 0.
+	PartNumber int32
+	// Index indicates the ordinal of this segment within a part.
+	// Index is managed by uplink.
+	// It is zero-indexed within each part.
+	Index int32
+}
 
 // SegmentDownloadResponseInfo represents segment download information inline/remote.
 type SegmentDownloadResponseInfo struct {
@@ -63,7 +75,10 @@ type SegmentDownloadResponseInfo struct {
 }
 
 // SegmentEncryption represents segment encryption key and nonce.
-type SegmentEncryption = storj.SegmentEncryption
+type SegmentEncryption struct {
+	EncryptedKeyNonce storj.Nonce
+	EncryptedKey      storj.EncryptedPrivateKey
+}
 
 var (
 	// ErrNoPath is an error class for using empty path.
