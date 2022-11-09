@@ -89,16 +89,49 @@ var (
 )
 
 // Object contains information about a specific object.
-type Object = storj.Object
+type Object struct {
+	Version  uint32
+	Bucket   Bucket
+	Path     string
+	IsPrefix bool
 
-// ObjectInfo contains information about a specific object.
-type ObjectInfo = storj.ObjectInfo
+	Metadata map[string]string
+
+	ContentType string
+	Created     time.Time
+	Modified    time.Time
+	Expires     time.Time
+
+	Stream
+}
 
 // Stream is information about an object stream.
-type Stream = storj.Stream
+type Stream struct {
+	ID storj.StreamID
+
+	// Size is the total size of the stream in bytes
+	Size int64
+
+	// SegmentCount is the number of segments
+	SegmentCount int64
+	// FixedSegmentSize is the size of each segment,
+	// when all segments have the same size. It is -1 otherwise.
+	FixedSegmentSize int64
+
+	// RedundancyScheme specifies redundancy strategy used for this stream
+	storj.RedundancyScheme
+	// EncryptionParameters specifies encryption strategy used for this stream
+	storj.EncryptionParameters
+
+	LastSegment LastSegment // TODO: remove
+}
 
 // LastSegment contains info about last segment.
-type LastSegment = storj.LastSegment
+type LastSegment struct {
+	Size              int64
+	EncryptedKeyNonce storj.Nonce
+	EncryptedKey      storj.EncryptedPrivateKey
+}
 
 var (
 	// ErrBucket is an error class for general bucket errors.
@@ -122,10 +155,6 @@ type Bucket struct {
 type ListDirection = storj.ListDirection
 
 const (
-	// Before lists backwards from cursor, without cursor [NOT SUPPORTED].
-	Before = storj.Before
-	// Backward lists backwards from cursor, including cursor [NOT SUPPORTED].
-	Backward = storj.Backward
 	// Forward lists forwards from cursor, including cursor.
 	Forward = storj.Forward
 	// After lists forwards from cursor, without cursor.
@@ -164,7 +193,15 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 }
 
 // ObjectList is a list of objects.
-type ObjectList = storj.ObjectList
+type ObjectList struct {
+	Bucket string
+	Prefix string
+	More   bool
+
+	// Items paths are relative to Prefix
+	// To get the full path use list.Prefix + list.Items[0].Path
+	Items []Object
+}
 
 // BucketList is a list of buckets.
 type BucketList struct {

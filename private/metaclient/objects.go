@@ -62,7 +62,7 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 	}
 
 	info := Object{
-		Bucket: storj.Bucket{Name: bucket},
+		Bucket: Bucket{Name: bucket},
 		Path:   key,
 	}
 
@@ -532,7 +532,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 	object := Object{
 		Version:  objectInfo.Version,
-		Bucket:   storj.Bucket{Name: bucket},
+		Bucket:   Bucket{Name: bucket},
 		Path:     key,
 		IsPrefix: false,
 
@@ -586,7 +586,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
 	object := Object{
 		Version:  uint32(listItem.Version),
-		Bucket:   storj.Bucket{Name: bucket},
+		Bucket:   Bucket{Name: bucket},
 		Path:     path,
 		IsPrefix: listItem.IsPrefix,
 
