@@ -5,6 +5,8 @@ package metaclient
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
@@ -70,7 +72,9 @@ func newBeginCopyObjectResponse(response *pb.ObjectBeginCopyResponse) BeginCopyO
 
 // BeginCopyObject requests data needed to copy an object from one key to another.
 func (client *Client) BeginCopyObject(ctx context.Context, params BeginCopyObjectParams) (_ BeginCopyObjectResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	var response *pb.ObjectBeginCopyResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		response, err = client.client.BeginCopyObject(ctx, params.toRequest(client.header()))
@@ -131,7 +135,9 @@ type FinishCopyObjectResponse struct {
 
 // FinishCopyObject finishes process of copying object from one key to another.
 func (client *Client) FinishCopyObject(ctx context.Context, params FinishCopyObjectParams) (_ FinishCopyObjectResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	var response *pb.ObjectFinishCopyResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		response, err = client.client.FinishCopyObject(ctx, params.toRequest(client.header()))

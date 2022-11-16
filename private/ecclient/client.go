@@ -6,13 +6,17 @@ package ecclient
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/trace"
 	"io"
+	"runtime"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
@@ -25,8 +29,6 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/piecestore"
 )
-
-var mon = monkit.Package()
 
 // Client defines an interface for storing erasure coded data to piece store nodes.
 type Client interface {
@@ -96,12 +98,14 @@ func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedO
 }
 
 func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
-	defer mon.Task()(&ctx,
-		"erasure:"+strconv.Itoa(rs.ErasureShareSize()),
-		"stripe:"+strconv.Itoa(rs.StripeSize()),
-		"repair:"+strconv.Itoa(rs.RepairThreshold()),
-		"optimal:"+strconv.Itoa(rs.OptimalThreshold()),
-	)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(),
+		trace.WithAttributes(attribute.String("", "erasure:"+strconv.Itoa(rs.ErasureShareSize()))),
+		trace.WithAttributes(attribute.String("", "stripe:"+strconv.Itoa(rs.StripeSize()))),
+		trace.WithAttributes(attribute.String("", "repair:"+strconv.Itoa(rs.RepairThreshold()))),
+		trace.WithAttributes(attribute.String("", "optimal:"+strconv.Itoa(rs.OptimalThreshold()))))
+	var meter = global.MeterProvider().Meter("uplink")
+	defer span.End()
 
 	pieceCount := len(limits)
 	if pieceCount != rs.TotalCount() {
@@ -186,11 +190,16 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		}
 	}()
 
-	mon.IntVal("put_segment_pieces_total").Observe(int64(pieceCount))
-	mon.IntVal("put_segment_pieces_optimal").Observe(int64(rs.OptimalThreshold()))
-	mon.IntVal("put_segment_pieces_successful").Observe(int64(successfulCount))
-	mon.IntVal("put_segment_pieces_failed").Observe(int64(failureCount))
-	mon.IntVal("put_segment_pieces_canceled").Observe(int64(cancellationCount))
+	counter, _ := meter.SyncInt64().Histogram("put_segment_pieces_total")
+	counter.Record(ctx, int64(pieceCount))
+	counter, _ = meter.SyncInt64().Histogram("put_segment_pieces_optimal")
+	counter.Record(ctx, int64(rs.OptimalThreshold()))
+	counter, _ = meter.SyncInt64().Histogram("put_segment_pieces_successful")
+	counter.Record(ctx, int64(successfulCount))
+	counter, _ = meter.SyncInt64().Histogram("put_segment_pieces_failed")
+	counter.Record(ctx, int64(failureCount))
+	counter, _ = meter.SyncInt64().Histogram("put_segment_pieces_canceled")
+	counter.Record(ctx, int64(cancellationCount))
 
 	if int(successfulCount) <= rs.RepairThreshold() && int(successfulCount) < rs.OptimalThreshold() {
 		return nil, nil, Error.New("successful puts (%d) less than or equal to repair threshold (%d), %w", successfulCount, rs.RepairThreshold(), pieceErrors.Err())
@@ -208,7 +217,9 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	if limit != nil {
 		nodeName = limit.GetLimit().StorageNodeId.String()[0:8]
 	}
-	defer mon.Task()(&ctx, "node: "+nodeName)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(), trace.WithAttributes(attribute.String("node", "node: "+nodeName)))
+	defer span.End()
 	defer func() { err = errs.Combine(err, data.Close()) }()
 
 	if limit == nil {
@@ -261,7 +272,9 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 }
 
 func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (rr ranger.Ranger, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if len(limits) != es.TotalCount() {
 		return nil, Error.New("size of limits slice (%d) does not match total count (%d) of erasure scheme", len(limits), es.TotalCount())
@@ -342,7 +355,9 @@ func (lr *lazyPieceRanger) Size() int64 {
 
 // Range implements Ranger.Range to be lazily connected.
 func (lr *lazyPieceRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -410,7 +425,9 @@ func (lr *lazyPieceReader) dial() error {
 }
 
 func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *piecestore.Client, _ *piecestore.Download, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	ps, err := lr.dialPiecestore(ctx, storj.NodeURL{
 		ID:      lr.limit.GetLimit().StorageNodeId,

@@ -7,13 +7,13 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"math"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
@@ -62,7 +62,9 @@ func (etag etag) ETag() []byte {
 //
 // UploadObject is a convenient way to upload single part objects.
 func (project *Project) BeginUpload(ctx context.Context, bucket, key string, options *UploadOptions) (info UploadInfo, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	switch {
 	case bucket == "":
@@ -110,7 +112,9 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 //
 // uploadID is an upload identifier returned by BeginUpload.
 func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID string, opts *CommitUploadOptions) (object *Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	// TODO add completedPart to options when we will have implementation for that
 
@@ -237,15 +241,18 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 		},
 		stats: newOperationStats(ctx, project.access.satelliteURL),
 	}
-	upload.task = mon.TaskNamed("PartUpload")(&ctx)
+
+	ctx, span := otel.Tracer("uplink").Start(ctx, "PartUpload")
+	defer span.End()
 	defer func() {
 		if err != nil {
 			upload.stats.flagFailure(err)
-			upload.emitEvent(false)
 		}
 	}()
 	defer upload.stats.trackWorking()()
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span = otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	switch {
 	case bucket == "":
@@ -285,7 +292,9 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 //
 // uploadID is an upload identifier returned by BeginUpload.
 func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID string) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	switch {
 	case bucket == "":
@@ -330,7 +339,9 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 
 // ListUploadParts returns an iterator over the parts of a multipart upload started with BeginUpload.
 func (project *Project) ListUploadParts(ctx context.Context, bucket, key, uploadID string, options *ListUploadPartsOptions) *PartIterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	opts := metaclient.ListSegmentsParams{}
 
@@ -379,7 +390,9 @@ func (project *Project) ListUploadParts(ctx context.Context, bucket, key, upload
 // Both multipart and regular uploads are returned. An object may not be
 // visible through ListUploads until it has a committed part.
 func (project *Project) ListUploads(ctx context.Context, bucket string, options *ListUploadsOptions) *UploadIterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	opts := metaclient.ListOptions{
 		Direction: metaclient.After,
@@ -494,7 +507,6 @@ func (upload *PartUpload) Commit() error {
 	)
 	upload.stats.flagFailure(err)
 	track()
-	upload.emitEvent(false)
 
 	return convertKnownErrors(err, upload.bucket, upload.key)
 }
@@ -524,7 +536,6 @@ func (upload *PartUpload) Abort() error {
 	)
 	upload.stats.flagFailure(err)
 	track()
-	upload.emitEvent(true)
 
 	return convertKnownErrors(err, upload.bucket, upload.key)
 }
@@ -538,26 +549,4 @@ func (upload *PartUpload) Info() *Part {
 		upload.part.ETag = part.ETag
 	}
 	return upload.part
-}
-
-func (upload *PartUpload) emitEvent(aborted bool) {
-	message, err := upload.stats.err()
-	upload.task(&err)
-
-	evs.Event("part-upload",
-		eventkit.Int64("bytes", upload.stats.bytes),
-		eventkit.Duration("user-elapsed", time.Since(upload.stats.start)),
-		eventkit.Duration("working-elapsed", upload.stats.working),
-		eventkit.Bool("success", err == nil),
-		eventkit.String("error", message),
-		eventkit.Bool("aborted", aborted),
-		eventkit.String("arch", runtime.GOARCH),
-		eventkit.String("os", runtime.GOOS),
-		eventkit.Int64("cpus", int64(runtime.NumCPU())),
-		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
-		eventkit.String("satellite", upload.stats.satellite),
-		eventkit.Bytes("path-checksum", pathChecksum(upload.stats.encPath)),
-		// segment count
-		// ram available
-	)
 }

@@ -6,6 +6,8 @@ package uplink
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"strings"
 	"time"
 	_ "unsafe" // for go:linkname
@@ -279,7 +281,9 @@ func accessFromInternal(access *grant.Access) (*Access, error) {
 // There may be a delay between a successful revocation request and actual
 // revocation, depending on the satellite's access caching policies.
 func (project *Project) RevokeAccess(ctx context.Context, access *Access) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {

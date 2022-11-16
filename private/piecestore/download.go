@@ -7,7 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"io"
+	"runtime"
 	"sync"
 	"time"
 
@@ -57,7 +61,9 @@ type downloadStream interface {
 
 // Download starts a new download using the specified order limit at the specified offset and size.
 func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, offset, size int64) (_ *Download, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	ctx, cancel := context2.WithCustomCancel(ctx)
 
@@ -113,7 +119,9 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 // Read downloads data from the storage node allocating as necessary.
 func (client *Download) Read(data []byte) (read int, err error) {
 	ctx := client.ctx
-	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(), trace.WithAttributes(attribute.String("node", "node: "+client.nodeID.String()[0:8])))
+	defer span.End()
 
 	if client.closingError.IsSet() {
 		return 0, io.ErrClosedPipe

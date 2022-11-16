@@ -5,6 +5,8 @@ package metaclient
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
@@ -58,7 +60,9 @@ func newBeginMoveObjectResponse(response *pb.ObjectBeginMoveResponse) BeginMoveO
 
 // BeginMoveObject begins process of moving object from one key to another.
 func (client *Client) BeginMoveObject(ctx context.Context, params BeginMoveObjectParams) (_ BeginMoveObjectResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectBeginMoveResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -116,7 +120,9 @@ func (params *FinishMoveObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // FinishMoveObject finishes process of moving object from one key to another.
 func (client *Client) FinishMoveObject(ctx context.Context, params FinishMoveObjectParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.FinishMoveObject(ctx, params.toRequest(client.header()))

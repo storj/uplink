@@ -5,6 +5,8 @@ package uplink
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"github.com/zeebo/errs"
 
@@ -32,7 +34,9 @@ type ListObjectsOptions struct {
 
 // ListObjects returns an iterator over the objects.
 func (project *Project) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) *ObjectIterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	b := metaclient.Bucket{Name: bucket}
 	opts := metaclient.ListOptions{

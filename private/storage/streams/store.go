@@ -6,13 +6,14 @@ package streams
 import (
 	"context"
 	"crypto/rand"
+	"go.opentelemetry.io/otel"
 	"io"
 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+	"runtime"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
@@ -31,8 +32,6 @@ import (
 func DisableDeleteOnCancel(ctx context.Context) context.Context {
 	return ctx
 }
-
-var mon = monkit.Package()
 
 // Meta info about a stream.
 type Meta struct {
@@ -106,7 +105,9 @@ func (s *Store) Close() error {
 //
 // If there is an error, it cleans up any uploaded segment before returning.
 func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
 		return Meta{}, errs.Wrap(err)
@@ -371,7 +372,9 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 // PutPart uploads single part.
 func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, streamID storj.StreamID, partNumber uint32, eTag ETag, data io.Reader) (_ Part, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var (
 		currentSegment        uint32
@@ -581,7 +584,9 @@ func deriveETagKey(key *storj.Key) (*storj.Key, error) {
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
 func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo) (rr ranger.Ranger, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	object := info.Object
 	if object.Size == 0 {
@@ -772,7 +777,9 @@ func (lr *lazySegmentRanger) Size() int64 {
 
 // Range implements Ranger.Range to be lazily connected.
 func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if lr.ranger == nil {
 		downloadResponse, err := lr.metainfo.DownloadSegmentWithRS(ctx, metaclient.DownloadSegmentParams{
@@ -802,7 +809,9 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 
 // decryptRanger returns a decrypted ranger of the given rr ranger.
 func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encryptionParameters storj.EncryptionParameters, derivedKey *storj.Key, encryptedKey storj.EncryptedPrivateKey, encryptedKeyNonce, startingNonce *storj.Nonce) (decrypted ranger.Ranger, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	contentKey, err := encryption.DecryptKey(encryptedKey, encryptionParameters.CipherSuite, derivedKey, encryptedKeyNonce)
 	if err != nil {
 		return nil, err
@@ -841,7 +850,9 @@ func decryptRanger(ctx context.Context, rr ranger.Ranger, plainSize int64, encry
 // deleteCancelledObject handles clean up of segments on receiving CTRL+C or context cancellation.
 func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encryptedObjectKey string, streamID storj.StreamID) {
 	var err error
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	_, err = s.metainfo.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
 		Bucket:             []byte(bucketName),
@@ -852,7 +863,7 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encrypted
 		Status:   int32(pb.Object_UPLOADING),
 	})
 	if err != nil {
-		mon.Event("failed to delete cancelled object")
+		span.AddEvent("failed to delete cancelled object")
 	}
 }
 
@@ -861,7 +872,9 @@ func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentW
 	info := response.Info
 	limits := response.Limits
 
-	defer mon.Task()(&ctx, info, limits, info.RedundancyScheme)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	// no order limits also means its inline segment
 	if len(info.EncryptedInlineData) != 0 || len(limits) == 0 {

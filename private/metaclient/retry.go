@@ -6,8 +6,10 @@ package metaclient
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"io"
 	"net"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -78,24 +80,27 @@ func WithRetry(ctx context.Context, fn func(ctx context.Context) error) (err err
 }
 
 func needsRetry(err error) bool {
+	pc, _, _, _ := runtime.Caller(0)
+	_, span := otel.Tracer("uplink").Start(context.Background(), runtime.FuncForPC(pc).Name())
+	defer span.End()
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		mon.Event("uplink_error_eof")
+		span.AddEvent("uplink_error_eof")
 		// Currently we don't retry with EOF because it's unclear if
 		// a query succeeded or failed.
 		return false
 	}
 
 	if errors.Is(err, syscall.ECONNRESET) {
-		mon.Event("uplink_error_conn_reset_needed_retry")
+		span.AddEvent("uplink_error_conn_reset_needed_retry")
 		return true
 	}
 	if errors.Is(err, syscall.ECONNREFUSED) {
-		mon.Event("uplink_error_conn_refused_needed_retry")
+		span.AddEvent("uplink_error_conn_refused_needed_retry")
 		return true
 	}
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		mon.Event("uplink_net_error_needed_retry")
+		span.AddEvent("uplink_net_error_needed_retry")
 		return true
 	}
 

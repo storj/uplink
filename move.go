@@ -6,6 +6,8 @@ package uplink
 import (
 	"context"
 	"crypto/rand"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"strings"
 
 	"github.com/zeebo/errs"
@@ -22,7 +24,9 @@ type MoveObjectOptions struct {
 
 // MoveObject moves object to a different bucket or/and key.
 func (project *Project) MoveObject(ctx context.Context, oldbucket, oldkey, newbucket, newkey string, options *MoveObjectOptions) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = validateMoveCopyInput(oldbucket, oldkey, newbucket, newkey)
 	if err != nil {

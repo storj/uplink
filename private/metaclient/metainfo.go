@@ -5,6 +5,8 @@ package metaclient
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"github.com/zeebo/errs"
 
@@ -35,7 +37,9 @@ func (db *DB) Close() error {
 
 // CreateBucket creates a new bucket with the specified information.
 func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucketName == "" {
 		return Bucket{}, ErrNoBucket.New("")
@@ -49,7 +53,9 @@ func (db *DB) CreateBucket(ctx context.Context, bucketName string) (newBucket Bu
 
 // DeleteBucket deletes bucket.
 func (db *DB) DeleteBucket(ctx context.Context, bucketName string, deleteAll bool) (bucket Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucketName == "" {
 		return Bucket{}, ErrNoBucket.New("")
@@ -64,7 +70,9 @@ func (db *DB) DeleteBucket(ctx context.Context, bucketName string, deleteAll boo
 
 // GetBucket gets bucket information.
 func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucketName == "" {
 		return Bucket{}, ErrNoBucket.New("")
@@ -78,7 +86,9 @@ func (db *DB) GetBucket(ctx context.Context, bucketName string) (bucket Bucket, 
 
 // ListBuckets lists buckets.
 func (db *DB) ListBuckets(ctx context.Context, options BucketListOptions) (bucketList BucketList, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	bucketList, err = db.metainfo.ListBuckets(ctx, ListBucketsParams{
 		ListOpts: options,
@@ -96,7 +106,9 @@ type IterateBucketsOptions struct {
 
 // IterateBuckets returns iterator to go over buckets.
 func IterateBuckets(ctx context.Context, options IterateBucketsOptions) *BucketIterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	opts := BucketListOptions{
 		Direction: After,

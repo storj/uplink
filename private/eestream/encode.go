@@ -5,8 +5,10 @@ package eestream
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/vivint/infectious"
 
@@ -137,7 +139,9 @@ type encodedReader struct {
 // EncodeReader2 takes a Reader and a RedundancyStrategy and returns a slice of
 // io.ReadClosers.
 func EncodeReader2(ctx context.Context, r io.Reader, rs RedundancyStrategy) (_ []io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	er := &encodedReader{
 		ctx:    ctx,
@@ -181,7 +185,9 @@ func EncodeReader2(ctx context.Context, r io.Reader, rs RedundancyStrategy) (_ [
 
 func (er *encodedReader) fillBuffer(ctx context.Context, r io.Reader, w sync2.PipeWriter) {
 	var err error
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	_, err = sync2.Copy(ctx, w, r)
 
 	// We probably cannot do anything reasonable with the error here.
@@ -233,7 +239,9 @@ func (ep *encodedPiece) Read(p []byte) (n int, err error) {
 
 func (ep *encodedPiece) Close() (err error) {
 	ctx := ep.er.ctx
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return ep.pipeReader.Close()
 }
 
@@ -266,7 +274,9 @@ func (er *EncodedRanger) OutputSize() int64 {
 
 // Range is like Ranger.Range, but returns a slice of Readers.
 func (er *EncodedRanger) Range(ctx context.Context, offset, length int64) (_ []io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	// the offset and length given may not be block-aligned, so let's figure
 	// out which blocks contain the request.
 	firstBlock, blockCount := encryption.CalcEncompassingBlocks(

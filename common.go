@@ -10,8 +10,6 @@ import (
 	"strings"
 	_ "unsafe" // for go:linkname
 
-	"github.com/jtolio/eventkit"
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
@@ -19,9 +17,6 @@ import (
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/uplink/private/metaclient"
 )
-
-var mon = monkit.Package()
-var evs = eventkit.Package()
 
 // We use packageError.Wrap/New instead of plain errs.Wrap/New to add a prefix "uplink" to every error
 // message emitted by the Uplink library.

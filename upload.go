@@ -6,11 +6,11 @@ package uplink
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
@@ -35,15 +35,17 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		bucket: bucket,
 		stats:  newOperationStats(ctx, project.access.satelliteURL),
 	}
-	upload.task = mon.TaskNamed("Upload")(&ctx)
+	ctx, span := otel.Tracer("uplink").Start(ctx, "Upload")
+	defer span.End()
 	defer func() {
 		if err != nil {
 			upload.stats.flagFailure(err)
-			upload.emitEvent(false)
 		}
 	}()
 	defer upload.stats.trackWorking()()
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span = otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
@@ -176,7 +178,6 @@ func (upload *Upload) Commit() error {
 	)
 	upload.stats.flagFailure(err)
 	track()
-	upload.emitEvent(false)
 
 	return convertKnownErrors(err, upload.bucket, upload.object.Key)
 }
@@ -207,41 +208,8 @@ func (upload *Upload) Abort() error {
 
 	track()
 	upload.stats.flagFailure(err)
-	upload.emitEvent(true)
 
 	return convertKnownErrors(err, upload.bucket, upload.object.Key)
-}
-
-func (upload *Upload) emitEvent(aborted bool) {
-	message, err := upload.stats.err()
-	upload.task(&err)
-
-	expires := false
-	if upload.upload != nil {
-		meta := upload.upload.Meta()
-		if meta != nil && !meta.Expiration.IsZero() {
-			expires = true
-		}
-	}
-
-	evs.Event("upload",
-		eventkit.Int64("bytes", upload.stats.bytes),
-		eventkit.Duration("user-elapsed", time.Since(upload.stats.start)),
-		eventkit.Duration("working-elapsed", upload.stats.working),
-		eventkit.Bool("success", err == nil),
-		eventkit.String("error", message),
-		eventkit.Bool("aborted", aborted),
-		eventkit.String("arch", runtime.GOARCH),
-		eventkit.String("os", runtime.GOOS),
-		eventkit.Int64("cpus", int64(runtime.NumCPU())),
-		eventkit.Bool("expires", expires),
-		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
-		eventkit.String("satellite", upload.stats.satellite),
-		eventkit.Bytes("path-checksum", pathChecksum(upload.stats.encPath)),
-		// upload.upload.Meta().Expiration
-		// segment count
-		// ram available
-	)
 }
 
 // SetCustomMetadata updates custom metadata to be included with the object.

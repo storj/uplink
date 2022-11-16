@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -80,7 +82,9 @@ func (meta CustomMetadata) Verify() error {
 
 // StatObject returns information about an object at the specific key.
 func (project *Project) StatObject(ctx context.Context, bucket, key string) (info *Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -100,7 +104,9 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 // Returned deleted is not nil when the access grant has read permissions and
 // the object was deleted.
 func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (deleted *Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {
@@ -123,7 +129,9 @@ type UploadObjectMetadataOptions struct {
 // UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
 // Any existing custom metadata will be deleted.
 func (project *Project) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata CustomMetadata, options *UploadObjectMetadataOptions) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	db, err := project.dialMetainfoDB(ctx)
 	if err != nil {

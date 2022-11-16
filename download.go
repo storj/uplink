@@ -8,12 +8,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"io"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/paths"
@@ -37,15 +37,18 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 		bucket: bucket,
 		stats:  newOperationStats(ctx, project.access.satelliteURL),
 	}
-	download.task = mon.TaskNamed("Download")(&ctx)
+
+	ctx, span := otel.Tracer("uplink").Start(ctx, "Download")
+	defer span.End()
 	defer func() {
 		if err != nil {
 			download.stats.flagFailure(err)
-			download.emitEvent()
 		}
 	}()
 	defer download.stats.trackWorking()()
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span = otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
@@ -174,7 +177,6 @@ func (download *Download) Close() error {
 	download.mu.Lock()
 	track()
 	download.stats.flagFailure(err)
-	download.emitEvent()
 	download.mu.Unlock()
 	return convertKnownErrors(err, download.bucket, download.object.Key)
 }
@@ -186,29 +188,4 @@ func pathChecksum(encPath paths.Encrypted) []byte {
 		panic(err)
 	}
 	return mac.Sum(nil)[:16]
-}
-
-func (download *Download) emitEvent() {
-	message, err := download.stats.err()
-	download.task(&err)
-
-	evs.Event("download",
-		eventkit.Int64("bytes", download.stats.bytes),
-		eventkit.Int64("requested_bytes", download.sizes.length),
-		eventkit.Int64("offset", download.sizes.offset),
-		eventkit.Int64("object_size", download.sizes.total),
-		eventkit.Duration("user-elapsed", time.Since(download.stats.start)),
-		eventkit.Duration("working-elapsed", download.stats.working),
-		eventkit.Bool("success", err == nil),
-		eventkit.String("error", message),
-		eventkit.String("arch", runtime.GOARCH),
-		eventkit.String("os", runtime.GOOS),
-		eventkit.Int64("cpus", int64(runtime.NumCPU())),
-		eventkit.Int64("quic-rollout", int64(download.stats.quicRollout)),
-		eventkit.String("satellite", download.stats.satellite),
-		eventkit.Bytes("path-checksum", pathChecksum(download.stats.encPath)),
-		eventkit.Duration("ttfb", download.ttfb),
-		// TODO: segment count
-		// TODO: ram available
-	)
 }

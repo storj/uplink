@@ -6,7 +6,9 @@ package piecestore
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"io"
+	"runtime"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -76,7 +78,9 @@ func Dial(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config 
 
 // Retain uses a bloom filter to tell the piece store which pieces to keep.
 func (client *Client) Retain(ctx context.Context, req *pb.RetainRequest) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	_, err = client.client.Retain(ctx, req)
 	return Error.Wrap(err)
 }

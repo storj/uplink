@@ -5,7 +5,9 @@ package eestream
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
 	"io"
+	"runtime"
 	"sync"
 	"time"
 
@@ -41,7 +43,9 @@ type decodedReader struct {
 // if forceErrorDetection is set to true then k+1 pieces will be always
 // required for decoding, so corrupted pieces can be detected.
 func DecodeReaders2(ctx context.Context, cancel func(), rs map[int]io.ReadCloser, es ErasureScheme, expectedSize int64, mbm int, forceErrorDetection bool) io.ReadCloser {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	if expectedSize < 0 {
 		return readcloser.FatalReadCloser(Error.New("negative expected size"))
 	}
@@ -102,7 +106,9 @@ func (dr *decodedReader) Read(p []byte) (n int, err error) {
 
 func (dr *decodedReader) Close() (err error) {
 	ctx := dr.ctx
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	errorThreshold := len(dr.readers) - dr.scheme.RequiredCount()
 	var closeGroup errs2.Group
 	// avoid double close of readers
@@ -139,7 +145,7 @@ func (dr *decodedReader) Close() (err error) {
 		return dr.closeErr
 	}
 	if dr.closeErr != nil {
-		mon.Event("close failed")
+		span.AddEvent("close failed")
 	}
 	return nil
 }
@@ -198,7 +204,9 @@ func (dr *decodedRanger) Size() int64 {
 }
 
 func (dr *decodedRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	ctx, cancel := context.WithCancel(ctx)
 	// offset and length might not be block-aligned. figure out which

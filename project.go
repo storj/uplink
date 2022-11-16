@@ -5,6 +5,8 @@ package uplink
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"github.com/zeebo/errs"
 
@@ -42,7 +44,9 @@ func OpenProject(ctx context.Context, access *Access) (*Project, error) {
 
 // OpenProject opens a project with the specific access grant.
 func (config Config) OpenProject(ctx context.Context, access *Access) (project *Project, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if access == nil {
 		return nil, packageError.New("access grant is nil")
@@ -121,7 +125,9 @@ func (project *Project) Close() (err error) {
 }
 
 func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
@@ -148,7 +154,9 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 }
 
 func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metaclient.DB, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
 	if err != nil {
@@ -159,7 +167,9 @@ func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metaclient.DB, e
 }
 
 func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.Client, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	metainfoClient, err := metaclient.DialNodeURL(ctx,
 		project.dialer,
@@ -176,7 +186,9 @@ func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.C
 //nolint:deadcode
 //lint:ignore U1000 its used in private/object package
 func dialMetainfoDBWithProject(ctx context.Context, project *Project) (_ *metaclient.DB, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	return project.dialMetainfoDB(ctx)
 }
@@ -184,7 +196,9 @@ func dialMetainfoDBWithProject(ctx context.Context, project *Project) (_ *metacl
 //nolint:deadcode
 //lint:ignore U1000 its used in private/object package
 func getStreamsStoreWithProject(ctx context.Context, project *Project) (_ *streams.Store, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	return project.getStreamsStore(ctx)
 }

@@ -5,6 +5,8 @@ package uplink
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"github.com/zeebo/errs"
 
@@ -18,7 +20,9 @@ type CopyObjectOptions struct {
 
 // CopyObject atomically copies object to a different bucket or/and key.
 func (project *Project) CopyObject(ctx context.Context, oldBucket, oldKey, newBucket, newKey string, options *CopyObjectOptions) (_ *Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = validateMoveCopyInput(oldBucket, oldKey, newBucket, newKey)
 	if err != nil {

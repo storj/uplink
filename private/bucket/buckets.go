@@ -5,15 +5,13 @@ package bucket
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	_ "unsafe" // for go:linkname
-
-	"github.com/spacemonkeygo/monkit/v3"
 
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
 )
-
-var mon = monkit.Package()
 
 // Bucket contains information about the bucket.
 type Bucket metaclient.Bucket
@@ -26,7 +24,9 @@ type ListBucketsOptions struct {
 
 // ListBucketsWithAttribution returns an iterator over the buckets.
 func ListBucketsWithAttribution(ctx context.Context, project *uplink.Project, options *ListBucketsOptions) *Iterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if options == nil {
 		options = &ListBucketsOptions{}

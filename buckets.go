@@ -5,6 +5,8 @@ package uplink
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 
 	"storj.io/uplink/private/metaclient"
 )
@@ -17,7 +19,9 @@ type ListBucketsOptions struct {
 
 // ListBuckets returns an iterator over the buckets.
 func (project *Project) ListBuckets(ctx context.Context, options *ListBucketsOptions) *BucketIterator {
-	defer mon.Task()(&ctx)(nil)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if options == nil {
 		options = &ListBucketsOptions{}

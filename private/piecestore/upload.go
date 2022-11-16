@@ -6,11 +6,14 @@ package piecestore
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"hash"
 	"io"
+	"runtime"
 	"time"
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
@@ -19,8 +22,6 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
 )
-
-var mon = monkit.Package()
 
 // Upload implements uploading to the storage node.
 type upload struct {
@@ -48,7 +49,9 @@ type uploadStream interface {
 
 // UploadReader uploads to the storage node.
 func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, piecePrivateKey storj.PiecePrivateKey, data io.Reader) (hash *pb.PieceHash, err error) {
-	defer mon.Task()(&ctx, "node: "+limit.StorageNodeId.String()[0:8])(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(), trace.WithAttributes(attribute.String("node", "node: "+limit.StorageNodeId.String()[0:8])))
+	defer span.End()
 
 	ctx, cancel := context2.WithCustomCancel(ctx)
 	defer cancel(context.Canceled)
@@ -101,7 +104,9 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 
 // write sends all data to the storagenode allocating as necessary.
 func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.PieceHash, err error) {
-	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(), trace.WithAttributes(attribute.String("node", "node: "+client.nodeID.String()[0:8])))
+	defer span.End()
 
 	defer func() {
 		if err != nil {
@@ -172,7 +177,9 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 
 // cancel cancels the uploading.
 func (client *upload) cancel(ctx context.Context) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	if client.finished {
 		return io.EOF
 	}
@@ -182,7 +189,9 @@ func (client *upload) cancel(ctx context.Context) (err error) {
 
 // commit finishes uploading by sending the piece-hash and retrieving the piece-hash.
 func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
-	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name(), trace.WithAttributes(attribute.String("node", "node: "+client.nodeID.String()[0:8])))
+	defer span.End()
 	if client.finished {
 		return nil, io.EOF
 	}

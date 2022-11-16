@@ -7,19 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/vivint/infectious"
+	"go.opentelemetry.io/otel"
 	"io"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/spacemonkeygo/monkit/v3"
-	"github.com/vivint/infectious"
-
 	"storj.io/common/rpc/rpctracing"
-)
-
-var (
-	mon = monkit.Package()
 )
 
 // StripeReader can read and decodes stripes from a set of readers.
@@ -91,12 +87,12 @@ func (r *StripeReader) Close() error {
 	return first
 }
 
-var backcompatMon = monkit.ScopeNamed("storj.io/storj/uplink/eestream")
-
 // ReadStripe reads and decodes the num-th stripe and concatenates it to p. The
 // return value is the updated byte slice.
 func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ []byte, err error) {
-	defer mon.Task()(&ctx, num)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	ctx = rpctracing.WithoutDistributedTracing(ctx)
 
 	for i := range r.inmap {
@@ -122,7 +118,7 @@ func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ [
 		}
 	}
 	// could not read enough shares to attempt a decode
-	backcompatMon.Meter("download_stripe_failed_not_enough_pieces_uplink").Mark(1) //mon:locked
+	span.AddEvent("download_stripe_failed_not_enough_pieces_uplink")
 	return nil, r.combineErrs(num)
 }
 

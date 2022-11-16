@@ -6,10 +6,11 @@ package multipart
 import (
 	"context"
 	"crypto/rand"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"time"
 	_ "unsafe" // for go:linkname
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
@@ -20,8 +21,6 @@ import (
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
 )
-
-var mon = monkit.Package()
 
 // UploadOptions contains additional options for uploading.
 type UploadOptions struct {
@@ -41,7 +40,9 @@ type UploadOptions struct {
 //
 // UploadObject is a convenient way to upload single part objects.
 func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key string, options *UploadOptions) (info uplink.UploadInfo, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	switch {
 	case bucket == "":

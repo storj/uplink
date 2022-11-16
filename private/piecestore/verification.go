@@ -6,6 +6,8 @@ package piecestore
 import (
 	"bytes"
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -30,7 +32,9 @@ var (
 
 // VerifyPieceHash verifies piece hash which is sent by peer.
 func (client *Client) VerifyPieceHash(ctx context.Context, peer *identity.PeerIdentity, limit *pb.OrderLimit, hash *pb.PieceHash, expectedHash []byte, algorithm pb.PieceHashAlgorithm) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	if peer == nil || limit == nil || hash == nil || len(expectedHash) == 0 {
 		return ErrProtocol.New("invalid arguments")
 	}

@@ -7,6 +7,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"strings"
 	"time"
 
@@ -28,7 +30,9 @@ type Meta struct {
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
 func (db *DB) GetObjectIPs(ctx context.Context, bucket Bucket, key string) (_ *GetObjectIPsResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket.Name == "" {
 		return nil, ErrNoBucket.New("")
@@ -51,7 +55,9 @@ func (db *DB) GetObjectIPs(ctx context.Context, bucket Bucket, key string) (_ *G
 
 // CreateObject creates an uploading object and returns an interface for uploading Object information.
 func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *CreateObject) (object *MutableObject, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return nil, ErrNoBucket.New("")
@@ -84,14 +90,18 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 
 // ModifyObject modifies a committed object.
 func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return nil, errors.New("not implemented")
 }
 
 // UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
 // Any existing custom metadata will be deleted.
 func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata map[string]string) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return ErrNoBucket.New("")
@@ -195,7 +205,9 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 
 // DeleteObject deletes an object from database.
 func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return Object{}, ErrNoBucket.New("")
@@ -223,19 +235,25 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, e
 
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
 func (db *DB) ModifyPendingObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return nil, errors.New("not implemented")
 }
 
 // ListPendingObjects lists pending objects in bucket based on the ListOptions.
 func (db *DB) ListPendingObjects(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return ObjectList{}, errors.New("not implemented")
 }
 
 // ListPendingObjectStreams lists streams for a specific pending object key.
 func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return ObjectList{}, ErrNoBucket.New("")
@@ -312,7 +330,9 @@ func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawOb
 
 // ListObjects lists objects in bucket based on the ListOptions.
 func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOptions) (list ObjectList, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return ObjectList{}, ErrNoBucket.New("")
@@ -445,7 +465,9 @@ type DownloadInfo struct {
 
 // DownloadObject gets object information, lists segments and downloads the first segment.
 func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options DownloadOptions) (info DownloadInfo, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return DownloadInfo{}, storj.ErrNoBucket.New("")
@@ -497,7 +519,9 @@ func (db *DB) ListSegments(ctx context.Context, params ListSegmentsParams) (resp
 
 // GetObject returns information about an object.
 func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	if bucket == "" {
 		return Object{}, ErrNoBucket.New("")
@@ -653,7 +677,9 @@ func (object *MutableObject) Info() Object { return object.info }
 
 // CreateStream creates a new stream for the object.
 func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return &MutableStream{
 		info: object.info,
 	}, nil
@@ -661,7 +687,9 @@ func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream
 
 // CreateDynamicStream creates a new dynamic stream for the object.
 func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	return &MutableStream{
 		info: object.info,
 
@@ -674,7 +702,9 @@ func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata S
 // typedDecryptStreamInfo decrypts stream info.
 func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted,
 	streamMetaBytes, metadataKey []byte, metadataNonce storj.Nonce) (_ *pb.StreamInfo, _ pb.StreamMeta, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	streamMeta := pb.StreamMeta{}
 	err = pb.Unmarshal(streamMetaBytes, &streamMeta)

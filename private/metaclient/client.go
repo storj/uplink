@@ -6,10 +6,11 @@ package metaclient
 import (
 	"bytes"
 	"context"
+	"go.opentelemetry.io/otel"
+	"runtime"
 	"sync"
 	"time"
 
-	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/errs2"
@@ -22,8 +23,6 @@ import (
 )
 
 var (
-	mon = monkit.Package()
-
 	// Error is the errs class of standard metainfo errors.
 	Error = errs.Class("metaclient")
 )
@@ -95,7 +94,9 @@ func (client *Client) header() *pb.RequestHeader {
 
 // GetProjectInfo gets the ProjectInfo for the api key associated with the metainfo client.
 func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectInfoResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		response, err = client.client.ProjectInfo(ctx, &pb.ProjectInfoRequest{
@@ -144,7 +145,9 @@ func newCreateBucketResponse(response *pb.BucketCreateResponse) (CreateBucketRes
 
 // CreateBucket creates a new bucket.
 func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParams) (respBucket Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.BucketCreateResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -200,7 +203,9 @@ func newGetBucketResponse(response *pb.BucketGetResponse) (GetBucketResponse, er
 
 // GetBucket returns a bucket.
 func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (respBucket Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.BucketGetResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -247,7 +252,9 @@ func (params *DeleteBucketParams) BatchItem() *pb.BatchRequestItem {
 
 // DeleteBucket deletes a bucket.
 func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ Bucket, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.BucketDeleteResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -315,7 +322,9 @@ func newListBucketsResponse(response *pb.BucketListResponse) ListBucketsResponse
 
 // ListBuckets lists buckets.
 func (client *Client) ListBuckets(ctx context.Context, params ListBucketsParams) (_ BucketList, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.BucketListResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -413,7 +422,9 @@ func newBeginObjectResponse(response *pb.ObjectBeginResponse) BeginObjectRespons
 
 // BeginObject begins object creation.
 func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams) (_ BeginObjectResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectBeginResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -457,7 +468,9 @@ func (params *CommitObjectParams) BatchItem() *pb.BatchRequestItem {
 
 // CommitObject commits a created object.
 func (client *Client) CommitObject(ctx context.Context, params CommitObjectParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.CommitObject(ctx, params.toRequest(client.header()))
@@ -547,7 +560,9 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 
 // GetObject gets single object.
 func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ RawObjectItem, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectGetResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -591,7 +606,9 @@ func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.Object
 
 // GetObjectIPs returns the IP addresses of the nodes which hold the object.
 func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParams) (r *GetObjectIPsResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectGetIPsResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -640,7 +657,9 @@ func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *p
 
 // UpdateObjectMetadata replaces objects metadata.
 func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObjectMetadataParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.UpdateObjectMetadata(ctx, params.toRequest(client.header()))
@@ -694,7 +713,9 @@ func newBeginDeleteObjectResponse(response *pb.ObjectBeginDeleteResponse) BeginD
 
 // BeginDeleteObject begins object deletion process.
 func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteObjectParams) (_ RawObjectItem, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectBeginDeleteResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -793,7 +814,9 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 
 // ListObjects lists objects according to specific parameters.
 func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []RawObjectListItem, more bool, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectListResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -872,7 +895,9 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 
 // ListPendingObjectStreams lists pending objects with the specified object key in the specified bucket.
 func (client *Client) ListPendingObjectStreams(ctx context.Context, params ListPendingObjectStreamsParams) (_ ListPendingObjectStreamsResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectListPendingStreamsResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -968,7 +993,9 @@ func newListSegmentsResponse(response *pb.SegmentListResponse) ListSegmentsRespo
 
 // ListSegments lists segments according to specific parameters.
 func (client *Client) ListSegments(ctx context.Context, params ListSegmentsParams) (_ ListSegmentsResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.SegmentListResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -1037,7 +1064,9 @@ func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentRes
 
 // BeginSegment begins a segment upload.
 func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParams) (_ BeginSegmentResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.SegmentBeginResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -1087,7 +1116,9 @@ func (params *CommitSegmentParams) BatchItem() *pb.BatchRequestItem {
 
 // CommitSegment commits an uploaded segment.
 func (client *Client) CommitSegment(ctx context.Context, params CommitSegmentParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.CommitSegment(ctx, params.toRequest(client.header()))
@@ -1134,7 +1165,9 @@ func (params *MakeInlineSegmentParams) BatchItem() *pb.BatchRequestItem {
 
 // MakeInlineSegment creates an inline segment.
 func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSegmentParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.MakeInlineSegment(ctx, params.toRequest(client.header()))
@@ -1272,7 +1305,9 @@ func newDownloadObjectResponse(response *pb.ObjectDownloadResponse) DownloadObje
 
 // DownloadObject gets object information, lists segments and downloads the first segment.
 func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.ObjectDownloadResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -1417,7 +1452,9 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) Down
 
 // DownloadSegmentWithRS gets information for downloading remote segment or data from an inline segment.
 func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ DownloadSegmentWithRSResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	var response *pb.SegmentDownloadResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
@@ -1436,7 +1473,9 @@ func (client *Client) DownloadSegmentWithRS(ctx context.Context, params Download
 
 // RevokeAPIKey revokes the APIKey provided in the params.
 func (client *Client) RevokeAPIKey(ctx context.Context, params RevokeAPIKeyParams) (err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.RevokeAPIKey(ctx, params.toRequest(client.header()))
 		return err
@@ -1458,7 +1497,9 @@ func (r RevokeAPIKeyParams) toRequest(header *pb.RequestHeader) *pb.RevokeAPIKey
 
 // Batch sends multiple requests in one batch.
 func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []BatchResponse, err error) {
-	defer mon.Task()(&ctx)(&err)
+	pc, _, _, _ := runtime.Caller(0)
+	ctx, span := otel.Tracer("uplink").Start(ctx, runtime.FuncForPC(pc).Name())
+	defer span.End()
 
 	batchItems := make([]*pb.BatchRequestItem, len(requests))
 	for i, request := range requests {
