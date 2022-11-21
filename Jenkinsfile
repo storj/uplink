@@ -178,7 +178,7 @@ pipeline {
 
                 stage('Go Compatibility') {
                     steps {
-                        sh 'go run ./scripts/go-version-compatibility -parallel 4'
+                        sh 'check-cross-compile -compiler "go,go1.17.13" storj.io/uplink/...'
                     }
                 }
             }
