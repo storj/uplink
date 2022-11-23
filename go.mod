@@ -4,12 +4,12 @@ go 1.17
 
 require (
 	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
-	github.com/spacemonkeygo/monkit/v3 v3.0.18
+	github.com/spacemonkeygo/monkit/v3 v3.0.19
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
-	storj.io/common v0.0.0-20221018143517-9eb8213fe465
+	storj.io/common v0.0.0-20221123115229-fed3e6651b63
 )
 
 require (

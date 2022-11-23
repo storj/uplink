@@ -147,8 +147,9 @@ github.com/shurcooL/webdavfs v0.0.0-20170829043945-18c3829fa133/go.mod h1:hKmq5k
 github.com/sourcegraph/annotate v0.0.0-20160123013949-f4cad6c6324d/go.mod h1:UdhH50NIW0fCiwBSr0co2m7BnFLdv4fQTgdqdJTHFeE=
 github.com/sourcegraph/syntaxhighlight v0.0.0-20170531221838-bd320f5d308e/go.mod h1:HuIsMU8RRBOtsCgI77wP899iHVBQpCmg4ErYMZB+2IA=
 github.com/spacemonkeygo/monkit/v3 v3.0.4/go.mod h1:JcK1pCbReQsOsMKF/POFSZCq7drXFybgGmbc27tuwes=
-github.com/spacemonkeygo/monkit/v3 v3.0.18 h1:in58fMOAD+w70PaNy9GLNAsd34tErGYANZsEPWBMuvs=
 github.com/spacemonkeygo/monkit/v3 v3.0.18/go.mod h1:kj1ViJhlyADa7DiA4xVnTuPA46lFKbM7mxQTrXCuJP4=
+github.com/spacemonkeygo/monkit/v3 v3.0.19 h1:wqBb9bpD7jXkVi4XwIp8jn1fektaVBQ+cp9SHRXgAdo=
+github.com/spacemonkeygo/monkit/v3 v3.0.19/go.mod h1:kj1ViJhlyADa7DiA4xVnTuPA46lFKbM7mxQTrXCuJP4=
 github.com/spacemonkeygo/monotime v0.0.0-20180824235756-e3f48a95f98a/go.mod h1:ul4bvvnCOPZgq8w0nTkSmWVg/hauVpFS97Am1YM1XXo=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
@@ -332,7 +333,7 @@ honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.0-20190106161140-3f1c8253044a/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 sourcegraph.com/sourcegraph/go-diff v0.5.0/go.mod h1:kuch7UrkMzY0X+p9CRK03kfuPQ2zzQcaEFbx8wA8rck=
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=
-storj.io/common v0.0.0-20221018143517-9eb8213fe465 h1:2o6NDi2sBKkbf54Nz1op+d82yxsH9kUYQ2ETVbRTwn4=
-storj.io/common v0.0.0-20221018143517-9eb8213fe465/go.mod h1:+gF7jbVvpjVIVHhK+EJFhfPbudX395lnPq/dKkj/Qys=
+storj.io/common v0.0.0-20221123115229-fed3e6651b63 h1:OuleF/3FvZe3Nnu6NdwVr+FvCXjfD4iNNdgfI2kcs3k=
+storj.io/common v0.0.0-20221123115229-fed3e6651b63/go.mod h1:+gF7jbVvpjVIVHhK+EJFhfPbudX395lnPq/dKkj/Qys=
 storj.io/drpc v0.0.32 h1:5p5ZwsK/VOgapaCu+oxaPVwO6UwIs+iwdMiD50+R4PI=
 storj.io/drpc v0.0.32/go.mod h1:6rcOyR/QQkSTX/9L5ZGtlZaE2PtXTTZl8d+ulSeeYEg=
