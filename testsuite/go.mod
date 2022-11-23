@@ -2,7 +2,8 @@ module storj.io/uplink/testsuite
 
 go 1.17
 
-replace storj.io/uplink => ../
+// TODO enable after adjusting storj/storj
+// replace storj.io/uplink => ../
 
 require (
 	github.com/stretchr/testify v1.7.0
