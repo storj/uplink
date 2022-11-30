@@ -2,18 +2,17 @@ module storj.io/uplink/testsuite
 
 go 1.17
 
-// TODO enable after adjusting storj/storj
-// replace storj.io/uplink => ../
+replace storj.io/uplink => ../
 
 require (
 	github.com/stretchr/testify v1.7.0
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20221024150824-a2a5c611dacf
+	storj.io/common v0.0.0-20221123115229-fed3e6651b63
 	storj.io/drpc v0.0.32
-	storj.io/storj v0.12.1-0.20221107134831-e4fab975ad9c
-	storj.io/uplink v1.9.1-0.20221103133433-65947dace243
+	storj.io/storj v0.12.1-0.20221129225603-3fe6aee78624
+	storj.io/uplink v1.9.1-0.20221123134449-bf3a9813b6e0
 )
 
 require (
@@ -98,5 +97,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	storj.io/monkit-jaeger v0.0.0-20220915074555-d100d7589f41 // indirect
-	storj.io/private v0.0.0-20221011183246-586e5f48357a // indirect
+	storj.io/private v0.0.0-20221108123115-3a27297f0b78 // indirect
 )

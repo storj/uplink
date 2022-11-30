@@ -430,8 +430,8 @@ func TestConcurrentUploadAndCommit(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
 
-		randData := testrand.Bytes(30 * memory.KiB)
-		_, err = upload1.Write(randData)
+		randDataA := testrand.Bytes(10 * memory.KiB)
+		_, err = upload1.Write(randDataA)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload1.Info(), "test.dat")
 
@@ -441,15 +441,24 @@ func TestConcurrentUploadAndCommit(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload2.Info(), "test.dat")
 
-		_, err = upload2.Write(randData)
+		randDataB := testrand.Bytes(10 * memory.KiB)
+		_, err = upload2.Write(randDataB)
 		require.NoError(t, err)
 
 		err = upload2.Commit()
 		require.NoError(t, err)
 
-		// Try to commit the first object, but this will fail because it was deleted.
+		data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], "testbucket", "test.dat")
+		require.NoError(t, err)
+		require.Equal(t, randDataB, data)
+
+		// first pending object is still available so it will replace existing object
 		err = upload1.Commit()
-		require.Error(t, err)
+		require.NoError(t, err)
+
+		data, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "testbucket", "test.dat")
+		require.NoError(t, err)
+		require.Equal(t, randDataA, data)
 
 		_, err = project.StatObject(ctx, "testbucket", "test.dat")
 		require.NoError(t, err)
