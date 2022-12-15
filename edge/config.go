@@ -23,7 +23,14 @@ type Config struct {
 	CertificatePEM []byte
 
 	// InsecureSkipVerify makes possible to connect to Authservice without TLS. Don't use in production.
+	//
+	// Deprecated: Use InsecureUnencryptedConnection instead.
 	InsecureSkipVerify bool
+
+	// InsecureUnencryptedConnection makes possible to connect to Authservice without TLS,
+	// sending plaintext requests over the network and receiving plaintext responses.
+	// Don't use in production.
+	InsecureUnencryptedConnection bool
 }
 
 func (config *Config) createDialer() rpc.Dialer {

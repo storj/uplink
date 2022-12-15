@@ -62,7 +62,7 @@ func (config *Config) RegisterAccess(
 
 	var conn *rpc.Conn
 	var err error
-	if config.InsecureSkipVerify {
+	if config.InsecureUnencryptedConnection || config.InsecureSkipVerify {
 		conn, err = config.createDialer().DialAddressUnencrypted(ctx, config.AuthServiceAddress)
 	} else {
 		conn, err = config.createDialer().DialAddressHostnameVerification(ctx, config.AuthServiceAddress)

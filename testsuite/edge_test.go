@@ -42,7 +42,38 @@ func (g *DRPCServerMock) RegisterAccess(context.Context, *pb.EdgeRegisterAccessR
 	}, nil
 }
 
-func TestRegisterAccess(t *testing.T) {
+func TestRegisterAccessUnencrypted(t *testing.T) {
+	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
+	defer ctx.Cleanup()
+
+	cancelCtx, authCancel := context.WithCancel(ctx)
+	port := startMockAuthServiceUnencrypted(cancelCtx, ctx, t)
+	defer authCancel()
+
+	remoteAddr := "localhost:" + strconv.Itoa(port)
+
+	access, err := uplink.ParseAccess(minimalAccess)
+	require.NoError(t, err)
+
+	edgeConfig := edge.Config{
+		AuthServiceAddress:            remoteAddr,
+		InsecureUnencryptedConnection: true,
+	}
+	credentials, err := edgeConfig.RegisterAccess(ctx, access, nil)
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		&edge.Credentials{
+			AccessKeyID: "l5pucy3dmvzxgs3fpfewix27l5pq",
+			SecretKey:   "l5pvgzldojsxis3fpfpv6x27l5pv6x27l5pv6x27l5pv6",
+			Endpoint:    "https://gateway.example",
+		},
+		credentials,
+	)
+}
+
+func TestRegisterAccessTLS(t *testing.T) {
 	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
 	defer ctx.Cleanup()
 
@@ -52,7 +83,7 @@ func TestRegisterAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	cancelCtx, authCancel := context.WithCancel(ctx)
-	port := startMockAuthService(cancelCtx, ctx, t, certificate)
+	port := startMockAuthServiceTLS(cancelCtx, ctx, t, certificate)
 	defer authCancel()
 
 	remoteAddr := "localhost:" + strconv.Itoa(port)
@@ -78,7 +109,24 @@ func TestRegisterAccess(t *testing.T) {
 	)
 }
 
-func startMockAuthService(cancelCtx context.Context, testCtx *testcontext.Context, t *testing.T, certificate tls.Certificate) (port int) {
+func startMockAuthServiceUnencrypted(cancelCtx context.Context, testCtx *testcontext.Context, t *testing.T) (port int) {
+	tcpListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port = tcpListener.Addr().(*net.TCPAddr).Port
+
+	mux := drpcmux.New()
+	err = pb.DRPCRegisterEdgeAuth(mux, &DRPCServerMock{})
+	require.NoError(t, err)
+
+	server := drpcserver.New(mux)
+	testCtx.Go(func() error {
+		return server.Serve(cancelCtx, tcpListener)
+	})
+
+	return port
+}
+
+func startMockAuthServiceTLS(cancelCtx context.Context, testCtx *testcontext.Context, t *testing.T, certificate tls.Certificate) (port int) {
 	serverTLSConfig := &tls.Config{
 		Certificates: []tls.Certificate{certificate},
 	}
@@ -88,14 +136,14 @@ func startMockAuthService(cancelCtx context.Context, testCtx *testcontext.Contex
 	require.NoError(t, err)
 	port = tcpListener.Addr().(*net.TCPAddr).Port
 
-	drpcListener := tls.NewListener(tcpListener, serverTLSConfig)
+	tlsListener := tls.NewListener(tcpListener, serverTLSConfig)
 	mux := drpcmux.New()
 	err = pb.DRPCRegisterEdgeAuth(mux, &DRPCServerMock{})
 	require.NoError(t, err)
 
 	server := drpcserver.New(mux)
 	testCtx.Go(func() error {
-		return server.Serve(cancelCtx, drpcListener)
+		return server.Serve(cancelCtx, tlsListener)
 	})
 
 	return port
