@@ -14,6 +14,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
+	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/signing"
 	"storj.io/common/storj"
@@ -55,7 +56,11 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 
 	var underlyingStream uploadStream
 	sync2.WithTimeout(client.config.MessageTimeout, func() {
-		underlyingStream, err = client.client.Upload(ctx)
+		if client.replaySafe != nil {
+			underlyingStream, err = client.replaySafe.Upload(ctx)
+		} else {
+			underlyingStream, err = client.client.Upload(ctx)
+		}
 	}, func() { cancel(errMessageTimeout) })
 	if err != nil {
 		return nil, err
@@ -140,14 +145,27 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 			return nil, ErrInternal.Wrap(err)
 		}
 
-		// send signed order + data
-		err = client.stream.Send(&pb.PieceUploadRequest{
+		req := &pb.PieceUploadRequest{
 			Order: order,
 			Chunk: &pb.PieceUploadRequest_Chunk{
 				Offset: client.offset,
 				Data:   sendData,
 			},
-		})
+		}
+
+		// update our offset
+		client.offset += int64(len(sendData))
+
+		// update allocation step, incrementally building trust
+		client.allocationStep = client.client.nextAllocationStep(client.allocationStep)
+
+		if done {
+			// combine the last request with the closing data.
+			return client.commit(ctx, req)
+		}
+
+		// send signed order + data
+		err = client.stream.Send(req)
 		if err != nil {
 			_, closeErr := client.stream.CloseAndRecv()
 			switch {
@@ -159,15 +177,9 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 
 			return nil, err
 		}
-
-		// update our offset
-		client.offset += int64(len(sendData))
-
-		// update allocation step, incrementally building trust
-		client.allocationStep = client.client.nextAllocationStep(client.allocationStep)
 	}
 
-	return client.commit(ctx)
+	return client.commit(ctx, &pb.PieceUploadRequest{})
 }
 
 // cancel cancels the uploading.
@@ -181,7 +193,7 @@ func (client *upload) cancel(ctx context.Context) (err error) {
 }
 
 // commit finishes uploading by sending the piece-hash and retrieving the piece-hash.
-func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
+func (client *upload) commit(ctx context.Context, req *pb.PieceUploadRequest) (_ *pb.PieceHash, err error) {
 	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
 	if client.finished {
 		return nil, io.EOF
@@ -205,9 +217,8 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 
 	// exchange signed piece hashes
 	// 1. send our piece hash
-	sendErr := client.stream.Send(&pb.PieceUploadRequest{
-		Done: uplinkHash,
-	})
+	req.Done = uplinkHash
+	sendErr := client.stream.Send(req)
 
 	// 2. wait for a piece hash as a response
 	response, closeErr := client.stream.CloseAndRecv()
@@ -218,8 +229,12 @@ func (client *upload) commit(ctx context.Context) (_ *pb.PieceHash, err error) {
 		return nil, errs.Combine(ErrProtocol.New("expected piece hash"), ignoreEOF(sendErr), ignoreEOF(closeErr))
 	}
 
-	// now that we have communicated with the peer, we can be sure that we know the peer identity.
-	peer, err := client.client.GetPeerIdentity()
+	var peer *identity.PeerIdentity
+	if len(response.NodeCertchain) > 0 {
+		peer, err = identity.DecodePeerIdentity(ctx, response.NodeCertchain)
+	} else {
+		peer, err = client.client.GetPeerIdentity()
+	}
 	if err != nil {
 		return nil, errs.Combine(err, ignoreEOF(sendErr), ignoreEOF(closeErr))
 	}

@@ -65,7 +65,11 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 
 	var underlyingStream downloadStream
 	sync2.WithTimeout(client.config.MessageTimeout, func() {
-		underlyingStream, err = client.client.Download(ctx)
+		if client.replaySafe != nil {
+			underlyingStream, err = client.replaySafe.Download(ctx)
+		} else {
+			underlyingStream, err = client.client.Download(ctx)
+		}
 	}, func() {
 		cancel(errMessageTimeout)
 	})

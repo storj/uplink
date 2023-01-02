@@ -55,6 +55,7 @@ var DefaultConfig = Config{
 // Client implements uploading, downloading and deleting content from a piecestore.
 type Client struct {
 	client         pb.DRPCPiecestoreClient
+	replaySafe     pb.DRPCReplaySafePiecestoreClient
 	nodeURL        storj.NodeURL
 	conn           *rpc.Conn
 	config         Config
@@ -74,6 +75,21 @@ func Dial(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config 
 		conn:    conn,
 		config:  config,
 	}, nil
+}
+
+// DialReplaySafe dials the target piecestore endpoint for replay safe request types.
+func DialReplaySafe(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config Config) (*Client, error) {
+	conn, err := dialer.DialNode(ctx, nodeURL, rpc.DialOptions{ReplaySafe: true})
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	return &Client{
+		replaySafe: pb.NewDRPCReplaySafePiecestoreClient(conn),
+		conn:       conn,
+		config:     config,
+	}, nil
+
 }
 
 // Retain uses a bloom filter to tell the piece store which pieces to keep.
