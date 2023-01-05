@@ -55,6 +55,7 @@ var DefaultConfig = Config{
 // Client implements uploading, downloading and deleting content from a piecestore.
 type Client struct {
 	client         pb.DRPCPiecestoreClient
+	nodeURL        storj.NodeURL
 	conn           *rpc.Conn
 	config         Config
 	UploadHashAlgo pb.PieceHashAlgorithm
@@ -68,9 +69,10 @@ func Dial(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config 
 	}
 
 	return &Client{
-		client: pb.NewDRPCPiecestoreClient(conn),
-		conn:   conn,
-		config: config,
+		client:  pb.NewDRPCPiecestoreClient(conn),
+		nodeURL: nodeURL,
+		conn:    conn,
+		config:  config,
 	}, nil
 }
 
@@ -86,10 +88,14 @@ func (client *Client) Close() error {
 	return client.conn.Close()
 }
 
-// GetPeerIdentity gets the connection's peer identity.
+// GetPeerIdentity gets the connection's peer identity. This doesn't work
+// on Noise-based connections.
 func (client *Client) GetPeerIdentity() (*identity.PeerIdentity, error) {
 	return client.conn.PeerIdentity()
 }
+
+// NodeURL returns the Node we dialed.
+func (client *Client) NodeURL() storj.NodeURL { return client.nodeURL }
 
 // next allocation step find the next trusted step.
 func (client *Client) nextAllocationStep(previous int64) int64 {

@@ -26,15 +26,17 @@ type Download struct {
 	client     *Client
 	limit      *pb.OrderLimit
 	privateKey storj.PiecePrivateKey
-	nodeID     storj.NodeID
 	stream     downloadStream
 	ctx        context.Context
 	cancelCtx  func(error)
 
+	offset       int64 // the offset into the piece
 	read         int64 // how much data we have read so far
 	allocated    int64 // how far have we sent orders
 	downloaded   int64 // how much data have we downloaded
 	downloadSize int64 // how much do we want to download
+
+	downloadRequestSent bool
 
 	// what is the step we consider to upload
 	allocationStep int64
@@ -77,30 +79,16 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		cancel:  cancel,
 	}
 
-	err = stream.Send(&pb.PieceDownloadRequest{
-		Limit: limit,
-		Chunk: &pb.PieceDownloadRequest_Chunk{
-			Offset:    offset,
-			ChunkSize: size,
-		},
-	})
-	if err != nil {
-		_, recvErr := stream.Recv()
-		_ = stream.Close()
-		cancel(context.Canceled)
-		return nil, ErrProtocol.Wrap(errs.Combine(err, recvErr))
-	}
-
 	return &Download{
 		client:     client,
 		limit:      limit,
 		privateKey: piecePrivateKey,
-		nodeID:     limit.StorageNodeId,
 		stream:     stream,
 		ctx:        ctx,
 		cancelCtx:  cancel,
 
-		read: 0,
+		offset: offset,
+		read:   0,
 
 		allocated:    0,
 		downloaded:   0,
@@ -113,7 +101,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 // Read downloads data from the storage node allocating as necessary.
 func (client *Download) Read(data []byte) (read int, err error) {
 	ctx := client.ctx
-	defer mon.Task()(&ctx, "node: "+client.nodeID.String()[0:8])(&err)
+	defer mon.Task()(&ctx, "node: "+client.limit.StorageNodeId.String()[0:8])(&err)
 
 	if client.closingError.IsSet() {
 		return 0, io.ErrClosedPipe
@@ -164,9 +152,45 @@ func (client *Download) Read(data []byte) (read int, err error) {
 					return read, nil
 				}
 
-				err = client.stream.Send(&pb.PieceDownloadRequest{
-					Order: order,
-				})
+				err = func() error {
+					if client.downloadRequestSent {
+						return client.stream.Send(&pb.PieceDownloadRequest{
+							Order: order,
+						})
+					}
+					client.downloadRequestSent = true
+
+					if client.client.NodeURL().NoiseInfo.Proto != storj.NoiseProto_Unset {
+						// all nodes that have noise support also support
+						// combining the order and the piece download request
+						// into one protobuf.
+						return client.stream.Send(&pb.PieceDownloadRequest{
+							Limit: client.limit,
+							Chunk: &pb.PieceDownloadRequest_Chunk{
+								Offset:    client.offset,
+								ChunkSize: client.downloadSize,
+							},
+							Order: order,
+						})
+					}
+
+					// nodes that don't support noise don't necessarily
+					// support these combined messages, but also don't
+					// benefit much from them being combined.
+					err := client.stream.Send(&pb.PieceDownloadRequest{
+						Limit: client.limit,
+						Chunk: &pb.PieceDownloadRequest_Chunk{
+							Offset:    client.offset,
+							ChunkSize: client.downloadSize,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					return client.stream.Send(&pb.PieceDownloadRequest{
+						Order: order,
+					})
+				}()
 				if err != nil {
 					// other side doesn't want to talk to us anymore or network went down
 					client.unread.IncludeError(err)
@@ -255,7 +279,7 @@ func (client *Download) Close() error {
 
 	err := client.closingError.Get()
 	if err != nil {
-		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.nodeID.String(), client.limit.PieceId.String()))
+		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.limit.StorageNodeId.String(), client.limit.PieceId.String()))
 		err = details.Wrap(Error.Wrap(err))
 	}
 
