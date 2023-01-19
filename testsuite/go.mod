@@ -1,6 +1,6 @@
 module storj.io/uplink/testsuite
 
-go 1.17
+go 1.18
 
 replace storj.io/uplink => ../
 

@@ -1,6 +1,6 @@
 module storj.io/uplink
 
-go 1.17
+go 1.18
 
 require (
 	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
