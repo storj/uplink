@@ -417,7 +417,10 @@ func TestConcurrentUploadAndCommit(t *testing.T) {
 		StorageNodeCount: 4,
 		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
-			Satellite: testplanet.MaxSegmentSize(20 * memory.KiB),
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				testplanet.MaxSegmentSize(20*memory.KiB)(log, index, config)
+				config.Metainfo.MultipleVersions = true
+			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		project := openProject(t, ctx, planet)

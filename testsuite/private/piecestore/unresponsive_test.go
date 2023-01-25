@@ -50,7 +50,12 @@ func (mock *piecestoreMock) DeletePieces(ctx context.Context, delete *pb.DeleteP
 func (mock *piecestoreMock) Retain(ctx context.Context, retain *pb.RetainRequest) (_ *pb.RetainResponse, err error) {
 	return nil, nil
 }
+
 func (mock *piecestoreMock) RestoreTrash(context.Context, *pb.RestoreTrashRequest) (*pb.RestoreTrashResponse, error) {
+	return nil, nil
+}
+
+func (mock *piecestoreMock) Exists(context.Context, *pb.ExistsRequest) (*pb.ExistsResponse, error) {
 	return nil, nil
 }
 
