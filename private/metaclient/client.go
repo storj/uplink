@@ -1051,6 +1051,53 @@ func (client *Client) BeginSegment(ctx context.Context, params BeginSegmentParam
 	return newBeginSegmentResponse(response)
 }
 
+// RetryBeginSegmentPiecesParams parameters for RetryBeginSegmentPieces method.
+type RetryBeginSegmentPiecesParams struct {
+	SegmentID         storj.SegmentID
+	RetryPieceNumbers []int
+}
+
+func (params *RetryBeginSegmentPiecesParams) toRequest(header *pb.RequestHeader) *pb.RetryBeginSegmentPiecesRequest {
+	retryPieceNumbers := make([]int32, len(params.RetryPieceNumbers))
+	for i, pieceNumber := range params.RetryPieceNumbers {
+		retryPieceNumbers[i] = int32(pieceNumber)
+	}
+	return &pb.RetryBeginSegmentPiecesRequest{
+		Header:            header,
+		SegmentId:         params.SegmentID,
+		RetryPieceNumbers: retryPieceNumbers,
+	}
+}
+
+// RetryBeginSegmentPiecesResponse response for RetryBeginSegmentPieces request.
+type RetryBeginSegmentPiecesResponse struct {
+	SegmentID storj.SegmentID
+	Limits    []*pb.AddressedOrderLimit
+}
+
+func newRetryBeginSegmentPiecesResponse(response *pb.RetryBeginSegmentPiecesResponse) (RetryBeginSegmentPiecesResponse, error) {
+	return RetryBeginSegmentPiecesResponse{
+		SegmentID: response.SegmentId,
+		Limits:    response.AddressedLimits,
+	}, nil
+}
+
+// RetryBeginSegmentPieces exchanges piece orders.
+func (client *Client) RetryBeginSegmentPieces(ctx context.Context, params RetryBeginSegmentPiecesParams) (_ RetryBeginSegmentPiecesResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.RetryBeginSegmentPiecesResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.RetryBeginSegmentPieces(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return RetryBeginSegmentPiecesResponse{}, Error.Wrap(err)
+	}
+
+	return newRetryBeginSegmentPiecesResponse(response)
+}
+
 // CommitSegmentParams parameters for CommitSegment method.
 type CommitSegmentParams struct {
 	SegmentID         storj.SegmentID
