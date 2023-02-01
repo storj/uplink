@@ -9,7 +9,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
-	storj.io/common v0.0.0-20230125172029-ac90a56db6dd
+	storj.io/common v0.0.0-20230201101354-04e35e465ace
 )
 
 require (
@@ -23,7 +23,9 @@ require (
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 	storj.io/drpc v0.0.32 // indirect
+	storj.io/picobuf v0.0.1 // indirect
 )
