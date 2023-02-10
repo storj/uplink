@@ -434,6 +434,68 @@ func TestListObjects(t *testing.T) {
 	})
 }
 
+func TestListObjects_PagingWithDiffPassphrase(t *testing.T) {
+	runTestWithPathCipher(t, 0, storj.EncAESGCM, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, dbA *metaclient.DB, streams *streams.Store) {
+		bucket, err := dbA.CreateBucket(ctx, TestBucket)
+		require.NoError(t, err)
+
+		objectKeys := []string{
+			"a", "aa", "b", "bb", "c",
+			"a/xa", "a/xaa", "a/xb", "a/xbb", "a/xc",
+			"b/ya", "b/yaa", "b/yb", "b/ybb", "b/yc",
+		}
+
+		for _, key := range objectKeys {
+			upload(ctx, t, dbA, streams, bucket.Name, key, nil)
+		}
+
+		// Upload one object with different passphrase
+		encAccess := newTestEncStore(TestEncKey + "different")
+		encAccess.SetDefaultPathCipher(storj.EncAESGCM)
+
+		dbB, streams, cleanup, err := newMetainfoParts(planet, encAccess)
+		require.NoError(t, err)
+		defer func() {
+			err := cleanup()
+			assert.NoError(t, err)
+		}()
+		upload(ctx, t, dbB, streams, bucket.Name, "object_with_different_passphrase", nil)
+
+		for i, tt := range []struct {
+			options metaclient.ListOptions
+			more    bool
+			result  []string
+			db      *metaclient.DB
+		}{
+			{
+				options: optionsRecursive("", "", 1),
+				result:  []string{"object_with_different_passphrase"},
+				db:      dbB,
+				more:    true,
+			},
+		} {
+			errTag := fmt.Sprintf("%d. %+v", i, tt)
+
+			list, err := tt.db.ListObjects(ctx, bucket.Name, tt.options)
+
+			if assert.NoError(t, err, errTag) {
+				assert.Equal(t, tt.more, list.More, errTag)
+				if assert.Len(t, list.Items, len(tt.result), errTag) {
+					for i, item := range list.Items {
+						assert.Equal(t, tt.result[i], item.Path, errTag)
+						assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
+						if item.IsPrefix {
+							assert.Equal(t, uint32(0), item.Version, errTag)
+						} else {
+							assert.Equal(t, uint32(1), item.Version, errTag)
+						}
+					}
+				}
+			}
+		}
+	})
+}
+
 func options(prefix, cursor string, limit int) metaclient.ListOptions {
 	return metaclient.ListOptions{
 		Prefix:    prefix,

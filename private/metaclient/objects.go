@@ -358,34 +358,54 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
-	items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
-		Bucket:                []byte(bucket),
-		EncryptedPrefix:       []byte(pi.ParentEnc.Raw()),
-		EncryptedCursor:       []byte(startAfter),
-		Limit:                 int32(options.Limit),
-		IncludeCustomMetadata: options.IncludeCustomMetadata,
-		IncludeSystemMetadata: options.IncludeSystemMetadata,
-		Recursive:             options.Recursive,
-		Status:                options.Status,
-	})
-	if err != nil {
-		return ObjectList{}, errClass.Wrap(err)
+	startAfterEnc := []byte(startAfter)
+	if len(options.CursorEnc) > 0 {
+		startAfterEnc = options.CursorEnc
 	}
 
-	objectsList, err := db.objectsFromRawObjectList(ctx, items, pi, startAfter)
-	if err != nil {
-		return ObjectList{}, errClass.Wrap(err)
+	var m bool
+	var objectsList []Object
+	// Keep looking until we find an object we can decrypt or we run out of objects
+	for {
+		items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
+			Bucket:                []byte(bucket),
+			EncryptedPrefix:       []byte(pi.ParentEnc.Raw()),
+			EncryptedCursor:       startAfterEnc,
+			Limit:                 int32(options.Limit),
+			IncludeCustomMetadata: options.IncludeCustomMetadata,
+			IncludeSystemMetadata: options.IncludeSystemMetadata,
+			Recursive:             options.Recursive,
+			Status:                options.Status,
+		})
+		if err != nil {
+			return ObjectList{}, errClass.Wrap(err)
+		}
+		m = more
+
+		objectsList, err = db.objectsFromRawObjectList(ctx, items, pi)
+		if err != nil {
+			return ObjectList{}, errClass.Wrap(err)
+		}
+
+		if len(items) > 0 {
+			startAfterEnc = items[len(items)-1].EncryptedObjectKey
+		}
+
+		if len(objectsList) != 0 || !more {
+			break
+		}
 	}
 
 	return ObjectList{
 		Bucket: bucket,
 		Prefix: options.Prefix,
-		More:   more,
+		More:   m,
 		Items:  objectsList,
+		Cursor: startAfterEnc,
 	}, nil
 }
 
-func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo, startAfter string) (objectList []Object, err error) {
+func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo) (objectList []Object, err error) {
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {

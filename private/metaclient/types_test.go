@@ -28,6 +28,7 @@ func TestListOptions(t *testing.T) {
 		Bucket: "hello",
 		Prefix: "alpha/",
 		More:   true,
+		Cursor: []byte("encrypted_path"),
 		Items: []metaclient.Object{
 			{Path: "alpha/xyz"},
 		},
@@ -36,7 +37,8 @@ func TestListOptions(t *testing.T) {
 	newopts := opts.NextPage(list)
 	require.Equal(t, metaclient.ListOptions{
 		Prefix:                "alpha/",
-		Cursor:                "alpha/xyz",
+		Cursor:                "",
+		CursorEnc:             []byte("encrypted_path"),
 		Delimiter:             '/',
 		Recursive:             true,
 		Direction:             metaclient.After,

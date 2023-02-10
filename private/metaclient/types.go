@@ -165,6 +165,7 @@ const (
 type ListOptions struct {
 	Prefix                storj.Path
 	Cursor                storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
+	CursorEnc             []byte
 	Delimiter             rune
 	Recursive             bool
 	Direction             ListDirection
@@ -182,7 +183,7 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 
 	return ListOptions{
 		Prefix:                opts.Prefix,
-		Cursor:                list.Items[len(list.Items)-1].Path,
+		CursorEnc:             list.Cursor,
 		Delimiter:             opts.Delimiter,
 		Recursive:             opts.Recursive,
 		IncludeSystemMetadata: opts.IncludeSystemMetadata,
@@ -198,6 +199,7 @@ type ObjectList struct {
 	Bucket string
 	Prefix string
 	More   bool
+	Cursor []byte
 
 	// Items paths are relative to Prefix
 	// To get the full path use list.Prefix + list.Items[0].Path
