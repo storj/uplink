@@ -18,7 +18,7 @@ require (
 require (
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/alicebob/miniredis/v2 v2.13.3 // indirect
-	github.com/apache/thrift v0.12.0 // indirect
+	github.com/apache/thrift v0.13.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bmkessler/fastdiv v0.0.0-20190227075523-41d5178f2044 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
