@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"testing"
@@ -659,6 +660,77 @@ func TestListUploads_Cursor(t *testing.T) {
 		require.False(t, list.Next())
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
+	})
+}
+
+func TestListUploads_Paging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		prefixes := []string{"", "aprefix/"}
+
+		numberOfObjects := 0
+		for _, prefix := range prefixes {
+			for i := 0; i < 10; i++ {
+				_, err := project.BeginUpload(ctx, "testbucket", prefix+"object"+strconv.Itoa(i), nil)
+				require.NoError(t, err)
+				numberOfObjects++
+			}
+		}
+
+		testCases := []struct {
+			Prefix          string
+			Cursor          string
+			Recursive       bool
+			ExpectedResults int
+		}{
+			{"", "", false, 11}, // 10 objects + prefix
+			{"aprefix/", "", false, 10},
+			{"", "", true, numberOfObjects},
+			{"aprefix/", "", true, 10},
+
+			// planet uplinks have always the same access grant
+			// so ordering should be the same all the time
+			{"", "object1", false, 5},
+			{"", "object1", true, 5},
+			{"aprefix/", "object1", true, 8},
+		}
+
+		for i, testCase := range testCases {
+			prefixLabel := testCase.Prefix
+			if prefixLabel == "" {
+				prefixLabel = "empty"
+			}
+
+			t.Run(fmt.Sprintf("#%d prefix %s", i, prefixLabel), func(t *testing.T) {
+				for _, listLimit := range []int{
+					0, 1, 2, 3, 7, numberOfObjects - 1, numberOfObjects, numberOfObjects + 1,
+				} {
+
+					t.Run(fmt.Sprintf("limit %d cursor %s rec %t", listLimit, testCase.Cursor, testCase.Recursive), func(t *testing.T) {
+						listCtx := testuplink.WithListLimit(ctx, listLimit)
+						list := project.ListUploads(listCtx, "testbucket", &uplink.ListUploadsOptions{
+							Prefix:    testCase.Prefix,
+							Cursor:    testCase.Cursor,
+							Recursive: testCase.Recursive,
+						})
+						items := 0
+						for list.Next() {
+							items++
+						}
+						require.Equal(t, testCase.ExpectedResults, items)
+					})
+				}
+			})
+		}
 	})
 }
 

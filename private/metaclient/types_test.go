@@ -13,12 +13,15 @@ import (
 
 func TestListOptions(t *testing.T) {
 	opts := metaclient.ListOptions{
-		Prefix:    "alpha/",
-		Cursor:    "a",
-		Delimiter: '/',
-		Recursive: true,
-		Direction: metaclient.After,
-		Limit:     30,
+		Prefix:                "alpha/",
+		Cursor:                "a",
+		Delimiter:             '/',
+		Recursive:             true,
+		Direction:             metaclient.After,
+		Limit:                 30,
+		IncludeCustomMetadata: true,
+		IncludeSystemMetadata: true,
+		Status:                2,
 	}
 
 	list := metaclient.ObjectList{
@@ -32,11 +35,14 @@ func TestListOptions(t *testing.T) {
 
 	newopts := opts.NextPage(list)
 	require.Equal(t, metaclient.ListOptions{
-		Prefix:    "alpha/",
-		Cursor:    "alpha/xyz",
-		Delimiter: '/',
-		Recursive: true,
-		Direction: metaclient.After,
-		Limit:     30,
+		Prefix:                "alpha/",
+		Cursor:                "alpha/xyz",
+		Delimiter:             '/',
+		Recursive:             true,
+		Direction:             metaclient.After,
+		Limit:                 30,
+		IncludeCustomMetadata: true,
+		IncludeSystemMetadata: true,
+		Status:                2,
 	}, newopts)
 }

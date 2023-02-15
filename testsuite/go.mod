@@ -9,10 +9,10 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20230207160724-4deac3e5d0d6
+	storj.io/common v0.0.0-20230214163549-c8518523a6f0
 	storj.io/drpc v0.0.33-0.20230204035225-c9649dee8f2a
-	storj.io/storj v0.12.1-0.20230207145345-522aed083d36
-	storj.io/uplink v1.10.1-0.20230125195524-beab4fa36cf1
+	storj.io/storj v0.12.1-0.20230216073347-6bb6479690f9
+	storj.io/uplink v1.10.1-0.20230207230755-d04ec4a303ef
 )
 
 require (
@@ -71,7 +71,7 @@ require (
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spf13/cobra v1.1.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stripe/stripe-go/v72 v72.51.0 // indirect
+	github.com/stripe/stripe-go/v72 v72.90.0 // indirect
 	github.com/xtgo/uuid v0.0.0-20140804021211-a0b114877d4c // indirect
 	github.com/yuin/gopher-lua v0.0.0-20191220021717-ab39c6098bdb // indirect
 	github.com/zeebo/admission/v3 v3.0.3 // indirect

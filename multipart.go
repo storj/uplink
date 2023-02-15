@@ -23,6 +23,7 @@ import (
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
+	"storj.io/uplink/private/testuplink"
 )
 
 // ErrUploadIDInvalid is returned when the upload ID is invalid.
@@ -393,6 +394,8 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeCustomMetadata = options.Custom
 	}
+
+	opts.Limit = testuplink.GetListLimit(ctx)
 
 	uploads := UploadIterator{
 		ctx:     ctx,

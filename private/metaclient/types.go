@@ -189,6 +189,7 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 		IncludeCustomMetadata: opts.IncludeCustomMetadata,
 		Direction:             After,
 		Limit:                 opts.Limit,
+		Status:                opts.Status,
 	}
 }
 
