@@ -4,6 +4,8 @@
 package metaclient
 
 import (
+	"context"
+
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
@@ -14,6 +16,12 @@ var (
 	ErrInvalidType = errs.New("invalid response type")
 )
 
+// Batcher issues batches.
+type Batcher interface {
+	// Batch issues multiple requests in one batch.
+	Batch(ctx context.Context, items ...BatchItem) ([]BatchResponse, error)
+}
+
 // BatchItem represents single request in batch.
 type BatchItem interface {
 	BatchItem() *pb.BatchRequestItem
@@ -23,6 +31,15 @@ type BatchItem interface {
 type BatchResponse struct {
 	pbRequest  interface{}
 	pbResponse interface{}
+}
+
+// MakeBatchResponse makes a batch response from the request and response
+// protobufs.
+func MakeBatchResponse(req *pb.BatchRequestItem, resp *pb.BatchResponseItem) BatchResponse {
+	return BatchResponse{
+		pbRequest:  req.Request,
+		pbResponse: resp.Response,
+	}
 }
 
 // CreateBucket returns BatchResponse for CreateBucket request.
