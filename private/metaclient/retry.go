@@ -10,6 +10,8 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"storj.io/common/sync2"
 )
 
 // ExponentialBackoff keeps track of how long we should sleep between
@@ -33,7 +35,7 @@ func (e *ExponentialBackoff) init() {
 
 // Wait should be called when there is a failure. Each time it is called
 // it will sleep an exponentially longer time, up to a max.
-func (e *ExponentialBackoff) Wait() {
+func (e *ExponentialBackoff) Wait(ctx context.Context) bool {
 	e.init()
 	if e.delay == 0 {
 		e.delay = e.Min
@@ -43,7 +45,7 @@ func (e *ExponentialBackoff) Wait() {
 	if e.delay > e.Max {
 		e.delay = e.Max
 	}
-	time.Sleep(e.delay)
+	return sync2.Sleep(ctx, e.delay)
 }
 
 // Maxed returns true if the wait time has maxed out.
@@ -69,7 +71,9 @@ func WithRetry(ctx context.Context, fn func(ctx context.Context) error) (err err
 		err = fn(ctx)
 		if err != nil && needsRetry(err) {
 			if !delay.Maxed() {
-				delay.Wait()
+				if !delay.Wait(ctx) {
+					return ctx.Err()
+				}
 				continue
 			}
 		}
