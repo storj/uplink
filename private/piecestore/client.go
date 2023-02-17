@@ -18,6 +18,9 @@ import (
 	"storj.io/common/storj"
 )
 
+// NoiseEnabled indicates whether Noise is enabled in this build.
+const NoiseEnabled = false
+
 var errMessageTimeout = errors.New("message timeout")
 
 var (
@@ -79,7 +82,7 @@ func Dial(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config 
 
 // DialReplaySafe dials the target piecestore endpoint for replay safe request types.
 func DialReplaySafe(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeURL, config Config) (*Client, error) {
-	conn, err := dialer.DialNode(ctx, nodeURL, rpc.DialOptions{ReplaySafe: true})
+	conn, err := dialer.DialNode(ctx, nodeURL, rpc.DialOptions{ReplaySafe: NoiseEnabled})
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}

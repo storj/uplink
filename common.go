@@ -18,6 +18,7 @@ import (
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/piecestore"
 )
 
 var mon = monkit.Package()
@@ -139,3 +140,16 @@ func (err *joinedErr) Error() string {
 func (err *joinedErr) Ungroup() []error {
 	return []error{err.main, err.alt}
 }
+
+var noiseVersion = func() int64 {
+	if piecestore.NoiseEnabled {
+		// this is a number that indicates what noise support exists so far.
+		// 1 was our first implementation, but crucially had an errant round
+		// trip on uploads and downloads. 2 has the round trip fixed for
+		// downloads but not uploads. we'll probably have future values here.
+		// we'll want to compare the performance of these different cases.
+		return 2
+	}
+	// 0 means no noise
+	return 0
+}()

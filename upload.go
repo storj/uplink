@@ -238,7 +238,7 @@ func (upload *Upload) emitEvent(aborted bool) {
 		eventkit.Int64("quic-rollout", int64(upload.stats.quicRollout)),
 		eventkit.String("satellite", upload.stats.satellite),
 		eventkit.Bytes("path-checksum", pathChecksum(upload.stats.encPath)),
-		eventkit.Int64("noise-version", 2),
+		eventkit.Int64("noise-version", noiseVersion),
 		// upload.upload.Meta().Expiration
 		// segment count
 		// ram available

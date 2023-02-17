@@ -208,7 +208,7 @@ func (download *Download) emitEvent() {
 		eventkit.String("satellite", download.stats.satellite),
 		eventkit.Bytes("path-checksum", pathChecksum(download.stats.encPath)),
 		eventkit.Duration("ttfb", download.ttfb),
-		eventkit.Int64("noise-version", 2),
+		eventkit.Int64("noise-version", noiseVersion),
 		// TODO: segment count
 		// TODO: ram available
 	)
