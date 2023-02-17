@@ -86,6 +86,7 @@ func DialReplaySafe(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeUR
 
 	return &Client{
 		replaySafe: pb.NewDRPCReplaySafePiecestoreClient(conn),
+		nodeURL:    nodeURL,
 		conn:       conn,
 		config:     config,
 	}, nil
