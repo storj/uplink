@@ -126,7 +126,7 @@ func (project *Project) DeleteBucket(ctx context.Context, bucket string) (delete
 	}
 
 	if len(existing.Name) == 0 {
-		return nil, nil
+		return &Bucket{Name: bucket}, nil
 	}
 
 	return &Bucket{
@@ -151,7 +151,7 @@ func (project *Project) DeleteBucketWithObjects(ctx context.Context, bucket stri
 	}
 
 	if len(existing.Name) == 0 {
-		return nil, nil
+		return &Bucket{Name: bucket}, nil
 	}
 
 	return &Bucket{
