@@ -28,6 +28,6 @@ require (
 	golang.org/x/sys v0.4.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	storj.io/drpc v0.0.33-0.20230204035225-c9649dee8f2a // indirect
+	storj.io/drpc v0.0.33-0.20230222225142-dbfc88394a82 // indirect
 	storj.io/picobuf v0.0.1 // indirect
 )
