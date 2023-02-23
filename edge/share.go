@@ -18,9 +18,9 @@ type ShareURLOptions struct {
 // JoinShareURL creates a linksharing URL from parts. The existence or accessibility of the target
 // is not checked, it might not exist or be inaccessible.
 //
-// Example result is https://link.us1.storjshare.io/s/l5pucy3dmvzxgs3fpfewix27l5pq/mybucket/myprefix/myobject
+// Example result is https://link.storjshare.io/s/l5pucy3dmvzxgs3fpfewix27l5pq/mybucket/myprefix/myobject
 //
-// The baseURL is the url of the linksharing service, e.g. https://link.us1.storjshare.io. The accessKeyID
+// The baseURL is the url of the linksharing service, e.g. https://link.storjshare.io. The accessKeyID
 // can be obtained by calling RegisterAccess. It must be associated with public visibility.
 // The bucket is optional, leave it blank to share the entire project. The object key is also optional,
 // if empty shares the entire bucket. It can also be a prefix, in which case it must end with a "/".
