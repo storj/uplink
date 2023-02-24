@@ -147,9 +147,10 @@ var noiseVersion = func() int64 {
 		// 1 was our first implementation, but crucially had an errant round
 		// trip on uploads and downloads. 2 has the round trip fixed for
 		// downloads but not uploads. 3 has long tail cancelation for
-		// downloads fixed. we'll probably have future values here.
+		// downloads fixed. 4 has round trips reduced for small uploads.
+		// we'll probably have future values here.
 		// we'll want to compare the performance of these different cases.
-		return 3
+		return 4
 	}
 	// 0 means no noise
 	return 0

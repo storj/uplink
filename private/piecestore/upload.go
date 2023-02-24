@@ -19,6 +19,7 @@ import (
 	"storj.io/common/signing"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
+	"storj.io/drpc"
 )
 
 var mon = monkit.Package()
@@ -67,16 +68,38 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	}
 	defer func() { _ = underlyingStream.Close() }()
 
+	streamGetter, ok := underlyingStream.(interface {
+		GetStream() drpc.Stream
+	})
+	if !ok {
+		// TODO: this really should be a static, compile-time failure.
+		// let's fail hard always if this doesn't work so we have the
+		// best chance of a refactor breakage being detected.
+		return nil, Error.New("stream must be a drpc stream: %#v", underlyingStream)
+	}
+	flusher, ok := streamGetter.GetStream().(interface {
+		SetManualFlush(bool)
+	})
+	if !ok {
+		// TODO: yep, this also should be a compile time failure.
+		// separately, if we know that the node we've dialed has
+		// https://review.dev.storj.io/c/storj/storj/+/9686, we could
+		// solve this another way, but we don't know that.
+		return nil, Error.New("stream must support controlling flushing behavior: %#v", streamGetter.GetStream())
+	}
+
 	stream := &timedUploadStream{
 		timeout: client.config.MessageTimeout,
 		stream:  underlyingStream,
 		cancel:  cancel,
 	}
 
+	flusher.SetManualFlush(true)
 	err = stream.Send(&pb.PieceUploadRequest{
 		Limit:         limit,
 		HashAlgorithm: client.UploadHashAlgo,
 	})
+	flusher.SetManualFlush(false)
 	if err != nil {
 		_, closeErr := stream.CloseAndRecv()
 		switch {
