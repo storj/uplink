@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/errs"
 
-	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 )
 
 var (
-	fakePrivateKey, _ = storj.PiecePrivateKeyFromBytes(bytes.Repeat([]byte{1}, 32))
+	fakePrivateKey = mustNewPiecePrivateKey()
 )
 
 func TestUploadOne(t *testing.T) {
@@ -93,7 +92,7 @@ type fakePutter struct {
 	failPuts int
 }
 
-func (p *fakePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *identity.PeerIdentity, error) {
+func (p *fakePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
@@ -110,4 +109,12 @@ func (p *fakePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.
 	default:
 		return hash(num), nil, nil
 	}
+}
+
+func mustNewPiecePrivateKey() storj.PiecePrivateKey {
+	pk, err := storj.PiecePrivateKeyFromBytes(bytes.Repeat([]byte{1}, 64))
+	if err != nil {
+		panic(err)
+	}
+	return pk
 }

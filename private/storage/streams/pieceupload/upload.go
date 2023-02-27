@@ -7,7 +7,6 @@ import (
 	"context"
 	"io"
 
-	"storj.io/common/identity"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 )
@@ -17,7 +16,7 @@ type PiecePutter interface {
 	// PutPiece puts a piece using the given limit and private key. The
 	// operation can be cancelled using the longTailCtx or uploadCtx is
 	// cancelled.
-	PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, id *identity.PeerIdentity, err error)
+	PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error)
 }
 
 // UploadOne uploads one piece from the manager using the given private key. If
