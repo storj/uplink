@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Storj Labs, Inc.
+// Copyright (C) 2023 Storj Labs, Inc.
 // See LICENSE for copying information.
 
 package uplink
@@ -20,6 +20,7 @@ import (
 	"storj.io/common/encryption"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
@@ -43,14 +44,6 @@ type UploadInfo struct {
 // CommitUploadOptions options for committing multipart upload.
 type CommitUploadOptions struct {
 	CustomMetadata CustomMetadata
-}
-
-type etag struct {
-	upload *PartUpload
-}
-
-func (etag etag) ETag() []byte {
-	return etag.upload.etag
 }
 
 // BeginUpload begins a new multipart upload to bucket and key.
@@ -236,7 +229,8 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 		part: &Part{
 			PartNumber: partNumber,
 		},
-		stats: newOperationStats(ctx, project.access.satelliteURL),
+		stats:  newOperationStats(ctx, project.access.satelliteURL),
+		eTagCh: make(chan []byte, 1),
 	}
 	upload.task = mon.TaskNamed("PartUpload")(&ctx)
 	defer func() {
@@ -275,9 +269,18 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
-
 	upload.streams = streams
-	upload.upload = stream.NewUploadPart(ctx, bucket, key, decodedStreamID, partNumber, etag{upload}, streams)
+
+	if project.concurrentSegmentUploadConfig == nil {
+		upload.upload = stream.NewUploadPart(ctx, bucket, key, decodedStreamID, partNumber, upload.eTagCh, streams)
+	} else {
+		sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
+		u, err := streams.UploadPart(ctx, bucket, key, decodedStreamID, int32(partNumber), upload.eTagCh, sched)
+		if err != nil {
+			return nil, convertKnownErrors(err, bucket, key)
+		}
+		upload.upload = u
+	}
 
 	return upload, nil
 }
@@ -432,12 +435,12 @@ type PartUpload struct {
 	closed  bool
 	aborted bool
 	cancel  context.CancelFunc
-	upload  *stream.PartUpload
+	upload  streamUpload
 	bucket  string
 	key     string
 	part    *Part
 	streams *streams.Store
-	etag    []byte
+	eTagCh  chan []byte
 
 	stats operationStats
 	task  func(*error)
@@ -458,9 +461,13 @@ func (upload *PartUpload) Write(p []byte) (int, error) {
 }
 
 // SetETag sets ETag for a part.
-func (upload *PartUpload) SetETag(etag []byte) error {
+func (upload *PartUpload) SetETag(eTag []byte) error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
+
+	if upload.part.ETag != nil {
+		return packageError.New("etag already set")
+	}
 
 	if upload.aborted {
 		return errwrapf("%w: upload aborted", ErrUploadDone)
@@ -469,7 +476,8 @@ func (upload *PartUpload) SetETag(etag []byte) error {
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
-	upload.etag = etag
+	upload.part.ETag = eTag
+	upload.eTagCh <- eTag
 	return nil
 }
 
@@ -491,8 +499,15 @@ func (upload *PartUpload) Commit() error {
 
 	upload.closed = true
 
+	// ETag must not be sent after a call to commit. The upload code waits on
+	// the channel before committing the last segment. Closing the channel
+	// allows the upload code to unblock if no eTag has been set. Not all
+	// multipart uploaders care about setting the eTag so we can't assume it
+	// has been set.
+	close(upload.eTagCh)
+
 	err := errs.Combine(
-		upload.upload.Close(),
+		upload.upload.Commit(),
 		upload.streams.Close(),
 	)
 	upload.stats.flagFailure(err)
@@ -534,11 +549,9 @@ func (upload *PartUpload) Abort() error {
 
 // Info returns the last information about the uploaded part.
 func (upload *PartUpload) Info() *Part {
-	part := upload.upload.Part()
-	if part != nil {
-		upload.part.Size = part.Size
-		upload.part.Modified = part.Modified
-		upload.part.ETag = part.ETag
+	if meta := upload.upload.Meta(); meta != nil {
+		upload.part.Size = meta.Size
+		upload.part.Modified = meta.Modified
 	}
 	return upload.part
 }

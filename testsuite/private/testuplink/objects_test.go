@@ -132,7 +132,7 @@ func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *strea
 	_, err = upload.Write(data)
 	require.NoError(t, err)
 
-	err = upload.Close()
+	err = upload.Commit()
 	require.NoError(t, err)
 }
 

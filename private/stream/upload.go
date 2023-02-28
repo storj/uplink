@@ -92,8 +92,8 @@ func (upload *Upload) Write(data []byte) (n int, err error) {
 	return upload.writer.Write(data)
 }
 
-// Close closes the stream and releases the underlying resources.
-func (upload *Upload) Close() error {
+// Commit closes the stream and releases the underlying resources.
+func (upload *Upload) Commit() error {
 	if err := upload.close(); err != nil {
 		return err
 	}

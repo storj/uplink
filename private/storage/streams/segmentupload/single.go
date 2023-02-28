@@ -28,7 +28,7 @@ type Scheduler interface {
 // Begin starts a segment upload identified by the segment ID provided in the
 // beginSegment response. The returned upload will complete when enough piece
 // uploads to fulfill the optimal threshold for the segment redundancy strategy
-// plus a small safety margin. It cancels remaining piece uploads once that
+// plus a small long tail margin. It cancels remaining piece uploads once that
 // threshold has been hit.
 func Begin(ctx context.Context,
 	beginSegment *metaclient.BeginSegmentResponse,
@@ -36,7 +36,7 @@ func Begin(ctx context.Context,
 	limitsExchanger pieceupload.LimitsExchanger,
 	piecePutter pieceupload.PiecePutter,
 	scheduler Scheduler,
-	safetyMargin int,
+	longTailMargin int,
 ) (_ *Upload, err error) {
 	// Join the scheduler so the concurrency can be limited appropriately.
 	handle := scheduler.Join()
@@ -46,8 +46,8 @@ func Begin(ctx context.Context,
 		}
 	}()
 
-	if safetyMargin < 0 {
-		return nil, errs.New("safety margin must be non-negative")
+	if longTailMargin < 0 {
+		return nil, errs.New("long tail margin must be non-negative")
 	}
 	if beginSegment.RedundancyStrategy.ErasureScheme == nil {
 		return nil, errs.New("begin segment response is missing redundancy strategy")
@@ -62,8 +62,8 @@ func Begin(ctx context.Context,
 	}
 
 	// The number of uploads is enough to satisfy the optimal threshold plus
-	// a small safety margin, capped by the number of limits.
-	uploaderCount := optimalThreshold + safetyMargin
+	// a small long tail margin, capped by the number of limits.
+	uploaderCount := optimalThreshold + longTailMargin
 	if uploaderCount > len(beginSegment.Limits) {
 		uploaderCount = len(beginSegment.Limits)
 	}

@@ -26,13 +26,13 @@ type PartUpload struct {
 	mu     sync.Mutex
 	closed bool
 
-	// partmu protects part
-	partmu sync.RWMutex
-	part   *streams.Part
+	// metaMu protects meta
+	metaMu sync.RWMutex
+	meta   *streams.Meta
 }
 
 // NewUploadPart creates new part upload.
-func NewUploadPart(ctx context.Context, bucket, key string, streamID storj.StreamID, partNumber uint32, etag streams.ETag, streamsStore *streams.Store) *PartUpload {
+func NewUploadPart(ctx context.Context, bucket, key string, streamID storj.StreamID, partNumber uint32, eTagCh <-chan []byte, streamsStore *streams.Store) *PartUpload {
 	reader, writer := io.Pipe()
 
 	upload := PartUpload{
@@ -42,15 +42,18 @@ func NewUploadPart(ctx context.Context, bucket, key string, streamID storj.Strea
 	}
 
 	upload.errgroup.Go(func() error {
-		part, err := streamsStore.PutPart(ctx, bucket, key, streamID, partNumber, etag, reader)
+		part, err := streamsStore.PutPart(ctx, bucket, key, streamID, partNumber, eTagCh, reader)
 		if err != nil {
 			err = Error.Wrap(err)
 			return errs.Combine(err, reader.CloseWithError(err))
 		}
 
-		upload.partmu.Lock()
-		upload.part = &part
-		upload.partmu.Unlock()
+		upload.metaMu.Lock()
+		upload.meta = &streams.Meta{
+			Size:     part.Size,
+			Modified: part.Modified,
+		}
+		upload.metaMu.Unlock()
 
 		return nil
 	})
@@ -90,8 +93,8 @@ func (upload *PartUpload) Write(data []byte) (n int, err error) {
 	return upload.writer.Write(data)
 }
 
-// Close closes the stream and releases the underlying resources.
-func (upload *PartUpload) Close() error {
+// Commit closes the stream and releases the underlying resources.
+func (upload *PartUpload) Commit() error {
 	if err := upload.close(); err != nil {
 		return err
 	}
@@ -119,14 +122,14 @@ func (upload *PartUpload) Abort() error {
 	return nil
 }
 
-// Part returns the part metadata.
+// Meta returns the part metadata.
 //
 // Will return nil if the upload is still in progress.
-func (upload *PartUpload) Part() *streams.Part {
-	upload.partmu.RLock()
-	defer upload.partmu.RUnlock()
+func (upload *PartUpload) Meta() *streams.Meta {
+	upload.metaMu.RLock()
+	defer upload.metaMu.RUnlock()
 
 	// we can safely return the pointer because it doesn't change after the
 	// upload finishes
-	return upload.part
+	return upload.meta
 }

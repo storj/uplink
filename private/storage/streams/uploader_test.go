@@ -32,7 +32,7 @@ var (
 	cipherSuite          = storj.EncAESGCM
 	encryptionParameters = storj.EncryptionParameters{CipherSuite: cipherSuite, BlockSize: 32}
 	inlineThreshold      = 1024
-	safetyMargin         = 1
+	longTailMargin       = 1
 	storjKey             = storj.Key{0: 1}
 	expiration           = creationDate.Add(time.Hour)
 	uploadInfo           = streamupload.Info{CreationDate: creationDate, PlainSize: 123}
@@ -46,7 +46,7 @@ func TestNewUploader(t *testing.T) {
 		segmentSize          int64
 		encryptionParameters storj.EncryptionParameters
 		inlineThreshold      int
-		safetyMargin         int
+		longTailMargin       int
 	}
 
 	for _, tc := range []struct {
@@ -90,7 +90,7 @@ func TestNewUploader(t *testing.T) {
 			}
 			tc.overrideConfig(&c)
 
-			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, c.safetyMargin)
+			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, c.longTailMargin)
 			if uploader != nil {
 				defer func() { assert.NoError(t, uploader.Close()) }()
 			}
@@ -163,7 +163,7 @@ func TestUpload(t *testing.T) {
 				}
 				tc.overrideConfig(&c)
 
-				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, safetyMargin)
+				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin)
 				require.NoError(t, err)
 				defer func() { assert.NoError(t, uploader.Close()) }()
 
@@ -342,8 +342,8 @@ func (fakeUploaderBackend) checkCommonParams(source streamupload.SegmentSource, 
 	if s, ok := u.sched.(noopScheduler); !ok {
 		return errs.New("segment uploader scheduler is of type %T but expected %T", u.sched, s)
 	}
-	if u.safetyMargin != safetyMargin {
-		return errs.New("segment uploader safety margin is %d but expected %d", u.safetyMargin, safetyMargin)
+	if u.longTailMargin != longTailMargin {
+		return errs.New("segment uploader long tail margin is %d but expected %d", u.longTailMargin, longTailMargin)
 	}
 
 	if b, ok := batcher.(metainfoUpload); !ok {

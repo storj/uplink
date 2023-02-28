@@ -1521,10 +1521,7 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 
 	resp = make([]BatchResponse, len(response.Responses))
 	for i, response := range response.Responses {
-		resp[i] = BatchResponse{
-			pbRequest:  batchItems[i].Request,
-			pbResponse: response.Response,
-		}
+		resp[i] = MakeBatchResponse(batchItems[i], response)
 	}
 
 	return resp, nil

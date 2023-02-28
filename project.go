@@ -27,12 +27,13 @@ var maxSegmentSize string
 
 // Project provides access to managing buckets and objects.
 type Project struct {
-	config               Config
-	access               *Access
-	dialer               rpc.Dialer
-	ec                   ecclient.Client
-	segmentSize          int64
-	encryptionParameters storj.EncryptionParameters
+	config                        Config
+	access                        *Access
+	dialer                        rpc.Dialer
+	ec                            ecclient.Client
+	segmentSize                   int64
+	encryptionParameters          storj.EncryptionParameters
+	concurrentSegmentUploadConfig *testuplink.ConcurrentSegmentUploadsConfig
 }
 
 // OpenProject opens a project with the specific access grant.
@@ -101,12 +102,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	ec := ecclient.New(dialer, 0)
 
 	return &Project{
-		config:               config,
-		access:               access,
-		dialer:               dialer,
-		ec:                   ec,
-		segmentSize:          segmentsSize,
-		encryptionParameters: encryptionParameters,
+		config:                        config,
+		access:                        access,
+		dialer:                        dialer,
+		ec:                            ec,
+		segmentSize:                   segmentsSize,
+		encryptionParameters:          encryptionParameters,
+		concurrentSegmentUploadConfig: testuplink.GetConcurrentSegmentUploadsConfig(ctx),
 	}, nil
 }
 
@@ -133,13 +135,19 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		}
 	}()
 
+	var longTailMargin int
+	if project.concurrentSegmentUploadConfig != nil {
+		longTailMargin = project.concurrentSegmentUploadConfig.LongTailMargin
+	}
+
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,
 		project.ec,
 		project.segmentSize,
 		project.access.encAccess.Store,
 		project.encryptionParameters,
-		maxInlineSize)
+		maxInlineSize,
+		longTailMargin)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

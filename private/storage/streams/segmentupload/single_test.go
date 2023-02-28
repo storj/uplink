@@ -45,16 +45,16 @@ var (
 )
 
 func TestBegin(t *testing.T) {
-	const safetyMargin = 1
+	const longTailMargin = 1
 
 	for _, tc := range []struct {
-		desc                 string
-		beginSegment         *metaclient.BeginSegmentResponse
-		overrideContext      func(*testing.T, context.Context) context.Context
-		overrideSafetyMargin func() int
-		expectBeginErr       string
-		expectWaitErr        string
-		expectUploaderCount  int // expected number of many concurrent piece uploads
+		desc                   string
+		beginSegment           *metaclient.BeginSegmentResponse
+		overrideContext        func(*testing.T, context.Context) context.Context
+		overrideLongTailMargin func() int
+		expectBeginErr         string
+		expectWaitErr          string
+		expectUploaderCount    int // expected number of many concurrent piece uploads
 	}{
 		{
 			desc:           "begin segment response missing private key",
@@ -77,16 +77,16 @@ func TestBegin(t *testing.T) {
 			expectBeginErr: fmt.Sprintf("begin segment response needs at least %d limits to meet optimal threshold but has %d", optimalShares, optimalShares-1),
 		},
 		{
-			desc:                 "negative safety margin",
-			beginSegment:         &metaclient.BeginSegmentResponse{RedundancyStrategy: rs, Limits: minimumLimits},
-			overrideSafetyMargin: func() int { return -1 },
-			expectBeginErr:       "safety margin must be non-negative",
+			desc:                   "negative long tail margin",
+			beginSegment:           &metaclient.BeginSegmentResponse{RedundancyStrategy: rs, Limits: minimumLimits},
+			overrideLongTailMargin: func() int { return -1 },
+			expectBeginErr:         "long tail margin must be non-negative",
 		},
 		{
-			desc:                 "zero safety margin",
-			beginSegment:         makeBeginSegment(fastKind, fastKind, fastKind, fastKind),
-			overrideSafetyMargin: func() int { return 0 },
-			expectUploaderCount:  optimalShares,
+			desc:                   "zero long tail margin",
+			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, fastKind),
+			overrideLongTailMargin: func() int { return 0 },
+			expectUploaderCount:    optimalShares,
 		},
 		{
 			desc:                "upload count is capped to limits",
@@ -94,14 +94,14 @@ func TestBegin(t *testing.T) {
 			expectUploaderCount: optimalShares,
 		},
 		{
-			desc:                "upload count does not exceed optimal threshold + safety margin",
+			desc:                "upload count does not exceed optimal threshold + long tail margin",
 			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind, fastKind),
-			expectUploaderCount: optimalShares + safetyMargin,
+			expectUploaderCount: optimalShares + longTailMargin,
 		},
 		{
 			desc:                "slow piece uploads are cancelled after optimal threshold hit",
 			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			expectUploaderCount: optimalShares + safetyMargin,
+			expectUploaderCount: optimalShares + longTailMargin,
 		},
 		{
 			desc:         "aborts immediately when context already cancelled",
@@ -125,16 +125,16 @@ func TestBegin(t *testing.T) {
 				limitsExchanger = new(fakeLimitsExchanger)
 				piecePutter     = new(fakePiecePutter)
 				sched           = newWrappedScheduler()
-				safetyMargin    = safetyMargin
+				longTailMargin  = longTailMargin
 			)
 			ctx := context.Background()
 			if tc.overrideContext != nil {
 				ctx = tc.overrideContext(t, ctx)
 			}
-			if tc.overrideSafetyMargin != nil {
-				safetyMargin = tc.overrideSafetyMargin()
+			if tc.overrideLongTailMargin != nil {
+				longTailMargin = tc.overrideLongTailMargin()
 			}
-			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, safetyMargin)
+			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, longTailMargin)
 			if tc.expectBeginErr != "" {
 				require.EqualError(t, err, tc.expectBeginErr)
 				require.NoError(t, sched.check(0))

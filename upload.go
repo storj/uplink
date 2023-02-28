@@ -6,6 +6,7 @@ package uplink
 import (
 	"context"
 	"errors"
+	"io"
 	"runtime"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
+	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -89,18 +91,27 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
-	streams, err := project.getStreamsStore(ctx)
-	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
-	}
-
 	// TODO: don't calculate this twice.
 	if encPath, err := encryptPath(project, bucket, key); err == nil {
 		upload.stats.encPath = encPath
 	}
 
+	streams, err := project.getStreamsStore(ctx)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
 	upload.streams = streams
-	upload.upload = stream.NewUpload(ctx, mutableStream, streams)
+
+	if project.concurrentSegmentUploadConfig == nil {
+		upload.upload = stream.NewUpload(ctx, mutableStream, streams)
+	} else {
+		sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
+		u, err := streams.UploadObject(ctx, mutableStream.BucketName(), mutableStream.Path(), mutableStream, mutableStream.Expires(), sched)
+		if err != nil {
+			return nil, convertKnownErrors(err, bucket, key)
+		}
+		upload.upload = u
+	}
 
 	return upload, nil
 }
@@ -113,13 +124,20 @@ func (dyn dynamicMetadata) Metadata() ([]byte, error) {
 	})
 }
 
+type streamUpload interface {
+	io.Writer
+	Commit() error
+	Abort() error
+	Meta() *streams.Meta
+}
+
 // Upload is an upload to Storj Network.
 type Upload struct {
 	mu      sync.Mutex
 	closed  bool
 	aborted bool
 	cancel  context.CancelFunc
-	upload  *stream.Upload
+	upload  streamUpload
 	bucket  string
 	object  *Object
 	streams *streams.Store
@@ -171,7 +189,7 @@ func (upload *Upload) Commit() error {
 	upload.closed = true
 
 	err := errs.Combine(
-		upload.upload.Close(),
+		upload.upload.Commit(),
 		upload.streams.Close(),
 	)
 	upload.stats.flagFailure(err)
