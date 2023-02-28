@@ -154,6 +154,10 @@ func (bs *baseSplitter) Write(p []byte) (n int, err error) {
 }
 
 func (bs *baseSplitter) Next(ctx context.Context, wf WriteFinisher) (inline []byte, eof bool, err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+
 	bs.nextMu.Lock()
 	defer bs.nextMu.Unlock()
 

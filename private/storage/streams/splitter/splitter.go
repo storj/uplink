@@ -112,17 +112,17 @@ func New(opts Options) (*Splitter, error) {
 
 // Finish informs the Splitter that no more writes are coming, along with any error
 // that may have caused the writes to stop.
-func (e *Splitter) Finish(err error) { e.split.Finish(err) }
+func (s *Splitter) Finish(err error) { s.split.Finish(err) }
 
 // Write appends data into the stream.
-func (e *Splitter) Write(p []byte) (int, error) { return e.split.Write(p) }
+func (s *Splitter) Write(p []byte) (int, error) { return s.split.Write(p) }
 
 // Next returns the next Segment split from the stream. If the stream is finished then
 // it will return nil, nil.
-func (e *Splitter) Next(ctx context.Context) (Segment, error) {
+func (s *Splitter) Next(ctx context.Context) (Segment, error) {
 	position := metaclient.SegmentPosition{
-		PartNumber: e.opts.PartNumber,
-		Index:      e.index,
+		PartNumber: s.opts.PartNumber,
+		Index:      s.index,
 	}
 	var contentKey storj.Key
 	var keyNonce storj.Nonce
@@ -138,20 +138,20 @@ func (e *Splitter) Next(ctx context.Context) (Segment, error) {
 	if _, err := rand.Read(keyNonce[:]); err != nil {
 		return nil, errs.Wrap(err)
 	}
-	enc, err := encryption.NewEncrypter(e.opts.Params.CipherSuite, &contentKey, &nonce, int(e.opts.Params.BlockSize))
+	enc, err := encryption.NewEncrypter(s.opts.Params.CipherSuite, &contentKey, &nonce, int(s.opts.Params.BlockSize))
 	if err != nil {
 		return nil, errs.Wrap(err)
 	}
-	encKey, err := encryption.EncryptKey(&contentKey, e.opts.Params.CipherSuite, e.opts.Key, &keyNonce)
+	encKey, err := encryption.EncryptKey(&contentKey, s.opts.Params.CipherSuite, s.opts.Key, &keyNonce)
 	if err != nil {
 		return nil, errs.Wrap(err)
 	}
-	backend, err := e.NewBackend()
+	backend, err := s.NewBackend()
 	if err != nil {
 		return nil, errs.Wrap(err)
 	}
 
-	buf := buffer.New(backend, e.opts.Minimum)
+	buf := buffer.New(backend, s.opts.Minimum)
 	wrc := encryption.TransformWriterPadded(buf, enc)
 	encBuf := newEncryptedBuffer(buf, wrc)
 	segEncryption := metaclient.SegmentEncryption{
@@ -161,7 +161,7 @@ func (e *Splitter) Next(ctx context.Context) (Segment, error) {
 
 	// check for the next segment/inline boundary. if an error, don't update any
 	// local state.
-	inline, eof, err := e.split.Next(ctx, encBuf)
+	inline, eof, err := s.split.Next(ctx, encBuf)
 	switch {
 	case err != nil:
 		return nil, errs.Wrap(err)
@@ -171,18 +171,18 @@ func (e *Splitter) Next(ctx context.Context) (Segment, error) {
 
 	case inline != nil:
 		// encrypt the inline data, and update the internal state if it succeeds.
-		encData, err := encryption.Encrypt(inline, e.opts.Params.CipherSuite, &contentKey, &nonce)
+		encData, err := encryption.Encrypt(inline, s.opts.Params.CipherSuite, &contentKey, &nonce)
 		if err != nil {
 			return nil, errs.Wrap(err)
 		}
 
 		// everything fallible is done. update the internal state.
-		e.index++
+		s.index++
 
 		return &splitterInline{
 			position:   position,
 			encryption: segEncryption,
-			encParams:  e.opts.Params,
+			encParams:  s.opts.Params,
 			contentKey: &contentKey,
 
 			encData:   encData,
@@ -191,15 +191,15 @@ func (e *Splitter) Next(ctx context.Context) (Segment, error) {
 
 	default:
 		// everything fallible is done. update the internal state.
-		e.index++
+		s.index++
 
 		return &splitterSegment{
 			position:   position,
 			encryption: segEncryption,
-			encParams:  e.opts.Params,
+			encParams:  s.opts.Params,
 			contentKey: &contentKey,
 
-			maxSegmentSize: e.maxSegmentSize,
+			maxSegmentSize: s.maxSegmentSize,
 			encTransformer: enc,
 			encBuf:         encBuf,
 		}, nil
