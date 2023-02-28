@@ -85,3 +85,13 @@ func TestCursor(t *testing.T) {
 		require.Equal(t, result{11, true, nil}, <-done)
 	})
 }
+
+func BenchmarkNewCursor(b *testing.B) {
+	b.ReportAllocs()
+
+	var c *Cursor
+	for i := 0; i < b.N; i++ {
+		c = NewCursor(1024)
+	}
+	runtime.KeepAlive(c)
+}
