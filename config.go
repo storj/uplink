@@ -34,8 +34,8 @@ type Config struct {
 	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-	pool      *rpcpool.Pool
-	connector rpc.Connector
+	poolFactory func(name string) *rpcpool.Pool
+	connector   rpc.Connector
 
 	// maximumBufferSize is used to set the maximum buffer size for DRPC
 	// connections/streams.
@@ -43,17 +43,23 @@ type Config struct {
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
-func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
+func (config Config) getDialer(ctx context.Context, name string) (_ rpc.Dialer, err error) {
 	tlsOptions, err := getProcessTLSOptions(ctx)
 	if err != nil {
 		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
 	dialer := rpc.NewDefaultDialer(tlsOptions)
-	if config.pool != nil {
-		dialer.Pool = config.pool
+	if config.poolFactory != nil {
+		dialer.Pool = config.poolFactory(name)
 	} else {
-		dialer.Pool = rpc.NewDefaultConnectionPool()
+		dialer.Pool = rpcpool.New(rpcpool.Options{
+			Name:           name,
+			Capacity:       100,
+			KeyCapacity:    5,
+			IdleExpiration: 2 * time.Minute,
+		},
+		)
 	}
 
 	dialer.DialTimeout = config.DialTimeout
@@ -94,18 +100,20 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 //nolint:unused,revive
 //go:linkname config_getDialer
 func config_getDialer(config Config, ctx context.Context) (_ rpc.Dialer, err error) {
-	return config.getDialer(ctx)
+	return config.getDialer(ctx, "")
 }
 
-// setConnectionPool exposes setting connection pool.
+// setConnectionPoolFactory exposes setting connection poolFactory.
 //
 // NB: this is used with linkname in internal/expose.
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
 //nolint:unused
-//go:linkname config_setConnectionPool
-func config_setConnectionPool(config *Config, pool *rpcpool.Pool) { config.pool = pool }
+//go:linkname config_setConnectionPoolFactory
+func config_setConnectionPoolFactory(config *Config, factory func(name string) *rpcpool.Pool) {
+	config.poolFactory = factory
+}
 
 // setConnector exposes setting a connector used by the dialer.
 //
