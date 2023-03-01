@@ -9,7 +9,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20230224050842-81c8060f089b
+	storj.io/common v0.0.0-20230317142710-ffea9ac03387
 	storj.io/drpc v0.0.33-0.20230224050324-1fd05d3459f8
 	storj.io/storj v0.12.1-0.20230306214826-d0408ee89b6b
 	storj.io/uplink v1.10.1-0.20230224190621-ce85aec713d4
@@ -67,7 +67,7 @@ require (
 	github.com/quic-go/quic-go v0.32.0 // indirect
 	github.com/segmentio/backo-go v0.0.0-20200129164019-23eae7c10bd3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
-	github.com/spacemonkeygo/monkit/v3 v3.0.19 // indirect
+	github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230227152157-d00b379de191 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spf13/cobra v1.1.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

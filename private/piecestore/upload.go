@@ -32,6 +32,8 @@ type upload struct {
 	nodeID     storj.NodeID
 	stream     uploadStream
 
+	nextRequest *pb.PieceUploadRequest
+
 	hash          hash.Hash // TODO: use concrete implementation
 	hashAlgorithm pb.PieceHashAlgorithm
 	offset        int64
@@ -68,48 +70,58 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	}
 	defer func() { _ = underlyingStream.Close() }()
 
-	streamGetter, ok := underlyingStream.(interface {
-		GetStream() drpc.Stream
-	})
-	if !ok {
-		// TODO: this really should be a static, compile-time failure.
-		// let's fail hard always if this doesn't work so we have the
-		// best chance of a refactor breakage being detected.
-		return nil, Error.New("stream must be a drpc stream: %#v", underlyingStream)
-	}
-	flusher, ok := streamGetter.GetStream().(interface {
-		SetManualFlush(bool)
-	})
-	if !ok {
-		// TODO: yep, this also should be a compile time failure.
-		// separately, if we know that the node we've dialed has
-		// https://review.dev.storj.io/c/storj/storj/+/9686, we could
-		// solve this another way, but we don't know that.
-		return nil, Error.New("stream must support controlling flushing behavior: %#v", streamGetter.GetStream())
-	}
-
 	stream := &timedUploadStream{
 		timeout: client.config.MessageTimeout,
 		stream:  underlyingStream,
 		cancel:  cancel,
 	}
 
-	flusher.SetManualFlush(true)
-	err = stream.Send(&pb.PieceUploadRequest{
+	nextRequest := &pb.PieceUploadRequest{
 		Limit:         limit,
 		HashAlgorithm: client.UploadHashAlgo,
-	})
-	flusher.SetManualFlush(false)
-	if err != nil {
-		_, closeErr := stream.CloseAndRecv()
-		switch {
-		case !errors.Is(err, io.EOF) && closeErr != nil:
-			err = ErrProtocol.Wrap(errs.Combine(err, closeErr))
-		case closeErr != nil:
-			err = ErrProtocol.Wrap(closeErr)
+	}
+	if client.NodeURL().DebounceLimit > 0 {
+		// in this case, the storage node is running code late enough that it will be able to handle
+		// aggregated requests entirely. this is the best case and we don't need to use drpc stream
+		// corking. this is because storage nodes that advertise their debounce limit
+		// also have the change that support aggregated request limits.
+
+		// leave nextRequest alone, so nothing to do!
+	} else {
+		// okay, let's see if we can do drpc stream corking.
+		if streamGetter, ok := underlyingStream.(interface {
+			GetStream() drpc.Stream
+		}); ok {
+			if flusher, ok := streamGetter.GetStream().(interface {
+				SetManualFlush(bool)
+			}); ok {
+				// we can. let's send the next request and empty the nextRequest variable.
+				flusher.SetManualFlush(true)
+				err = stream.Send(nextRequest)
+				flusher.SetManualFlush(false)
+				nextRequest = nil
+				// err checking below.
+			}
+		}
+		if nextRequest != nil {
+			// okay here, we are not in the DebounceLimit > 0 case, but we did not discover
+			// we could do stream corking, so, give up I guess, just send as-is.
+			err = stream.Send(nextRequest)
+			nextRequest = nil
+			// err checking below.
 		}
 
-		return nil, err
+		if err != nil {
+			_, closeErr := stream.CloseAndRecv()
+			switch {
+			case !errors.Is(err, io.EOF) && closeErr != nil:
+				err = ErrProtocol.Wrap(errs.Combine(err, closeErr))
+			case closeErr != nil:
+				err = ErrProtocol.Wrap(closeErr)
+			}
+
+			return nil, err
+		}
 	}
 
 	upload := &upload{
@@ -122,6 +134,7 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 		hashAlgorithm: client.UploadHashAlgo,
 		offset:        0,
 		orderStep:     client.config.InitialStep,
+		nextRequest:   nextRequest,
 	}
 
 	return upload.write(ctx, data)
@@ -174,11 +187,14 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 		}
 		sendData = sendData[:n]
 
-		req := &pb.PieceUploadRequest{
-			Chunk: &pb.PieceUploadRequest_Chunk{
-				Offset: client.offset,
-				Data:   sendData,
-			},
+		req := client.nextRequest
+		client.nextRequest = nil
+		if req == nil {
+			req = &pb.PieceUploadRequest{}
+		}
+		req.Chunk = &pb.PieceUploadRequest_Chunk{
+			Offset: client.offset,
+			Data:   sendData,
 		}
 
 		if client.offset+int64(len(sendData)) > orderedSoFar {

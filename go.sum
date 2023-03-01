@@ -35,8 +35,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
-github.com/spacemonkeygo/monkit/v3 v3.0.19 h1:wqBb9bpD7jXkVi4XwIp8jn1fektaVBQ+cp9SHRXgAdo=
-github.com/spacemonkeygo/monkit/v3 v3.0.19/go.mod h1:kj1ViJhlyADa7DiA4xVnTuPA46lFKbM7mxQTrXCuJP4=
+github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230227152157-d00b379de191 h1:QVUfVxilbPp8fBJ7701LL/WEUjBSiSxbs9LUaCIe5qM=
+github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230227152157-d00b379de191/go.mod h1:kj1ViJhlyADa7DiA4xVnTuPA46lFKbM7mxQTrXCuJP4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
@@ -102,8 +102,8 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EV
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-storj.io/common v0.0.0-20230224050842-81c8060f089b h1:iitkGcBeH9jduIdA5ZCKD/oD9NnGBOIViuPLr6s3h+Q=
-storj.io/common v0.0.0-20230224050842-81c8060f089b/go.mod h1:tDgoLthBVcrTPEokBgPdjrn39p/gyNx06j6ehhTSiUg=
+storj.io/common v0.0.0-20230317142710-ffea9ac03387 h1:wgyGHKzd//0///B5NCr88CmUJ4yjZCEP5SumAsX5NZs=
+storj.io/common v0.0.0-20230317142710-ffea9ac03387/go.mod h1:mYWledc0VY1J4+merC3LIFZr0Wa4FaB/hg0ucMdYnzA=
 storj.io/drpc v0.0.33-0.20230224050324-1fd05d3459f8 h1:TVfWJuTTBPT3pNu3b7q0nSg5bFCScMFqiU65MbWBbco=
 storj.io/drpc v0.0.33-0.20230224050324-1fd05d3459f8/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
 storj.io/picobuf v0.0.1 h1:ekEvxSQCbEjTVIi/qxj2za13SJyfRE37yE30IBkZeT0=
