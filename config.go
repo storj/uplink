@@ -27,11 +27,25 @@ type Config struct {
 
 	// DialTimeout defines how long client should wait for establishing
 	// a connection to peers.
-	// No explicit value or 0 means default 10s will be used. Value lower than 0 means there is no timeout.
+	// No explicit value or 0 means default 20s will be used. Value lower than 0 means there is no timeout.
+	// DialTimeout is ignored if DialContext is provided.
+	//
+	// Deprecated: with the advent of Noise and TCP_FASTOPEN use, traditional dialing
+	// doesn't necessarily happen anymore. This is already ignored for certain
+	// connections and will be removed in a future release.
 	DialTimeout time.Duration
 
-	// DialContext is how sockets are opened and is called to establish
-	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
+	// DialContext is an extremely low level concern. It should almost certainly
+	// remain unset so that this library can make informed choices about how to
+	// talk to each node.
+	// DialContext is how sockets are opened to nodes of all kinds and is called to
+	// establish a connection. If DialContext is nil, it'll try to use the implementation
+	// best suited for each node.
+	//
+	// Deprecated: this will be removed in a future release. All analyzed uses of
+	// setting this value in open source projects are attempting to solve some more
+	// nuanced problem (like QoS) which can only be handled for some types of
+	// connections. This value is a hammer where we need a scalpel.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
 	// satellitePool is a connection pool dedicated for satellite connections.
@@ -41,8 +55,6 @@ type Config struct {
 	// pool is a connection pool for everything else (mainly for storagenode). Or everything if satellitePool is not set.
 	// If nil, a default pool will be created.
 	pool *rpcpool.Pool
-
-	connector rpc.Connector
 
 	// maximumBufferSize is used to set the maximum buffer size for DRPC
 	// connections/streams.
@@ -72,9 +84,7 @@ func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (
 
 	dialer.DialTimeout = config.DialTimeout
 
-	if config.connector != nil {
-		dialer.Connector = config.connector
-	} else if config.DialContext != nil {
+	if config.DialContext != nil {
 		// N.B.: It is okay to use NewDefaultTCPConnector here because we explicitly don't want
 		// NewHybridConnector. NewHybridConnector would not be able to use the user-provided
 		// DialContext.
@@ -131,18 +141,6 @@ func config_setConnectionPool(config *Config, pool *rpcpool.Pool) { config.pool 
 //go:linkname config_setSatelliteConnectionPool
 func config_setSatelliteConnectionPool(config *Config, pool *rpcpool.Pool) {
 	config.satellitePool = pool
-}
-
-// setConnector exposes setting a connector used by the dialer.
-//
-// NB: this is used with linkname in internal/expose.
-// It needs to be updated when this is updated.
-//
-//lint:ignore U1000, used with linkname
-//nolint:unused
-//go:linkname config_setConnector
-func config_setConnector(config *Config, connector rpc.Connector) {
-	config.connector = connector
 }
 
 // setMaximumBufferSize exposes setting maximumBufferSize.

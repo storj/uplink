@@ -30,11 +30,6 @@ func ConfigSetSatelliteConnectionPool(*uplink.Config, *rpcpool.Pool)
 //nolint:revive
 func ConfigGetDialer(uplink.Config, context.Context) (rpc.Dialer, error)
 
-// ConfigSetConnector exposes Config.setConnector.
-//
-//go:linkname ConfigSetConnector storj.io/uplink.config_setConnector
-func ConfigSetConnector(*uplink.Config, rpc.Connector)
-
 // ConfigSetMaximumBufferSize exposes Config.setMaximumBufferSize.
 //
 //go:linkname ConfigSetMaximumBufferSize storj.io/uplink.config_setMaximumBufferSize
