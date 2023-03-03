@@ -34,7 +34,14 @@ type Config struct {
 	// a connection. If DialContext is nil, it'll try to use an implementation with background congestion control.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-	pool      *rpcpool.Pool
+	// satellitePool is a connection pool dedicated for satellite connections.
+	// If not set, the normal pool / default will be used.
+	satellitePool *rpcpool.Pool
+
+	// pool is a connection pool for everything else (mainly for storagenode). Or everything if satellitePool is not set.
+	// If nil, a default pool will be created.
+	pool *rpcpool.Pool
+
 	connector rpc.Connector
 
 	// maximumBufferSize is used to set the maximum buffer size for DRPC
@@ -44,13 +51,20 @@ type Config struct {
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
 func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
+	return config.getDialerForPool(ctx, nil)
+}
+
+// getDialerForPool returns a new rpc.Dialer corresponding to the config, using the chosen pool (or config.pool if pool is nil).
+func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (_ rpc.Dialer, err error) {
 	tlsOptions, err := getProcessTLSOptions(ctx)
 	if err != nil {
 		return rpc.Dialer{}, packageError.Wrap(err)
 	}
 
 	dialer := rpc.NewDefaultDialer(tlsOptions)
-	if config.pool != nil {
+	if pool != nil {
+		dialer.Pool = pool
+	} else if config.pool != nil {
 		dialer.Pool = config.pool
 	} else {
 		dialer.Pool = rpc.NewDefaultConnectionPool()
@@ -106,6 +120,18 @@ func config_getDialer(config Config, ctx context.Context) (_ rpc.Dialer, err err
 //nolint:unused
 //go:linkname config_setConnectionPool
 func config_setConnectionPool(config *Config, pool *rpcpool.Pool) { config.pool = pool }
+
+// setSatelliteConnectionPool exposes setting connection pool for satellite.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused
+//go:linkname config_setSatelliteConnectionPool
+func config_setSatelliteConnectionPool(config *Config, pool *rpcpool.Pool) {
+	config.satellitePool = pool
+}
 
 // setConnector exposes setting a connector used by the dialer.
 //

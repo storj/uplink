@@ -29,7 +29,8 @@ var maxSegmentSize string
 type Project struct {
 	config                        Config
 	access                        *Access
-	dialer                        rpc.Dialer
+	satelliteDialer               rpc.Dialer
+	storagenodeDialer             rpc.Dialer
 	ec                            ecclient.Client
 	segmentSize                   int64
 	encryptionParameters          storj.EncryptionParameters
@@ -65,7 +66,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	dialer, err := config.getDialer(ctx)
+	storagenodeDialer, err := config.getDialerForPool(ctx, config.pool)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	satelliteDialer, err := config.getDialerForPool(ctx, config.satellitePool)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -99,12 +104,13 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}
 	}
 
-	ec := ecclient.New(dialer, 0)
+	ec := ecclient.New(storagenodeDialer, 0)
 
 	return &Project{
 		config:                        config,
 		access:                        access,
-		dialer:                        dialer,
+		satelliteDialer:               satelliteDialer,
+		storagenodeDialer:             storagenodeDialer,
 		ec:                            ec,
 		segmentSize:                   segmentsSize,
 		encryptionParameters:          encryptionParameters,
@@ -114,9 +120,14 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
-	// only close the connection pool if it's created through OpenProject
+	// only close the connection pools if it's created through OpenProject / getDialer()
 	if project.config.pool == nil {
-		err = errs.Combine(err, project.dialer.Pool.Close())
+		err = errs.Combine(err, project.storagenodeDialer.Pool.Close())
+
+		if project.config.satellitePool == nil {
+			// if config.satellitePool is nil, but config.pool is not, it might be a second Close, but it's safe.
+			err = errs.Combine(err, project.satelliteDialer.Pool.Close())
+		}
 	}
 
 	return packageError.Wrap(err)
@@ -170,7 +181,7 @@ func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.C
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := metaclient.DialNodeURL(ctx,
-		project.dialer,
+		project.satelliteDialer,
 		project.access.satelliteURL.String(),
 		project.access.apiKey,
 		project.config.UserAgent)

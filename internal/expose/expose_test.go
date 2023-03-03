@@ -16,6 +16,7 @@ import (
 func TestExposed(t *testing.T) {
 	config := uplink.Config{}
 	expose.ConfigSetConnectionPool(&config, nil)
+	expose.ConfigSetSatelliteConnectionPool(&config, nil)
 	dialer, _ := expose.ConfigGetDialer(config, context.Background())
 	require.NotNil(t, dialer)
 

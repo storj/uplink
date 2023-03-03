@@ -19,6 +19,11 @@ import (
 //go:linkname ConfigSetConnectionPool storj.io/uplink.config_setConnectionPool
 func ConfigSetConnectionPool(*uplink.Config, *rpcpool.Pool)
 
+// ConfigSetSatelliteConnectionPool exposes Config.setSatelliteConnectionPool.
+//
+//go:linkname ConfigSetSatelliteConnectionPool storj.io/uplink.config_setSatelliteConnectionPool
+func ConfigSetSatelliteConnectionPool(*uplink.Config, *rpcpool.Pool)
+
 // ConfigGetDialer exposes Config.getDialer.
 //
 //go:linkname ConfigGetDialer storj.io/uplink.config_getDialer
