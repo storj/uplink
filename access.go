@@ -169,7 +169,7 @@ func config_requestAccessWithPassphraseAndConcurrency(config Config, ctx context
 		return nil, packageError.Wrap(err)
 	}
 
-	dialer, err := config.getDialer(ctx, "default")
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

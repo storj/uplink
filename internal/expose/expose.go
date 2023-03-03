@@ -14,10 +14,10 @@ import (
 	"storj.io/uplink"
 )
 
-// ConfigSetConnectionPoolFactory exposes Config.setConnectionPoolFactory
+// ConfigSetConnectionPool exposes Config.setConnectionPool.
 //
-//go:linkname ConfigSetConnectionPoolFactory storj.io/uplink.config_setConnectionPoolFactory
-func ConfigSetConnectionPoolFactory(*uplink.Config, func(string) *rpcpool.Pool)
+//go:linkname ConfigSetConnectionPool storj.io/uplink.config_setConnectionPool
+func ConfigSetConnectionPool(*uplink.Config, *rpcpool.Pool)
 
 // ConfigGetDialer exposes Config.getDialer.
 //

@@ -29,8 +29,7 @@ var maxSegmentSize string
 type Project struct {
 	config                        Config
 	access                        *Access
-	satelliteDialer               rpc.Dialer
-	storagenodeDialer             rpc.Dialer
+	dialer                        rpc.Dialer
 	ec                            ecclient.Client
 	segmentSize                   int64
 	encryptionParameters          storj.EncryptionParameters
@@ -66,12 +65,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		return nil, packageError.Wrap(err)
 	}
 
-	satelliteDialer, err := config.getDialer(ctx, "satellite")
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
-	storagenodeDialer, err := config.getDialer(ctx, "storagnode")
+	dialer, err := config.getDialer(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -105,13 +99,12 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}
 	}
 
-	ec := ecclient.New(storagenodeDialer, 0)
+	ec := ecclient.New(dialer, 0)
 
 	return &Project{
 		config:                        config,
 		access:                        access,
-		storagenodeDialer:             storagenodeDialer,
-		satelliteDialer:               satelliteDialer,
+		dialer:                        dialer,
 		ec:                            ec,
 		segmentSize:                   segmentsSize,
 		encryptionParameters:          encryptionParameters,
@@ -122,7 +115,10 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
 	// only close the connection pool if it's created through OpenProject
-	err = errs.Combine(err, project.satelliteDialer.Pool.Close(), project.storagenodeDialer.Pool.Close())
+	if project.config.pool == nil {
+		err = errs.Combine(err, project.dialer.Pool.Close())
+	}
+
 	return packageError.Wrap(err)
 }
 
@@ -174,7 +170,7 @@ func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.C
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := metaclient.DialNodeURL(ctx,
-		project.satelliteDialer,
+		project.dialer,
 		project.access.satelliteURL.String(),
 		project.access.apiKey,
 		project.config.UserAgent)

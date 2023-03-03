@@ -12,10 +12,10 @@ import (
 	"storj.io/uplink/internal/expose"
 )
 
-// SetConnectionPoolFactory configures connection pool on the passed in config. If
+// SetConnectionPool configures connection pool on the passed in config. If
 // argument pool is nil, it will clear the pool on the config.
-func SetConnectionPoolFactory(ctx context.Context, config *uplink.Config, factory func(name string) *rpcpool.Pool) error {
-	expose.ConfigSetConnectionPoolFactory(config, factory)
+func SetConnectionPool(ctx context.Context, config *uplink.Config, pool *rpcpool.Pool) error {
+	expose.ConfigSetConnectionPool(config, pool)
 	return nil
 }
 

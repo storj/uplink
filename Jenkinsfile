@@ -138,26 +138,25 @@ pipeline {
                         STORJ_TEST_DATABASES = 'pg|pgx|postgres://postgres@localhost/testmetabase?sslmode=disable'
                     }
                     steps {
-                        sh 'echo "Disabled due to the circular dependency. Will be re-enabled as soon storj/storj starts to use this commit."'
-//                         sh 'psql -U postgres -c \'create database teststorj2;\''
-//                         sh 'psql -U postgres -c \'create database testmetabase;\''
-//                         dir('testsuite'){
-//                             sh 'cp go.mod go-temp.mod'
-//                             sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-//                             sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... > ../.build/testsuite-storj.json'
-//                         }
+                        sh 'psql -U postgres -c \'create database teststorj2;\''
+                        sh 'psql -U postgres -c \'create database testmetabase;\''
+                        dir('testsuite'){
+                            sh 'cp go.mod go-temp.mod'
+                            sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
+                            sh 'go test -modfile go-temp.mod -mod=mod -parallel 4 -p 6 -vet=off -timeout 20m -json storj.io/storj/... > ../.build/testsuite-storj.json'
+                        }
                     }
 
-//                     post {
-//                         always {
-//                             dir('testsuite'){
-//                                 sh 'cat ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
-//                             }
-//                             sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
-//                             archiveArtifacts artifacts: '.build/testsuite-storj.json'
-//                             junit '.build/testsuite-storj.xml'
-//                         }
-//                     }
+                    post {
+                        always {
+                            dir('testsuite'){
+                                sh 'cat ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            }
+                            sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite-storj.json'
+                            junit '.build/testsuite-storj.xml'
+                        }
+                    }
                 }
 
                 stage('Integration [rclone]') {

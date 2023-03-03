@@ -6,25 +6,16 @@ package expose_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"storj.io/common/rpc/rpcpool"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 )
 
 func TestExposed(t *testing.T) {
 	config := uplink.Config{}
-	expose.ConfigSetConnectionPoolFactory(&config, func(s string) *rpcpool.Pool {
-		return rpcpool.New(rpcpool.Options{
-			Name:           s,
-			Capacity:       100,
-			KeyCapacity:    5,
-			IdleExpiration: 200 * time.Second,
-		})
-	})
+	expose.ConfigSetConnectionPool(&config, nil)
 	dialer, _ := expose.ConfigGetDialer(config, context.Background())
 	require.NotNil(t, dialer)
 
