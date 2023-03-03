@@ -39,7 +39,7 @@ type Download struct {
 	downloadRequestSent bool
 
 	// what is the step we consider to upload
-	allocationStep int64
+	orderStep int64
 
 	unread ReadBuffer
 
@@ -98,7 +98,7 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		downloaded:   0,
 		downloadSize: size,
 
-		allocationStep: client.config.InitialStep,
+		orderStep: client.config.InitialStep,
 	}, nil
 }
 
@@ -128,8 +128,8 @@ func (client *Download) Read(data []byte) (read int, err error) {
 
 		// do we need to send a new order to storagenode
 		notYetReceived := client.allocated - client.downloaded
-		if notYetReceived < client.allocationStep {
-			newAllocation := client.allocationStep
+		if notYetReceived < client.orderStep {
+			newAllocation := client.orderStep
 
 			// If we have downloaded more than we have allocated
 			// due to a generous storagenode include this in the next allocation.
@@ -210,7 +210,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 
 				// update our allocation step
 				client.allocated += newAllocation
-				client.allocationStep = client.client.nextAllocationStep(client.allocationStep)
+				client.orderStep = client.client.nextOrderStep(client.orderStep)
 			}
 		}
 

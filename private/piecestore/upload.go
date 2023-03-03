@@ -32,10 +32,10 @@ type upload struct {
 	nodeID     storj.NodeID
 	stream     uploadStream
 
-	hash           hash.Hash // TODO: use concrete implementation
-	hashAlgorithm  pb.PieceHashAlgorithm
-	offset         int64
-	allocationStep int64
+	hash          hash.Hash // TODO: use concrete implementation
+	hashAlgorithm pb.PieceHashAlgorithm
+	offset        int64
+	orderStep     int64
 
 	// when there's a send error then it will automatically close
 	finished bool
@@ -113,15 +113,15 @@ func (client *Client) UploadReader(ctx context.Context, limit *pb.OrderLimit, pi
 	}
 
 	upload := &upload{
-		client:         client,
-		limit:          limit,
-		privateKey:     piecePrivateKey,
-		nodeID:         limit.StorageNodeId,
-		stream:         stream,
-		hash:           pb.NewHashFromAlgorithm(client.UploadHashAlgo),
-		hashAlgorithm:  client.UploadHashAlgo,
-		offset:         0,
-		allocationStep: client.config.InitialStep,
+		client:        client,
+		limit:         limit,
+		privateKey:    piecePrivateKey,
+		nodeID:        limit.StorageNodeId,
+		stream:        stream,
+		hash:          pb.NewHashFromAlgorithm(client.UploadHashAlgo),
+		hashAlgorithm: client.UploadHashAlgo,
+		offset:        0,
+		orderStep:     client.config.InitialStep,
 	}
 
 	return upload.write(ctx, data)
@@ -141,12 +141,27 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 	// write the hash of the data sent to the server
 	data = io.TeeReader(data, client.hash)
 
-	backingArray := make([]byte, client.client.config.MaximumStep)
+	// Some facts about uploads
+	//  * Signing orders are CPU intensive, so we don't want to do them too often.
+	//  * Buffering data in RAM is resource intensive, so we don't want to buffer
+	//    much.
+	//  * We don't pay for upload bandwidth, so there's not a ton of benefit to
+	//    even having upload orders other than making sure we can measure
+	//    user bandwidth usage well.
+	//  So, to address these things, we're going to read in a small increment
+	// (maybe config.InitialStep I guess) consistently, throughout the entire
+	// operation. We're going to keep track of how much we've written, and if
+	// the current write requires us to send an order with a larger amount in
+	// it, only then will we sign. Most writes won't include an order.
+
+	backingArray := make([]byte, client.client.config.InitialStep)
+
+	var orderedSoFar int64
 
 	done := false
 	for !done {
-		// try our best to read up to the next allocation step
-		sendData := backingArray[:client.allocationStep]
+		// read the next amount
+		sendData := backingArray
 		n, readErr := tryReadFull(ctx, data, sendData)
 		if readErr != nil {
 			if !errors.Is(readErr, io.EOF) {
@@ -159,28 +174,37 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 		}
 		sendData = sendData[:n]
 
-		// create a signed order for the next chunk
-		order, err := signing.SignUplinkOrder(ctx, client.privateKey, &pb.Order{
-			SerialNumber: client.limit.SerialNumber,
-			Amount:       client.offset + int64(len(sendData)),
-		})
-		if err != nil {
-			return nil, ErrInternal.Wrap(err)
-		}
-
 		req := &pb.PieceUploadRequest{
-			Order: order,
 			Chunk: &pb.PieceUploadRequest_Chunk{
 				Offset: client.offset,
 				Data:   sendData,
 			},
 		}
 
+		if client.offset+int64(len(sendData)) > orderedSoFar {
+			// okay, create the next signed order.
+			// Note: it might be larger than we need! in the worst
+			// case, if there's only one byte here and we're at the
+			// max order step, we will overshoot by
+			// MaximumStepSize - 1.
+			// But that's okay. Upload bandwidth is free.
+
+			orderedSoFar = min(client.offset+client.orderStep, client.limit.Limit)
+
+			order, err := signing.SignUplinkOrder(ctx, client.privateKey, &pb.Order{
+				SerialNumber: client.limit.SerialNumber,
+				Amount:       orderedSoFar,
+			})
+			if err != nil {
+				return nil, ErrInternal.Wrap(err)
+			}
+			req.Order = order
+			// update order step, incrementally building trust
+			client.orderStep = client.client.nextOrderStep(client.orderStep)
+		}
+
 		// update our offset
 		client.offset += int64(len(sendData))
-
-		// update allocation step, incrementally building trust
-		client.allocationStep = client.client.nextAllocationStep(client.allocationStep)
 
 		if done {
 			// combine the last request with the closing data.
@@ -324,4 +348,11 @@ func (stream *timedUploadStream) CloseAndRecv() (resp *pb.PieceUploadResponse, e
 		resp, err = stream.stream.CloseAndRecv()
 	}, stream.cancelTimeout)
 	return resp, err
+}
+
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }

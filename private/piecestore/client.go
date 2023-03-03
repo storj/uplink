@@ -118,7 +118,7 @@ func (client *Client) GetPeerIdentity() (*identity.PeerIdentity, error) {
 func (client *Client) NodeURL() storj.NodeURL { return client.nodeURL }
 
 // next allocation step find the next trusted step.
-func (client *Client) nextAllocationStep(previous int64) int64 {
+func (client *Client) nextOrderStep(previous int64) int64 {
 	// TODO: ensure that this is frame idependent
 	next := previous * 3 / 2
 	if next > client.config.MaximumStep {
