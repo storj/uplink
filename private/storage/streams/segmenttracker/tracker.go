@@ -7,10 +7,13 @@ import (
 	"context"
 	"sync"
 
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/uplink/private/metaclient"
 )
+
+var mon = monkit.Package()
 
 // Segment represents a segment being tracked.
 type Segment interface {
@@ -104,7 +107,9 @@ func (t *Tracker) SegmentsScheduled(lastSegment Segment) {
 // provided in New, encryptes that eTag with the last segment, and then injects
 // the encrypted eTag into the batch item that commits that segment (i.e.
 // MakeInlineSegment or CommitSegment).
-func (t *Tracker) Flush(ctx context.Context) error {
+func (t *Tracker) Flush(ctx context.Context) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	if t.eTagCh == nil {
 		return nil
 	}
@@ -136,7 +141,9 @@ func (t *Tracker) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (t *Tracker) addEncryptedETag(ctx context.Context, lastSegment Segment, batchItem metaclient.BatchItem) error {
+func (t *Tracker) addEncryptedETag(ctx context.Context, lastSegment Segment, batchItem metaclient.BatchItem) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	select {
 	case eTag := <-t.eTagCh:
 		if len(eTag) == 0 {

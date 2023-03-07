@@ -7,10 +7,13 @@ import (
 	"context"
 	"sync"
 
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/uplink/private/metaclient"
 )
+
+var mon = monkit.Package()
 
 // Aggregator aggregates batch items to reduce round trips.
 type Aggregator struct {
@@ -39,7 +42,9 @@ func (a *Aggregator) Schedule(batchItem metaclient.BatchItem) {
 // ScheduleAndFlush schedules a batch item and immediately issues all
 // scheduled batch items. It returns the response to the batch item scheduled
 // with the call.
-func (a *Aggregator) ScheduleAndFlush(ctx context.Context, batchItem metaclient.BatchItem) (*metaclient.BatchResponse, error) {
+func (a *Aggregator) ScheduleAndFlush(ctx context.Context, batchItem metaclient.BatchItem) (_ *metaclient.BatchResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -56,15 +61,18 @@ func (a *Aggregator) ScheduleAndFlush(ctx context.Context, batchItem metaclient.
 }
 
 // Flush issues all scheduled batch items.
-func (a *Aggregator) Flush(ctx context.Context) error {
+func (a *Aggregator) Flush(ctx context.Context) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	_, err := a.issueBatchLocked(ctx)
+	_, err = a.issueBatchLocked(ctx)
 	return err
 }
 
-func (a *Aggregator) issueBatchLocked(ctx context.Context) ([]metaclient.BatchResponse, error) {
+func (a *Aggregator) issueBatchLocked(ctx context.Context) (_ []metaclient.BatchResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
 	batchItems := a.scheduled
 	a.scheduled = a.scheduled[:0]
 

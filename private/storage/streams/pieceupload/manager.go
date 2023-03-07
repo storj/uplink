@@ -15,6 +15,12 @@ import (
 	"storj.io/common/storj"
 )
 
+var (
+	// ErrDone is returned from the Manager NextPiece when all of the piece
+	// uploads have completed.
+	ErrDone = errs.New("all pieces have been uploaded")
+)
+
 // PieceReader provides a reader for a piece with the given number.
 type PieceReader interface {
 	PieceReader(num int) io.Reader
@@ -38,66 +44,106 @@ type Manager struct {
 	mu        sync.Mutex
 	segmentID storj.SegmentID
 	limits    []*pb.AddressedOrderLimit
-	next      []int
+	next      chan int
+	exchange  chan struct{}
+	done      chan struct{}
 	failed    []int
 	results   []*pb.SegmentPieceUploadResult
 }
 
 // NewManager returns a new piece upload manager.
 func NewManager(exchanger LimitsExchanger, pieceReader PieceReader, segmentID storj.SegmentID, limits []*pb.AddressedOrderLimit) *Manager {
-	next := make([]int, len(limits))
-	for num := range next {
-		next[num] = len(next) - 1 - num // descending order, because it feels right.
+	next := make(chan int, len(limits))
+	for num := 0; num < len(limits); num++ {
+		next <- num
 	}
 	return &Manager{
 		exchanger:   exchanger,
 		pieceReader: pieceReader,
 		segmentID:   segmentID,
-		next:        next,
 		limits:      limits,
+		next:        next,
+		exchange:    make(chan struct{}, 1),
+		done:        make(chan struct{}),
 	}
 }
 
 // NextPiece returns a reader and limit for the next piece to upload. It also
 // returns a callback that the caller uses to indicate success (along with the
 // results) or not. NextPiece may return data with a new limit for a piece that
-// was previously attempted but failed. It will return an error failed if there
-// are no more pieces to upload or if it was unable to exchange the limit for a
-// failed piece.
+// was previously attempted but failed. It will return ErrDone when enough
+// pieces have finished successfully to satisfy the optimal threshold. If
+// NextPiece is unable to exchange limits for failed pieces, it will return
+// an error.
 func (mgr *Manager) NextPiece(ctx context.Context) (_ io.Reader, _ *pb.AddressedOrderLimit, _ func(hash *pb.PieceHash, uploaded bool), err error) {
-	mgr.mu.Lock()
-	defer mgr.mu.Unlock()
-
-	if len(mgr.next) == 0 {
-		if err := mgr.exchangeLimitsUnderLock(ctx); err != nil {
+	var num int
+	for acquired := false; !acquired; {
+		// If NextPiece is called with a cancelled context, we want to ensure
+		// that we return before hitting the select and possibly picking up
+		// another piece to upload.
+		if err := ctx.Err(); err != nil {
 			return nil, nil, nil, err
+		}
+
+		select {
+		case num = <-mgr.next:
+			acquired = true
+		case <-mgr.exchange:
+			if err := mgr.exchangeLimits(ctx); err != nil {
+				return nil, nil, nil, err
+			}
+		case <-ctx.Done():
+			return nil, nil, nil, ctx.Err()
+		case <-mgr.done:
+			return nil, nil, nil, ErrDone
 		}
 	}
 
-	// Grab the next piece to upload from the tail of the next list
-	num := mgr.next[len(mgr.next)-1]
-	mgr.next = mgr.next[:len(mgr.next)-1]
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
 
 	limit := mgr.limits[num]
 	piece := mgr.pieceReader.PieceReader(num)
 
+	invoked := false
 	done := func(hash *pb.PieceHash, uploaded bool) {
 		mgr.mu.Lock()
 		defer mgr.mu.Unlock()
 
-		// If the piece upload failed, then add it to the failed list so that
-		// it can be retried with a new order limit if/when needed to keep the
-		// upload going.
-		if !uploaded {
+		// Protect against the callback being invoked twice.
+		if invoked {
+			return
+		}
+		invoked = true
+
+		if uploaded {
+			mgr.results = append(mgr.results, &pb.SegmentPieceUploadResult{
+				PieceNum: int32(num),
+				NodeId:   limit.Limit.StorageNodeId,
+				Hash:     hash,
+			})
+		} else {
 			mgr.failed = append(mgr.failed, num)
+		}
+
+		if len(mgr.results)+len(mgr.failed) < len(mgr.limits) {
 			return
 		}
 
-		mgr.results = append(mgr.results, &pb.SegmentPieceUploadResult{
-			PieceNum: int32(num),
-			NodeId:   limit.Limit.StorageNodeId,
-			Hash:     hash,
-		})
+		// All of the uploads are accounted for. If there are failed pieces
+		// then signal that an exchange should take place so that the
+		// uploads can hopefully continue.
+		if len(mgr.failed) > 0 {
+			select {
+			case mgr.exchange <- struct{}{}:
+			default:
+			}
+			return
+		}
+
+		// Otherwise, all piece uploads have finished and we can signal the
+		// other callers that we are done.
+		close(mgr.done)
 	}
 
 	return piece, limit, done, nil
@@ -120,7 +166,10 @@ func (mgr *Manager) Results() (storj.SegmentID, []*pb.SegmentPieceUploadResult) 
 	return segmentID, results
 }
 
-func (mgr *Manager) exchangeLimitsUnderLock(ctx context.Context) error {
+func (mgr *Manager) exchangeLimits(ctx context.Context) error {
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
+
 	if len(mgr.failed) == 0 {
 		// purely defensive: shouldn't happen.
 		return errs.New("failed piece list is empty")
@@ -132,7 +181,9 @@ func (mgr *Manager) exchangeLimitsUnderLock(ctx context.Context) error {
 	}
 	mgr.segmentID = segmentID
 	mgr.limits = limits
-	mgr.next = append(mgr.next, mgr.failed...)
+	for _, num := range mgr.failed {
+		mgr.next <- num
+	}
 	mgr.failed = mgr.failed[:0]
 	return nil
 }

@@ -20,9 +20,7 @@ import (
 	"storj.io/uplink/private/storage/streams/streambatcher"
 )
 
-var (
-	mon = monkit.Package()
-)
+var mon = monkit.Package()
 
 // SegmentSource is a source of segments to be uploaded.
 type SegmentSource interface {
@@ -59,17 +57,21 @@ type Info = streambatcher.Info
 
 // UploadObject uploads a stream of segments as an object identified by the
 // given beginObject response.
-func UploadObject(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata) (Info, error) {
+func UploadObject(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata) (_ Info, err error) {
+	defer mon.Task()(&ctx)(&err)
 	return uploadSegments(ctx, segmentSource, segmentUploader, miBatcher, beginObject, encMeta, nil, nil)
 }
 
 // UploadPart uploads a stream of segments as a part of a multipart upload
 // identified by the given streamID.
-func UploadPart(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, eTagCh <-chan []byte) (Info, error) {
+func UploadPart(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, eTagCh <-chan []byte) (_ Info, err error) {
+	defer mon.Task()(&ctx)(&err)
 	return uploadSegments(ctx, segmentSource, segmentUploader, miBatcher, nil, nil, streamID, eTagCh)
 }
 
 func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata, streamID storj.StreamID, eTagCh <-chan []byte) (_ Info, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	batcher := streambatcher.New(miBatcher, streamID)
 	aggregator := batchaggregator.New(batcher)
 

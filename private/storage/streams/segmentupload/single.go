@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
@@ -17,6 +18,11 @@ import (
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams/pieceupload"
 	"storj.io/uplink/private/storage/streams/splitter"
+)
+
+var (
+	mon        = monkit.Package()
+	uploadTask = mon.TaskNamed("segment-upload")
 )
 
 // Scheduler is used to coordinate and constrain resources between
@@ -38,6 +44,15 @@ func Begin(ctx context.Context,
 	scheduler Scheduler,
 	longTailMargin int,
 ) (_ *Upload, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	taskDone := uploadTask(&ctx)
+	defer func() {
+		if err != nil {
+			taskDone(&err)
+		}
+	}()
+
 	// Join the scheduler so the concurrency can be limited appropriately.
 	handle := scheduler.Join()
 	defer func() {
@@ -46,9 +61,6 @@ func Begin(ctx context.Context,
 		}
 	}()
 
-	if longTailMargin < 0 {
-		return nil, errs.New("long tail margin must be non-negative")
-	}
 	if beginSegment.RedundancyStrategy.ErasureScheme == nil {
 		return nil, errs.New("begin segment response is missing redundancy strategy")
 	}
@@ -61,11 +73,14 @@ func Begin(ctx context.Context,
 		return nil, errs.New("begin segment response needs at least %d limits to meet optimal threshold but has %d", optimalThreshold, len(beginSegment.Limits))
 	}
 
-	// The number of uploads is enough to satisfy the optimal threshold plus
-	// a small long tail margin, capped by the number of limits.
-	uploaderCount := optimalThreshold + longTailMargin
-	if uploaderCount > len(beginSegment.Limits) {
-		uploaderCount = len(beginSegment.Limits)
+	uploaderCount := len(beginSegment.Limits)
+	if longTailMargin >= 0 {
+		// The number of uploads is enough to satisfy the optimal threshold plus
+		// a small long tail margin, capped by the number of limits.
+		uploaderCount = optimalThreshold + longTailMargin
+		if uploaderCount > len(beginSegment.Limits) {
+			uploaderCount = len(beginSegment.Limits)
+		}
 	}
 
 	mgr := pieceupload.NewManager(
@@ -120,6 +135,7 @@ func Begin(ctx context.Context,
 
 	return &Upload{
 		ctx:              ctx,
+		taskDone:         taskDone,
 		optimalThreshold: beginSegment.RedundancyStrategy.OptimalThreshold(),
 		handle:           handle,
 		results:          results,
@@ -151,6 +167,7 @@ type segmentResult struct {
 // method.
 type Upload struct {
 	ctx              context.Context
+	taskDone         func(*error)
 	optimalThreshold int
 	handle           scheduler.Handle
 	results          chan segmentResult
@@ -162,7 +179,8 @@ type Upload struct {
 
 // Wait blocks until the segment upload completes. It will be successful as
 // long as enough pieces have uploaded successfully.
-func (upload *Upload) Wait() (*metaclient.CommitSegmentParams, error) {
+func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
+	defer upload.taskDone(&err)
 	defer upload.handle.Done()
 	defer upload.cancel()
 
@@ -182,7 +200,6 @@ func (upload *Upload) Wait() (*metaclient.CommitSegmentParams, error) {
 	// really only necessary for deterministic testing.
 	upload.wg.Wait()
 
-	var err error
 	if successful < upload.optimalThreshold {
 		err = errs.Combine(errs.New("failed to upload enough pieces (needed at least %d but got %d)", upload.optimalThreshold, successful), eg.Err())
 	}

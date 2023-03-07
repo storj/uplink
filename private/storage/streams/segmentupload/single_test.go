@@ -25,6 +25,7 @@ import (
 
 const (
 	optimalShares = 3
+	totalShares   = 4
 )
 
 var (
@@ -78,13 +79,13 @@ func TestBegin(t *testing.T) {
 		},
 		{
 			desc:                   "negative long tail margin",
-			beginSegment:           &metaclient.BeginSegmentResponse{RedundancyStrategy: rs, Limits: minimumLimits},
+			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
 			overrideLongTailMargin: func() int { return -1 },
-			expectBeginErr:         "long tail margin must be non-negative",
+			expectUploaderCount:    totalShares,
 		},
 		{
 			desc:                   "zero long tail margin",
-			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, fastKind),
+			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
 			overrideLongTailMargin: func() int { return 0 },
 			expectUploaderCount:    optimalShares,
 		},
@@ -384,7 +385,7 @@ func mustNewRedundancyStrategy() eestream.RedundancyStrategy {
 		RequiredShares: 1,
 		RepairShares:   2,
 		OptimalShares:  int16(optimalShares),
-		TotalShares:    4,
+		TotalShares:    int16(totalShares),
 	})
 	if err != nil {
 		panic(err)

@@ -7,9 +7,13 @@ import (
 	"context"
 	"io"
 
+	"github.com/spacemonkeygo/monkit/v3"
+
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 )
+
+var mon = monkit.Package()
 
 // PiecePutter puts pieces.
 type PiecePutter interface {
@@ -22,7 +26,16 @@ type PiecePutter interface {
 // UploadOne uploads one piece from the manager using the given private key. If
 // it fails, it will attempt to upload another until either the upload context,
 // or the long tail context is cancelled.
-func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey) (bool, error) {
+func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey) (_ bool, err error) {
+	defer mon.Task()(&longTailCtx)(&err)
+
+	// If the long tail context is cancelled, then return a nil error.
+	defer func() {
+		if longTailCtx.Err() != nil {
+			err = nil
+		}
+	}()
+
 	for {
 		piece, limit, done, err := manager.NextPiece(longTailCtx)
 		if err != nil {
@@ -39,12 +52,12 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 			return false, err
 		}
 
-		if err := longTailCtx.Err(); err != nil {
+		if longTailCtx.Err() != nil {
 			// If this context is done but the uploadCtx context isn't, then the
 			// download was cancelled for long tail optimization purposes. This
 			// is expected. Return that there was no error but that the upload
 			// did not complete.
-			return false, nil //nolint: nilerr // returning nil here is intended
+			return false, nil
 		}
 	}
 }

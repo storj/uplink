@@ -61,7 +61,7 @@ func TestUploadOne(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			uploadCtx, uploadCancel := context.WithCancel(context.Background())
 			t.Cleanup(uploadCancel)
-			longTailCtx, longTailCancel := context.WithCancel(uploadCtx)
+			longTailCtx, longTailCancel := context.WithCancel(context.Background())
 			t.Cleanup(longTailCancel)
 
 			if tc.cancelUpload {

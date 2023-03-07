@@ -5,6 +5,7 @@ package pieceupload
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,8 +20,9 @@ func TestManager(t *testing.T) {
 
 		done0 := requireNextPiece(t, manager, piecenum{0}, revision{0})
 		requireNextPieceAndFinish(t, manager, piecenum{1}, revision{0}, true)
-		requireNoNextPiece(t, manager)
 		done0(true)
+
+		requireDone(t, manager)
 
 		assertResults(t, manager, revision{0},
 			makeResult(piecenum{0}, revision{0}),
@@ -38,21 +40,24 @@ func TestManager(t *testing.T) {
 		requireNextPieceAndFinish(t, manager, piecenum{1}, revision{0}, true)
 		requireNextPieceAndFinish(t, manager, piecenum{2}, revision{0}, false)
 
-		// retries happen in last-failed-first order, so:
+		// Now that the all uploads have been attempted, we expect the next
+		// call to exchange the upload limits and return a piece to retry.
+
+		// Retries happen in first-failed order, so:
 		// 2(1) is retried and succeeds
 		// 0(1) is retried and fails
-		requireNextPieceAndFinish(t, manager, piecenum{2}, revision{1}, true)
-		requireNextPieceAndFinish(t, manager, piecenum{0}, revision{1}, false)
+		requireNextPieceAndFinish(t, manager, piecenum{0}, revision{1}, true)
+		requireNextPieceAndFinish(t, manager, piecenum{2}, revision{1}, false)
 
-		// 0(2) is retried again and succeeds
-		requireNextPieceAndFinish(t, manager, piecenum{0}, revision{2}, true)
+		// 0(2) is retried again (after another limit exchange) and succeeds
+		requireNextPieceAndFinish(t, manager, piecenum{2}, revision{2}, true)
 
-		requireNoNextPiece(t, manager)
+		requireDone(t, manager)
 
 		assertResults(t, manager, revision{2},
-			makeResult(piecenum{0}, revision{2}),
+			makeResult(piecenum{0}, revision{1}),
 			makeResult(piecenum{1}, revision{0}),
-			makeResult(piecenum{2}, revision{1}),
+			makeResult(piecenum{2}, revision{2}),
 		)
 	})
 
@@ -90,13 +95,13 @@ func requireNextPiece(t *testing.T, manager *Manager, expectedNum piecenum, expe
 	}
 }
 
-func requireNoNextPiece(t *testing.T, manager *Manager) {
+func requireDone(t *testing.T, manager *Manager) {
 	reader, _, _, err := manager.NextPiece(context.Background())
 	if err == nil {
-		require.FailNowf(t, "expected no next piece", "next piece %d", pieceReaderNum(reader))
+		require.FailNowf(t, "expected done", "next piece %d", pieceReaderNum(reader))
 		return
 	}
-	require.EqualError(t, err, "failed piece list is empty")
+	require.True(t, errors.Is(err, ErrDone), "expected done but got %q", err)
 }
 
 func requireNextPieceAndFinish(t *testing.T, manager *Manager, expectedNum piecenum, expectedRev revision, uploaded bool) {
