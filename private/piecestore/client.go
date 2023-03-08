@@ -19,7 +19,7 @@ import (
 )
 
 // NoiseEnabled indicates whether Noise is enabled in this build.
-const NoiseEnabled = true
+const NoiseEnabled = false
 
 var errMessageTimeout = errors.New("message timeout")
 
