@@ -35,6 +35,11 @@ func ConfigGetDialer(uplink.Config, context.Context) (rpc.Dialer, error)
 //go:linkname ConfigSetMaximumBufferSize storj.io/uplink.config_setMaximumBufferSize
 func ConfigSetMaximumBufferSize(*uplink.Config, int)
 
+// ConfigDisableObjectKeyEncryption exposes Config.disableObjectKeyEncryption.
+//
+//go:linkname ConfigDisableObjectKeyEncryption storj.io/uplink.config_disableObjectKeyEncryption
+func ConfigDisableObjectKeyEncryption(config *uplink.Config)
+
 // AccessGetAPIKey exposes Access.getAPIKey.
 //
 //go:linkname AccessGetAPIKey storj.io/uplink.access_getAPIKey

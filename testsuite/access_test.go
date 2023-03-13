@@ -637,6 +637,61 @@ func TestUploadNotAllowedPath(t *testing.T) {
 	})
 }
 
+func TestListObjects_DisableObjectKeyEncryption(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		apiKey := planet.Uplinks[0].Projects[0].APIKey
+
+		// Request an access grant with disable object key encryption
+		config := uplink.Config{}
+		privateAccess.DisableObjectKeyEncryption(&config)
+		access, err := config.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "mypassphrase")
+		require.NoError(t, err)
+
+		bucketName := "testbucket"
+
+		// Restrict the access grant to the test bucket to test that the
+		// object key encryption is still disabled in the derived access grant.
+		access, err = access.Share(uplink.FullPermission(), uplink.SharePrefix{Bucket: bucketName})
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.CreateBucket(ctx, bucketName)
+		require.NoError(t, err)
+
+		// Upload 20 object with random object keys
+		objectCount := 20
+		for i := 0; i < objectCount; i++ {
+			upload, err := project.UploadObject(ctx, bucketName, testrand.Path(), nil)
+			require.NoError(t, err)
+
+			_, err = io.Copy(upload, bytes.NewBuffer(testrand.Bytes(memory.KiB)))
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+		}
+
+		objects := project.ListObjects(ctx, bucketName, &uplink.ListObjectsOptions{
+			Recursive: true,
+		})
+
+		// Check that the object listing is lexicographically sorted
+		var listing []string
+		for objects.Next() {
+			listing = append(listing, objects.Item().Key)
+		}
+		require.NoError(t, objects.Err())
+		require.Len(t, listing, objectCount)
+		assert.IsIncreasing(t, listing)
+	})
+}
+
 func TestListObjects_EncryptionBypass(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,

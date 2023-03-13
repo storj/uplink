@@ -59,6 +59,16 @@ type Config struct {
 	// maximumBufferSize is used to set the maximum buffer size for DRPC
 	// connections/streams.
 	maximumBufferSize int
+
+	// disableObjectKeyEncryption disables the encryption of object keys for newly
+	// uploaded objects.
+	//
+	// Disabling the encryption of object keys means that the object keys are
+	// stored in plain text in the satellite database. This allows object listings
+	// to be returned in lexicographically sorted order.
+	//
+	// Object content is still encrypted as usual.
+	disableObjectKeyEncryption bool
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
@@ -153,6 +163,18 @@ func config_setSatelliteConnectionPool(config *Config, pool *rpcpool.Pool) {
 //go:linkname config_setMaximumBufferSize
 func config_setMaximumBufferSize(config *Config, maximumBufferSize int) {
 	config.maximumBufferSize = maximumBufferSize
+}
+
+// disableObjectKeyEncryption exposes setting disableObjectKeyEncryption.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused
+//go:linkname config_disableObjectKeyEncryption
+func config_disableObjectKeyEncryption(config *Config) {
+	config.disableObjectKeyEncryption = true
 }
 
 func (config Config) validateUserAgent(ctx context.Context) error {

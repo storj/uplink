@@ -20,3 +20,15 @@ func EnablePathEncryptionBypass(access *uplink.Access) error {
 func APIKey(access *uplink.Access) *macaroon.APIKey {
 	return expose.AccessGetAPIKey(access)
 }
+
+// DisableObjectKeyEncryption disables the encryption of object keys for newly
+// uploaded objects.
+//
+// Disabling the encryption of object keys means that the object keys are
+// stored in plain text in the satellite database. This allows object listings
+// to be returned in lexicographically sorted order.
+//
+// Object content is still encrypted as usual.
+func DisableObjectKeyEncryption(config *uplink.Config) {
+	expose.ConfigDisableObjectKeyEncryption(config)
+}

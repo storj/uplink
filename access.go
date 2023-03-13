@@ -193,6 +193,9 @@ func config_requestAccessWithPassphraseAndConcurrency(config Config, ctx context
 
 	encAccess := grant.NewEncryptionAccessWithDefaultKey(key)
 	encAccess.SetDefaultPathCipher(storj.EncAESGCM)
+	if config.disableObjectKeyEncryption {
+		encAccess.SetDefaultPathCipher(storj.EncNull)
+	}
 	encAccess.LimitTo(parsedAPIKey)
 
 	return &Access{
