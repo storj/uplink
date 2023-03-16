@@ -59,7 +59,7 @@ func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey 
 		return nil, Error.New("node ID is required in node URL %q", nodeURL)
 	}
 
-	conn, err := dialer.DialNodeURL(ctx, url)
+	conn, err := dialer.DialNode(ctx, url, rpc.DialOptions{ForceTCPFastOpenMultidialSupport: true})
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
