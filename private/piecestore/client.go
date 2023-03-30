@@ -38,6 +38,7 @@ var (
 // Config defines piecestore client parameters for upload and download.
 type Config struct {
 	DownloadBufferSize int64
+	UploadBufferSize   int64
 
 	InitialStep int64
 	MaximumStep int64
@@ -48,9 +49,10 @@ type Config struct {
 // DefaultConfig are the default params used for upload and download.
 var DefaultConfig = Config{
 	DownloadBufferSize: 256 * memory.KiB.Int64(),
+	UploadBufferSize:   64 * memory.KiB.Int64(),
 
-	InitialStep: 64 * memory.KiB.Int64(),
-	MaximumStep: 256 * memory.KiB.Int64(),
+	InitialStep: 256 * memory.KiB.Int64(),
+	MaximumStep: 550 * memory.KiB.Int64(),
 
 	MessageTimeout: 10 * time.Minute,
 }

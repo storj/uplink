@@ -419,7 +419,6 @@ func TestConcurrentUploadAndCommit(t *testing.T) {
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				testplanet.MaxSegmentSize(20*memory.KiB)(log, index, config)
-				config.Metainfo.MultipleVersions = true
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {

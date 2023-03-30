@@ -167,7 +167,7 @@ func (client *upload) write(ctx context.Context, data io.Reader) (hash *pb.Piece
 	// the current write requires us to send an order with a larger amount in
 	// it, only then will we sign. Most writes won't include an order.
 
-	backingArray := make([]byte, client.client.config.InitialStep)
+	backingArray := make([]byte, client.client.config.UploadBufferSize)
 
 	var orderedSoFar int64
 
