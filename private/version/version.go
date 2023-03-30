@@ -25,6 +25,12 @@ func AppendVersionToUserAgent(useragentStr string) (string, error) {
 			return "", errs.New("invalid user agent: %w", err)
 		}
 	}
+
+	// uplink, built locally, using go.work references
+	if version == "(devel)" {
+		version = ""
+	}
+
 	entries = append(entries, useragent.Entry{
 		Product: "uplink",
 		Version: version,
