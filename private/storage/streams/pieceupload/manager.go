@@ -41,14 +41,17 @@ type Manager struct {
 	exchanger   LimitsExchanger
 	pieceReader PieceReader
 
-	mu        sync.Mutex
-	segmentID storj.SegmentID
-	limits    []*pb.AddressedOrderLimit
-	next      chan int
-	exchange  chan struct{}
-	done      chan struct{}
-	failed    []int
-	results   []*pb.SegmentPieceUploadResult
+	mu         sync.Mutex
+	retries    int
+	segmentID  storj.SegmentID
+	limits     []*pb.AddressedOrderLimit
+	next       chan int
+	exchange   chan struct{}
+	done       chan struct{}
+	xchgFailed chan struct{}
+	xchgError  error
+	failed     []int
+	results    []*pb.SegmentPieceUploadResult
 }
 
 // NewManager returns a new piece upload manager.
@@ -65,6 +68,7 @@ func NewManager(exchanger LimitsExchanger, pieceReader PieceReader, segmentID st
 		next:        next,
 		exchange:    make(chan struct{}, 1),
 		done:        make(chan struct{}),
+		xchgFailed:  make(chan struct{}),
 	}
 }
 
@@ -96,6 +100,8 @@ func (mgr *Manager) NextPiece(ctx context.Context) (_ io.Reader, _ *pb.Addressed
 			return nil, nil, nil, ctx.Err()
 		case <-mgr.done:
 			return nil, nil, nil, ErrDone
+		case <-mgr.xchgFailed:
+			return nil, nil, nil, mgr.xchgError
 		}
 	}
 
@@ -166,14 +172,28 @@ func (mgr *Manager) Results() (storj.SegmentID, []*pb.SegmentPieceUploadResult) 
 	return segmentID, results
 }
 
-func (mgr *Manager) exchangeLimits(ctx context.Context) error {
+func (mgr *Manager) exchangeLimits(ctx context.Context) (err error) {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
+
+	// any error in exchangeLimits is permanently fatal because the
+	// api call should have retries in it already.
+	defer func() {
+		if err != nil && mgr.xchgError == nil {
+			mgr.xchgError = err
+			close(mgr.xchgFailed)
+		}
+	}()
 
 	if len(mgr.failed) == 0 {
 		// purely defensive: shouldn't happen.
 		return errs.New("failed piece list is empty")
 	}
+
+	if mgr.retries > 10 {
+		return errs.New("too many retries: are any nodes reachable?")
+	}
+	mgr.retries++
 
 	segmentID, limits, err := mgr.exchanger.ExchangeLimits(ctx, mgr.segmentID, mgr.failed)
 	if err != nil {

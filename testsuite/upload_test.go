@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestSetMetadata(t *testing.T) {
@@ -342,6 +344,40 @@ func TestUpdateMetadata(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, download.Close())
 		require.Equal(t, expected, downloaded)
+	})
+}
+
+func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 40,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.ReconfigureRS(1, 2, 3, 4),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		for i := 0; i < 40; i++ {
+			require.NoError(t, planet.StopPeer(planet.StorageNodes[i]))
+		}
+
+		project, err := planet.Uplinks[0].OpenProject(
+			testuplink.WithConcurrentSegmentUploadsDefaultConfig(ctx),
+			planet.Satellites[0],
+		)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucket := createBucket(t, ctx, project, "testbucket")
+
+		data := make([]byte, 1*memory.MiB)
+		_, err = rand.Read(data)
+		require.NoError(t, err)
+
+		upload, err := project.UploadObject(ctx, bucket.Name, "test/path", nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write(data)
+		require.Error(t, err)
 	})
 }
 
