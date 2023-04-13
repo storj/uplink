@@ -6,6 +6,8 @@ package metaclient
 import (
 	"time"
 
+	"github.com/zeebo/errs"
+
 	"storj.io/common/storj"
 )
 
@@ -135,13 +137,13 @@ type LastSegment struct {
 
 var (
 	// ErrBucket is an error class for general bucket errors.
-	ErrBucket = storj.ErrBucket
+	ErrBucket = errs.Class("bucket")
 
 	// ErrNoBucket is an error class for using empty bucket name.
-	ErrNoBucket = storj.ErrNoBucket
+	ErrNoBucket = errs.Class("no bucket specified")
 
 	// ErrBucketNotFound is an error class for non-existing bucket.
-	ErrBucketNotFound = storj.ErrBucketNotFound
+	ErrBucketNotFound = errs.Class("bucket not found")
 )
 
 // Bucket contains information about a specific bucket.

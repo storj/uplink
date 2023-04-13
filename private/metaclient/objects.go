@@ -468,10 +468,10 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options Do
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
-		return DownloadInfo{}, storj.ErrNoBucket.New("")
+		return DownloadInfo{}, ErrNoBucket.New("")
 	}
 	if key == "" {
-		return DownloadInfo{}, storj.ErrNoPath.New("")
+		return DownloadInfo{}, ErrNoPath.New("")
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
