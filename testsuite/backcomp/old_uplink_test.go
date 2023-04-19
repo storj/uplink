@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
+	"storj.io/common/pb"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
+	"storj.io/uplink/private/piecestore"
 )
 
 const storjrelease = "v1.0.0" // uses storj.io/uplink v1.0.0-rc.5.0.20200311190324-aee82d3f05aa
@@ -59,8 +61,12 @@ func TestOldUplink(t *testing.T) {
 		// upload with old uplink
 		runBinary("cp", srcOldFile, "sj://bucket/old-uplink", "--access="+access)
 
-		// upload with new uplink
-		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "bucket", "new-uplink", newExpectedData)
+		// upload with new uplink (using SHA-256 piece hash algorithm)
+		err = planet.Uplinks[0].Upload(piecestore.WithPieceHashAlgo(ctx, pb.PieceHashAlgorithm_SHA256), planet.Satellites[0], "bucket", "new-uplink-sha256", newExpectedData)
+		require.NoError(t, err)
+
+		// upload with new uplink (using BLAKE3 piece hash algorithm)
+		err = planet.Uplinks[0].Upload(piecestore.WithPieceHashAlgo(ctx, pb.PieceHashAlgorithm_BLAKE3), planet.Satellites[0], "bucket", "new-uplink-blake3", newExpectedData)
 		require.NoError(t, err)
 
 		// uploaded with old uplink and downloaded with old uplink
@@ -75,9 +81,15 @@ func TestOldUplink(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, oldExpectedData, data)
 
-		// uploaded with new uplink and downloaded with old uplink
-		runBinary("cp", "sj://bucket/new-uplink", dstNewFile, "--access="+access)
+		// uploaded with new uplink and downloaded with old uplink (sha256)
+		runBinary("cp", "sj://bucket/new-uplink-sha256", dstNewFile, "--access="+access)
 		newData, err := os.ReadFile(dstNewFile)
+		require.NoError(t, err)
+		require.Equal(t, newExpectedData, newData)
+
+		// uploaded with new uplink and downloaded with old uplink (blake3)
+		runBinary("cp", "sj://bucket/new-uplink-blake3", dstNewFile, "--access="+access)
+		newData, err = os.ReadFile(dstNewFile)
 		require.NoError(t, err)
 		require.Equal(t, newExpectedData, newData)
 
