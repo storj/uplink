@@ -1328,7 +1328,7 @@ func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectP
 	})
 	if err != nil {
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return DownloadObjectResponse{}, storj.ErrObjectNotFound.Wrap(err)
+			return DownloadObjectResponse{}, ErrObjectNotFound.Wrap(err)
 		}
 		return DownloadObjectResponse{}, Error.Wrap(err)
 	}
