@@ -279,7 +279,7 @@ func (params *ListBucketsParams) toRequest(header *pb.RequestHeader) *pb.BucketL
 		Header:    header,
 		Cursor:    []byte(params.ListOpts.Cursor),
 		Limit:     int32(params.ListOpts.Limit),
-		Direction: int32(params.ListOpts.Direction),
+		Direction: params.ListOpts.Direction,
 	}
 }
 

@@ -9,8 +9,8 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.1.0
-	storj.io/common v0.0.0-20230317142710-ffea9ac03387
-	storj.io/drpc v0.0.33-0.20230224050324-1fd05d3459f8
+	storj.io/common v0.0.0-20230419105836-a520bd7e35e2
+	storj.io/drpc v0.0.33-0.20230417171205-2ca712ef4ab5
 )
 
 require (

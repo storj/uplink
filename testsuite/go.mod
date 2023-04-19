@@ -9,10 +9,10 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
-	storj.io/common v0.0.0-20230403133453-c41ac89d0a5f
-	storj.io/drpc v0.0.33-0.20230329154546-1af8c33020a2
-	storj.io/storj v0.12.1-0.20230406083807-a5d9caa5a5de
-	storj.io/uplink v1.10.1-0.20230331141033-1b3a2ee2cdbe
+	storj.io/common v0.0.0-20230419105836-a520bd7e35e2
+	storj.io/drpc v0.0.33-0.20230417171205-2ca712ef4ab5
+	storj.io/storj v0.12.1-0.20230419123042-41931970fd84
+	storj.io/uplink v1.10.1-0.20230413192940-d37f89e8219e
 )
 
 require (
@@ -89,7 +89,7 @@ require (
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.2.0 // indirect
@@ -98,5 +98,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	storj.io/monkit-jaeger v0.0.0-20220915074555-d100d7589f41 // indirect
 	storj.io/picobuf v0.0.1 // indirect
-	storj.io/private v0.0.0-20230404192906-a2aa8d04d813 // indirect
+	storj.io/private v0.0.0-20230405095015-9e5bbc1c7ca8 // indirect
 )

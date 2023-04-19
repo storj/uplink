@@ -8,6 +8,7 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/pb"
 	"storj.io/common/storj"
 )
 
@@ -84,10 +85,10 @@ type SegmentEncryption struct {
 
 var (
 	// ErrNoPath is an error class for using empty path.
-	ErrNoPath = storj.ErrNoPath
+	ErrNoPath = errs.Class("no path specified")
 
 	// ErrObjectNotFound is an error class for non-existing object.
-	ErrObjectNotFound = storj.ErrObjectNotFound
+	ErrObjectNotFound = errs.Class("object not found")
 )
 
 // Object contains information about a specific object.
@@ -154,13 +155,13 @@ type Bucket struct {
 }
 
 // ListDirection specifies listing direction.
-type ListDirection = storj.ListDirection
+type ListDirection = pb.ListDirection
 
 const (
 	// Forward lists forwards from cursor, including cursor.
-	Forward = storj.Forward
+	Forward = pb.ListDirection_FORWARD
 	// After lists forwards from cursor, without cursor.
-	After = storj.After
+	After = pb.ListDirection_AFTER
 )
 
 // ListOptions lists objects.
