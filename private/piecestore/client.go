@@ -40,8 +40,9 @@ type Config struct {
 	DownloadBufferSize int64
 	UploadBufferSize   int64
 
-	InitialStep int64
-	MaximumStep int64
+	InitialStep      int64
+	MaximumStep      int64
+	MaximumChunkSize int32
 
 	MessageTimeout time.Duration
 }
@@ -51,8 +52,9 @@ var DefaultConfig = Config{
 	DownloadBufferSize: 256 * memory.KiB.Int64(),
 	UploadBufferSize:   64 * memory.KiB.Int64(),
 
-	InitialStep: 256 * memory.KiB.Int64(),
-	MaximumStep: 550 * memory.KiB.Int64(),
+	InitialStep:      256 * memory.KiB.Int64(),
+	MaximumStep:      550 * memory.KiB.Int64(),
+	MaximumChunkSize: 16 * memory.KiB.Int32(),
 
 	MessageTimeout: 10 * time.Minute,
 }

@@ -5,11 +5,11 @@ go 1.18
 require (
 	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
 	github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230227152157-d00b379de191
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.2
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.1.0
-	storj.io/common v0.0.0-20230419105836-a520bd7e35e2
+	storj.io/common v0.0.0-20230428200501-099739f940f7
 	storj.io/drpc v0.0.33-0.20230417171205-2ca712ef4ab5
 )
 

@@ -174,7 +174,8 @@ func (client *Download) Read(data []byte) (read int, err error) {
 								Offset:    client.offset,
 								ChunkSize: client.downloadSize,
 							},
-							Order: order,
+							Order:            order,
+							MaximumChunkSize: client.client.config.MaximumChunkSize,
 						})
 					}
 
@@ -187,6 +188,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 							Offset:    client.offset,
 							ChunkSize: client.downloadSize,
 						},
+						MaximumChunkSize: client.client.config.MaximumChunkSize,
 					})
 					if err != nil {
 						return err
