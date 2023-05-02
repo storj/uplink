@@ -22,6 +22,110 @@ import (
 	"storj.io/uplink/private/storage/streams/streamupload"
 )
 
+// At a high level, uploads are composed of two pieces: a SegmentSource and an
+// UploaderBackend. The SegmentSource is responsible for providing the UploaderBackend
+// with encrypted segments to upload along with the metadata necessary to upload them,
+// and the UploaderBackend is responsible for uploading the all of segments as fast and as
+// reliably as possible.
+//
+// One main reason for this split is to create a "light upload" where a smaller client
+// can be the SegmentSource, encrypting and splitting the data, and a third party server
+// can be the UploaderBackend, performing the Reed-Solomon encoding and uploading the pieces
+// to nodes and issuing the correct RPCs to the satellite.
+//
+// Concretely, the SegmentSource is implemented by the splitter package, and the
+// UploaderBackend is implemented by the streamupload package. The Uploader in this package
+// creates and combines those two to perform the uploads without the help of a third
+// party server.
+//
+// The splitter package exports the Splitter type which implements SegmentSource and has
+// these methods (only Next is part of the SegmentSource interface):
+//
+//  * Write([]byte) (int, error): the standard io.Writer interface.
+//  * Finish(error): informs the splitter that no more writes are coming
+//                   with a potential error if there was one.
+//  * Next(context.Context) (Segment, error): blocks until enough data has been
+//                                            written to know if the segment should
+//                                            be inline and then returns the next
+//                                            segment to upload.
+//
+// where the Segment type is an interface that mainly allows one to get a reader
+// for the data with the `Reader() io.Reader` method and has many other methods
+// for getting the metadata an UploaderBackend would need to upload the segment.
+// This means the Segment is somewhat like a promise type, where not necessarily
+// all of the data is available immediately, but it will be available eventually.
+//
+// The Next method on the SegmentSource is used by the UploaderBackend when it wants
+// a new segment to upload, and the Write and Finish calls are used by the client
+// providing the data to upload. The splitter.Splitter has the property that there
+// is bounded write-ahead: Write calls will block until enough data has been read from
+// the io.Reader returned by the Segment. This provides backpressure to the client
+//  avoiding the need for large buffers.
+//
+// The UploaderBackend ends up calling one of UploadObject or UploadPart
+// in the streamupload package. Both of those end up dispatching to the
+// same logic in uploadSegments which creates and uses many smaller helper
+// types with small responsibilities. The main helper types are:
+//
+//  * streambatcher.Batcher: Wraps the metaclient.Batch api to keep track of
+//                           plain bytes uploaded and the stream id of the upload,
+//                           because sometimes the stream id is not known until
+//                           after a BeginObject call.
+//  * batchaggregator.Aggregator: Aggregates individual metaclient.BatchItems
+//                                into larger batches, lazily flushing them
+//                                to reduce round trips to the satellite.
+//  * segmenttracker.Tracker: Some data is only available after the final segment
+//                            is uploaded, like the ETag. But, since segments can
+//                            be uploaded in parallel and finish out of order, we
+//                            cannot commit any segment until we are sure it is not
+//                            the last segment. This type holds CommitSegment calls
+//                            until it knows the ETag will be available and then
+//                            flushes them when possible.
+//
+// The uploadSegments function simply calls Next on the SegmentSource, issuing
+// any RPCs necessary to begin the segment and passes it to a provided SegmentUploader.
+// multiple segments to be uploaded in parallel thanks to the SegmentUploader interface.
+// It has a method to begin uploading a segment that blocks until enough resources are
+// available, and returns a handle that can be Waited on that returns when the segment
+// is finished uploading. The function thus calls Begin synchronously with the loop
+// getting the next segment, and then calls Wait asynchronously in a goroutine. Thus,
+// the function is limited on the input side by the Write calls to the source, and
+// limited on the output side on the Begin call blocking for enough resources.
+// Finally, when all of the segments are finished indicated by Next returning a nil
+// segment, it issues some more necessary RPCs to finish off the upload, and returns the
+// result.
+//
+// The SegmentUploader is responsible for uploading an individual segment and also has
+// many smaller helper types:
+//
+//  * pieceupload.LimitsExchanger: This allows the segment upload to request more
+//                                 nodes to upload to when some of the piece uploads
+//                                 fail, making segment uploads resilient.
+//  * pieceupload.Manager: Responsible for handing out pieces to upload and in charge
+//                         of using the LimitsExchanger when necessary. It keeps track
+//                         of which pieces have succeeded and which have failed for
+//                         final inspection, ensuring enough pieces are successful for
+//                         an upload and constructing a FinishSegment RPC telling the
+//                         satellite which pieces were successful.
+//  * pieceupload.PiecePutter: This is the interface that actually performs an individual
+//                             piece upload to a single node. It will grab a piece from
+//                             the Manager and attempt to upload it, looping until it is
+//                             either canceled or succeeds in uploading some piece to
+//                             some node, both potentially different every iteration.
+//  * scheduler.Scheduler: This is how the SegmentUploader ensures that it operates
+//                         within some amount of resources. At time of writing, it is
+//                         a priority semaphore in the sense that each segment upload
+//                         grabs a Handle that can be used to grab a Resource. The total
+//                         number of Resources is limited, and when a Resource is put
+//                         back, the earliest acquired Handle is given priority. This
+//                         ensures that earlier started segments finish more quickly
+//                         keeping overall resource usage low.
+//
+// The SegmentUploader simply acquires a Handle from the scheduler, and for each piece
+// acquires a Resource from the Handle, launches a goroutine that attempts to upload
+// a piece and returns the Resource when it is done, and returns a type that knows how
+// to wait for all of those goroutines to finish and return the upload results.
+
 // MetainfoUpload are the metainfo methods needed to upload a stream.
 type MetainfoUpload interface {
 	metaclient.Batcher
