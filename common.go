@@ -76,13 +76,17 @@ func convertKnownErrors(err error, bucket, key string) error {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrSegmentsLimitExceeded))
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
+		const (
+			bucketNotFoundPrefix = "bucket not found"
+			objectNotFoundPrefix = "object not found"
+		)
+
 		message := errs.Unwrap(err).Error()
-		if strings.HasPrefix(message, metaclient.ErrBucketNotFound.New("").Error()) {
-			prefixLength := len(metaclient.ErrBucketNotFound.New("").Error())
+		if strings.HasPrefix(message, bucketNotFoundPrefix) {
 			// remove error prefix + ": " from message
-			bucket := message[prefixLength+2:]
+			bucket := strings.TrimPrefix(message[len(bucketNotFoundPrefix):], ": ")
 			return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
-		} else if strings.HasPrefix(message, metaclient.ErrObjectNotFound.New("").Error()) {
+		} else if strings.HasPrefix(message, objectNotFoundPrefix) {
 			return errwrapf("%w (%q)", ErrObjectNotFound, key)
 		}
 	case errs2.IsRPC(err, rpcstatus.PermissionDenied):
