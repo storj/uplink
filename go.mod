@@ -10,7 +10,7 @@ require (
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.1.0
 	storj.io/common v0.0.0-20230428200501-099739f940f7
-	storj.io/drpc v0.0.33-0.20230417171205-2ca712ef4ab5
+	storj.io/drpc v0.0.33
 )
 
 require (
