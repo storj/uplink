@@ -112,7 +112,7 @@ func TestBegin(t *testing.T) {
 				cancel()
 				return ctx
 			},
-			expectBeginErr: "failed to obtain piece upload resource",
+			expectBeginErr: "failed to obtain piece upload handle",
 		},
 		{
 			desc:          "fails when not enough successful pieces were uploaded",
@@ -285,13 +285,21 @@ func newWrappedScheduler() *wrappedScheduler {
 	}
 }
 
-func (w *wrappedScheduler) Join() scheduler.Handle {
-	handle := &wrappedHandle{wrapped: w.wrapped.Join()}
+func (w *wrappedScheduler) Join(ctx context.Context) (scheduler.Handle, bool) {
+	wrapped, ok := w.wrapped.Join(ctx)
+	if !ok {
+		return nil, false
+	}
+	handle := &wrappedHandle{wrapped: wrapped}
 	w.handles = append(w.handles, handle)
-	return handle
+	return handle, true
 }
 
 func (w *wrappedScheduler) check(expectedUploaderCount int) error {
+	// we're allowed 0 handles if we expected no upload resources
+	if expectedUploaderCount == 0 && len(w.handles) == 0 {
+		return nil
+	}
 	if len(w.handles) != 1 {
 		return errs.New("expected one handle but got %d", len(w.handles))
 	}

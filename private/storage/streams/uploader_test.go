@@ -388,8 +388,8 @@ func (fixedMetadata) Metadata() ([]byte, error) {
 
 type noopScheduler struct{}
 
-func (noopScheduler) Join() scheduler.Handle {
-	return noopHandle{}
+func (noopScheduler) Join(ctx context.Context) (scheduler.Handle, bool) {
+	return noopHandle{}, true
 }
 
 type noopHandle struct{}

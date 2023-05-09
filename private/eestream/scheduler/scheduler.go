@@ -12,8 +12,9 @@ import (
 // with the property that earlier acquired handles get preference for
 // new resources over later acquired handles.
 type Scheduler struct {
-	opts Options
-	sema chan struct{}
+	opts  Options
+	rsema chan struct{}
+	hsema chan struct{}
 
 	mu      sync.Mutex
 	prio    int
@@ -22,14 +23,21 @@ type Scheduler struct {
 
 // Options controls the parameters of the Scheduler.
 type Options struct {
-	MaximumConcurrent int // number of maximum concurrent resources
+	MaximumConcurrent        int // number of maximum concurrent resources
+	MaximumConcurrentHandles int // number of maximum concurrent handles
 }
 
 // New constructs a new Scheduler.
 func New(opts Options) *Scheduler {
+	var hsema chan struct{}
+	if opts.MaximumConcurrentHandles > 0 {
+		hsema = make(chan struct{}, opts.MaximumConcurrentHandles)
+	}
+
 	return &Scheduler{
-		opts: opts,
-		sema: make(chan struct{}, opts.MaximumConcurrent),
+		opts:  opts,
+		rsema: make(chan struct{}, opts.MaximumConcurrent),
+		hsema: hsema,
 	}
 }
 
@@ -43,7 +51,7 @@ func (s *Scheduler) resourceGet(ctx context.Context, h *handle) bool {
 	// fast path: if we have a semaphore slot, then immediately return it.
 	select {
 	default:
-	case s.sema <- struct{}{}:
+	case s.rsema <- struct{}{}:
 		return true
 	}
 
@@ -61,7 +69,7 @@ func (s *Scheduler) resourceGet(ctx context.Context, h *handle) bool {
 
 		// if we acquired a resource, then we're responsible for informing
 		// the appropriate handler.
-		case s.sema <- struct{}{}:
+		case s.rsema <- struct{}{}:
 			// find the most appropriate handler and forward them the token.
 			var w *handle
 			s.mu.Lock()
@@ -74,7 +82,7 @@ func (s *Scheduler) resourceGet(ctx context.Context, h *handle) bool {
 			// are no waiters, then we must have been removed from the list
 			// and so we must be ready to return the token. wait and do that.
 			if len(s.waiters) == 0 {
-				<-s.sema
+				<-s.rsema
 				s.mu.Unlock()
 
 				<-h.sig
@@ -114,7 +122,17 @@ func (s *Scheduler) numWaiters() int {
 }
 
 // Join acquires a new Handle that can be used to acquire Resources.
-func (s *Scheduler) Join() Handle {
+func (s *Scheduler) Join(ctx context.Context) (Handle, bool) {
+	if ctx.Err() != nil {
+		return nil, false
+	} else if s.hsema != nil {
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case s.hsema <- struct{}{}:
+		}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -124,7 +142,7 @@ func (s *Scheduler) Join() Handle {
 		prio:  s.prio,
 		sched: s,
 		sig:   make(chan struct{}, 1),
-	}
+	}, true
 }
 
 // Handle is the interface describing acquired handles from a scheduler.
@@ -142,15 +160,25 @@ type Handle interface {
 
 type handle struct {
 	prio  int
-	done  bool
 	wg    sync.WaitGroup
 	sched *Scheduler
 	sig   chan struct{}
+
+	mu   sync.Mutex
+	done bool
 }
 
 func (h *handle) Done() {
+	h.mu.Lock()
+	done := h.done
 	h.done = true
+	h.mu.Unlock()
+
 	h.wg.Wait()
+
+	if !done && h.sched.hsema != nil {
+		<-h.sched.hsema
+	}
 }
 
 func (h *handle) Get(ctx context.Context) (Resource, bool) {
@@ -175,7 +203,7 @@ type Resource interface {
 type resource handle
 
 func (r *resource) Done() {
-	<-(*handle)(r).sched.sema
+	<-(*handle)(r).sched.rsema
 	(*handle)(r).wg.Done()
 }
 

@@ -23,9 +23,9 @@ func TestScheduler_Priority(t *testing.T) {
 
 	s := New(Options{MaximumConcurrent: 3})
 
-	h1 := s.Join()
-	h2 := s.Join()
-	h3 := s.Join()
+	h1, _ := s.Join(ctx)
+	h2, _ := s.Join(ctx)
+	h3, _ := s.Join(ctx)
 
 	_, _ = h1.Get(ctx)
 	_, _ = h1.Get(ctx)
@@ -123,7 +123,7 @@ func TestScheduler_Limits(t *testing.T) {
 			defer wg.Done()
 			rng := rand.New(rand.NewSource(seed + int64(i)))
 
-			h := s.Join()
+			h, _ := s.Join(ctx)
 			defer h.Done()
 
 			held := make([]Resource, 0, maxConcurrent)
@@ -177,12 +177,42 @@ func TestScheduler_Limits(t *testing.T) {
 	require.LessOrEqual(t, max, int64(maxConcurrent))
 }
 
+func TestScheduler_MaxHandles(t *testing.T) {
+	ctx := context.Background()
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+
+	s := New(Options{MaximumConcurrentHandles: 1})
+
+	{ // first join should be fine
+		h, ok := s.Join(ctx)
+		require.True(t, ok)
+		h.Done()
+	}
+
+	{ // join with canceled should always fail
+		_, ok := s.Join(canceled)
+		require.False(t, ok)
+	}
+
+	func() { // a second join should fail when handle outstanding
+		h, ok := s.Join(ctx)
+		require.True(t, ok)
+		defer h.Done()
+
+		timeout, cancel := context.WithTimeout(ctx, time.Millisecond)
+		defer cancel()
+		_, ok = s.Join(timeout)
+		require.False(t, ok)
+	}()
+}
+
 func BenchmarkScheduler_Single(b *testing.B) {
 	ctx := context.Background()
 
 	s := New(Options{MaximumConcurrent: 1})
 
-	h := s.Join()
+	h, _ := s.Join(ctx)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -203,7 +233,7 @@ func BenchmarkScheduler_Parallel(b *testing.B) {
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
-		h := s.Join()
+		h, _ := s.Join(ctx)
 		defer h.Done()
 
 		for pb.Next() {

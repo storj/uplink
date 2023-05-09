@@ -77,7 +77,8 @@ type ConcurrentSegmentUploadsConfig struct {
 func DefaultConcurrentSegmentUploadsConfig() ConcurrentSegmentUploadsConfig {
 	return ConcurrentSegmentUploadsConfig{
 		SchedulerOptions: scheduler.Options{
-			MaximumConcurrent: 300,
+			MaximumConcurrent:        300,
+			MaximumConcurrentHandles: 10,
 		},
 		LongTailMargin: 50,
 	}

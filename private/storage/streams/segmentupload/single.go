@@ -28,7 +28,7 @@ var (
 // Scheduler is used to coordinate and constrain resources between
 // concurrent segment uploads.
 type Scheduler interface {
-	Join() scheduler.Handle
+	Join(ctx context.Context) (scheduler.Handle, bool)
 }
 
 // Begin starts a segment upload identified by the segment ID provided in the
@@ -54,7 +54,10 @@ func Begin(ctx context.Context,
 	}()
 
 	// Join the scheduler so the concurrency can be limited appropriately.
-	handle := scheduler.Join()
+	handle, ok := scheduler.Join(ctx)
+	if !ok {
+		return nil, errs.New("failed to obtain piece upload handle")
+	}
 	defer func() {
 		if err != nil {
 			handle.Done()
