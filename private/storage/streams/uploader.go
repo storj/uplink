@@ -235,7 +235,7 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 		// outstanding writes to the splitter fail, otherwise the writes will
 		// block waiting for the upload to read the stream.
 		if err != nil {
-			split.Finish(errs.Combine(errs.New("upload failed"), err))
+			split.Finish(err)
 		}
 		done <- uploadResult{info: info, err: err}
 	}()
@@ -297,7 +297,7 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 		// outstanding writes to the splitter fail, otherwise the writes will
 		// block waiting for the upload to read the stream.
 		if err != nil {
-			split.Finish(errs.Combine(errs.New("upload failed"), err))
+			split.Finish(err)
 		}
 		done <- uploadResult{info: info, err: err}
 	}()
