@@ -231,6 +231,10 @@ type fakeSegment struct {
 	err error
 }
 
+func (fakeSegment) Position() metaclient.SegmentPosition {
+	return metaclient.SegmentPosition{}
+}
+
 func (fakeSegment) Reader() io.Reader {
 	return bytes.NewReader(nil)
 }

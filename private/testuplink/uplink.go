@@ -5,6 +5,10 @@ package testuplink
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"sync"
+	"time"
 
 	"storj.io/common/memory"
 	"storj.io/uplink/private/eestream/scheduler"
@@ -17,6 +21,11 @@ type plainSizeKey struct{}
 type listLimitKey struct{}
 
 type concurrentSegmentUploadsConfigKey struct{}
+
+type (
+	logWriterKey        struct{}
+	logWriterContextKey struct{}
+)
 
 // WithMaxSegmentSize creates context with max segment size for testing purposes.
 //
@@ -110,4 +119,82 @@ func GetConcurrentSegmentUploadsConfig(ctx context.Context) *ConcurrentSegmentUp
 		return &config
 	}
 	return nil
+}
+
+// WithLogWriter creates context with information about upload log file.
+func WithLogWriter(ctx context.Context, w io.Writer) context.Context {
+	return context.WithValue(ctx, logWriterKey{}, w)
+}
+
+// GetLogWriter returns upload log file from context if exists.
+func GetLogWriter(ctx context.Context) io.Writer {
+	if w, ok := ctx.Value(logWriterKey{}).(io.Writer); ok {
+		return w
+	}
+	return nil
+}
+
+type contextKeyList struct {
+	key  string
+	val  string
+	next *contextKeyList
+}
+
+// WithLogWriterContext appends the key/val pair to the context that is logged with
+// each Log call.
+func WithLogWriterContext(ctx context.Context, kvs ...string) context.Context {
+	for i := 0; i+1 < len(kvs); i += 2 {
+		ctx = context.WithValue(ctx, logWriterContextKey{}, &contextKeyList{
+			key:  kvs[i],
+			val:  kvs[i+1],
+			next: getLogWriterContext(ctx),
+		})
+	}
+	return ctx
+}
+
+func getLogWriterContext(ctx context.Context) *contextKeyList {
+	l, _ := ctx.Value(logWriterContextKey{}).(*contextKeyList)
+	return l
+}
+
+var (
+	logMu    sync.Mutex
+	logStart = time.Now()
+)
+
+// Log writes to upload log file if exists.
+func Log(ctx context.Context, args ...interface{}) {
+	w := GetLogWriter(ctx)
+	if w == nil {
+		return
+	}
+
+	logMu.Lock()
+	defer logMu.Unlock()
+
+	now := time.Now()
+
+	_, _ = io.WriteString(w, now.Truncate(0).Format(time.StampNano))
+	_, _ = io.WriteString(w, " (")
+	_, _ = fmt.Fprintf(w, "%-12s", now.Sub(logStart).String())
+	_, _ = io.WriteString(w, ")")
+
+	l, first := getLogWriterContext(ctx), true
+	for ; l != nil; l, first = l.next, false {
+		if first {
+			_, _ = io.WriteString(w, " [")
+		} else {
+			_, _ = io.WriteString(w, ", ")
+		}
+		_, _ = io.WriteString(w, l.key)
+		_, _ = io.WriteString(w, "=")
+		_, _ = io.WriteString(w, l.val)
+	}
+	if !first {
+		_, _ = io.WriteString(w, "]")
+	}
+
+	_, _ = io.WriteString(w, ": ")
+	_, _ = fmt.Fprintln(w, args...)
 }

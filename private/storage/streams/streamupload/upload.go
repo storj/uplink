@@ -18,6 +18,7 @@ import (
 	"storj.io/uplink/private/storage/streams/segmenttracker"
 	"storj.io/uplink/private/storage/streams/splitter"
 	"storj.io/uplink/private/storage/streams/streambatcher"
+	"storj.io/uplink/private/testuplink"
 )
 
 var mon = monkit.Package()
@@ -72,6 +73,9 @@ func UploadPart(ctx context.Context, segmentSource SegmentSource, segmentUploade
 func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata, streamID storj.StreamID, eTagCh <-chan []byte) (_ Info, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	testuplink.Log(ctx, "Uploading segments...")
+	defer testuplink.Log(ctx, "Done uploading segments...")
+
 	batcher := streambatcher.New(miBatcher, streamID)
 	aggregator := batchaggregator.New(batcher)
 
@@ -106,10 +110,13 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 	for {
 		segment, err := segmentSource.Next(ctx)
 		if err != nil {
+			testuplink.Log(ctx, "Next segment err:", err)
 			return Info{}, err
 		} else if segment == nil {
+			testuplink.Log(ctx, "Next returned nil segment")
 			break
 		}
+		testuplink.Log(ctx, "Got next segment. Inline:", segment.Inline())
 		segments = append(segments, segment)
 
 		if segment.Inline() {
@@ -152,6 +159,7 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 
 	tracker.SegmentsScheduled(lastSegment)
 
+	testuplink.Log(ctx, "Waiting for error group managing segments...")
 	if err := eg.Wait(); err != nil {
 		return Info{}, err
 	}

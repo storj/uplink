@@ -5,6 +5,7 @@ package segmentupload
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams/pieceupload"
 	"storj.io/uplink/private/storage/streams/splitter"
+	"storj.io/uplink/private/testuplink"
 )
 
 var (
@@ -45,6 +47,10 @@ func Begin(ctx context.Context,
 	longTailMargin int,
 ) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
+
+	ctx = testuplink.WithLogWriterContext(ctx, "seg_pos", fmt.Sprint(segment.Position()))
+	testuplink.Log(ctx, "Begin upload segment...")
+	defer testuplink.Log(ctx, "Done begin upload segment.")
 
 	taskDone := uploadTask(&ctx)
 	defer func() {
@@ -127,9 +133,10 @@ func Begin(ctx context.Context,
 			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey)
 			results <- segmentResult{uploaded: uploaded, err: err}
 			if uploaded {
-				// Piece upload was successful. If we have met or surpassed the
-				// optimal threshold, we can cancel the rest.
-				if int(atomic.AddInt32(&successful, 1)) >= optimalThreshold {
+				// Piece upload was successful. If we have met the optimal threshold, we
+				// can cancel the rest.
+				if int(atomic.AddInt32(&successful, 1)) == optimalThreshold {
+					testuplink.Log(ctx, "Segment reached optimal threshold of", optimalThreshold, "pieces.")
 					cancel()
 				}
 			}
@@ -207,6 +214,13 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 		err = errs.Combine(errs.New("failed to upload enough pieces (needed at least %d but got %d)", upload.optimalThreshold, successful), eg.Err())
 	}
 	upload.segment.DoneReading(err)
+
+	testuplink.Log(upload.ctx, "Done waiting for segment.",
+		"successful:", successful,
+		"optimal:", upload.optimalThreshold,
+		"errs:", eg.Err(),
+	)
+
 	if err != nil {
 		return nil, err
 	}

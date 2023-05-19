@@ -5,12 +5,14 @@ package batchaggregator
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/testuplink"
 )
 
 var mon = monkit.Package()
@@ -80,5 +82,13 @@ func (a *Aggregator) issueBatchLocked(ctx context.Context) (_ []metaclient.Batch
 		return nil, nil
 	}
 
+	for _, batchItem := range batchItems {
+		testuplink.Log(ctx, "Flush batch item:", batchItemTypeName(batchItem))
+	}
+
 	return a.batcher.Batch(ctx, batchItems...)
+}
+
+func batchItemTypeName(batchItem metaclient.BatchItem) string {
+	return fmt.Sprintf("%T", batchItem.BatchItem().Request)
 }

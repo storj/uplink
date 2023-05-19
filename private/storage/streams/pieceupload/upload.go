@@ -5,12 +5,14 @@ package pieceupload
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/spacemonkeygo/monkit/v3"
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/uplink/private/testuplink"
 )
 
 var mon = monkit.Package()
@@ -42,7 +44,26 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 			return false, err
 		}
 
+		var pieceID string
+		if limit.Limit != nil {
+			pieceID = limit.Limit.PieceId.String()
+		}
+
+		var address, noise string
+		if limit.StorageNodeAddress != nil {
+			address = fmt.Sprintf("%-21s", limit.StorageNodeAddress.Address)
+			noise = fmt.Sprintf("%-5t", limit.StorageNodeAddress.NoiseInfo != nil)
+		}
+
+		logCtx := testuplink.WithLogWriterContext(uploadCtx,
+			"piece_id", pieceID,
+			"address", address,
+			"noise", noise,
+		)
+
+		testuplink.Log(logCtx, "Uploading piece...")
 		hash, _, err := putter.PutPiece(longTailCtx, uploadCtx, limit, privateKey, io.NopCloser(piece))
+		testuplink.Log(logCtx, "Done uploading piece. err:", err)
 		done(hash, err == nil)
 		if err == nil {
 			return true, nil

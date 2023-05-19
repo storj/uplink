@@ -6,7 +6,9 @@ package streams
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -20,6 +22,7 @@ import (
 	"storj.io/uplink/private/storage/streams/segmentupload"
 	"storj.io/uplink/private/storage/streams/splitter"
 	"storj.io/uplink/private/storage/streams/streamupload"
+	"storj.io/uplink/private/testuplink"
 )
 
 // At a high level, uploads are composed of two pieces: a SegmentSource and an
@@ -175,9 +178,15 @@ func (u *Uploader) Close() error {
 	return u.metainfo.Close()
 }
 
+var uploadCounter int64
+
 // UploadObject starts an upload of an object to the given location. The object
 // contents can be written to the returned upload, which can then be committed.
 func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey string, metadata Metadata, expiration time.Time, sched segmentupload.Scheduler) (_ *Upload, err error) {
+	ctx = testuplink.WithLogWriterContext(ctx, "upload", fmt.Sprint(atomic.AddInt64(&uploadCounter, 1)))
+	testuplink.Log(ctx, "Starting upload")
+	defer testuplink.Log(ctx, "Done starting upload")
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -237,6 +246,7 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 		if err != nil {
 			split.Finish(err)
 		}
+		testuplink.Log(ctx, "Upload finished. err:", err)
 		done <- uploadResult{info: info, err: err}
 	}()
 
@@ -253,6 +263,13 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 // eTag should be  sent on the channel only after the contents of the part have
 // been fully written to the returned upload, but before calling Commit.
 func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string, streamID storj.StreamID, partNumber int32, eTag <-chan []byte, sched segmentupload.Scheduler) (_ *Upload, err error) {
+	ctx = testuplink.WithLogWriterContext(ctx,
+		"upload", fmt.Sprint(atomic.AddInt64(&uploadCounter, 1)),
+		"part_number", fmt.Sprint(partNumber),
+	)
+	testuplink.Log(ctx, "Starting upload")
+	defer testuplink.Log(ctx, "Done starting upload")
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -299,6 +316,7 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 		if err != nil {
 			split.Finish(err)
 		}
+		testuplink.Log(ctx, "Upload finished. err:", err)
 		done <- uploadResult{info: info, err: err}
 	}()
 
