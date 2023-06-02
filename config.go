@@ -11,7 +11,6 @@ import (
 
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
-	"storj.io/common/socket"
 	"storj.io/common/useragent"
 )
 
@@ -93,6 +92,7 @@ func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (
 	}
 
 	dialer.DialTimeout = config.DialTimeout
+	dialer.AttemptBackgroundQoS = true
 
 	if config.DialContext != nil {
 		// N.B.: It is okay to use NewDefaultTCPConnector here because we explicitly don't want
@@ -100,20 +100,7 @@ func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (
 		// DialContext.
 		//lint:ignore SA1019 deprecated okay,
 		//nolint:staticcheck // deprecated okay.
-		dialer.Connector = rpc.NewDefaultTCPConnector(&rpc.ConnectorAdapter{DialContext: config.DialContext})
-	} else {
-		connector := rpc.NewHybridConnector()
-		// N.B.: It is okay to use NewDefaultTCPConnector here because we are using it
-		// within the above hybrid connector. Perhaps we should remove the deprecation
-		// status since this seems like a pretty natural usage.
-		//lint:ignore SA1019 deprecated okay,
-		//nolint:staticcheck // deprecated okay.
-		tcpConnector := rpc.NewDefaultTCPConnector(
-			&rpc.ConnectorAdapter{
-				DialContext: socket.BackgroundDialer().DialContext,
-			})
-		connector.AddCandidateConnector("tcp", tcpConnector, rpc.TCPConnectorPriority)
-		dialer.Connector = connector
+		dialer.Connector = rpc.NewDefaultTCPConnector(config.DialContext)
 	}
 
 	dialer.ConnectionOptions.Manager.Stream.MaximumBufferSize = config.maximumBufferSize
