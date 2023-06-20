@@ -80,7 +80,9 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 	encBlockSize := 29 * 256 * memory.B.Int32()
 
 	encryptionParameters := storj.EncryptionParameters{
-		// TODO: the cipher should be provided by the Access, but we don't store it there yet.
+		// N.B.: This is the ciphersuite we use for encrypting content keys,
+		// which should absolutely be encrypted, even if the access grant
+		// says EncNull.
 		CipherSuite: storj.EncAESGCM,
 		BlockSize:   encBlockSize,
 	}

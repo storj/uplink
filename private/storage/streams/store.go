@@ -179,6 +179,15 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			return Meta{}, errs.Wrap(err)
 		}
 
+		// note that we are *not* using the cipher suite from the encryption store, which
+		// might be encnull. we must make sure this actually encrypts here, otherwise the
+		// satellite will receive the decryption keys for all uploaded data.
+		// we also care that the storage nodes don't receive unencrypted data, even if
+		// paths are unencrypted.
+		if s.encryptionParameters.CipherSuite == storj.EncNull ||
+			s.encryptionParameters.CipherSuite == storj.EncNullBase64URL {
+			return Meta{}, errs.New("programmer error")
+		}
 		encryptedKey, err = encryption.EncryptKey(&contentKey, s.encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 		if err != nil {
 			return Meta{}, errs.Wrap(err)
@@ -192,12 +201,9 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 			return Meta{}, errs.Wrap(err)
 		}
 
-		segmentEncryption := metaclient.SegmentEncryption{}
-		if s.encryptionParameters.CipherSuite != storj.EncNull {
-			segmentEncryption = metaclient.SegmentEncryption{
-				EncryptedKey:      encryptedKey,
-				EncryptedKeyNonce: encryptedKeyNonce,
-			}
+		segmentEncryption := metaclient.SegmentEncryption{
+			EncryptedKey:      encryptedKey,
+			EncryptedKeyNonce: encryptedKeyNonce,
 		}
 
 		if isRemote {

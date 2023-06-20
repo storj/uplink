@@ -138,6 +138,15 @@ func (s *Splitter) Next(ctx context.Context) (Segment, error) {
 	if _, err := rand.Read(keyNonce[:]); err != nil {
 		return nil, errs.Wrap(err)
 	}
+
+	// note that we are *not* using the cipher suite from the encryption store, which
+	// might be encnull. we must make sure this actually encrypts here, otherwise the
+	// satellite will receive the decryption keys for all uploaded data.
+	// also, maybe the storage nodes may receive unencrypted data?
+	if s.opts.Params.CipherSuite == storj.EncNull ||
+		s.opts.Params.CipherSuite == storj.EncNullBase64URL {
+		return nil, errs.New("programmer error")
+	}
 	enc, err := encryption.NewEncrypter(s.opts.Params.CipherSuite, &contentKey, &nonce, int(s.opts.Params.BlockSize))
 	if err != nil {
 		return nil, errs.Wrap(err)
