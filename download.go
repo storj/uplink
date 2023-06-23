@@ -16,6 +16,7 @@ import (
 	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/leak"
 	"storj.io/common/paths"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
@@ -122,6 +123,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 
 	download.object = convertObject(&objectDownload.Object)
 	download.download = stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start)
+	download.tracker = project.tracker.Child("download", 1)
 	return download, nil
 }
 
@@ -139,6 +141,8 @@ type Download struct {
 	ttfb  time.Duration
 	stats operationStats
 	task  func(*error)
+
+	tracker leak.Ref
 }
 
 // Info returns the last information about the object.
@@ -170,6 +174,7 @@ func (download *Download) Close() error {
 	err := errs.Combine(
 		download.download.Close(),
 		download.streams.Close(),
+		download.tracker.Close(),
 	)
 	download.mu.Lock()
 	track()

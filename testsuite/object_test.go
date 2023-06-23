@@ -583,8 +583,8 @@ func TestVeryLongDownload(t *testing.T) {
 
 		download, cleanup, err := planet.Uplinks[0].DownloadStream(ctx, planet.Satellites[0], "testbucket", "test.dat")
 		require.NoError(t, err)
-		defer ctx.Check(download.Close)
 		defer ctx.Check(cleanup)
+		defer ctx.Check(download.Close)
 
 		// read the first half of the first segment
 		buf := make([]byte, segmentSize.Int()/2)

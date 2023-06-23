@@ -589,6 +589,7 @@ func TestAccessSerialization(t *testing.T) {
 		download, err := project.DownloadObject(ctx, "test-bucket", "test.dat", nil)
 		require.NoError(t, err)
 		assertObject(t, download.Info(), "test.dat")
+		require.NoError(t, download.Close())
 	})
 }
 
@@ -856,24 +857,31 @@ func TestImmutableUpload(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		upload, err := project.UploadObject(ctx, "testbucket", "object1", nil)
-		require.NoError(t, err)
 		testData := testrand.Bytes(5 * memory.KiB)
-		_, err = upload.Write(testData)
-		require.NoError(t, err)
-		require.NoError(t, upload.Commit())
 
-		// we shouldn't be able to overwrite object
-		_, err = project.UploadObject(ctx, "testbucket", "object1", nil)
-		require.NoError(t, err)
-		_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
-		require.Error(t, err)
+		{ // successful upload
+			upload, err := project.UploadObject(ctx, "testbucket", "object1", nil)
+			require.NoError(t, err)
+			_, err = upload.Write(testData)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+		}
 
-		// we shouldn't be able upload to a different location
-		_, err = project.UploadObject(ctx, "testbucket", "object2", nil)
-		require.NoError(t, err)
-		_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
-		require.Error(t, err)
+		{ // we shouldn't be able to overwrite object
+			upload, err := project.UploadObject(ctx, "testbucket", "object1", nil)
+			require.NoError(t, err)
+			_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+			require.NoError(t, err)
+			require.Error(t, upload.Commit())
+		}
+
+		{ // we shouldn't be able upload to a different location
+			upload, err := project.UploadObject(ctx, "testbucket", "object2", nil)
+			require.NoError(t, err)
+			_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+			require.Error(t, err)
+			require.Error(t, upload.Commit())
+		}
 
 		// we shouldn't be able to delete
 		_, err = project.DeleteObject(ctx, "testbucket", "object1")
@@ -886,5 +894,7 @@ func TestImmutableUpload(t *testing.T) {
 		data, err := io.ReadAll(download)
 		require.NoError(t, err)
 		require.Equal(t, testData, data)
+
+		require.NoError(t, download.Close())
 	})
 }

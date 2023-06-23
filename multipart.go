@@ -18,6 +18,7 @@ import (
 
 	"storj.io/common/base58"
 	"storj.io/common/encryption"
+	"storj.io/common/leak"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/eestream/scheduler"
@@ -282,6 +283,7 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 		upload.upload = u
 	}
 
+	upload.tracker = project.tracker.Child("upload-part", 1)
 	return upload, nil
 }
 
@@ -444,6 +446,8 @@ type PartUpload struct {
 
 	stats operationStats
 	task  func(*error)
+
+	tracker leak.Ref
 }
 
 // Write uploads len(p) bytes from p to the object's data stream.
@@ -509,6 +513,7 @@ func (upload *PartUpload) Commit() error {
 	err := errs.Combine(
 		upload.upload.Commit(),
 		upload.streams.Close(),
+		upload.tracker.Close(),
 	)
 	upload.stats.flagFailure(err)
 	track()
@@ -539,6 +544,7 @@ func (upload *PartUpload) Abort() error {
 	err := errs.Combine(
 		upload.upload.Abort(),
 		upload.streams.Close(),
+		upload.tracker.Close(),
 	)
 	upload.stats.flagFailure(err)
 	track()

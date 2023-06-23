@@ -14,6 +14,7 @@ import (
 	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/leak"
 	"storj.io/common/pb"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/storage/streams"
@@ -113,6 +114,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 		upload.upload = u
 	}
 
+	upload.tracker = project.tracker.Child("upload", 1)
 	return upload, nil
 }
 
@@ -144,6 +146,8 @@ type Upload struct {
 
 	stats operationStats
 	task  func(*error)
+
+	tracker leak.Ref
 }
 
 // Info returns the last information about the uploaded object.
@@ -191,6 +195,7 @@ func (upload *Upload) Commit() error {
 	err := errs.Combine(
 		upload.upload.Commit(),
 		upload.streams.Close(),
+		upload.tracker.Close(),
 	)
 	upload.stats.flagFailure(err)
 	track()
@@ -221,6 +226,7 @@ func (upload *Upload) Abort() error {
 	err := errs.Combine(
 		upload.upload.Abort(),
 		upload.streams.Close(),
+		upload.tracker.Close(),
 	)
 
 	track()

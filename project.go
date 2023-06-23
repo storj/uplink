@@ -8,6 +8,7 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/leak"
 	"storj.io/common/memory"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
@@ -35,6 +36,8 @@ type Project struct {
 	segmentSize                   int64
 	encryptionParameters          storj.EncryptionParameters
 	concurrentSegmentUploadConfig *testuplink.ConcurrentSegmentUploadsConfig
+
+	tracker leak.Ref
 }
 
 // OpenProject opens a project with the specific access grant.
@@ -108,6 +111,11 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 	ec := ecclient.New(storagenodeDialer, 0)
 
+	tracker := leak.FromContext(ctx)
+	if tracker == (leak.Ref{}) { // TODO: handle this check better
+		tracker = leak.Root(1)
+	}
+
 	return &Project{
 		config:                        config,
 		access:                        access,
@@ -117,6 +125,8 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		segmentSize:                   segmentsSize,
 		encryptionParameters:          encryptionParameters,
 		concurrentSegmentUploadConfig: testuplink.GetConcurrentSegmentUploadsConfig(ctx),
+
+		tracker: tracker,
 	}, nil
 }
 
@@ -132,7 +142,7 @@ func (project *Project) Close() (err error) {
 		}
 	}
 
-	return packageError.Wrap(err)
+	return packageError.Wrap(errs.Combine(err, project.tracker.Close()))
 }
 
 func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {

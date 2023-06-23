@@ -378,6 +378,7 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 
 		_, err = upload.Write(data)
 		require.Error(t, err)
+		require.NoError(t, upload.Abort())
 	})
 }
 
