@@ -8,7 +8,6 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
-	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/context2"
 	"storj.io/common/pb"
@@ -101,11 +100,8 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 		}
 	}()
 
-	var eg errgroup.Group
-	defer func() { _ = eg.Wait() }()
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cg := newCancelGroup(ctx)
+	defer cg.Close()
 
 	for {
 		segment, err := segmentSource.Next(ctx)
@@ -139,11 +135,9 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 			return Info{}, err
 		}
 
-		eg.Go(func() error {
+		cg.Go(func() error {
 			commitSegment, err := upload.Wait()
 			if err != nil {
-				// an upload has failed so we should cancel the rest of the uploads
-				cancel()
 				return err
 			}
 			tracker.SegmentDone(segment, commitSegment)
@@ -160,7 +154,7 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 	tracker.SegmentsScheduled(lastSegment)
 
 	testuplink.Log(ctx, "Waiting for error group managing segments...")
-	if err := eg.Wait(); err != nil {
+	if err := cg.Wait(); err != nil {
 		return Info{}, err
 	}
 
