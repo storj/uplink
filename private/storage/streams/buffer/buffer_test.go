@@ -12,7 +12,7 @@ import (
 )
 
 func TestBuffer(t *testing.T) {
-	buf := New(new(MemoryBackend), 10)
+	buf := New(NewMemoryBackend(25), 10)
 	r1 := buf.Reader()
 	r2 := buf.Reader()
 
@@ -47,7 +47,7 @@ func TestBuffer(t *testing.T) {
 }
 
 func TestBufferSimpleConcurrent(t *testing.T) {
-	buf := New(new(MemoryBackend), 2)
+	buf := New(NewMemoryBackend(1024), 2)
 	r := buf.Reader()
 
 	go func() {
@@ -83,7 +83,7 @@ func TestWriteBufferConcurrent(t *testing.T) {
 	wrap := func(n int64, err error) result { return result{n, err} }
 
 	results := make(chan result)
-	buf := New(new(MemoryBackend), 1024)
+	buf := New(NewMemoryBackend(amount), 1024)
 	defer buf.DoneReading(nil)
 
 	go func() {

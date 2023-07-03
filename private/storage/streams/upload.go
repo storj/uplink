@@ -34,6 +34,10 @@ func (u *Upload) Write(p []byte) (int, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
+	if u.done == nil {
+		return 0, errs.New("upload already done")
+	}
+
 	return u.split.Write(p)
 }
 

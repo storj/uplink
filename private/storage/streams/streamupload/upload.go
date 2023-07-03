@@ -120,22 +120,22 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 			break
 		}
 
-		resp, err := aggregator.ScheduleAndFlush(ctx, segment.Begin())
-		if err != nil {
-			return Info{}, err
-		}
-
-		beginSegment, err := resp.BeginSegment()
-		if err != nil {
-			return Info{}, err
-		}
-
-		upload, err := segmentUploader.Begin(ctx, &beginSegment, segment)
-		if err != nil {
-			return Info{}, err
-		}
-
 		cg.Go(func() error {
+			resp, err := aggregator.ScheduleAndFlush(ctx, segment.Begin())
+			if err != nil {
+				return err
+			}
+
+			beginSegment, err := resp.BeginSegment()
+			if err != nil {
+				return err
+			}
+
+			upload, err := segmentUploader.Begin(ctx, &beginSegment, segment)
+			if err != nil {
+				return err
+			}
+
 			commitSegment, err := upload.Wait()
 			if err != nil {
 				return err

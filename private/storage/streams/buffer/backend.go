@@ -5,7 +5,7 @@ package buffer
 
 import (
 	"io"
-	"sync"
+	"sync/atomic"
 )
 
 // Backend is a backing store of bytes for a Backend.
@@ -17,52 +17,47 @@ type Backend interface {
 
 // NewMemoryBackend returns a MemoryBackend with the provided initial
 // capacity. It implements the Backend interface.
-func NewMemoryBackend(cap int) *MemoryBackend {
+func NewMemoryBackend(cap int64) *MemoryBackend {
 	return &MemoryBackend{
-		buf: make([]byte, 0, cap),
+		buf: make([]byte, cap),
 	}
 }
 
 // MemoryBackend implements the Backend interface backed by a slice.
 type MemoryBackend struct {
-	mu     sync.Mutex
 	buf    []byte
+	len    int64
 	closed bool
 }
 
 // Write appends the data to the buffer.
 func (u *MemoryBackend) Write(p []byte) (n int, err error) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
 	if u.closed {
 		return 0, io.ErrClosedPipe
 	}
-	u.buf = append(u.buf, p...)
-
-	return len(p), nil
+	l := atomic.LoadInt64(&u.len)
+	n = copy(u.buf[l:], p)
+	if n != len(p) {
+		return n, io.ErrShortWrite
+	}
+	atomic.AddInt64(&u.len, int64(n))
+	return n, nil
 }
 
 // ReadAt reads into the provided buffer p starting at off.
 func (u *MemoryBackend) ReadAt(p []byte, off int64) (n int, err error) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
 	if u.closed {
 		return 0, io.ErrClosedPipe
-	} else if off >= int64(len(u.buf)) {
+	}
+	l := atomic.LoadInt64(&u.len)
+	if off < 0 || off >= l {
 		return 0, io.EOF
 	}
-	n = copy(p, u.buf[off:])
-
-	return n, nil
+	return copy(p, u.buf[off:l]), nil
 }
 
 // Close releases memory and causes future calls to ReadAt and Write to fail.
 func (u *MemoryBackend) Close() error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
 	u.buf = nil
 	u.closed = true
 	return nil
