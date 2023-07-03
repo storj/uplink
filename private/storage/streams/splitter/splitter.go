@@ -102,7 +102,9 @@ func New(opts Options) (*Splitter, error) {
 	}
 
 	return &Splitter{
-		NewBackend: func() (buffer.Backend, error) { return buffer.NewMemoryBackend(0), nil },
+		NewBackend: func() (buffer.Backend, error) {
+			return buffer.NewMemoryBackend(maxSegmentSize), nil
+		},
 
 		split:          newBaseSplitter(opts.Split, opts.Minimum),
 		opts:           opts,

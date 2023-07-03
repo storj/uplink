@@ -33,7 +33,7 @@ func TestBaseSplitter(t *testing.T) {
 	}
 
 	readResult := func(splitter *baseSplitter) (res result, ok bool) {
-		buf := buffer.New(new(buffer.MemoryBackend), 10)
+		buf := buffer.New(buffer.NewMemoryBackend(splitter.split), 10)
 
 		inline, eof, err := splitter.Next(ctx, buf)
 		if err != nil {

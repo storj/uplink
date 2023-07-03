@@ -186,7 +186,7 @@ func TestUpload(t *testing.T) {
 				// upload should fail, since either path finishes the underlying
 				// splitter.
 				_, copyErr := io.Copy(upload, strings.NewReader("JUNK"))
-				require.EqualError(t, copyErr, "already finished")
+				require.EqualError(t, copyErr, "upload already done")
 
 				if tc.expectCommitErr != "" {
 					require.EqualError(t, err, tc.expectCommitErr)
