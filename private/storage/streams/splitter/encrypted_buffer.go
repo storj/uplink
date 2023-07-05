@@ -27,8 +27,8 @@ func newEncryptedBuffer(sbuf *buffer.Buffer, wrc io.WriteCloser) *encryptedBuffe
 	}
 }
 
-func (e *encryptedBuffer) Reader() io.Reader     { return e.sbuf.Reader() }
-func (e *encryptedBuffer) DoneReading(err error) { e.sbuf.DoneReading(err) }
+func (e *encryptedBuffer) Reader() buffer.Chunker { return e.sbuf.Reader() }
+func (e *encryptedBuffer) DoneReading(err error)  { e.sbuf.DoneReading(err) }
 
 func (e *encryptedBuffer) Write(p []byte) (int, error) {
 	e.mu.Lock()

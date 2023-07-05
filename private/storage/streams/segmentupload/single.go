@@ -13,7 +13,6 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
-	"storj.io/common/encryption"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
@@ -161,11 +160,8 @@ type pieceReader struct {
 	redundancy eestream.RedundancyStrategy
 }
 
-func (r *pieceReader) PieceReader(num int) io.Reader {
-	segment := r.segment.Reader()
-	stripeSize := r.redundancy.StripeSize()
-	paddedData := encryption.PadReader(io.NopCloser(segment), stripeSize)
-	return NewEncodedReader(paddedData, r.redundancy, num)
+func (r *pieceReader) PieceReader(num int) io.WriterTo {
+	return NewEncodedChunker(r.segment.Reader(), r.redundancy, num)
 }
 
 type segmentResult struct {

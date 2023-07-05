@@ -56,7 +56,7 @@ func TestSplitter(t *testing.T) {
 
 		_ = seg.Begin() // ensure this can even be called
 
-		n, err := io.Copy(io.Discard, seg.Reader())
+		n, err := discard(seg.Reader())
 		seg.DoneReading(nil)
 
 		if err != nil {

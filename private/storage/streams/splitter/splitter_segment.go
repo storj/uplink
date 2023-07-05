@@ -4,11 +4,10 @@
 package splitter
 
 import (
-	"io"
-
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/storage/streams/buffer"
 )
 
 type splitterSegment struct {
@@ -32,7 +31,7 @@ func (s *splitterSegment) Begin() metaclient.BatchItem {
 
 func (s *splitterSegment) Position() metaclient.SegmentPosition { return s.position }
 func (s *splitterSegment) Inline() bool                         { return false }
-func (s *splitterSegment) Reader() io.Reader                    { return s.encBuf.Reader() }
+func (s *splitterSegment) Reader() buffer.Chunker               { return s.encBuf.Reader() }
 func (s *splitterSegment) DoneReading(err error)                { s.encBuf.DoneReading(err) }
 
 func (s *splitterSegment) EncryptETag(eTag []byte) ([]byte, error) {

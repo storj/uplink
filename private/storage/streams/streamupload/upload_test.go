@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/storage/streams/buffer"
 	"storj.io/uplink/private/storage/streams/splitter"
 )
 
@@ -289,8 +289,23 @@ func (s *segment) Begin() metaclient.BatchItem {
 func (s *segment) Position() metaclient.SegmentPosition {
 	return metaclient.SegmentPosition{Index: int32(s.index)}
 }
-func (s *segment) Inline() bool      { return s.inline }
-func (s *segment) Reader() io.Reader { return strings.NewReader("HELLO") }
+func (s *segment) Inline() bool           { return s.inline }
+func (s *segment) Reader() buffer.Chunker { return &chunker{buf: []byte("HELLO")} }
+
+type chunker struct {
+	buf []byte
+}
+
+func (c *chunker) Chunk(n int) (b []byte, err error) {
+	if len(c.buf) == 0 {
+		return nil, io.EOF
+	}
+	if n > len(c.buf) {
+		n = len(c.buf)
+	}
+	b, c.buf = c.buf[:n], c.buf[n:]
+	return b, nil
+}
 
 func (s *segment) Finalize() *splitter.SegmentInfo {
 	return &splitter.SegmentInfo{

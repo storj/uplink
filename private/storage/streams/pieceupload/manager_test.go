@@ -84,7 +84,7 @@ func assertResults(t *testing.T, manager *Manager, expectedRev revision, expecte
 func requireNextPiece(t *testing.T, manager *Manager, expectedNum piecenum, expectedRev revision) func(bool) {
 	reader, limit, done, err := manager.NextPiece(context.Background())
 	require.NoError(t, err, "expected next piece")
-	require.Equal(t, expectedNum, pieceReaderNum(reader), "unexpected next piece number")
+	require.Equal(t, expectedNum, pieceReaderNumWriter(reader), "unexpected next piece number")
 	require.Equal(t, makeLimit(expectedNum, expectedRev), limit, "unexpected next piece number limit")
 	return func(uploaded bool) {
 		if uploaded {
@@ -98,7 +98,7 @@ func requireNextPiece(t *testing.T, manager *Manager, expectedNum piecenum, expe
 func requireDone(t *testing.T, manager *Manager) {
 	reader, _, _, err := manager.NextPiece(context.Background())
 	if err == nil {
-		require.FailNowf(t, "expected done", "next piece %d", pieceReaderNum(reader))
+		require.FailNowf(t, "expected done", "next piece %d", pieceReaderNumWriter(reader))
 		return
 	}
 	require.True(t, errors.Is(err, ErrDone), "expected done but got %q", err)

@@ -6,7 +6,6 @@ package buffer
 import (
 	"io"
 	"testing"
-	"testing/iotest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -16,11 +15,11 @@ func TestBuffer(t *testing.T) {
 	r1 := buf.Reader()
 	r2 := buf.Reader()
 
-	requireRead := func(r io.Reader, n int, err error) {
+	requireRead := func(r Chunker, n int, err error) {
 		t.Helper()
-		m, gerr := r.Read(make([]byte, n))
+		m, gerr := r.Chunk(n)
 		require.Equal(t, err, gerr)
-		require.Equal(t, n, m)
+		require.Equal(t, n, len(m))
 	}
 
 	requireWrite := func(w io.Writer, n int) {
@@ -47,7 +46,7 @@ func TestBuffer(t *testing.T) {
 }
 
 func TestBufferSimpleConcurrent(t *testing.T) {
-	buf := New(NewMemoryBackend(1024), 2)
+	buf := New(NewMemoryBackend(2048), 2)
 	r := buf.Reader()
 
 	go func() {
@@ -58,9 +57,8 @@ func TestBufferSimpleConcurrent(t *testing.T) {
 		buf.DoneWriting(nil)
 	}()
 
-	var tmp [1]byte
 	for {
-		_, err := r.Read(tmp[:])
+		_, err := r.Chunk(1)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -91,13 +89,23 @@ func TestWriteBufferConcurrent(t *testing.T) {
 		buf.DoneWriting(nil)
 	}()
 
-	go func() { results <- wrap(io.Copy(io.Discard, iotest.OneByteReader(buf.Reader()))) }()
-	go func() { results <- wrap(io.Copy(io.Discard, iotest.HalfReader(buf.Reader()))) }()
 	for i := 0; i < 10; i++ {
-		go func() { results <- wrap(io.Copy(io.Discard, buf.Reader())) }()
+		go func() { results <- wrap(discard(buf.Reader())) }()
 	}
 
-	for i := 0; i < 13; i++ {
+	for i := 0; i < 11; i++ {
 		require.Equal(t, result{amount, nil}, <-results)
+	}
+}
+
+func discard(ch Chunker) (n int64, err error) {
+	for {
+		buf, err := ch.Chunk(10240)
+		n += int64(len(buf))
+		if err == io.EOF {
+			return n, nil
+		} else if err != nil {
+			return n, err
+		}
 	}
 }

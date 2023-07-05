@@ -4,11 +4,11 @@
 package splitter
 
 import (
-	"bytes"
 	"io"
 
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/storage/streams/buffer"
 )
 
 type splitterInline struct {
@@ -34,7 +34,7 @@ func (s *splitterInline) Begin() metaclient.BatchItem {
 
 func (s *splitterInline) Position() metaclient.SegmentPosition { return s.position }
 func (s *splitterInline) Inline() bool                         { return true }
-func (s *splitterInline) Reader() io.Reader                    { return bytes.NewReader(s.encData) }
+func (s *splitterInline) Reader() buffer.Chunker               { return &chunker{s.encData} }
 func (s *splitterInline) DoneReading(err error)                {}
 
 func (s *splitterInline) EncryptETag(eTag []byte) ([]byte, error) {
@@ -47,4 +47,19 @@ func (s *splitterInline) Finalize() *SegmentInfo {
 		PlainSize:     s.plainSize,
 		EncryptedSize: int64(len(s.encData)),
 	}
+}
+
+type chunker struct {
+	buf []byte
+}
+
+func (c *chunker) Chunk(n int) (b []byte, err error) {
+	if len(c.buf) == 0 {
+		return nil, io.EOF
+	}
+	if n > len(c.buf) {
+		n = len(c.buf)
+	}
+	b, c.buf = c.buf[:n], c.buf[n:]
+	return b, nil
 }

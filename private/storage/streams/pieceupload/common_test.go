@@ -4,7 +4,6 @@
 package pieceupload
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -36,10 +35,27 @@ func newManagerWithExchanger(pieceCount int, exchanger LimitsExchanger) *Manager
 
 type fakePieceReader struct{}
 
-func (f fakePieceReader) PieceReader(num int) io.Reader {
+func (f fakePieceReader) PieceReader(num int) io.WriterTo {
 	var data [8]byte
 	binary.BigEndian.PutUint64(data[:], uint64(num))
-	return bytes.NewReader(data[:])
+	return &writerTo{data[:]}
+}
+
+type writerTo struct {
+	buf []byte
+}
+
+func (c *writerTo) WriteTo(w io.Writer) (int64, error) {
+	n, err := w.Write(c.buf)
+	return int64(n), err
+}
+
+func pieceReaderNumWriter(r io.WriterTo) piecenum {
+	pr, pw := io.Pipe()
+	defer pw.Close()
+	defer pr.Close()
+	go r.WriteTo(pw)
+	return pieceReaderNum(pr)
 }
 
 func pieceReaderNum(r io.Reader) piecenum {

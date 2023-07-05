@@ -20,6 +20,7 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/storage/streams/buffer"
 	"storj.io/uplink/private/storage/streams/splitter"
 )
 
@@ -235,8 +236,12 @@ func (fakeSegment) Position() metaclient.SegmentPosition {
 	return metaclient.SegmentPosition{}
 }
 
-func (fakeSegment) Reader() io.Reader {
-	return bytes.NewReader(nil)
+type emptyChunker struct{}
+
+func (emptyChunker) Chunk(n int) ([]byte, error) { return nil, io.EOF }
+
+func (fakeSegment) Reader() buffer.Chunker {
+	return emptyChunker{}
 }
 
 func (s *fakeSegment) DoneReading(err error) {

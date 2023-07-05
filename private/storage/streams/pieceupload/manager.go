@@ -23,7 +23,7 @@ var (
 
 // PieceReader provides a reader for a piece with the given number.
 type PieceReader interface {
-	PieceReader(num int) io.Reader
+	PieceReader(num int) io.WriterTo
 }
 
 // LimitsExchanger exchanges piece upload limits.
@@ -79,7 +79,7 @@ func NewManager(exchanger LimitsExchanger, pieceReader PieceReader, segmentID st
 // pieces have finished successfully to satisfy the optimal threshold. If
 // NextPiece is unable to exchange limits for failed pieces, it will return
 // an error.
-func (mgr *Manager) NextPiece(ctx context.Context) (_ io.Reader, _ *pb.AddressedOrderLimit, _ func(hash *pb.PieceHash, uploaded bool), err error) {
+func (mgr *Manager) NextPiece(ctx context.Context) (_ io.WriterTo, _ *pb.AddressedOrderLimit, _ func(hash *pb.PieceHash, uploaded bool), err error) {
 	var num int
 	for acquired := false; !acquired; {
 		// If NextPiece is called with a cancelled context, we want to ensure

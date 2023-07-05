@@ -6,7 +6,6 @@ package splitter
 import (
 	"context"
 	"crypto/rand"
-	"io"
 
 	"github.com/zeebo/errs"
 
@@ -30,7 +29,7 @@ type Segment interface {
 	Inline() bool
 
 	// Reader returns a fresh io.Reader that reads the data of the segment.
-	Reader() io.Reader
+	Reader() buffer.Chunker
 
 	// EncryptETag encrypts the provided etag with the correct encryption
 	// keys that the segment is using.
@@ -162,7 +161,7 @@ func (s *Splitter) Next(ctx context.Context) (Segment, error) {
 		return nil, errs.Wrap(err)
 	}
 
-	buf := buffer.New(backend, s.opts.Minimum)
+	buf := buffer.New(backend, 10*s.opts.Minimum)
 	wrc := encryption.TransformWriterPadded(buf, enc)
 	encBuf := newEncryptedBuffer(buf, wrc)
 	segEncryption := metaclient.SegmentEncryption{

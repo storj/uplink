@@ -16,6 +16,18 @@ import (
 	"storj.io/uplink/private/storage/streams/buffer"
 )
 
+func discard(ch buffer.Chunker) (n int64, err error) {
+	for {
+		buf, err := ch.Chunk(4096)
+		n += int64(len(buf))
+		if err == io.EOF {
+			return n, nil
+		} else if err != nil {
+			return n, err
+		}
+	}
+}
+
 func TestBaseSplitter(t *testing.T) {
 	ctx := context.Background()
 
@@ -46,7 +58,7 @@ func TestBaseSplitter(t *testing.T) {
 			return result{"inline", int64(len(inline)), nil}, true
 		}
 
-		amount, err := io.Copy(io.Discard, buf.Reader())
+		amount, err := discard(buf.Reader())
 		buf.DoneReading(nil)
 
 		// we get a nondeterministic number of bytes read if there was an error so
@@ -168,7 +180,7 @@ func BenchmarkBaseSplitter(b *testing.B) {
 					break
 				}
 				if inline == nil {
-					_, _ = io.Copy(io.Discard, buf.Reader())
+					_, _ = discard(buf.Reader())
 					buf.DoneReading(nil)
 				}
 			}

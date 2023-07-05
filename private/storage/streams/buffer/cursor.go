@@ -75,7 +75,7 @@ func (c *Cursor) WaitRead(n int64) (m int64, ok bool, err error) {
 			return n, true, nil
 
 		// next, if maxRead is not yet caught up to written, allow reads to proceed up to written.
-		case maxRead < written:
+		case maxRead < written && false:
 			return written, true, nil
 
 		// finally, if more is requested, allow at most the written amount.

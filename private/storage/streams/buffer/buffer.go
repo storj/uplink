@@ -84,34 +84,36 @@ type bufferReader struct {
 
 // Reader returns a fresh io.Reader that can be used to read all of the previously
 // and future written bytes to the Buffer.
-func (w *Buffer) Reader() io.Reader {
+func (w *Buffer) Reader() Chunker {
 	return &bufferReader{
 		cursor: w.cursor,
 		buffer: w.backend,
 	}
 }
 
-// Read reads bytes into p, waiting for writes to happen if needed. It returns
-// 0, io.EOF when the end of the data has been reached.
-func (w *bufferReader) Read(p []byte) (n int, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+type Chunker interface {
+	Chunk(n int) ([]byte, error)
+}
 
-	m, ok, err := w.cursor.WaitRead(w.read + int64(len(p)))
+func (br *bufferReader) Chunk(n int) ([]byte, error) {
+	br.mu.Lock()
+	defer br.mu.Unlock()
+
+	m, ok, err := br.cursor.WaitRead(br.read + int64(n))
 	if err != nil {
-		return 0, err
-	} else if m == w.read {
-		return 0, io.EOF
+		return nil, err
+	} else if m == br.read {
+		return nil, io.EOF
 	}
 
-	n, err = w.buffer.ReadAt(p[:m-w.read], w.read)
-	w.read += int64(n)
-	w.cursor.ReadTo(w.read)
+	buf, err := br.buffer.ChunkAt(n, br.read)
+	br.read += int64(len(buf))
+	br.cursor.ReadTo(br.read)
 
 	if err != nil {
-		return n, err
+		return buf, err
 	} else if !ok {
-		return n, io.EOF
+		return buf, io.EOF
 	}
-	return n, nil
+	return buf, nil
 }

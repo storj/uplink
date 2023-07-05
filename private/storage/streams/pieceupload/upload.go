@@ -61,8 +61,24 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 			"noise", noise,
 		)
 
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			_, err := piece.WriteTo(pw)
+			pw.CloseWithError(err)
+		}()
+
+		go func() {
+			select {
+			case <-uploadCtx.Done():
+			case <-longTailCtx.Done():
+			}
+			pr.CloseWithError(context.Canceled)
+			pw.CloseWithError(context.Canceled)
+		}()
+
 		testuplink.Log(logCtx, "Uploading piece...")
-		hash, _, err := putter.PutPiece(longTailCtx, uploadCtx, limit, privateKey, io.NopCloser(piece))
+		hash, _, err := putter.PutPiece(longTailCtx, uploadCtx, limit, privateKey, pr)
 		testuplink.Log(logCtx, "Done uploading piece. err:", err)
 		done(hash, err == nil)
 		if err == nil {

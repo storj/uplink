@@ -11,8 +11,8 @@ import (
 // Backend is a backing store of bytes for a Backend.
 type Backend interface {
 	io.Writer
-	io.ReaderAt
 	io.Closer
+	ChunkAt(n int, off int64) ([]byte, error)
 }
 
 // NewMemoryBackend returns a MemoryBackend with the provided initial
@@ -42,6 +42,21 @@ func (u *MemoryBackend) Write(p []byte) (n int, err error) {
 	}
 	atomic.AddInt64(&u.len, int64(n))
 	return n, nil
+}
+
+func (u *MemoryBackend) ChunkAt(n int, off int64) ([]byte, error) {
+	if u.closed {
+		return nil, io.ErrClosedPipe
+	}
+	l := atomic.LoadInt64(&u.len)
+	if off < 0 || off >= l {
+		return nil, io.EOF
+	}
+	end := off + int64(n)
+	if end > l {
+		end = l
+	}
+	return u.buf[off:end], nil
 }
 
 // ReadAt reads into the provided buffer p starting at off.
