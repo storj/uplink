@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
@@ -75,13 +76,15 @@ func TestListBuckets_TwoBuckets(t *testing.T) {
 		}
 
 		for bucket := range expectedBuckets {
-			bucket := bucket
 			createBucket(t, ctx, project, bucket)
-			defer func() {
+		}
+		bucketsToDelete := maps.Keys(expectedBuckets)
+		defer func() {
+			for _, bucket := range bucketsToDelete {
 				_, err := project.DeleteBucket(ctx, bucket)
 				require.NoError(t, err)
-			}()
-		}
+			}
+		}()
 
 		list := listBuckets(ctx, t, project, nil)
 
@@ -178,12 +181,14 @@ func TestListBuckets_AutoPaging(t *testing.T) {
 			bucketName := fmt.Sprintf("bucket%d", i)
 			expectedBuckets[bucketName] = true
 			createBucket(t, ctx, project, bucketName)
-
-			defer func() {
+		}
+		bucketsToDelete := maps.Keys(expectedBuckets)
+		defer func() {
+			for _, bucketName := range bucketsToDelete {
 				_, err := project.DeleteBucket(ctx, bucketName)
 				require.NoError(t, err)
-			}()
-		}
+			}
+		}()
 
 		list := listBuckets(ctx, t, project, nil)
 

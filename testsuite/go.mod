@@ -9,6 +9,7 @@ require (
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
+	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
 	storj.io/common v0.0.0-20230602145716-d6ea82d58b3d
 	storj.io/drpc v0.0.33
 	storj.io/storj v0.12.1-0.20230502161034-25f2305e0078
@@ -85,7 +86,6 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
