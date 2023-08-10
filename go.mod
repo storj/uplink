@@ -1,6 +1,6 @@
 module storj.io/uplink
 
-go 1.18
+go 1.19
 
 require (
 	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
@@ -8,8 +8,8 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
-	golang.org/x/sync v0.1.0
-	storj.io/common v0.0.0-20230602145716-d6ea82d58b3d
+	golang.org/x/sync v0.2.0
+	storj.io/common v0.0.0-20230810082159-49300ce78196
 	storj.io/drpc v0.0.33
 )
 
@@ -26,7 +26,7 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	storj.io/picobuf v0.0.1 // indirect
