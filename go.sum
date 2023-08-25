@@ -115,8 +115,8 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EV
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-storj.io/common v0.0.0-20230822112919-e5441f1061f5 h1:tc8fS4DGpROoQJAWEyCAusV77gXlejFKvYJliM6Z+1Q=
-storj.io/common v0.0.0-20230822112919-e5441f1061f5/go.mod h1:9evX8PZey+J3bcflXmR666E8GW4uRy5EDiVvg8iER7s=
+storj.io/common v0.0.0-20230824112457-9233ce5adb92 h1:05A/0l5rLnLRM1ntubre4oMZ6SvRs544cDskYuy40GE=
+storj.io/common v0.0.0-20230824112457-9233ce5adb92/go.mod h1:9evX8PZey+J3bcflXmR666E8GW4uRy5EDiVvg8iER7s=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
 storj.io/picobuf v0.0.1 h1:ekEvxSQCbEjTVIi/qxj2za13SJyfRE37yE30IBkZeT0=

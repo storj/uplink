@@ -8,6 +8,7 @@ import (
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"github.com/zeebo/errs"
 
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
@@ -73,8 +74,28 @@ func (buckets *Iterator) Item() *Bucket {
 	}
 }
 
-//go:linkname dialMetainfoClient storj.io/uplink.dialMetainfoClient
-func dialMetainfoClient(ctx context.Context, project *uplink.Project) (_ *metaclient.Client, err error)
+// GetBucketLocation returns bucket location.
+func GetBucketLocation(ctx context.Context, project *uplink.Project, bucketName string) (_ string, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return "", convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return "", convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	response, err := metainfoClient.GetBucketLocation(ctx, metaclient.GetBucketLocationParams{
+		Name: []byte(bucketName),
+	})
+	return string(response.Location), convertKnownErrors(err, bucketName, "")
+}
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
+
+//go:linkname dialMetainfoClient storj.io/uplink.dialMetainfoClient
+func dialMetainfoClient(ctx context.Context, project *uplink.Project) (_ *metaclient.Client, err error)
