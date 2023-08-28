@@ -52,7 +52,7 @@ pushd $RCLONE
     go build -mod=mod ./fstest/test_all
     go build -mod=mod
 
-    ./rclone config create TestTardigrade tardigrade access_grant $UPLINK_ACCESS
+    ./rclone config create TestStorj storj access_grant $UPLINK_ACCESS
 
-    ./test_all -backends tardigrade -output $SCRIPTDIR/../../.build/rclone-integration-tests
+    ./test_all -backends storj -output $SCRIPTDIR/../../.build/rclone-integration-tests -config $SCRIPTDIR/config.yaml
 popd

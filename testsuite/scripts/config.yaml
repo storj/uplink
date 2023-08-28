@@ -1,0 +1,19 @@
+tests:
+ - path: backend
+   addbackend: true
+   nobinary:   true
+   short:      true
+ - path: fs/operations
+   fastlist: true
+ - path: fs/sync
+   fastlist: true
+ - path: vfs
+ - path: cmd/serve/restic
+   localonly: true
+backends:
+ - backend:  "storj"
+   remote:   "TestStorj:"
+   fastlist: true
+   ignore:
+    # This test doesn't work against local env for now as rclone auth service is hardcoded
+     - TestIntegration/FsMkdir/FsPutFiles/PublicLink
