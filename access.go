@@ -241,7 +241,17 @@ func (access *Access) Share(permission Permission, prefixes ...SharePrefix) (*Ac
 	for _, prefix := range prefixes {
 		internalPrefixes = append(internalPrefixes, grant.SharePrefix(prefix))
 	}
-	rv, err := access.toInternal().Restrict(grant.Permission(permission), internalPrefixes...)
+	rv, err := access.toInternal().Restrict(
+		grant.Permission{
+			AllowDownload: permission.AllowDownload,
+			AllowUpload:   permission.AllowUpload,
+			AllowList:     permission.AllowList,
+			AllowDelete:   permission.AllowDelete,
+			NotBefore:     permission.NotBefore,
+			NotAfter:      permission.NotAfter,
+		},
+		internalPrefixes...,
+	)
 	if err != nil {
 		return nil, err
 	}
