@@ -178,6 +178,8 @@ github.com/gorilla/schema v1.2.0 h1:YufUaxZYCKGFuAq3c96BOhjgd5nmXiOY9NGzF247Tsc=
 github.com/gorilla/schema v1.2.0/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
 github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/graphql-go/graphql v0.7.9 h1:5Va/Rt4l5g3YjwDnid3vFfn43faaQBq7rMcIZ0VnV34=
+github.com/graphql-go/graphql v0.7.9/go.mod h1:k6yrAYQaSP59DC5UVxbgxESlmVyojThKdORUqGDGmrI=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
@@ -889,8 +891,8 @@ rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8
 sourcegraph.com/sourcegraph/go-diff v0.5.0/go.mod h1:kuch7UrkMzY0X+p9CRK03kfuPQ2zzQcaEFbx8wA8rck=
 sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4/go.mod h1:ketZ/q3QxT9HOBeFhu6RdvsftgpsbFHBF5Cas6cDKZ0=
 storj.io/common v0.0.0-20220719163320-cd2ef8e1b9b0/go.mod h1:mCYV6Ud5+cdbuaxdPD5Zht/HYaIn0sffnnws9ErkrMQ=
-storj.io/common v0.0.0-20230906174921-851a779994e4 h1:8dVpVN/UoUUKk1CSbz8SEUD84PIP6t/58r4oKuczIKs=
-storj.io/common v0.0.0-20230906174921-851a779994e4/go.mod h1:FMVOxf2+SgsmfjxwFCM1MZCKwXis4U7l22M/6nIhIas=
+storj.io/common v0.0.0-20230907123639-5fd0608fd947 h1:X75A5hX1nFjQH8GIvei4T1LNQTLa++bsDKMxXxfPHE8=
+storj.io/common v0.0.0-20230907123639-5fd0608fd947/go.mod h1:FMVOxf2+SgsmfjxwFCM1MZCKwXis4U7l22M/6nIhIas=
 storj.io/drpc v0.0.32/go.mod h1:6rcOyR/QQkSTX/9L5ZGtlZaE2PtXTTZl8d+ulSeeYEg=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
@@ -900,5 +902,5 @@ storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c h1:or/DtG5uaZpzimL61ahlgAA
 storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c/go.mod h1:JCuc3C0gzCJHQ4J6SOx/Yjg+QTpX0D+Fvs5H46FETCk=
 storj.io/private v0.0.0-20230824104110-1eac532af65a h1:x0OnU7z801JmR0XwFrFxmEBqcq+FDDuSn5jMbFoyfBo=
 storj.io/private v0.0.0-20230824104110-1eac532af65a/go.mod h1:6+MGr4KUXEBIOsOstFz1efPkA+8wVVfzsO8RpuAhhB4=
-storj.io/storj v0.12.1-0.20230907102753-82b108de6990 h1:MT0tE+il3OKl8jmKybWvvVPhpBy/pQPbri7xKoDJn/Q=
-storj.io/storj v0.12.1-0.20230907102753-82b108de6990/go.mod h1:nZMfzP16xsL4B23GnrofX2VT39pEn1lQfvkIspv35kI=
+storj.io/storj v0.12.1-0.20230908114701-c52554a2b9e4 h1:3vm8hdgEtgoB3wqxOoyyeONU15HPeBUiKHeIIFMM40M=
+storj.io/storj v0.12.1-0.20230908114701-c52554a2b9e4/go.mod h1:EzweTj/J1INtLvgwWyqv3B2Hrlkc7MdIEpxNmAi0f/4=

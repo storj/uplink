@@ -10,10 +10,10 @@ require (
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
-	storj.io/common v0.0.0-20230906174921-851a779994e4
+	storj.io/common v0.0.0-20230907123639-5fd0608fd947
 	storj.io/drpc v0.0.33
-	storj.io/storj v0.12.1-0.20230907102753-82b108de6990
-	storj.io/uplink v1.11.1-0.20230905131215-412de374f05c
+	storj.io/storj v0.12.1-0.20230908114701-c52554a2b9e4
+	storj.io/uplink v1.11.1-0.20230907122241-39cbd8e765dc
 )
 
 require (
@@ -40,6 +40,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
+	github.com/graphql-go/graphql v0.7.9 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451 // indirect

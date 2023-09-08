@@ -898,3 +898,45 @@ func TestImmutableUpload(t *testing.T) {
 		require.NoError(t, download.Close())
 	})
 }
+
+func TestAccessMaxObjectTTL(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.ReconfigureRS(2, 3, 4, 4),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
+
+		now := time.Now()
+		oneHour := time.Hour
+
+		permission := uplink.FullPermission()
+		permission.MaxObjectTTL = &oneHour
+		ttlAccess, err := access.Share(permission)
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, ttlAccess)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.EnsureBucket(ctx, "testbucket")
+		require.NoError(t, err)
+
+		upload, err := project.UploadObject(ctx, "testbucket", "object", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+		require.NoError(t, err)
+		require.NoError(t, upload.Commit())
+
+		object, err := project.StatObject(ctx, "testbucket", "object")
+		require.NoError(t, err)
+		require.WithinDuration(t, now.Add(oneHour), object.System.Expires, time.Minute)
+
+		for _, node := range planet.StorageNodes {
+			pieces, err := node.DB.PieceExpirationDB().GetExpired(ctx, now.Add(oneHour+10*time.Minute), 10)
+			require.NoError(t, err)
+			require.Len(t, pieces, 1)
+		}
+	})
+}
