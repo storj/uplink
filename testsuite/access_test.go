@@ -618,16 +618,11 @@ func TestUploadNotAllowedPath(t *testing.T) {
 
 		testData := bytes.NewBuffer(testrand.Bytes(1 * memory.KiB))
 
-		upload, err := project.UploadObject(ctx, "testbucket", "first-level-object", nil)
-		require.NoError(t, err)
-
-		_, err = io.Copy(upload, testData)
+		_, err = project.UploadObject(ctx, "testbucket", "first-level-object", nil)
 		require.Error(t, err)
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
 
-		err = upload.Abort()
-		require.NoError(t, err)
-
-		upload, err = project.UploadObject(ctx, "testbucket", "videos/second-level-object", nil)
+		upload, err := project.UploadObject(ctx, "testbucket", "videos/second-level-object", nil)
 		require.NoError(t, err)
 
 		_, err = io.Copy(upload, testData)
@@ -876,11 +871,9 @@ func TestImmutableUpload(t *testing.T) {
 		}
 
 		{ // we shouldn't be able upload to a different location
-			upload, err := project.UploadObject(ctx, "testbucket", "object2", nil)
-			require.NoError(t, err)
-			_, err = upload.Write(testrand.Bytes(5 * memory.KiB))
+			_, err := project.UploadObject(ctx, "testbucket", "object2", nil)
 			require.Error(t, err)
-			require.Error(t, upload.Commit())
+			require.ErrorIs(t, err, uplink.ErrPermissionDenied)
 		}
 
 		// we shouldn't be able to delete

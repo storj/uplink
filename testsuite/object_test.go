@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"storj.io/common/errs2"
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
@@ -386,9 +385,7 @@ func TestContextCancelUpload(t *testing.T) {
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
 		uploadcancel()
-		_, err = upload.Write(randData)
-		require.Error(t, err)
-		require.True(t, errs2.IsCanceled(err))
+		requireWriteEventuallyReturns(t, upload, randData, context.Canceled)
 
 		err = upload.Abort()
 		require.NoError(t, err)

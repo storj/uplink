@@ -16,8 +16,7 @@ import (
 	"storj.io/uplink/private/testuplink"
 )
 
-func TestMultisegmentUploadWithLastInline(t *testing.T) {
-	// this is special case were uploaded object has 3 segments (2 remote + 1 inline)
+func TestMultisegmentUploadWithoutInlineSegment(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
@@ -36,7 +35,9 @@ func TestMultisegmentUploadWithLastInline(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
 
-		// verify that object has 3 segments, 2 remote + 1 inline
+		// in the past object with size equal to multiplication of max segment size was uploaded
+		// as remote segments + one additional inline segment, after upload code path refactor we
+		// are uploading now only 2 remote segments without last inline segment
 		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "testbucket")
 		require.NoError(t, err)
 		require.Len(t, objects, 1)
@@ -47,9 +48,8 @@ func TestMultisegmentUploadWithLastInline(t *testing.T) {
 			ObjectKey:  objects[0].ObjectKey,
 		})
 		require.NoError(t, err)
-		require.Equal(t, 3, len(segments))
-		// TODO we should check 2 segments to be remote and last one to be inline
-		// but main satellite implementation doens't give such info at the moment
+		require.Len(t, segments, 2)
+		require.EqualValues(t, 20*memory.KiB, segments[0].PlainSize)
 	})
 }
 

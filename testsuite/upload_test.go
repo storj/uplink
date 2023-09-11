@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -360,10 +362,7 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 			require.NoError(t, planet.StopPeer(planet.StorageNodes[i]))
 		}
 
-		project, err := planet.Uplinks[0].OpenProject(
-			testuplink.WithConcurrentSegmentUploadsDefaultConfig(ctx),
-			planet.Satellites[0],
-		)
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
@@ -448,4 +447,148 @@ func TestConcurrentUploadToSamePath(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
 	})
+}
+
+func TestUploadLimits(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 2,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.ProjectLimit.CacheCapacity = 0
+			},
+		},
+	}, func(t *testing.T, tpCtx *testcontext.Context, planet *testplanet.Planet) {
+		data := testrand.Bytes(6 * memory.KiB)
+
+		ctx := testuplink.WithMaxSegmentSize(tpCtx, 5*memory.KiB)
+
+		t.Run("segment limit", func(t *testing.T) {
+			upl := planet.Uplinks[0]
+			accountingDB := planet.Satellites[0].DB.ProjectAccounting()
+			err := accountingDB.UpdateProjectSegmentLimit(ctx, upl.Projects[0].ID, 0)
+			require.NoError(t, err)
+
+			project, err := upl.OpenProject(ctx, planet.Satellites[0])
+			require.NoError(t, err)
+			defer tpCtx.Check(project.Close)
+
+			_, err = project.CreateBucket(ctx, "testbucket")
+			require.NoError(t, err)
+
+			// should fail on Write beause we uploaded more than segment
+			// and request to satellite were made. The Write call may not fail
+			// immmediately, since writes are buffered and the segment uploads
+			// are handled concurrently.
+			upload, err := project.UploadObject(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+			requireWriteEventuallyReturns(t, upload, data, uplink.ErrSegmentsLimitExceeded)
+			require.ErrorIs(t, upload.Commit(), uplink.ErrSegmentsLimitExceeded)
+
+			// should fail on Commit as Write input is too small to create single segment
+			upload, err = project.UploadObject(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+			n, err := upload.Write(testrand.Bytes(3 * memory.KiB))
+			require.NoError(t, err)
+			require.NotZero(t, n)
+			require.ErrorIs(t, upload.Commit(), uplink.ErrSegmentsLimitExceeded)
+
+			// should fail on direct call to BeginObject
+			_, err = project.BeginUpload(ctx, "testbucket", "test/path/0", nil)
+			require.ErrorIs(t, err, uplink.ErrSegmentsLimitExceeded)
+
+			// update limit to be able to call BeginUpload without error
+			err = accountingDB.UpdateProjectSegmentLimit(ctx, upl.Projects[0].ID, 1)
+			require.NoError(t, err)
+
+			uploadInfo, err := project.BeginUpload(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+
+			err = accountingDB.UpdateProjectSegmentLimit(ctx, upl.Projects[0].ID, 0)
+			require.NoError(t, err)
+
+			// should fail on Write beause we uploaded more than segment
+			// and request to satellite were made. The Write call may not fail
+			// immmediately, since writes are buffered and the segment uploads
+			// are handled concurrently.
+			partUpload, err := project.UploadPart(ctx, "testbucket", "test/path/0", uploadInfo.UploadID, 0)
+			require.NoError(t, err)
+			requireWriteEventuallyReturns(t, partUpload, data, uplink.ErrSegmentsLimitExceeded)
+			require.ErrorIs(t, partUpload.Commit(), uplink.ErrSegmentsLimitExceeded)
+
+			// should fail on Commit as Write input is too small to create single segment
+			partUpload, err = project.UploadPart(ctx, "testbucket", "test/path/0", uploadInfo.UploadID, 0)
+			require.NoError(t, err)
+			_, err = partUpload.Write(testrand.Bytes(3 * memory.KiB))
+			require.NoError(t, err)
+			require.ErrorIs(t, partUpload.Commit(), uplink.ErrSegmentsLimitExceeded)
+		})
+		t.Run("storage limit", func(t *testing.T) {
+			upl := planet.Uplinks[1]
+			accountingDB := planet.Satellites[0].DB.ProjectAccounting()
+			err := accountingDB.UpdateProjectUsageLimit(ctx, upl.Projects[0].ID, 0)
+			require.NoError(t, err)
+
+			project, err := upl.OpenProject(ctx, planet.Satellites[0])
+			require.NoError(t, err)
+			defer tpCtx.Check(project.Close)
+
+			_, err = project.CreateBucket(ctx, "testbucket")
+			require.NoError(t, err)
+
+			// should fail on Write beause we uploaded more than segment
+			// and request to satellite were made. The Write call may not fail
+			// immmediately, since writes are buffered and the segment uploads
+			// are handled concurrently.
+			upload, err := project.UploadObject(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+			requireWriteEventuallyReturns(t, upload, data, uplink.ErrStorageLimitExceeded)
+			require.ErrorIs(t, upload.Commit(), uplink.ErrStorageLimitExceeded)
+
+			// should fail on Commit as Write input is too small to create single segment
+			upload, err = project.UploadObject(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+			_, err = upload.Write(testrand.Bytes(3 * memory.KiB))
+			require.NoError(t, err)
+			require.ErrorIs(t, upload.Commit(), uplink.ErrStorageLimitExceeded)
+
+			// should fail on direct call to BeginObject
+			_, err = project.BeginUpload(ctx, "testbucket", "test/path/0", nil)
+			require.ErrorIs(t, err, uplink.ErrStorageLimitExceeded)
+
+			// update limit to be able to call BeginUpload without error
+			err = accountingDB.UpdateProjectUsageLimit(ctx, upl.Projects[0].ID, 1)
+			require.NoError(t, err)
+
+			uploadInfo, err := project.BeginUpload(ctx, "testbucket", "test/path/0", nil)
+			require.NoError(t, err)
+
+			err = accountingDB.UpdateProjectUsageLimit(ctx, upl.Projects[0].ID, 0)
+			require.NoError(t, err)
+
+			// should fail on Write beause we uploaded more than segment
+			// and request to satellite were made. The Write call may not fail
+			// immmediately, since writes are buffered and the segment uploads
+			// are handled concurrently.
+			partUpload, err := project.UploadPart(ctx, "testbucket", "test/path/0", uploadInfo.UploadID, 0)
+			require.NoError(t, err)
+			requireWriteEventuallyReturns(t, partUpload, data, uplink.ErrStorageLimitExceeded)
+			require.ErrorIs(t, partUpload.Commit(), uplink.ErrStorageLimitExceeded)
+
+			// should fail on Commit as Write input is too small to create single segment
+			partUpload, err = project.UploadPart(ctx, "testbucket", "test/path/0", uploadInfo.UploadID, 0)
+			require.NoError(t, err)
+			_, err = partUpload.Write(testrand.Bytes(3 * memory.KiB))
+			require.NoError(t, err)
+			require.ErrorIs(t, partUpload.Commit(), uplink.ErrStorageLimitExceeded)
+		})
+	})
+}
+
+func requireWriteEventuallyReturns(tb testing.TB, w io.Writer, data []byte, expectErr error) {
+	require.Eventually(tb, func() bool {
+		_, err := w.Write(data)
+		// only write the data on the first call to write.
+		data = data[0:]
+		return errors.Is(err, expectErr)
+	}, time.Second*5, time.Millisecond*10)
 }
