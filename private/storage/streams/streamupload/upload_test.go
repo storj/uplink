@@ -38,6 +38,7 @@ func TestUploadObject(t *testing.T) {
 	for _, tc := range []struct {
 		desc                    string
 		segments                []splitter.Segment
+		blockNext               bool
 		sourceErr               error
 		sourceErrAfter          int
 		expectBeginObject       bool
@@ -83,14 +84,16 @@ func TestUploadObject(t *testing.T) {
 		},
 		{
 			desc:                    "failed segment upload begin",
-			segments:                makeSegments(goodRemote, badBeginRemote, blockWaitRemote),
+			segments:                makeSegments(goodRemote, badBeginRemote),
+			blockNext:               true,
 			expectBeginObject:       true,
 			expectBeginDeleteObject: true,
 			expectErr:               "begin failed",
 		},
 		{
 			desc:                    "failed segment upload wait",
-			segments:                makeSegments(goodRemote, badWaitRemote, blockWaitRemote),
+			segments:                makeSegments(goodRemote, badWaitRemote),
+			blockNext:               true,
 			expectBeginObject:       true,
 			expectBeginDeleteObject: true,
 			expectErr:               "wait failed",
@@ -99,7 +102,7 @@ func TestUploadObject(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			var (
 				encMeta         = encryptedMetadata{}
-				segmentSource   = &segmentSource{segments: tc.segments, err: tc.sourceErr, errAfter: tc.sourceErrAfter}
+				segmentSource   = &segmentSource{segments: tc.segments, blockNext: tc.blockNext, err: tc.sourceErr, errAfter: tc.sourceErrAfter}
 				segmentUploader = segmentUploader{}
 				miBatcher       = newMetainfoBatcher(t, false, len(tc.segments))
 			)
@@ -131,6 +134,7 @@ func TestUploadPart(t *testing.T) {
 	for _, tc := range []struct {
 		desc           string
 		segments       []splitter.Segment
+		blockNext      bool
 		sourceErr      error
 		sourceErrAfter int
 		expectErr      string
@@ -171,18 +175,20 @@ func TestUploadPart(t *testing.T) {
 		},
 		{
 			desc:      "failed segment upload begin",
-			segments:  makeSegments(goodRemote, badBeginRemote, blockWaitRemote),
+			segments:  makeSegments(goodRemote, badBeginRemote),
+			blockNext: true,
 			expectErr: "begin failed",
 		},
 		{
 			desc:      "failed segment upload wait",
-			segments:  makeSegments(goodRemote, badWaitRemote, blockWaitRemote),
+			segments:  makeSegments(goodRemote, badWaitRemote),
+			blockNext: true,
 			expectErr: "wait failed",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			var (
-				segmentSource   = &segmentSource{segments: tc.segments, err: tc.sourceErr, errAfter: tc.sourceErrAfter}
+				segmentSource   = &segmentSource{segments: tc.segments, blockNext: tc.blockNext, err: tc.sourceErr, errAfter: tc.sourceErrAfter}
 				segmentUploader = segmentUploader{}
 				miBatcher       = newMetainfoBatcher(t, true, len(tc.segments))
 			)
@@ -215,13 +221,14 @@ func TestUploadPart(t *testing.T) {
 }
 
 type segmentSource struct {
-	next     int
-	segments []splitter.Segment
-	err      error
-	errAfter int
+	next      int
+	segments  []splitter.Segment
+	blockNext bool
+	err       error
+	errAfter  int
 }
 
-func (src *segmentSource) Next(context.Context) (segment splitter.Segment, err error) {
+func (src *segmentSource) Next(ctx context.Context) (segment splitter.Segment, err error) {
 	switch {
 	case src.err != nil && src.next == src.errAfter:
 		return nil, src.err
@@ -229,6 +236,9 @@ func (src *segmentSource) Next(context.Context) (segment splitter.Segment, err e
 		segment := src.segments[src.next]
 		src.next++
 		return segment, nil
+	case src.blockNext:
+		<-ctx.Done()
+		return nil, ctx.Err()
 	default:
 		return nil, nil
 	}
