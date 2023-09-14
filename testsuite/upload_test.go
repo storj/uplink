@@ -382,8 +382,6 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 }
 
 func TestConcurrentUploadToSamePath(t *testing.T) {
-	t.Skip("Currently, we cannot override object on upload with metabase implementation")
-
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 4,
