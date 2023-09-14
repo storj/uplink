@@ -926,6 +926,12 @@ func TestAccessMaxObjectTTL(t *testing.T) {
 		require.NoError(t, err)
 		require.WithinDuration(t, now.Add(oneHour), object.System.Expires, time.Minute)
 
+		objects := project.ListObjects(ctx, "testbucket", &uplink.ListObjectsOptions{System: true})
+		require.True(t, objects.Next())
+		require.WithinDuration(t, now.Add(oneHour), objects.Item().System.Expires, time.Minute)
+		require.False(t, objects.Next())
+		require.NoError(t, objects.Err())
+
 		for _, node := range planet.StorageNodes {
 			pieces, err := node.DB.PieceExpirationDB().GetExpired(ctx, now.Add(oneHour+10*time.Minute), 10)
 			require.NoError(t, err)
