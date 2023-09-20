@@ -10,10 +10,10 @@ require (
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
-	storj.io/common v0.0.0-20230907123639-5fd0608fd947
+	storj.io/common v0.0.0-20230920095429-0ce0a575e6f8
 	storj.io/drpc v0.0.33
-	storj.io/storj v0.12.1-0.20230908114701-c52554a2b9e4
-	storj.io/uplink v1.11.1-0.20230907122241-39cbd8e765dc
+	storj.io/storj v0.12.1-0.20230920100647-22261146bef9
+	storj.io/uplink v1.12.1-0.20230915133208-3b7b92a826a3
 )
 
 require (
@@ -69,7 +69,7 @@ require (
 	github.com/redis/go-redis/v9 v9.0.3 // indirect
 	github.com/segmentio/backo-go v0.0.0-20200129164019-23eae7c10bd3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
-	github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230419135619-fb89f20752cb // indirect
+	github.com/spacemonkeygo/monkit/v3 v3.0.22 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spacemonkeygo/tlshowdy v0.0.0-20160207005338-8fa2cec1d7cd // indirect
 	github.com/spf13/afero v1.6.0 // indirect
@@ -108,5 +108,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	storj.io/monkit-jaeger v0.0.0-20220915074555-d100d7589f41 // indirect
 	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect
-	storj.io/private v0.0.0-20230824104110-1eac532af65a // indirect
+	storj.io/private v0.0.0-20230912093002-ca2d4ab44679 // indirect
 )

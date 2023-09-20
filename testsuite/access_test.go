@@ -939,3 +939,54 @@ func TestAccessMaxObjectTTL(t *testing.T) {
 		}
 	})
 }
+
+func TestMultipleAccessRestrict(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
+
+		{
+			project, err := uplink.OpenProject(ctx, access)
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			_, err = project.EnsureBucket(ctx, "testbucket")
+			require.NoError(t, err)
+
+			upload, err := project.UploadObject(ctx, "testbucket", "object", nil)
+			require.NoError(t, err)
+			_, err = upload.Write(testrand.Bytes(1 * memory.KiB))
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			objects := project.ListObjects(ctx, "testbucket", nil)
+			require.True(t, objects.Next())
+			require.NoError(t, objects.Err())
+		}
+
+		// Restrict without allowed paths
+		permission := uplink.FullPermission()
+		permission.NotAfter = time.Now().Add(2 * time.Hour)
+		restricted, err := access.Share(permission)
+		require.NoError(t, err)
+
+		// Restrict further with an allowed path
+		restricted, err = restricted.Share(uplink.FullPermission(), uplink.SharePrefix{Bucket: "testbucket"})
+		require.NoError(t, err)
+
+		// Restrict further again without any additional allowed paths
+		permission.NotAfter = time.Now().Add(1 * time.Hour)
+		restricted, err = restricted.Share(permission)
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, restricted)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		// Check that the access grant can still access the allowed path
+		objects := project.ListObjects(ctx, "testbucket", nil)
+		assert.True(t, objects.Next())
+		assert.NoError(t, objects.Err())
+	})
+}
