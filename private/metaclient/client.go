@@ -129,7 +129,6 @@ func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectI
 type BeginObjectParams struct {
 	Bucket               []byte
 	EncryptedObjectKey   []byte
-	Version              int32
 	Redundancy           storj.RedundancyScheme
 	EncryptionParameters storj.EncryptionParameters
 	ExpiresAt            time.Time
@@ -147,7 +146,6 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
-		Version:            params.Version,
 		ExpiresAt:          params.ExpiresAt,
 		RedundancyScheme: &pb.RedundancyScheme{
 			Type:             pb.RedundancyScheme_SchemeType(params.Redundancy.Algorithm),
