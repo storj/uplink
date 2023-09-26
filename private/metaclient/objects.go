@@ -377,6 +377,8 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 			IncludeSystemMetadata: options.IncludeSystemMetadata,
 			Recursive:             options.Recursive,
 			Status:                options.Status,
+			IncludeAllVersions:    options.IncludeAllVersions,
+			VersionCursor:         options.VersionCursor,
 		})
 		if err != nil {
 			return ObjectList{}, errClass.Wrap(err)

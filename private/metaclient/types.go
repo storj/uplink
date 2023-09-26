@@ -172,6 +172,7 @@ type ListOptions struct {
 	Prefix                storj.Path
 	Cursor                storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
 	CursorEnc             []byte
+	VersionCursor         []byte
 	Delimiter             rune
 	Recursive             bool
 	Direction             ListDirection
@@ -179,6 +180,7 @@ type ListOptions struct {
 	IncludeCustomMetadata bool
 	IncludeSystemMetadata bool
 	Status                int32
+	IncludeAllVersions    bool
 }
 
 // NextPage returns options for listing the next page.
@@ -192,6 +194,8 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 		CursorEnc:             list.Cursor,
 		Delimiter:             opts.Delimiter,
 		Recursive:             opts.Recursive,
+		IncludeAllVersions:    opts.IncludeAllVersions,
+		VersionCursor:         opts.VersionCursor,
 		IncludeSystemMetadata: opts.IncludeSystemMetadata,
 		IncludeCustomMetadata: opts.IncludeCustomMetadata,
 		Direction:             After,

@@ -861,11 +861,13 @@ type ListObjectsParams struct {
 	Bucket                []byte
 	EncryptedPrefix       []byte
 	EncryptedCursor       []byte
+	VersionCursor         []byte
 	Limit                 int32
 	IncludeCustomMetadata bool
 	IncludeSystemMetadata bool
 	Recursive             bool
 	Status                int32
+	IncludeAllVersions    bool
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -879,9 +881,11 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 			Metadata:              params.IncludeCustomMetadata,
 			ExcludeSystemMetadata: !params.IncludeSystemMetadata,
 		},
-		UseObjectIncludes: true,
-		Recursive:         params.Recursive,
-		Status:            pb.Object_Status(params.Status),
+		UseObjectIncludes:  true,
+		Recursive:          params.Recursive,
+		Status:             pb.Object_Status(params.Status),
+		IncludeAllVersions: params.IncludeAllVersions,
+		VersionCursor:      params.VersionCursor,
 	}
 }
 

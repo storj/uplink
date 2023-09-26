@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/encryption"
 	"storj.io/common/memory"
@@ -22,6 +23,8 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/satellite"
+	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
@@ -483,6 +486,51 @@ func TestListObjects_PagingWithDiffPassphrase(t *testing.T) {
 				}
 			}
 		}
+	})
+}
+
+func TestListObjectVersions(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		encStore := newTestEncStore(TestEncKey)
+		encStore.SetDefaultPathCipher(storj.EncAESGCM)
+
+		db, streams, cleanup, err := newMetainfoParts(planet, encStore)
+		require.NoError(t, err)
+		defer ctx.Check(cleanup)
+
+		objectKey := "test-object"
+
+		testBucket, err := db.CreateBucket(ctx, TestBucket)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer func() { assert.NoError(t, project.Close()) }()
+
+		err = bucket.SetBucketVersioning(ctx, project, testBucket.Name, true)
+		require.NoError(t, err)
+
+		upload(ctx, t, db, streams, testBucket.Name, objectKey, nil)
+
+		upload(ctx, t, db, streams, testBucket.Name, objectKey, nil)
+
+		list, err := db.ListObjects(ctx, testBucket.Name, options("", "", 0))
+		require.NoError(t, err)
+		require.Equal(t, 1, len(list.Items))
+
+		list, err = db.ListObjects(ctx, testBucket.Name, metaclient.ListOptions{
+			IncludeAllVersions: true,
+			Direction:          metaclient.After,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 2, len(list.Items))
 	})
 }
 
