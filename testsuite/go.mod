@@ -12,7 +12,7 @@ require (
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
 	storj.io/common v0.0.0-20230920095429-0ce0a575e6f8
 	storj.io/drpc v0.0.33
-	storj.io/storj v0.12.1-0.20230920100647-22261146bef9
+	storj.io/storj v0.12.1-0.20230928053853-31d42bb136fe
 	storj.io/uplink v1.12.1-0.20230915133208-3b7b92a826a3
 )
 

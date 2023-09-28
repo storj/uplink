@@ -902,5 +902,5 @@ storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c h1:or/DtG5uaZpzimL61ahlgAA
 storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c/go.mod h1:JCuc3C0gzCJHQ4J6SOx/Yjg+QTpX0D+Fvs5H46FETCk=
 storj.io/private v0.0.0-20230912093002-ca2d4ab44679 h1:58rShZRrm14tDqc71bnyoFZDvdNIcJ7iBwQWEQZl60U=
 storj.io/private v0.0.0-20230912093002-ca2d4ab44679/go.mod h1:6+MGr4KUXEBIOsOstFz1efPkA+8wVVfzsO8RpuAhhB4=
-storj.io/storj v0.12.1-0.20230920100647-22261146bef9 h1:7T0K0G0Sq8S+jv/nesQnXkTXnYDpjKsteiSBGnNQdzk=
-storj.io/storj v0.12.1-0.20230920100647-22261146bef9/go.mod h1:5mf9sC6zB8Aaq5+pRDThbrdO7DrLI9ILHx8oqbFDwSk=
+storj.io/storj v0.12.1-0.20230928053853-31d42bb136fe h1:SEbuP3bteR04uudX6rQtktdt+2wi0ERrv5jYlb6oEK0=
+storj.io/storj v0.12.1-0.20230928053853-31d42bb136fe/go.mod h1:sVBt64az1Va9oR07naE2YKnp20kIwoEG69OSZcwvI4M=
