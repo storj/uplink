@@ -80,7 +80,7 @@ func (project *Project) CopyObject(ctx context.Context, oldBucket, oldKey, newBu
 		NewSegmentKeys:               newKeys,
 	})
 	if err != nil {
-		return nil, packageError.Wrap(err)
+		return nil, convertKnownErrors(err, oldBucket, oldKey)
 	}
 
 	db, err := project.dialMetainfoDB(ctx)

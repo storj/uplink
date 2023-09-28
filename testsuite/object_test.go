@@ -602,6 +602,36 @@ func TestVeryLongDownload(t *testing.T) {
 	})
 }
 
+func TestObjectPermissionDenied(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
+
+		deleteAccess, err := access.Share(uplink.Permission{AllowDelete: true}, uplink.SharePrefix{
+			Bucket: "source-bucket",
+		})
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, deleteAccess)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "source-bucket", "testkey", []byte("hello"))
+		require.NoError(t, err)
+
+		_, err = project.CopyObject(ctx, "source-bucket", "testkey", "source-bucket", "testkey-copy", nil)
+		require.Error(t, err)
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+
+		err = project.MoveObject(ctx, "source-bucket", "testkey", "source-bucket", "testkey-copy", nil)
+		require.Error(t, err)
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+	})
+}
+
 func assertObject(t *testing.T, obj *uplink.Object, expectedKey string) {
 	assert.Equal(t, expectedKey, obj.Key)
 	assert.WithinDuration(t, time.Now(), obj.System.Created, 10*time.Second)
