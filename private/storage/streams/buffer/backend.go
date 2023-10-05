@@ -25,8 +25,8 @@ func NewMemoryBackend(cap int64) *MemoryBackend {
 
 // MemoryBackend implements the Backend interface backed by a slice.
 type MemoryBackend struct {
-	buf    []byte
 	len    int64
+	buf    []byte
 	closed bool
 }
 

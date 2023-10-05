@@ -58,6 +58,7 @@ pipeline {
                                 sh 'check-errs ./...'
                                 sh './scripts/check-dependencies.sh'
                                 sh 'staticcheck ./...'
+                                sh 'GOOS=linux GOARCH=arm staticcheck ./...'
                                 sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
                                 sh 'go-licenses check ./...'
                                 sh './scripts/check-libuplink-size.sh'
