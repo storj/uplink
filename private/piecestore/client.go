@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -19,7 +20,7 @@ import (
 )
 
 // NoiseEnabled indicates whether Noise is enabled in this build.
-const NoiseEnabled = true
+var NoiseEnabled = os.Getenv("STORJ_NOISE_DISABLED_EXPERIMENTAL") != "true"
 
 var errMessageTimeout = errors.New("message timeout")
 

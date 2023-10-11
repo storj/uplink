@@ -2,7 +2,7 @@ pipeline {
     agent none
 
     options {
-          timeout(time: 26, unit: 'MINUTES')
+          timeout(time: 35, unit: 'MINUTES')
     }
     environment {
         NPM_CONFIG_CACHE = '/tmp/npm/cache'
