@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
@@ -20,6 +21,8 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
 )
+
+var evs = eventkit.Package()
 
 // Download implements downloading from a piecestore.
 type Download struct {
@@ -46,6 +49,9 @@ type Download struct {
 	// hash and originLimit are received in the event of a GET_REPAIR
 	hash        *pb.PieceHash
 	originLimit *pb.OrderLimit
+
+	// did the storagenode restore the piece from trash to serve the download request
+	restoredFromTrash bool
 
 	close        sync.Once
 	closingError syncError
@@ -235,6 +241,10 @@ func (client *Download) Read(data []byte) (read int, err error) {
 			client.originLimit = response.Limit
 		}
 
+		if !client.restoredFromTrash && response != nil {
+			client.restoredFromTrash = response.RestoredFromTrash
+		}
+
 		// we may have some data buffered, so we cannot immediately return the error
 		// we'll queue the error and use the received error as the closing error
 		if err != nil {
@@ -291,12 +301,24 @@ func (client *Download) Close() error {
 		err = details.Wrap(Error.Wrap(err))
 	}
 
+	client.emitEvent()
+
 	return err
 }
 
 // GetHashAndLimit gets the download's hash and original order limit.
 func (client *Download) GetHashAndLimit() (*pb.PieceHash, *pb.OrderLimit) {
 	return client.hash, client.originLimit
+}
+
+func (client *Download) emitEvent() {
+	if client.restoredFromTrash {
+		evs.Event("piece-download",
+			eventkit.String("node_id", client.limit.StorageNodeId.String()),
+			eventkit.String("piece_id", client.limit.PieceId.String()),
+			eventkit.Bool("restored_from_trash", client.restoredFromTrash),
+		)
+	}
 }
 
 // ReadBuffer implements buffered reading with an error.
