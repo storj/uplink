@@ -10,27 +10,27 @@ import (
 
 // PieceBuffer is a synchronized buffer for storing erasure shares for a piece.
 type PieceBuffer struct {
-	buf          []byte
-	shareSize    int
-	cond         *sync.Cond
-	newDataCond  *sync.Cond
-	rpos, wpos   int
-	full         bool
-	currentShare int64 // current erasure share number
-	totalwr      int64 // total bytes ever written to the buffer
-	lastwr       int64 // total bytes ever written when last notified newDataCond
-	err          error
+	buf           []byte
+	shareSize     int
+	cond          *sync.Cond
+	newDataSignal chan struct{}
+	rpos, wpos    int
+	full          bool
+	currentShare  int64 // current erasure share number
+	totalwr       int64 // total bytes ever written to the buffer
+	lastwr        int64 // total bytes ever written when last notified newDataCond
+	err           error
 }
 
 // NewPieceBuffer creates and initializes a new PieceBuffer using buf as its
-// internal content. If new data is written to the buffer, newDataCond will be
+// internal content. If new data is written to the buffer, newDataSignal will be
 // notified.
-func NewPieceBuffer(buf []byte, shareSize int, newDataCond *sync.Cond) *PieceBuffer {
+func NewPieceBuffer(buf []byte, shareSize int, newDataSignal chan struct{}) *PieceBuffer {
 	return &PieceBuffer{
-		buf:         buf,
-		shareSize:   shareSize,
-		cond:        sync.NewCond(&sync.Mutex{}),
-		newDataCond: newDataCond,
+		buf:           buf,
+		shareSize:     shareSize,
+		cond:          sync.NewCond(&sync.Mutex{}),
+		newDataSignal: newDataSignal,
 	}
 }
 
@@ -193,10 +193,10 @@ func (b *PieceBuffer) getError() error {
 
 // notifyNewData notifies newDataCond that new data is written to the buffer.
 func (b *PieceBuffer) notifyNewData() {
-	b.newDataCond.L.Lock()
-	defer b.newDataCond.L.Unlock()
-
-	b.newDataCond.Broadcast()
+	select {
+	case b.newDataSignal <- struct{}{}:
+	default:
+	}
 }
 
 // empty chacks if the buffer is empty.
