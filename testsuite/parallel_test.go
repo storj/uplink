@@ -4,12 +4,14 @@
 package testsuite_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"storj.io/common/errs2"
 	"storj.io/common/memory"
@@ -94,5 +96,47 @@ func TestParallelUploadDownload(t *testing.T) {
 		for i, expected := range expectedData {
 			require.Equal(t, expected, downloadedData[i])
 		}
+	})
+}
+
+func TestUplinksParallel(t *testing.T) {
+	const uplinkCount = 2
+	const parallelCount = 2
+
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 6, UplinkCount: uplinkCount,
+		Reconfigure: testplanet.DisableQUIC,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+
+		var group errgroup.Group
+		for i := range planet.Uplinks {
+			uplink := planet.Uplinks[i]
+
+			for p := 0; p < parallelCount; p++ {
+				suffix := fmt.Sprintf("-%d-%d", i, p)
+				group.Go(func() error {
+					data := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)
+
+					err := uplink.Upload(ctx, satellite, "testbucket"+suffix, "test/path"+suffix, data)
+					if err != nil {
+						return err
+					}
+
+					downloaded, err := uplink.Download(ctx, satellite, "testbucket"+suffix, "test/path"+suffix)
+					if err != nil {
+						return err
+					}
+
+					if !bytes.Equal(data, downloaded) {
+						return fmt.Errorf("upload != download data: %s", suffix)
+					}
+
+					return nil
+				})
+			}
+		}
+		err := group.Wait()
+		require.NoError(t, err)
 	})
 }

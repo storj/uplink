@@ -6,6 +6,8 @@ package eestream
 import (
 	"context"
 	"io"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,20 +17,30 @@ import (
 	"storj.io/common/errs2"
 	"storj.io/common/ranger"
 	"storj.io/common/readcloser"
+	"storj.io/uplink/private/eestream/improved"
 )
 
+var disableNewStripeReader = map[string]bool{
+	"yes": true, "true": true, "1": true,
+}[strings.ToLower(os.Getenv("STORJ_UPLINK_DISABLE_NEW_STRIPE_READER"))]
+
+type stripeReader interface {
+	ReadStripes(context.Context, int64, []byte) ([]byte, int, error)
+	Close() error
+}
+
 type decodedReader struct {
-	ctx             context.Context
-	cancel          context.CancelFunc
-	readers         map[int]io.ReadCloser
-	scheme          ErasureScheme
-	stripeReader    *StripeReader
-	outbuf          []byte
-	err             error
-	currentStripe   int64
-	expectedStripes int64
-	close           sync.Once
-	closeErr        error
+	ctx               context.Context
+	cancel            context.CancelFunc
+	readers           map[int]io.ReadCloser
+	scheme            ErasureScheme
+	stripeReader      stripeReader
+	outbuf, outbufmem []byte
+	err               error
+	currentStripe     int64
+	expectedStripes   int64
+	close             sync.Once
+	closeErr          error
 }
 
 // DecodeReaders2 takes a map of readers and an ErasureScheme returning a
@@ -53,13 +65,20 @@ func DecodeReaders2(ctx context.Context, cancel func(), rs map[int]io.ReadCloser
 	if err := checkMBM(mbm); err != nil {
 		return readcloser.FatalReadCloser(err)
 	}
+	expectedStripes := expectedSize / int64(es.StripeSize())
 	dr := &decodedReader{
 		readers:         rs,
 		scheme:          es,
-		stripeReader:    NewStripeReader(rs, es, mbm, forceErrorDetection),
-		outbuf:          make([]byte, 0, es.StripeSize()),
-		expectedStripes: expectedSize / int64(es.StripeSize()),
+		outbufmem:       make([]byte, 0, 32*1024),
+		expectedStripes: expectedStripes,
 	}
+
+	if disableNewStripeReader {
+		dr.stripeReader = NewStripeReader(rs, es, mbm, forceErrorDetection)
+	} else {
+		dr.stripeReader = improved.New(rs, es, int(expectedStripes), forceErrorDetection)
+	}
+
 	dr.ctx, dr.cancel = ctx, cancel
 	// Kick off a goroutine to watch for context cancelation.
 	go func() {
@@ -84,19 +103,16 @@ func (dr *decodedReader) Read(p []byte) (n int, err error) {
 			return 0, dr.err
 		}
 		// read the input buffers of the next stripe - may also decode it
-		dr.outbuf, dr.err = dr.stripeReader.ReadStripe(ctx, dr.currentStripe, dr.outbuf)
+		var newStripes int
+		dr.outbuf, newStripes, dr.err = dr.stripeReader.ReadStripes(ctx, dr.currentStripe, dr.outbufmem)
+		dr.currentStripe += int64(newStripes)
 		if dr.err != nil {
 			return 0, dr.err
 		}
-		dr.currentStripe++
 	}
 
-	// copy what data we have to the output
 	n = copy(p, dr.outbuf)
-	// slide the remaining bytes to the beginning
-	copy(dr.outbuf, dr.outbuf[n:])
-	// shrink the remaining buffer
-	dr.outbuf = dr.outbuf[:len(dr.outbuf)-n]
+	dr.outbuf = dr.outbuf[n:]
 	return n, nil
 }
 

@@ -4,6 +4,7 @@
 package eestream
 
 import (
+	"storj.io/common/sync2/race2"
 	"storj.io/infectious"
 )
 
@@ -28,21 +29,33 @@ func (s *unsafeRSScheme) Encode(input []byte, output func(num int, data []byte))
 	})
 }
 
-func (s *unsafeRSScheme) Decode(out []byte, in map[int][]byte) ([]byte, error) {
-	shares := make([]infectious.Share, 0, len(in))
-	for num, data := range in {
-		shares = append(shares, infectious.Share{Number: num, Data: data})
+func (s *unsafeRSScheme) Decode(out []byte, in []infectious.Share) ([]byte, error) {
+	for _, share := range in {
+		race2.ReadSlice(share.Data)
 	}
 
-	stripe := make([]byte, s.RequiredCount()*s.ErasureShareSize())
-	err := s.fc.Rebuild(shares, func(share infectious.Share) {
-		copy(stripe[share.Number*s.ErasureShareSize():], share.Data)
+	race2.WriteSlice(out)
+	expectedCap := s.RequiredCount() * s.ErasureShareSize()
+	if cap(out) < expectedCap {
+		out = make([]byte, expectedCap)
+	} else {
+		out = out[:expectedCap]
+	}
+	err := s.fc.Rebuild(in, func(share infectious.Share) {
+		copy(out[share.Number*s.ErasureShareSize():], share.Data)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return stripe, nil
+	return out, nil
+}
+
+func (s *unsafeRSScheme) Rebuild(in []infectious.Share, out func(infectious.Share)) error {
+	for _, v := range in {
+		race2.ReadSlice(v.Data)
+	}
+	return s.fc.Rebuild(in, out)
 }
 
 func (s *unsafeRSScheme) ErasureShareSize() int {

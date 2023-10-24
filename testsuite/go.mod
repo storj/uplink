@@ -9,6 +9,7 @@ require (
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
+	golang.org/x/sync v0.3.0
 	storj.io/common v0.0.0-20231030160447-a6058ddbb07f
 	storj.io/drpc v0.0.33
 	storj.io/infectious v0.0.1
@@ -96,7 +97,6 @@ require (
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect

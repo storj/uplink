@@ -8,7 +8,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.3.0
-	storj.io/common v0.0.0-20231027080355-b4cb1b0d728e
+	storj.io/common v0.0.0-20231030160447-a6058ddbb07f
 	storj.io/drpc v0.0.33
 	storj.io/infectious v0.0.1
 )

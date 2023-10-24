@@ -193,24 +193,24 @@ func TestNewRedundancyStrategy(t *testing.T) {
 // Test will pass if at least required number of pieces are still good.
 func TestRSErrors(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 1, 1, true},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 1, 2, 1, false},
-		{4 * 1024, 1024, 1, 2, 2, true},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{4 * 1024, 1024, 2, 4, 2, false},
-		{4 * 1024, 1024, 2, 4, 3, true},
-		{4 * 1024, 1024, 2, 4, 4, true},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 3, false},
-		{6 * 1024, 1024, 3, 7, 4, false},
-		{6 * 1024, 1024, 3, 7, 5, true},
-		{6 * 1024, 1024, 3, 7, 6, true},
-		{6 * 1024, 1024, 3, 7, 7, true},
+		{4 * 1024, 1024, 1, 1, 0, false, false},
+		{4 * 1024, 1024, 1, 1, 1, true, false},
+		{4 * 1024, 1024, 1, 2, 0, false, false},
+		{4 * 1024, 1024, 1, 2, 1, false, false},
+		{4 * 1024, 1024, 1, 2, 2, true, false},
+		{4 * 1024, 1024, 2, 4, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 1, false, false},
+		{4 * 1024, 1024, 2, 4, 2, false, false},
+		{4 * 1024, 1024, 2, 4, 3, true, false},
+		{4 * 1024, 1024, 2, 4, 4, true, false},
+		{6 * 1024, 1024, 3, 7, 0, false, false},
+		{6 * 1024, 1024, 3, 7, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 2, false, false},
+		{6 * 1024, 1024, 3, 7, 3, false, false},
+		{6 * 1024, 1024, 3, 7, 4, false, false},
+		{6 * 1024, 1024, 3, 7, 5, true, false},
+		{6 * 1024, 1024, 3, 7, 6, true, false},
+		{6 * 1024, 1024, 3, 7, 7, true, false},
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			return readcloser.FatalReadCloser(
@@ -223,24 +223,24 @@ func TestRSErrors(t *testing.T) {
 // Test will pass if those pieces are less than required.
 func TestRSEOF(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 1, 1, true},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 1, 2, 1, false},
-		{4 * 1024, 1024, 1, 2, 2, true},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{4 * 1024, 1024, 2, 4, 2, false},
-		{4 * 1024, 1024, 2, 4, 3, true},
-		{4 * 1024, 1024, 2, 4, 4, true},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 3, false},
-		{6 * 1024, 1024, 3, 7, 4, false},
-		{6 * 1024, 1024, 3, 7, 5, true},
-		{6 * 1024, 1024, 3, 7, 6, true},
-		{6 * 1024, 1024, 3, 7, 7, true},
+		{4 * 1024, 1024, 1, 1, 0, false, false},
+		{4 * 1024, 1024, 1, 1, 1, true, false},
+		{4 * 1024, 1024, 1, 2, 0, false, false},
+		{4 * 1024, 1024, 1, 2, 1, false, false},
+		{4 * 1024, 1024, 1, 2, 2, true, false},
+		{4 * 1024, 1024, 2, 4, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 1, false, false},
+		{4 * 1024, 1024, 2, 4, 2, false, false},
+		{4 * 1024, 1024, 2, 4, 3, true, false},
+		{4 * 1024, 1024, 2, 4, 4, true, false},
+		{6 * 1024, 1024, 3, 7, 0, false, false},
+		{6 * 1024, 1024, 3, 7, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 2, false, false},
+		{6 * 1024, 1024, 3, 7, 3, false, false},
+		{6 * 1024, 1024, 3, 7, 4, false, false},
+		{6 * 1024, 1024, 3, 7, 5, true, false},
+		{6 * 1024, 1024, 3, 7, 6, true, false},
+		{6 * 1024, 1024, 3, 7, 7, true, false},
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			return readcloser.LimitReadCloser(
@@ -253,24 +253,24 @@ func TestRSEOF(t *testing.T) {
 // Test will pass if those pieces are less than required.
 func TestRSEarlyEOF(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 1, 1, true},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 1, 2, 1, false},
-		{4 * 1024, 1024, 1, 2, 2, true},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{4 * 1024, 1024, 2, 4, 2, false},
-		{4 * 1024, 1024, 2, 4, 3, true},
-		{4 * 1024, 1024, 2, 4, 4, true},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 3, false},
-		{6 * 1024, 1024, 3, 7, 4, false},
-		{6 * 1024, 1024, 3, 7, 5, true},
-		{6 * 1024, 1024, 3, 7, 6, true},
-		{6 * 1024, 1024, 3, 7, 7, true},
+		{4 * 1024, 1024, 1, 1, 0, false, false},
+		{4 * 1024, 1024, 1, 1, 1, true, false},
+		{4 * 1024, 1024, 1, 2, 0, false, false},
+		{4 * 1024, 1024, 1, 2, 1, false, false},
+		{4 * 1024, 1024, 1, 2, 2, true, false},
+		{4 * 1024, 1024, 2, 4, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 1, false, false},
+		{4 * 1024, 1024, 2, 4, 2, false, false},
+		{4 * 1024, 1024, 2, 4, 3, true, false},
+		{4 * 1024, 1024, 2, 4, 4, true, false},
+		{6 * 1024, 1024, 3, 7, 0, false, false},
+		{6 * 1024, 1024, 3, 7, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 2, false, false},
+		{6 * 1024, 1024, 3, 7, 3, false, false},
+		{6 * 1024, 1024, 3, 7, 4, false, false},
+		{6 * 1024, 1024, 3, 7, 5, true, false},
+		{6 * 1024, 1024, 3, 7, 6, true, false},
+		{6 * 1024, 1024, 3, 7, 7, true, false},
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// Read EOF after 500 bytes
@@ -284,24 +284,24 @@ func TestRSEarlyEOF(t *testing.T) {
 // Test will pass if at least required number of pieces are still good.
 func TestRSLateEOF(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 1, 1, false},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 1, 2, 1, false},
-		{4 * 1024, 1024, 1, 2, 2, false},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{4 * 1024, 1024, 2, 4, 2, false},
-		{4 * 1024, 1024, 2, 4, 3, false},
-		{4 * 1024, 1024, 2, 4, 4, false},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 3, false},
-		{6 * 1024, 1024, 3, 7, 4, false},
-		{6 * 1024, 1024, 3, 7, 5, false},
-		{6 * 1024, 1024, 3, 7, 6, false},
-		{6 * 1024, 1024, 3, 7, 7, false},
+		{4 * 1024, 1024, 1, 1, 0, false, false},
+		{4 * 1024, 1024, 1, 1, 1, false, false},
+		{4 * 1024, 1024, 1, 2, 0, false, false},
+		{4 * 1024, 1024, 1, 2, 1, false, false},
+		{4 * 1024, 1024, 1, 2, 2, false, false},
+		{4 * 1024, 1024, 2, 4, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 1, false, false},
+		{4 * 1024, 1024, 2, 4, 2, false, false},
+		{4 * 1024, 1024, 2, 4, 3, false, false},
+		{4 * 1024, 1024, 2, 4, 4, false, false},
+		{6 * 1024, 1024, 3, 7, 0, false, false},
+		{6 * 1024, 1024, 3, 7, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 2, false, false},
+		{6 * 1024, 1024, 3, 7, 3, false, false},
+		{6 * 1024, 1024, 3, 7, 4, false, false},
+		{6 * 1024, 1024, 3, 7, 5, false, false},
+		{6 * 1024, 1024, 3, 7, 6, false, false},
+		{6 * 1024, 1024, 3, 7, 7, false, false},
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// extend the input with random number of random bytes
@@ -316,23 +316,23 @@ func TestRSLateEOF(t *testing.T) {
 // Test will pass if there are enough good pieces for error correction.
 func TestRSRandomData(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 1, 1, true},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 1, 2, 1, true},
-		{4 * 1024, 1024, 1, 2, 2, true},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{4 * 1024, 1024, 2, 4, 2, true},
-		{4 * 1024, 1024, 2, 4, 3, true},
-		{4 * 1024, 1024, 2, 4, 4, true},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 4, true},
-		{6 * 1024, 1024, 3, 7, 5, true},
-		{6 * 1024, 1024, 3, 7, 6, true},
-		{6 * 1024, 1024, 3, 7, 7, true},
+		{4 * 1024, 1024, 1, 1, 0, false, true},
+		{4 * 1024, 1024, 1, 1, 1, true, true},
+		{4 * 1024, 1024, 1, 2, 0, false, true},
+		{4 * 1024, 1024, 1, 2, 1, true, true},
+		{4 * 1024, 1024, 1, 2, 2, true, true},
+		{4 * 1024, 1024, 2, 4, 0, false, true},
+		{4 * 1024, 1024, 2, 4, 1, false, true},
+		{4 * 1024, 1024, 2, 4, 2, true, true},
+		{4 * 1024, 1024, 2, 4, 3, true, true},
+		{4 * 1024, 1024, 2, 4, 4, true, true},
+		{6 * 1024, 1024, 3, 7, 0, false, true},
+		{6 * 1024, 1024, 3, 7, 1, false, true},
+		{6 * 1024, 1024, 3, 7, 2, false, true},
+		{6 * 1024, 1024, 3, 7, 4, true, true},
+		{6 * 1024, 1024, 3, 7, 5, true, true},
+		{6 * 1024, 1024, 3, 7, 6, true, true},
+		{6 * 1024, 1024, 3, 7, 7, true, true},
 	} {
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
 			// return random data instead of expected one
@@ -344,14 +344,14 @@ func TestRSRandomData(t *testing.T) {
 // Some pieces will read slowly.
 func TestRSSlow(t *testing.T) {
 	for i, tt := range []testCase{
-		{4 * 1024, 1024, 1, 1, 0, false},
-		{4 * 1024, 1024, 1, 2, 0, false},
-		{4 * 1024, 1024, 2, 4, 0, false},
-		{4 * 1024, 1024, 2, 4, 1, false},
-		{6 * 1024, 1024, 3, 7, 0, false},
-		{6 * 1024, 1024, 3, 7, 1, false},
-		{6 * 1024, 1024, 3, 7, 2, false},
-		{6 * 1024, 1024, 3, 7, 3, false},
+		{4 * 1024, 1024, 1, 1, 0, false, false},
+		{4 * 1024, 1024, 1, 2, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 0, false, false},
+		{4 * 1024, 1024, 2, 4, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 0, false, false},
+		{6 * 1024, 1024, 3, 7, 1, false, false},
+		{6 * 1024, 1024, 3, 7, 2, false, false},
+		{6 * 1024, 1024, 3, 7, 3, false, false},
 	} {
 		start := time.Now()
 		testRSProblematic(t, tt, i, func(in []byte) io.ReadCloser {
@@ -365,12 +365,13 @@ func TestRSSlow(t *testing.T) {
 }
 
 type testCase struct {
-	dataSize    int
-	blockSize   int
-	required    int
-	total       int
-	problematic int
-	fail        bool
+	dataSize       int
+	blockSize      int
+	required       int
+	total          int
+	problematic    int
+	fail           bool
+	errorDetection bool
 }
 
 type problematicReadCloser func([]byte) io.ReadCloser
@@ -408,7 +409,7 @@ func testRSProblematic(t *testing.T, tt testCase, i int, fn problematicReadClose
 		readerMap[i] = io.NopCloser(bytes.NewReader(pieces[i]))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, int64(tt.dataSize), 3*1024, false)
+	decoder := eestream.DecodeReaders2(ctx, cancel, readerMap, rs, int64(tt.dataSize), 3*1024, tt.errorDetection)
 	defer func() { assert.NoError(t, decoder.Close()) }()
 	data2, err := io.ReadAll(decoder)
 	if tt.fail {
@@ -614,7 +615,6 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 
 			b.Run("Decode/"+confname+testname, func(b *testing.B) {
 				b.SetBytes(int64(dataSize))
-				shareMap := make(map[int][]byte, configuration.total*2)
 				for i := 0; i < b.N; i++ {
 					rand.Shuffle(len(shares), func(i, k int) {
 						shares[i], shares[k] = shares[k], shares[i]
@@ -626,14 +626,7 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 						n = configuration.total
 					}
 
-					for k := range shareMap {
-						delete(shareMap, k)
-					}
-					for i := range shares[:n] {
-						shareMap[shares[i].Number] = shares[i].Data
-					}
-
-					_, err = erasureScheme.Decode(output[:dataSize], shareMap)
+					_, err = erasureScheme.Decode(output[:dataSize], shares[:n])
 					if err != nil {
 						b.Fatal(err)
 					}

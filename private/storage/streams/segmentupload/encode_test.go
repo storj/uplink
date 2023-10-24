@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"storj.io/infectious"
 )
 
 func TestEncodedReader(t *testing.T) {
@@ -17,12 +19,15 @@ func TestEncodedReader(t *testing.T) {
 	t.Run("produces valid pieces", func(t *testing.T) {
 		expected := bytes.Repeat([]byte{1}, rs.StripeSize())
 
-		pieces := map[int][]byte{}
+		pieces := make([]infectious.Share, 0, rs.TotalCount())
 		for i := 0; i < rs.TotalCount(); i++ {
 			r := NewEncodedReader(bytes.NewReader(expected), rs, i)
 			piece, err := io.ReadAll(r)
 			require.NoError(t, err)
-			pieces[i] = piece
+			pieces = append(pieces, infectious.Share{
+				Number: i,
+				Data:   piece,
+			})
 		}
 
 		actual, err := rs.Decode(nil, pieces)

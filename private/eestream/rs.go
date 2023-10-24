@@ -4,6 +4,7 @@
 package eestream
 
 import (
+	"storj.io/common/sync2/race2"
 	"storj.io/infectious"
 )
 
@@ -28,12 +29,19 @@ func (s *rsScheme) Encode(input []byte, output func(num int, data []byte)) (
 	})
 }
 
-func (s *rsScheme) Decode(out []byte, in map[int][]byte) ([]byte, error) {
-	shares := make([]infectious.Share, 0, len(in))
-	for num, data := range in {
-		shares = append(shares, infectious.Share{Number: num, Data: data})
+func (s *rsScheme) Decode(out []byte, in []infectious.Share) ([]byte, error) {
+	for _, share := range in {
+		race2.ReadSlice(share.Data)
 	}
-	return s.fc.Decode(out, shares)
+	race2.WriteSlice(out)
+	return s.fc.Decode(out, in)
+}
+
+func (s *rsScheme) Rebuild(in []infectious.Share, out func(infectious.Share)) error {
+	for _, v := range in {
+		race2.ReadSlice(v.Data)
+	}
+	return s.fc.Rebuild(in, out)
 }
 
 func (s *rsScheme) ErasureShareSize() int {

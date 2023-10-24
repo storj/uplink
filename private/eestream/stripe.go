@@ -93,9 +93,9 @@ func (r *StripeReader) Close() error {
 var backcompatMon = monkit.ScopeNamed("storj.io/storj/uplink/eestream")
 var monReadStripeTask = mon.Task()
 
-// ReadStripe reads and decodes the num-th stripe and concatenates it to p. The
-// return value is the updated byte slice.
-func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ []byte, err error) {
+// ReadStripes reads and decodes the next stripes and concatenates them to p. The
+// return value is the updated byte slice and the number of stripes.
+func (r *StripeReader) ReadStripes(ctx context.Context, num int64, p []byte) (_ []byte, _ int, err error) {
 	defer monReadStripeTask(&ctx, num)(&err)
 	ctx = rpctracing.WithoutDistributedTracing(ctx)
 
@@ -108,19 +108,26 @@ func (r *StripeReader) ReadStripe(ctx context.Context, num int64, p []byte) (_ [
 			<-r.newData
 		}
 		if r.hasEnoughShares() {
-			out, err := r.scheme.Decode(p, r.inmap)
+			shares := make([]infectious.Share, 0, len(r.inmap))
+			for num, data := range r.inmap {
+				shares = append(shares, infectious.Share{
+					Number: num,
+					Data:   data,
+				})
+			}
+			out, err := r.scheme.Decode(p, shares)
 			if err != nil {
 				if r.shouldWaitForMore(err) {
 					continue
 				}
-				return nil, err
+				return nil, 0, err
 			}
-			return out, nil
+			return out, 1, nil
 		}
 	}
 	// could not read enough shares to attempt a decode
 	backcompatMon.Meter("download_stripe_failed_not_enough_pieces_uplink").Mark(1) //mon:locked
-	return nil, r.combineErrs(num)
+	return nil, 0, r.combineErrs(num)
 }
 
 // readAvailableShares reads the available num-th erasure shares from the piece
