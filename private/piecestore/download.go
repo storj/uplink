@@ -51,7 +51,7 @@ type Download struct {
 	originLimit *pb.OrderLimit
 
 	// did the storagenode restore the piece from trash to serve the download request
-	restoredFromTrash bool
+	restoredFromTrashSent bool
 
 	close        sync.Once
 	closingError syncError
@@ -241,8 +241,13 @@ func (client *Download) Read(data []byte) (read int, err error) {
 			client.originLimit = response.Limit
 		}
 
-		if !client.restoredFromTrash && response != nil {
-			client.restoredFromTrash = response.RestoredFromTrash
+		if !client.restoredFromTrashSent && response != nil && response.RestoredFromTrash {
+			client.restoredFromTrashSent = true
+			evs.Event("piece-download",
+				eventkit.String("node_id", client.limit.StorageNodeId.String()),
+				eventkit.String("piece_id", client.limit.PieceId.String()),
+				eventkit.Bool("restored_from_trash", true),
+			)
 		}
 
 		// we may have some data buffered, so we cannot immediately return the error
@@ -301,24 +306,12 @@ func (client *Download) Close() error {
 		err = details.Wrap(Error.Wrap(err))
 	}
 
-	client.emitEvent()
-
 	return err
 }
 
 // GetHashAndLimit gets the download's hash and original order limit.
 func (client *Download) GetHashAndLimit() (*pb.PieceHash, *pb.OrderLimit) {
 	return client.hash, client.originLimit
-}
-
-func (client *Download) emitEvent() {
-	if client.restoredFromTrash {
-		evs.Event("piece-download",
-			eventkit.String("node_id", client.limit.StorageNodeId.String()),
-			eventkit.String("piece_id", client.limit.PieceId.String()),
-			eventkit.Bool("restored_from_trash", client.restoredFromTrash),
-		)
-	}
 }
 
 // ReadBuffer implements buffered reading with an error.
