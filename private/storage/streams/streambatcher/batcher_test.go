@@ -36,7 +36,6 @@ func TestBatcher(t *testing.T) {
 		expectItems    []metaclient.BatchItem
 		expectBatchErr string
 		expectInfo     Info
-		expectInfoErr  string
 	}
 
 	for _, tc := range []struct {
@@ -104,20 +103,6 @@ func TestBatcher(t *testing.T) {
 			},
 		},
 		{
-			desc: "info fails when stream ID is malformed",
-			runs: []batchRun{
-				{
-					items: []metaclient.BatchItem{
-						&metaclient.BeginObjectParams{},
-					},
-					responses: []*pb.BatchResponseItem{
-						{Response: &pb.BatchResponseItem_ObjectBegin{ObjectBegin: &pb.BeginObjectResponse{StreamId: []byte("BOGUS")}}},
-					},
-					expectInfoErr: "stream ID is malformed: unexpected EOF",
-				},
-			},
-		},
-		{
 			desc: "upload object with single inline segment",
 			runs: []batchRun{
 				{
@@ -134,7 +119,10 @@ func TestBatcher(t *testing.T) {
 					responses: []*pb.BatchResponseItem{
 						{Response: &pb.BatchResponseItem_ObjectBegin{ObjectBegin: &pb.BeginObjectResponse{StreamId: streamID1}}},
 						{Response: &pb.BatchResponseItem_SegmentMakeInline{SegmentMakeInline: &pb.MakeInlineSegmentResponse{}}},
-						{Response: &pb.BatchResponseItem_ObjectCommit{ObjectCommit: &pb.CommitObjectResponse{}}},
+						{Response: &pb.BatchResponseItem_ObjectCommit{ObjectCommit: &pb.CommitObjectResponse{Object: &pb.Object{
+							CreatedAt: creationDate1,
+							PlainSize: 123,
+						}}}},
 					},
 					expectStreamID: streamID1,
 					expectInfo:     Info{PlainSize: 123, CreationDate: creationDate1},
@@ -158,7 +146,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentBegin{SegmentBegin: &pb.BeginSegmentResponse{}}},
 					},
 					expectStreamID: streamID1,
-					expectInfo:     Info{PlainSize: 0, CreationDate: creationDate1},
+					expectInfo:     Info{PlainSize: 0},
 				},
 				{
 					items: []metaclient.BatchItem{
@@ -171,7 +159,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentCommit{SegmentCommit: &pb.CommitSegmentResponse{}}},
 					},
 					expectStreamID: streamID1,
-					expectInfo:     Info{PlainSize: 123, CreationDate: creationDate1},
+					expectInfo:     Info{PlainSize: 123},
 				},
 				{
 					items: []metaclient.BatchItem{
@@ -184,7 +172,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentMakeInline{SegmentMakeInline: &pb.MakeInlineSegmentResponse{}}},
 					},
 					expectStreamID: streamID1,
-					expectInfo:     Info{PlainSize: 444, CreationDate: creationDate1},
+					expectInfo:     Info{PlainSize: 444},
 				},
 			},
 		},
@@ -203,7 +191,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentMakeInline{SegmentMakeInline: &pb.MakeInlineSegmentResponse{}}},
 					},
 					expectStreamID: streamID2,
-					expectInfo:     Info{PlainSize: 123, CreationDate: creationDate2},
+					expectInfo:     Info{PlainSize: 123},
 				},
 			},
 		},
@@ -222,7 +210,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentBegin{SegmentBegin: &pb.BeginSegmentResponse{}}},
 					},
 					expectStreamID: streamID2,
-					expectInfo:     Info{PlainSize: 0, CreationDate: creationDate2},
+					expectInfo:     Info{PlainSize: 0},
 				},
 				{
 					items: []metaclient.BatchItem{
@@ -235,7 +223,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentCommit{SegmentCommit: &pb.CommitSegmentResponse{}}},
 					},
 					expectStreamID: streamID2,
-					expectInfo:     Info{PlainSize: 123, CreationDate: creationDate2},
+					expectInfo:     Info{PlainSize: 123},
 				},
 				{
 					items: []metaclient.BatchItem{
@@ -248,7 +236,7 @@ func TestBatcher(t *testing.T) {
 						{Response: &pb.BatchResponseItem_SegmentMakeInline{SegmentMakeInline: &pb.MakeInlineSegmentResponse{}}},
 					},
 					expectStreamID: streamID2,
-					expectInfo:     Info{PlainSize: 444, CreationDate: creationDate2},
+					expectInfo:     Info{PlainSize: 444},
 				},
 			},
 		},
@@ -273,10 +261,6 @@ func TestBatcher(t *testing.T) {
 					require.NoError(t, err)
 
 					info, err := streamBatcher.Info()
-					if run.expectInfoErr != "" {
-						require.EqualError(t, err, run.expectInfoErr)
-						return
-					}
 					require.NoError(t, err)
 
 					assert.Equal(t, run.expectStreamID, streamBatcher.StreamID(), "unexpected stream ID tracked by the stream batcher")

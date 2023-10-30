@@ -577,15 +577,39 @@ func (params *CommitObjectParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// CommitObjectResponse response for CommitObject request.
+type CommitObjectResponse struct {
+	Object RawObjectItem
+}
+
 // CommitObject commits a created object.
+// TODO remove when all code will be adjusted.
 func (client *Client) CommitObject(ctx context.Context, params CommitObjectParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	err = WithRetry(ctx, func(ctx context.Context) error {
+	return WithRetry(ctx, func(ctx context.Context) error {
 		_, err = client.client.CommitObject(ctx, params.toRequest(client.header()))
 		return err
 	})
-	return Error.Wrap(err)
+}
+
+// CommitObjectWithResponse commits a created object.
+func (client *Client) CommitObjectWithResponse(ctx context.Context, params CommitObjectParams) (_ CommitObjectResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.CommitObjectResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.CommitObject(ctx, params.toRequest(client.header()))
+		return err
+	})
+
+	if err != nil {
+		return CommitObjectResponse{}, Error.Wrap(err)
+	}
+
+	return CommitObjectResponse{
+		Object: newObjectInfo(response.Object),
+	}, nil
 }
 
 // GetObjectParams parameters for GetObject method.
@@ -646,11 +670,13 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		EncryptedMetadata:             object.EncryptedMetadata,
 		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+	}
 
-		EncryptionParameters: storj.EncryptionParameters{
+	if object.EncryptionParameters != nil {
+		info.EncryptionParameters = storj.EncryptionParameters{
 			CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),
 			BlockSize:   int32(object.EncryptionParameters.BlockSize),
-		},
+		}
 	}
 
 	pbRS := object.RedundancyScheme

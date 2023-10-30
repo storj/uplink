@@ -88,6 +88,24 @@ func (resp *BatchResponse) BeginObject() (BeginObjectResponse, error) {
 	return newBeginObjectResponse(item.ObjectBegin), nil
 }
 
+// IsCommitObject returns true if response is from CommitObject request.
+func (resp *BatchResponse) IsCommitObject() bool {
+	_, ok := resp.pbResponse.(*pb.BatchResponseItem_ObjectCommit)
+	return ok
+}
+
+// CommitObject returns response for CommitObject request.
+func (resp *BatchResponse) CommitObject() (CommitObjectResponse, error) {
+	item, ok := resp.pbResponse.(*pb.BatchResponseItem_ObjectCommit)
+	if !ok {
+		return CommitObjectResponse{}, ErrInvalidType
+	}
+
+	return CommitObjectResponse{
+		Object: newObjectInfo(item.ObjectCommit.Object),
+	}, nil
+}
+
 // BeginDeleteObject returns response for BeginDeleteObject request.
 func (resp *BatchResponse) BeginDeleteObject() (BeginDeleteObjectResponse, error) {
 	item, ok := resp.pbResponse.(*pb.BatchResponseItem_ObjectBeginDelete)

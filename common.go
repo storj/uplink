@@ -57,6 +57,8 @@ func convertKnownErrors(err error, bucket, key string) error {
 		return errwrapf("%w (%q)", ErrBucketNotFound, bucket)
 	case metaclient.ErrObjectNotFound.Has(err):
 		return errwrapf("%w (%q)", ErrObjectNotFound, key)
+	case metaclient.ErrUploadIDInvalid.Has(err):
+		return errwrapf("%w (%q)", ErrUploadIDInvalid, key)
 	case encryption.ErrMissingEncryptionBase.Has(err):
 		return errwrapf("%w (%q)", ErrPermissionDenied, key)
 	case encryption.ErrMissingDecryptionBase.Has(err):

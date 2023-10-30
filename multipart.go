@@ -5,7 +5,6 @@ package uplink
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"math"
 	"runtime"
@@ -17,7 +16,6 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
-	"storj.io/common/encryption"
 	"storj.io/common/leak"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
@@ -109,115 +107,22 @@ func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID 
 
 	// TODO add completedPart to options when we will have implementation for that
 
-	switch {
-	case bucket == "":
-		return nil, errwrapf("%w (%q)", ErrBucketNameInvalid, bucket)
-	case key == "":
-		return nil, errwrapf("%w (%q)", ErrObjectKeyInvalid, key)
-	case uploadID == "":
-		return nil, packageError.Wrap(ErrUploadIDInvalid)
-	}
-
-	decodedStreamID, version, err := base58.CheckDecode(uploadID)
-	if err != nil || version != 1 {
-		return nil, packageError.Wrap(ErrUploadIDInvalid)
-	}
-
-	id, err := storj.StreamIDFromBytes(decodedStreamID)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-
 	if opts == nil {
 		opts = &CommitUploadOptions{}
 	}
 
-	commitObjParams, err := project.fillMetadata(bucket, key, id, opts.CustomMetadata)
+	metainfoDB, err := project.dialMetainfoDB(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
+	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
 
-	metainfoClient, err := project.dialMetainfoClient(ctx)
-	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
-
-	err = metainfoClient.CommitObject(ctx, commitObjParams)
+	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, project.encryptionParameters)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
-	// TODO return real object after committing
-	return &Object{
-		Key: key,
-	}, nil
-}
-
-func (project *Project) fillMetadata(bucket, key string, id storj.StreamID, metadata CustomMetadata) (metaclient.CommitObjectParams, error) {
-	commitObjParams := metaclient.CommitObjectParams{StreamID: id}
-	if len(metadata) == 0 {
-		return commitObjParams, nil
-	}
-
-	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
-		UserDefined: metadata.Clone(),
-	})
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	streamInfo, err := pb.Marshal(&pb.StreamInfo{
-		Metadata: metadataBytes,
-	})
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	derivedKey, err := deriveContentKey(project, bucket, key)
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	var metadataKey storj.Key
-	// generate random key for encrypting the segment's content
-	_, err = rand.Read(metadataKey[:])
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	var encryptedKeyNonce storj.Nonce
-	// generate random nonce for encrypting the metadata key
-	_, err = rand.Read(encryptedKeyNonce[:])
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	encryptionParameters := project.encryptionParameters
-	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	// encrypt metadata with the content encryption key and zero nonce.
-	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
-	streamMetaBytes, err := pb.Marshal(&pb.StreamMeta{
-		EncryptedStreamInfo: encryptedStreamInfo,
-	})
-	if err != nil {
-		return metaclient.CommitObjectParams{}, packageError.Wrap(err)
-	}
-
-	commitObjParams.EncryptedMetadataEncryptedKey = encryptedKey
-	commitObjParams.EncryptedMetadataNonce = encryptedKeyNonce
-	commitObjParams.EncryptedMetadata = streamMetaBytes
-
-	return commitObjParams, nil
+	return convertObject(&mObject), nil
 }
 
 // UploadPart uploads a part with partNumber to a multipart upload started with BeginUpload.

@@ -10,7 +10,6 @@ import (
 
 	"github.com/zeebo/errs"
 
-	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
 )
@@ -34,9 +33,9 @@ type Info struct {
 type Batcher struct {
 	miBatcher metaclient.Batcher
 
-	mu        sync.Mutex
-	streamID  storj.StreamID
-	plainSize int64
+	mu       sync.Mutex
+	streamID storj.StreamID
+	info     Info
 }
 
 // New returns a new Batcher that issues batch items for a stream. The streamID
@@ -64,9 +63,9 @@ func (s *Batcher) Batch(ctx context.Context, batchItems ...metaclient.BatchItem)
 			item.StreamID = s.streamID
 		case *metaclient.MakeInlineSegmentParams:
 			item.StreamID = s.streamID
-			s.plainSize += item.PlainSize
+			s.info.PlainSize += item.PlainSize
 		case *metaclient.CommitSegmentParams:
-			s.plainSize += item.PlainSize
+			s.info.PlainSize += item.PlainSize
 		case *metaclient.CommitObjectParams:
 			item.StreamID = s.streamID
 		}
@@ -96,6 +95,20 @@ func (s *Batcher) Batch(ctx context.Context, batchItems ...metaclient.BatchItem)
 		s.streamID = beginObject.StreamID
 	}
 
+	for _, response := range resp {
+		if response.IsCommitObject() {
+			commitObject, err := response.CommitObject()
+			if err != nil {
+				return nil, errs.New("programmer error: batch must be CommitObject: %w", err)
+			}
+
+			s.info = Info{
+				CreationDate: commitObject.Object.Created,
+				PlainSize:    commitObject.Object.PlainSize,
+			}
+		}
+	}
+
 	return resp, nil
 }
 
@@ -112,23 +125,9 @@ func (s *Batcher) Info() (Info, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	creationDate, err := creationDateFromStreamID(s.streamID)
-	if err != nil {
-		return Info{}, err
+	if s.streamID == nil {
+		return Info{}, errs.New("stream ID is unexpectedly nil")
 	}
-	return Info{
-		CreationDate: creationDate,
-		PlainSize:    s.plainSize,
-	}, nil
-}
 
-func creationDateFromStreamID(streamID storj.StreamID) (time.Time, error) {
-	if streamID == nil {
-		return time.Time{}, errs.New("stream ID is unexpectedly nil")
-	}
-	satStreamID := &pb.SatStreamID{}
-	if err := pb.Unmarshal(streamID, satStreamID); err != nil {
-		return time.Time{}, errs.New("stream ID is malformed: %w", err)
-	}
-	return satStreamID.CreationDate, nil
+	return s.info, nil
 }

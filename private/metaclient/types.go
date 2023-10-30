@@ -89,6 +89,9 @@ var (
 
 	// ErrObjectNotFound is an error class for non-existing object.
 	ErrObjectNotFound = errs.Class("object not found")
+
+	// ErrUploadIDInvalid is an error class for invalid upload ID.
+	ErrUploadIDInvalid = errs.Class("upload ID invalid")
 )
 
 // Object contains information about a specific object.

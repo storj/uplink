@@ -114,8 +114,7 @@ func TestUploadObject(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, Info{
-				CreationDate: creationDate,
-				PlainSize:    segmentsPlainSize(len(tc.segments)),
+				PlainSize: segmentsPlainSize(len(tc.segments)),
 			}, info)
 
 			// Assert that the expected operations took place on the metainfo store
@@ -204,8 +203,7 @@ func TestUploadPart(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, Info{
-				CreationDate: creationDate,
-				PlainSize:    segmentsPlainSize(len(tc.segments)),
+				PlainSize: segmentsPlainSize(len(tc.segments)),
 			}, info)
 
 			// Assert that the expected operations took place on the metainfo store
@@ -420,7 +418,11 @@ func (m *metainfoBatcher) Batch(ctx context.Context, items ...metaclient.BatchIt
 				EncryptedMetadata:             encryptMetadata(int64(m.lastSegmentIndex)),
 			}, req.ObjectCommit)
 			m.commitObject++
-			resp.Response = &pb.BatchResponseItem_ObjectCommit{ObjectCommit: &pb.CommitObjectResponse{}}
+			resp.Response = &pb.BatchResponseItem_ObjectCommit{ObjectCommit: &pb.CommitObjectResponse{
+				Object: &pb.Object{
+					PlainSize: segmentsPlainSize(len(m.makeInlineSegment) + len(m.commitSegment)),
+				},
+			}}
 
 		case *pb.BatchRequestItem_ObjectBeginDelete:
 			assert.Equal(m.t, &pb.BeginDeleteObjectRequest{

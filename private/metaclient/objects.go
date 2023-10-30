@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"storj.io/common/base58"
 	"storj.io/common/encryption"
 	"storj.io/common/paths"
 	"storj.io/common/pb"
@@ -542,6 +543,112 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string, version []byte)
 	}
 
 	return db.ObjectFromRawObjectItem(ctx, bucket, key, objectInfo)
+}
+
+// CommitObject commits an object.
+func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, customMetadata map[string]string, encryptionParameters storj.EncryptionParameters) (info Object, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	switch {
+	case bucket == "":
+		return Object{}, ErrNoBucket.New("")
+	case key == "":
+		return Object{}, ErrNoPath.New("")
+	case uploadID == "":
+		return Object{}, ErrUploadIDInvalid.New("")
+	}
+
+	decodedStreamID, version, err := base58.CheckDecode(uploadID)
+	if err != nil || version != 1 {
+		return Object{}, ErrUploadIDInvalid.New("")
+	}
+
+	id, err := storj.StreamIDFromBytes(decodedStreamID)
+	if err != nil {
+		return Object{}, err
+	}
+
+	commitObjParams, err := db.fillMetadata(bucket, key, id, customMetadata, encryptionParameters)
+	if err != nil {
+		return Object{}, err
+	}
+
+	response, err := db.metainfo.CommitObjectWithResponse(ctx, commitObjParams)
+	if err != nil {
+		return Object{}, err
+	}
+
+	return db.ObjectFromRawObjectItem(ctx, bucket, key, response.Object)
+}
+
+func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[string]string, encryptionParameters storj.EncryptionParameters) (CommitObjectParams, error) {
+	commitObjParams := CommitObjectParams{StreamID: id}
+	if len(metadata) == 0 {
+		return commitObjParams, nil
+	}
+
+	clone := make(map[string]string, len(metadata))
+	for k, v := range metadata {
+		clone[k] = v
+	}
+
+	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
+		UserDefined: clone,
+	})
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	streamInfo, err := pb.Marshal(&pb.StreamInfo{
+		Metadata: metadataBytes,
+	})
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	var metadataKey storj.Key
+	// generate random key for encrypting the segment's content
+	_, err = rand.Read(metadataKey[:])
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	var encryptedKeyNonce storj.Nonce
+	// generate random nonce for encrypting the metadata key
+	_, err = rand.Read(encryptedKeyNonce[:])
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	// encrypt metadata with the content encryption key and zero nonce.
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
+	streamMetaBytes, err := pb.Marshal(&pb.StreamMeta{
+		EncryptedStreamInfo: encryptedStreamInfo,
+	})
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
+	commitObjParams.EncryptedMetadataEncryptedKey = encryptedKey
+	commitObjParams.EncryptedMetadataNonce = encryptedKeyNonce
+	commitObjParams.EncryptedMetadata = streamMetaBytes
+
+	return commitObjParams, nil
 }
 
 // ObjectFromRawObjectItem converts RawObjectItem into storj.Object struct.
