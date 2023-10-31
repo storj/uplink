@@ -10,13 +10,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vivint/infectious"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/memory"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
+	"storj.io/infectious"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"

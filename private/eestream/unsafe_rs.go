@@ -4,7 +4,7 @@
 package eestream
 
 import (
-	"github.com/vivint/infectious"
+	"storj.io/infectious"
 )
 
 type unsafeRSScheme struct {

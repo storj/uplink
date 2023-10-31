@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/spacemonkeygo/monkit/v3"
-	"github.com/vivint/infectious"
 
 	"storj.io/common/rpc/rpctracing"
+	"storj.io/infectious"
 )
 
 var (

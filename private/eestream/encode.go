@@ -8,8 +8,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/vivint/infectious"
-
 	"storj.io/common/encryption"
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
@@ -18,6 +16,7 @@ import (
 	"storj.io/common/readcloser"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
+	"storj.io/infectious"
 )
 
 // ErasureScheme represents the general format of any erasure scheme algorithm.

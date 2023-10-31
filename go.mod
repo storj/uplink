@@ -6,11 +6,11 @@ require (
 	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
 	github.com/spacemonkeygo/monkit/v3 v3.0.22
 	github.com/stretchr/testify v1.8.2
-	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.3.0
 	storj.io/common v0.0.0-20231027080355-b4cb1b0d728e
 	storj.io/drpc v0.0.33
+	storj.io/infectious v0.0.1
 )
 
 require (
@@ -26,7 +26,7 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect

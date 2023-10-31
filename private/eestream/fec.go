@@ -3,7 +3,7 @@
 
 package eestream
 
-import "github.com/vivint/infectious"
+import "storj.io/infectious"
 
 // A Share represents a piece of the FEC-encoded data.
 type Share = infectious.Share

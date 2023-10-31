@@ -6,14 +6,14 @@ replace storj.io/uplink => ../
 
 require (
 	github.com/stretchr/testify v1.8.4
-	github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
-	storj.io/common v0.0.0-20231027080355-b4cb1b0d728e
+	storj.io/common v0.0.0-20231030160447-a6058ddbb07f
 	storj.io/drpc v0.0.33
-	storj.io/storj v0.12.1-0.20231028044343-1fa918c255e4
-	storj.io/uplink v1.12.2-0.20231020093444-f991cbc7f64d
+	storj.io/infectious v0.0.1
+	storj.io/storj v0.12.1-0.20231031171416-e5e55ef2665c
+	storj.io/uplink v1.12.2-0.20231031134744-8966f4365d45
 )
 
 require (
@@ -97,7 +97,7 @@ require (
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.9.1 // indirect
