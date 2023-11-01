@@ -10,7 +10,7 @@ require (
 	go.uber.org/zap v1.16.0
 	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
 	golang.org/x/sync v0.3.0
-	storj.io/common v0.0.0-20231030160447-a6058ddbb07f
+	storj.io/common v0.0.0-20231101115145-09481ec98b57
 	storj.io/drpc v0.0.33
 	storj.io/infectious v0.0.1
 	storj.io/storj v0.12.1-0.20231031171416-e5e55ef2665c
@@ -64,8 +64,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/otp v1.3.0 // indirect
-	github.com/quic-go/qtls-go1-20 v0.3.4 // indirect
-	github.com/quic-go/quic-go v0.39.3 // indirect
+	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
+	github.com/quic-go/quic-go v0.40.0 // indirect
 	github.com/redis/go-redis/v9 v9.0.3 // indirect
 	github.com/segmentio/backo-go v0.0.0-20200129164019-23eae7c10bd3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
