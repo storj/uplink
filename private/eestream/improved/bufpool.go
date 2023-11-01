@@ -61,7 +61,6 @@ func (b *Batch) Claim() bool {
 			return false
 		}
 		if b.refCount.CompareAndSwap(val, val+1) {
-			race2.WriteSlice(b.slice[:])
 			return true
 		}
 	}

@@ -31,7 +31,7 @@ var (
 )
 
 const debugEnabled = false
-const maxStripesAhead = 0 // might be interesting to test different values later
+const maxStripesAhead = 256 // might be interesting to test different values later
 
 // pieceReader represents the stream of shares within one piece.
 type pieceReader struct {
@@ -312,7 +312,7 @@ func (s *StripeReader) ReadStripes(ctx context.Context, nextStripe int64, out []
 		// not enough ready.
 		// okay, were there enough running share readers at the start still so that
 		// we could potentially still have enough ready in the future?
-		if runningPieces < s.bundy.NeededShares() {
+		if runningPieces+int32(len(ready)) < s.bundy.NeededShares() {
 			// nope. we need to give up.
 			backcompatMon.Meter("download_stripe_failed_not_enough_pieces_uplink").Mark(1) //mon:locked
 			return nil, 0, s.combineErrs()
