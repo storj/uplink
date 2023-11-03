@@ -61,5 +61,32 @@ func TestStatObject(t *testing.T) {
 	})
 }
 
+func TestCommitUpload(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		uploadInfo, err := project.BeginUpload(ctx, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		// use custom method which will also return object version
+		obj, err := object.CommitUpload(ctx, project, bucketName, objectKey, uploadInfo.UploadID, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, obj.Version)
+
+		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, obj.Version)
+		require.NoError(t, err)
+		require.Equal(t, obj, statObj)
+	})
+}
+
 // TODO(ver) add tests for versioned/unversioned/suspended objects as well as delete markers
 // for all methods from 'object' package

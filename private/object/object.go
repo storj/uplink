@@ -10,6 +10,7 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/metaclient"
@@ -79,6 +80,30 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 	return convertObject(&obj), nil
 }
 
+// CommitUpload commits a multipart upload to bucket and key started with BeginUpload.
+//
+// uploadID is an upload identifier returned by BeginUpload.
+func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, opts *uplink.CommitUploadOptions) (info *VersionedObject, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if opts == nil {
+		opts = &uplink.CommitUploadOptions{}
+	}
+
+	metainfoDB, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
+
+	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, encryptionParameters(project))
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
+
+	return convertObject(&mObject), nil
+}
+
 // convertObject converts metainfo.Object to Version.
 func convertObject(obj *metaclient.Object) *VersionedObject {
 	if obj.Bucket.Name == "" { // zero object
@@ -104,3 +129,6 @@ func convertKnownErrors(err error, bucket, key string) error
 
 //go:linkname dialMetainfoDB storj.io/uplink.dialMetainfoDB
 func dialMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metaclient.DB, err error)
+
+//go:linkname encryptionParameters storj.io/uplink.encryptionParameters
+func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
