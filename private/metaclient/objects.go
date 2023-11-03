@@ -464,7 +464,7 @@ type DownloadInfo struct {
 }
 
 // DownloadObject gets object information, lists segments and downloads the first segment.
-func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options DownloadOptions) (info DownloadInfo, err error) {
+func (db *DB) DownloadObject(ctx context.Context, bucket, key string, version []byte, options DownloadOptions) (info DownloadInfo, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -482,6 +482,7 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, options Do
 	resp, err := db.metainfo.DownloadObject(ctx, DownloadObjectParams{
 		Bucket:             []byte(bucket),
 		EncryptedObjectKey: []byte(encPath.Raw()),
+		Version:            version,
 		Range:              options.Range,
 	})
 	if err != nil {

@@ -137,7 +137,7 @@ func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *strea
 }
 
 func assertData(ctx context.Context, t *testing.T, db *metaclient.DB, streams *streams.Store, bucketName, objectKey string, content []byte) {
-	info, err := db.DownloadObject(ctx, bucketName, objectKey, metaclient.DownloadOptions{})
+	info, err := db.DownloadObject(ctx, bucketName, objectKey, nil, metaclient.DownloadOptions{})
 	require.NoError(t, err)
 
 	download := stream.NewDownload(ctx, info, streams)

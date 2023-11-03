@@ -1339,6 +1339,7 @@ func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSe
 type DownloadObjectParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
+	Version            []byte
 
 	Range StreamRange
 }
@@ -1429,6 +1430,7 @@ func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.Obje
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
+		ObjectVersion:      params.Version,
 		Range:              params.Range.toProto(),
 	}
 }

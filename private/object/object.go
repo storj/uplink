@@ -69,6 +69,28 @@ func (upload *VersionedUpload) Abort() error {
 	return upload.upload.Abort()
 }
 
+// VersionedDownload is a download from Storj Network.
+type VersionedDownload struct {
+	download *uplink.Download
+}
+
+// Info returns the last information about the object.
+func (download *VersionedDownload) Info() *VersionedObject {
+	info := download.download.Info()
+	return convertUplinkObject(info)
+}
+
+// Read downloads up to len(p) bytes into p from the object's data stream.
+// It returns the number of bytes read (0 <= n <= len(p)) and any error encountered.
+func (download *VersionedDownload) Read(p []byte) (n int, err error) {
+	return download.download.Read(p)
+}
+
+// Close closes the reader of the download.
+func (download *VersionedDownload) Close() error {
+	return download.download.Close()
+}
+
 // GetObjectIPs returns the IP-s for a given object.
 //
 // TODO: delete, once we have stopped using it.
@@ -133,6 +155,19 @@ func UploadObject(ctx context.Context, project *uplink.Project, bucket, key stri
 	}, nil
 }
 
+// DownloadObject starts a download from the specific key and version. If version is empty latest object will be downloaded.
+func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *VersionedDownload, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	download, err := downloadObjectWithVersion(ctx, project, bucket, key, version, options)
+	if err != nil {
+		return
+	}
+	return &VersionedDownload{
+		download: download,
+	}, nil
+}
+
 // CommitUpload commits a multipart upload to bucket and key started with BeginUpload.
 //
 // uploadID is an upload identifier returned by BeginUpload.
@@ -190,3 +225,6 @@ func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
 
 //go:linkname objectVersion storj.io/uplink.objectVersion
 func objectVersion(object *uplink.Object) []byte
+
+//go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
+func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *uplink.Download, err error)

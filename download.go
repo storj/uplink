@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	_ "unsafe" // for go:linkname
 
 	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
@@ -34,6 +35,10 @@ type DownloadOptions struct {
 
 // DownloadObject starts a download from the specific key.
 func (project *Project) DownloadObject(ctx context.Context, bucket, key string, options *DownloadOptions) (_ *Download, err error) {
+	return project.downloadObjectWithVersion(ctx, bucket, key, nil, options)
+}
+
+func (project *Project) downloadObjectWithVersion(ctx context.Context, bucket, key string, version []byte, options *DownloadOptions) (_ *Download, err error) {
 	download := &Download{
 		bucket: bucket,
 		stats:  newOperationStats(ctx, project.access.satelliteURL),
@@ -96,7 +101,7 @@ func (project *Project) DownloadObject(ctx context.Context, bucket, key string, 
 	// TODO: handle DownloadObject & downloadInfo.ListSegments.More in the same location.
 	//       currently this code is rather disjoint.
 
-	objectDownload, err := db.DownloadObject(ctx, bucket, key, opts)
+	objectDownload, err := db.DownloadObject(ctx, bucket, key, version, opts)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -217,4 +222,16 @@ func (download *Download) emitEvent() {
 		// TODO: segment count
 		// TODO: ram available
 	)
+}
+
+// downloadObjectWithVersion is exposing project.downloadObjectWithVersion method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname downloadObjectWithVersion
+func downloadObjectWithVersion(ctx context.Context, project *Project, bucket, key string, version []byte, options *DownloadOptions) (_ *Download, err error) {
+	return project.downloadObjectWithVersion(ctx, bucket, key, version, options)
 }
