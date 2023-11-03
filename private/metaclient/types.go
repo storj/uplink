@@ -14,7 +14,7 @@ import (
 
 // RawObjectItem represents raw object item from get request.
 type RawObjectItem struct {
-	Version            uint32
+	Version            []byte
 	Bucket             string
 	EncryptedObjectKey []byte
 
@@ -37,7 +37,7 @@ type RawObjectItem struct {
 // RawObjectListItem represents raw object item from list objects request.
 type RawObjectListItem struct {
 	EncryptedObjectKey            []byte
-	Version                       int32
+	Version                       []byte
 	Status                        int32
 	CreatedAt                     time.Time
 	StatusAt                      time.Time
@@ -93,7 +93,7 @@ var (
 
 // Object contains information about a specific object.
 type Object struct {
-	Version  uint32
+	Version  []byte
 	Bucket   Bucket
 	Path     string
 	IsPrefix bool

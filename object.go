@@ -88,7 +88,7 @@ func (project *Project) StatObject(ctx context.Context, bucket, key string) (inf
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.GetObject(ctx, bucket, key)
+	obj, err := db.GetObject(ctx, bucket, key, nil)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

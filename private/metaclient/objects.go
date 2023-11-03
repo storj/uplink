@@ -185,7 +185,6 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 	return db.metainfo.UpdateObjectMetadata(ctx, UpdateObjectMetadataParams{
 		Bucket:                        []byte(bucket),
 		EncryptedObjectKey:            []byte(encPath.Raw()),
-		Version:                       int32(object.Version),
 		StreamID:                      object.Stream.ID,
 		EncryptedMetadata:             streamMetaBytes,
 		EncryptedMetadataEncryptedKey: encryptedKey,
@@ -516,7 +515,7 @@ func (db *DB) ListSegments(ctx context.Context, params ListSegmentsParams) (resp
 }
 
 // GetObject returns information about an object.
-func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, err error) {
+func (db *DB) GetObject(ctx context.Context, bucket, key string, version []byte) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -535,6 +534,7 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string) (info Object, e
 	objectInfo, err := db.metainfo.GetObject(ctx, GetObjectParams{
 		Bucket:                     []byte(bucket),
 		EncryptedObjectKey:         []byte(encPath.Raw()),
+		Version:                    version,
 		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
@@ -605,7 +605,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
 	object := Object{
-		Version:  uint32(listItem.Version),
+		Version:  listItem.Version,
 		Bucket:   Bucket{Name: bucket},
 		Path:     path,
 		IsPrefix: listItem.IsPrefix,

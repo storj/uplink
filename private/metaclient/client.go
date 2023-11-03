@@ -514,7 +514,7 @@ func (client *Client) CommitObject(ctx context.Context, params CommitObjectParam
 type GetObjectParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
-	Version            int32
+	Version            []byte
 
 	RedundancySchemePerSegment bool
 }
@@ -524,7 +524,7 @@ func (params *GetObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectGet
 		Header:                     header,
 		Bucket:                     params.Bucket,
 		EncryptedObjectKey:         params.EncryptedObjectKey,
-		Version:                    params.Version,
+		ObjectVersion:              params.Version,
 		RedundancySchemePerSegment: params.RedundancySchemePerSegment,
 	}
 }
@@ -557,7 +557,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 	info := RawObjectItem{
 		Bucket:             string(object.Bucket),
 		EncryptedObjectKey: object.EncryptedObjectKey,
-		Version:            uint32(object.Version),
+		Version:            object.ObjectVersion,
 
 		StreamID: object.StreamId,
 
@@ -613,7 +613,6 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 type GetObjectIPsParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
-	Version            int32
 }
 
 // GetObjectIPsResponse is the response from GetObjectIPs.
@@ -629,7 +628,6 @@ func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.Object
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
-		Version:            params.Version,
 	}
 }
 
@@ -661,7 +659,6 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParam
 type UpdateObjectMetadataParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
-	Version            int32
 	StreamID           storj.StreamID
 
 	EncryptedMetadataNonce        storj.Nonce
@@ -674,7 +671,6 @@ func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *p
 		Header:                        header,
 		Bucket:                        params.Bucket,
 		EncryptedObjectKey:            params.EncryptedObjectKey,
-		Version:                       params.Version,
 		StreamId:                      params.StreamID,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
@@ -811,7 +807,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 
 		objects[i] = RawObjectListItem{
 			EncryptedObjectKey:            object.EncryptedObjectKey,
-			Version:                       object.Version,
+			Version:                       object.ObjectVersion,
 			Status:                        int32(object.Status),
 			StatusAt:                      object.StatusAt,
 			CreatedAt:                     object.CreatedAt,
@@ -891,7 +887,7 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 
 		objects[i] = RawObjectListItem{
 			EncryptedObjectKey:     object.EncryptedObjectKey,
-			Version:                object.Version,
+			Version:                object.ObjectVersion,
 			Status:                 int32(object.Status),
 			StatusAt:               object.StatusAt,
 			CreatedAt:              object.CreatedAt,

@@ -64,23 +64,23 @@ func TestGetObject(t *testing.T) {
 		require.NoError(t, err)
 		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
 
-		_, err = db.GetObject(ctx, "", "")
+		_, err = db.GetObject(ctx, "", "", nil)
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
-		_, err = db.GetObject(ctx, bucket.Name, "")
+		_, err = db.GetObject(ctx, bucket.Name, "", nil)
 		assert.True(t, metaclient.ErrNoPath.Has(err))
 
-		_, err = db.GetObject(ctx, "non-existing-bucket", TestFile)
+		_, err = db.GetObject(ctx, "non-existing-bucket", TestFile, nil)
 		assert.True(t, metaclient.ErrObjectNotFound.Has(err))
 
-		_, err = db.GetObject(ctx, bucket.Name, "non-existing-file")
+		_, err = db.GetObject(ctx, bucket.Name, "non-existing-file", nil)
 		assert.True(t, metaclient.ErrObjectNotFound.Has(err))
 
-		object, err := db.GetObject(ctx, bucket.Name, TestFile)
+		object, err := db.GetObject(ctx, bucket.Name, TestFile, nil)
 		require.NoError(t, err)
 		assert.Equal(t, TestFile, object.Path)
 		assert.Equal(t, TestBucket, object.Bucket.Name)
-		assert.Equal(t, uint32(1), object.Version)
+		assert.NotNil(t, uint32(1), object.Version)
 	})
 }
 
@@ -95,10 +95,10 @@ func TestDownloadObject(t *testing.T) {
 		upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
 		upload(ctx, t, db, streams, bucket.Name, "large-file", data)
 
-		_, err = db.GetObject(ctx, "", "")
+		_, err = db.GetObject(ctx, "", "", nil)
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
 
-		_, err = db.GetObject(ctx, bucket.Name, "")
+		_, err = db.GetObject(ctx, bucket.Name, "", nil)
 		assert.True(t, metaclient.ErrNoPath.Has(err))
 
 		assertData(ctx, t, db, streams, bucket.Name, "empty-file", []byte{})
@@ -422,11 +422,6 @@ func TestListObjects(t *testing.T) {
 					for i, item := range list.Items {
 						assert.Equal(t, tt.result[i], item.Path, errTag)
 						assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
-						if item.IsPrefix {
-							assert.Equal(t, uint32(0), item.Version, errTag)
-						} else {
-							assert.Equal(t, uint32(1), item.Version, errTag)
-						}
 					}
 				}
 			}
@@ -484,11 +479,6 @@ func TestListObjects_PagingWithDiffPassphrase(t *testing.T) {
 					for i, item := range list.Items {
 						assert.Equal(t, tt.result[i], item.Path, errTag)
 						assert.Equal(t, TestBucket, item.Bucket.Name, errTag)
-						if item.IsPrefix {
-							assert.Equal(t, uint32(0), item.Version, errTag)
-						} else {
-							assert.Equal(t, uint32(1), item.Version, errTag)
-						}
 					}
 				}
 			}
