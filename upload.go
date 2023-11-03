@@ -156,6 +156,7 @@ func (upload *Upload) Info() *Object {
 	if meta != nil {
 		upload.object.System.ContentLength = meta.Size
 		upload.object.System.Created = meta.Modified
+		upload.object.version = meta.Version
 	}
 	return upload.object
 }

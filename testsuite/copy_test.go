@@ -93,10 +93,10 @@ func TestCopyObject(t *testing.T) {
 				}
 
 				// compare original object with copied, result from copy operation
-				require.Equal(t, obj, statCopyObject)
+				require.EqualExportedValues(t, *obj, *statCopyObject)
 
 				// compare original object with copied, stat request
-				require.Equal(t, obj, copyObject)
+				require.EqualExportedValues(t, *obj, *copyObject)
 
 				// verify that original object still exists
 				_, err = project.StatObject(ctx, tc.Bucket, tc.Key)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	_ "unsafe" // for go:linkname
 
 	"github.com/zeebo/errs"
 
@@ -30,6 +31,8 @@ type Object struct {
 
 	System SystemMetadata
 	Custom CustomMetadata
+
+	version []byte
 }
 
 // SystemMetadata contains information about the object that cannot be changed directly.
@@ -153,5 +156,19 @@ func convertObject(obj *metaclient.Object) *Object {
 			ContentLength: obj.Size,
 		},
 		Custom: obj.Metadata,
+
+		version: obj.Version,
 	}
+}
+
+// objectVersion is exposing object version field.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname objectVersion
+func objectVersion(object *Object) []byte {
+	return object.version
 }

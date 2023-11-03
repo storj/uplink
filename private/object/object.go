@@ -31,6 +31,44 @@ type VersionedObject struct {
 	Version []byte
 }
 
+// VersionedUpload represents upload which returnes object version at the end.
+type VersionedUpload struct {
+	upload *uplink.Upload
+}
+
+// Info returns the last information about the uploaded object.
+func (upload *VersionedUpload) Info() *VersionedObject {
+	info := upload.upload.Info()
+	return convertUplinkObject(info)
+}
+
+// Write uploads len(p) bytes from p to the object's data stream.
+// It returns the number of bytes written from p (0 <= n <= len(p))
+// and any error encountered that caused the write to stop early.
+func (upload *VersionedUpload) Write(p []byte) (n int, err error) {
+	return upload.upload.Write(p)
+}
+
+// Commit commits data to the store.
+//
+// Returns ErrUploadDone when either Abort or Commit has already been called.
+func (upload *VersionedUpload) Commit() error {
+	return upload.upload.Commit()
+}
+
+// SetCustomMetadata updates custom metadata to be included with the object.
+// If it is nil, it won't be modified.
+func (upload *VersionedUpload) SetCustomMetadata(ctx context.Context, custom uplink.CustomMetadata) error {
+	return upload.upload.SetCustomMetadata(ctx, custom)
+}
+
+// Abort aborts the upload.
+//
+// Returns ErrUploadDone when either Abort or Commit has already been called.
+func (upload *VersionedUpload) Abort() error {
+	return upload.upload.Abort()
+}
+
 // GetObjectIPs returns the IP-s for a given object.
 //
 // TODO: delete, once we have stopped using it.
@@ -80,28 +118,33 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 	return convertObject(&obj), nil
 }
 
+// UploadObject starts an upload to the specific key.
+//
+// It is not guaranteed that the uncommitted object is visible through ListUploads while uploading.
+func UploadObject(ctx context.Context, project *uplink.Project, bucket, key string, options *uplink.UploadOptions) (_ *VersionedUpload, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	upload, err := project.UploadObject(ctx, bucket, key, options)
+	if err != nil {
+		return
+	}
+	return &VersionedUpload{
+		upload: upload,
+	}, nil
+}
+
 // CommitUpload commits a multipart upload to bucket and key started with BeginUpload.
 //
 // uploadID is an upload identifier returned by BeginUpload.
 func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, opts *uplink.CommitUploadOptions) (info *VersionedObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if opts == nil {
-		opts = &uplink.CommitUploadOptions{}
-	}
-
-	metainfoDB, err := dialMetainfoDB(ctx, project)
+	obj, err := project.CommitUpload(ctx, bucket, key, uploadID, opts)
 	if err != nil {
-		return nil, packageError.Wrap(err)
-	}
-	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
-
-	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, encryptionParameters(project))
-	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
+		return nil, err
 	}
 
-	return convertObject(&mObject), nil
+	return convertUplinkObject(obj), nil
 }
 
 // convertObject converts metainfo.Object to Version.
@@ -124,6 +167,18 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 	}
 }
 
+// convertObject converts metainfo.Object to Version.
+func convertUplinkObject(obj *uplink.Object) *VersionedObject {
+	if obj == nil {
+		return nil
+	}
+
+	return &VersionedObject{
+		Object:  *obj,
+		Version: objectVersion(obj),
+	}
+}
+
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
 
@@ -132,3 +187,6 @@ func dialMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metaclient
 
 //go:linkname encryptionParameters storj.io/uplink.encryptionParameters
 func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
+
+//go:linkname objectVersion storj.io/uplink.objectVersion
+func objectVersion(object *uplink.Object) []byte

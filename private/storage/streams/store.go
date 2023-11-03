@@ -40,6 +40,7 @@ type Meta struct {
 	Expiration time.Time
 	Size       int64
 	Data       []byte
+	Version    []byte
 }
 
 // Part info about a part.
@@ -357,13 +358,23 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		commitObject.EncryptedMetadataEncryptedKey = encryptedKey
 		commitObject.EncryptedMetadataNonce = encryptedKeyNonce
 	}
+
+	var rawObject metaclient.RawObjectItem
 	if len(requestsToBatch) > 0 {
-		_, err = s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
+		responses, err := s.metainfo.Batch(ctx, append(requestsToBatch, &commitObject)...)
+		if err != nil {
+			return Meta{}, errs.Wrap(err)
+		}
+		if len(responses) > 0 && responses[len(responses)-1].IsCommitObject() {
+			response, _ := responses[len(responses)-1].CommitObject()
+			rawObject = response.Object
+		}
 	} else {
-		err = s.metainfo.CommitObject(ctx, commitObject)
-	}
-	if err != nil {
-		return Meta{}, errs.Wrap(err)
+		response, err := s.metainfo.CommitObjectWithResponse(ctx, commitObject)
+		if err != nil {
+			return Meta{}, errs.Wrap(err)
+		}
+		rawObject = response.Object
 	}
 
 	satStreamID := &pb.SatStreamID{}
@@ -372,10 +383,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	resultMeta := Meta{
-		Modified:   satStreamID.CreationDate,
+		Modified:   rawObject.Created,
 		Expiration: expiration,
 		Size:       streamSize,
 		Data:       metadataBytes,
+		Version:    rawObject.Version,
 	}
 
 	return resultMeta, nil

@@ -14,6 +14,7 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
 	"storj.io/uplink/private/object"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestStatObject(t *testing.T) {
@@ -84,7 +85,73 @@ func TestCommitUpload(t *testing.T) {
 
 		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, obj.Version)
 		require.NoError(t, err)
-		require.Equal(t, obj, statObj)
+		require.EqualExportedValues(t, *obj, *statObj)
+	})
+}
+
+func TestUploadObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+
+		uploadObject := upload.Info()
+		uploadObject.Custom = uplink.CustomMetadata{}
+		statObj.Custom = uplink.CustomMetadata{}
+		require.EqualExportedValues(t, *uploadObject, *statObj)
+	})
+}
+
+func TestUploadObject_OldCodePath(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		uploadCtx := testuplink.DisableConcurrentSegmentUploads(ctx)
+
+		project, err := planet.Uplinks[0].OpenProject(uploadCtx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := object.UploadObject(uploadCtx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		statObj, err := object.StatObject(uploadCtx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+
+		uploadObject := upload.Info()
+		uploadObject.Custom = uplink.CustomMetadata{}
+		statObj.Custom = uplink.CustomMetadata{}
+		require.EqualExportedValues(t, *uploadObject, *statObj)
 	})
 }
 

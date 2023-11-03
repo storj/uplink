@@ -24,6 +24,9 @@ type Info struct {
 	// PlainSize is the plain-text size of the stream aggregated from all
 	// MakeInlineSegment or CommitSegment batch items.
 	PlainSize int64
+
+	// Version is object version retrieved from CommitObject batch item.
+	Version []byte
 }
 
 // Batcher issues batch items related to a single stream. It aggregates
@@ -105,6 +108,7 @@ func (s *Batcher) Batch(ctx context.Context, batchItems ...metaclient.BatchItem)
 			s.info = Info{
 				CreationDate: commitObject.Object.Created,
 				PlainSize:    commitObject.Object.PlainSize,
+				Version:      commitObject.Object.Version,
 			}
 		}
 	}
