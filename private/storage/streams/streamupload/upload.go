@@ -213,10 +213,8 @@ func deleteCancelledObject(ctx context.Context, batcher metaclient.Batcher, begi
 	_, err = batcher.Batch(ctx, &metaclient.BeginDeleteObjectParams{
 		Bucket:             beginObject.Bucket,
 		EncryptedObjectKey: beginObject.EncryptedObjectKey,
-		// TODO remove it or set to 0 when satellite side will be fixed
-		Version:  1,
-		StreamID: streamID,
-		Status:   int32(pb.Object_UPLOADING),
+		StreamID:           streamID,
+		Status:             int32(pb.Object_UPLOADING),
 	})
 	return err
 }

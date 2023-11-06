@@ -231,10 +231,8 @@ func (project *Project) AbortUpload(ctx context.Context, bucket, key, uploadID s
 	_, err = metainfoClient.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
 		Bucket:             []byte(bucket),
 		EncryptedObjectKey: []byte(encPath.Raw()),
-		// TODO remove it or set to 0 when satellite side will be fixed
-		Version:  1,
-		StreamID: id,
-		Status:   int32(pb.Object_UPLOADING),
+		StreamID:           id,
+		Status:             int32(pb.Object_UPLOADING),
 	})
 	return convertKnownErrors(err, bucket, key)
 }

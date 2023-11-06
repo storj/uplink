@@ -182,19 +182,19 @@ func TestDeleteObject(t *testing.T) {
 				encStore.EncryptionBypass = true
 			}
 
-			_, err = db.DeleteObject(ctx, "", "")
+			_, err = db.DeleteObject(ctx, "", "", nil)
 			assert.True(t, metaclient.ErrNoBucket.Has(err))
 
-			_, err = db.DeleteObject(ctx, bucket.Name, "")
+			_, err = db.DeleteObject(ctx, bucket.Name, "", nil)
 			assert.True(t, metaclient.ErrNoPath.Has(err))
 
-			_, err = db.DeleteObject(ctx, bucket.Name+"-not-exist", TestFile)
+			_, err = db.DeleteObject(ctx, bucket.Name+"-not-exist", TestFile, nil)
 			assert.Nil(t, err)
 
-			_, err = db.DeleteObject(ctx, bucket.Name, "non-existing-file")
+			_, err = db.DeleteObject(ctx, bucket.Name, "non-existing-file", nil)
 			assert.Nil(t, err)
 
-			object, err := db.DeleteObject(ctx, bucket.Name, key)
+			object, err := db.DeleteObject(ctx, bucket.Name, key, nil)
 			if assert.NoError(t, err) {
 				assert.Equal(t, key, object.Path)
 			}

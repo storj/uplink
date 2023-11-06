@@ -194,7 +194,7 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 }
 
 // DeleteObject deletes an object from database.
-func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, err error) {
+func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []byte) (_ Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -213,6 +213,7 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string) (_ Object, e
 	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
 		Bucket:             []byte(bucket),
 		EncryptedObjectKey: []byte(encPath.Raw()),
+		Version:            version,
 	})
 	if err != nil {
 		return Object{}, err
