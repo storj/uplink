@@ -877,10 +877,8 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encrypted
 	_, err = s.metainfo.BeginDeleteObject(ctx, metaclient.BeginDeleteObjectParams{
 		Bucket:             []byte(bucketName),
 		EncryptedObjectKey: []byte(encryptedObjectKey),
-		// TODO remove it or set to 0 when satellite side will be fixed
-		Version:  1,
-		StreamID: streamID,
-		Status:   int32(pb.Object_UPLOADING),
+		StreamID:           streamID,
+		Status:             int32(pb.Object_UPLOADING),
 	})
 	if err != nil {
 		mon.Event("failed to delete cancelled object")

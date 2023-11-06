@@ -140,6 +140,26 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 	return convertObject(&obj), nil
 }
 
+// DeleteObject deletes the object at the specific key.
+// Returned deleted is not nil when the access grant has read permissions and
+// the object was deleted.
+func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte) (info *VersionedObject, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	obj, err := db.DeleteObject(ctx, bucket, key, version)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
+
+	return convertObject(&obj), nil
+}
+
 // UploadObject starts an upload to the specific key.
 //
 // It is not guaranteed that the uncommitted object is visible through ListUploads while uploading.

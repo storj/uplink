@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
@@ -157,8 +158,6 @@ func TestUploadObject_OldCodePath(t *testing.T) {
 		require.NoError(t, err)
 
 		uploadObject := upload.Info()
-		uploadObject.Custom = uplink.CustomMetadata{}
-		statObj.Custom = uplink.CustomMetadata{}
 		require.EqualExportedValues(t, *uploadObject, *statObj)
 	})
 }
@@ -244,5 +243,57 @@ func TestDownloadObject(t *testing.T) {
 		require.Equal(t, expectedDataB, data)
 
 		// TODO(ver): add test to download delete marker
+	})
+}
+
+func TestDeleteObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload := func(key string) *object.VersionedObject {
+			upload, err := object.UploadObject(ctx, project, bucketName, key, nil)
+			require.NoError(t, err)
+
+			_, err = upload.Write([]byte("test"))
+			require.NoError(t, err)
+
+			require.NoError(t, upload.Commit())
+			require.NotEmpty(t, upload.Info().Version)
+			return upload.Info()
+		}
+
+		uploadInfoA := upload(objectKey)
+		uploadInfoB := upload(objectKey + "B")
+
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, 2)
+
+		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA.Key, uploadInfoA.Version)
+		require.NoError(t, err)
+		require.NotNil(t, deleteObj)
+
+		require.EqualExportedValues(t, *uploadInfoA, *deleteObj)
+
+		// delete non existing version of existing object
+		nonExistingVersion := slices.Clone(uploadInfoB.Version)
+		nonExistingVersion[0]++ // change oriinal version
+		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nonExistingVersion)
+		require.NoError(t, err)
+		require.Nil(t, deleteObj)
+
+		// delete latest version with version nil
+		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil)
+		require.NoError(t, err)
+		require.EqualExportedValues(t, *uploadInfoB, *deleteObj)
 	})
 }

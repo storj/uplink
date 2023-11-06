@@ -111,7 +111,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.DeleteObject(ctx, bucket, key)
+	obj, err := db.DeleteObject(ctx, bucket, key, nil)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -148,7 +148,7 @@ func convertObject(obj *metaclient.Object) *Object {
 		return nil
 	}
 
-	return &Object{
+	object := &Object{
 		Key: obj.Path,
 		System: SystemMetadata{
 			Created:       obj.Created,
@@ -159,6 +159,12 @@ func convertObject(obj *metaclient.Object) *Object {
 
 		version: obj.Version,
 	}
+
+	if object.Custom == nil {
+		object.Custom = CustomMetadata{}
+	}
+
+	return object
 }
 
 // objectVersion is exposing object version field.

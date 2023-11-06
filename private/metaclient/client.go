@@ -803,7 +803,7 @@ func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObj
 type BeginDeleteObjectParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
-	Version            int32
+	Version            []byte
 	StreamID           storj.StreamID
 	Status             int32
 }
@@ -813,7 +813,7 @@ func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.O
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
-		Version:            params.Version,
+		ObjectVersion:      params.Version,
 		StreamId:           &params.StreamID,
 		Status:             params.Status,
 	}

@@ -429,7 +429,6 @@ func (m *metainfoBatcher) Batch(ctx context.Context, items ...metaclient.BatchIt
 				Bucket:             bucket,
 				EncryptedObjectKey: encryptedObjectKey,
 				StreamId:           &streamID,
-				Version:            1,
 				Status:             int32(pb.Object_UPLOADING),
 			}, req.ObjectBeginDelete)
 			m.beginDeleteObject++
