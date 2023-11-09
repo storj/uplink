@@ -94,6 +94,48 @@ func GetBucketLocation(ctx context.Context, project *uplink.Project, bucketName 
 	return string(response.Location), convertKnownErrors(err, bucketName, "")
 }
 
+// GetBucketVersioning returns bucket versioning state.
+func GetBucketVersioning(ctx context.Context, project *uplink.Project, bucketName string) (_ int32, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return 0, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return 0, convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	response, err := metainfoClient.GetBucketVersioning(ctx, metaclient.GetBucketVersioningParams{
+		Name: []byte(bucketName),
+	})
+	return response.Versioning, convertKnownErrors(err, bucketName, "")
+}
+
+// SetBucketVersioning sets the versioning state for a bucket. True will attempt to enable versioning,
+// false will attempt to disable it.
+func SetBucketVersioning(ctx context.Context, project *uplink.Project, bucketName string, versioning bool) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	err = metainfoClient.SetBucketVersioning(ctx, metaclient.SetBucketVersioningParams{
+		Name:       []byte(bucketName),
+		Versioning: versioning,
+	})
+	return convertKnownErrors(err, bucketName, "")
+}
+
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
 

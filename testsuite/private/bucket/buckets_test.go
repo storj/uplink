@@ -115,3 +115,5 @@ func TestGetBucketLocation(t *testing.T) {
 		require.Equal(t, "Poland", location)
 	})
 }
+
+// TODO add test for set/get bucket level versioning

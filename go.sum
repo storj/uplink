@@ -111,8 +111,8 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EV
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-storj.io/common v0.0.0-20231101115145-09481ec98b57 h1:/u6GmKmMzGdoc71B2Tg5ukJ1Lli/oyO6MQzJAyuUO+c=
-storj.io/common v0.0.0-20231101115145-09481ec98b57/go.mod h1:qjHfzW5RlGg5z04CwIEjJd1eQ3HCGhUNtxZ6K/W7yqM=
+storj.io/common v0.0.0-20231109220147-20d29693cc75 h1:hOUOn3LzEwxGZNKKlrXaWRaUIyTVK5Omu/ttQCUQBHs=
+storj.io/common v0.0.0-20231109220147-20d29693cc75/go.mod h1:qjHfzW5RlGg5z04CwIEjJd1eQ3HCGhUNtxZ6K/W7yqM=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
 storj.io/infectious v0.0.1 h1:/EdG6zvf589iTaTBdv+7+Q34/gR/evAGyYT3I2XYRxw=

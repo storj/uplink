@@ -266,6 +266,84 @@ func (client *Client) GetBucketLocation(ctx context.Context, params GetBucketLoc
 	}, nil
 }
 
+// GetBucketVersioningParams parameters for GetBucketVersioning method.
+type GetBucketVersioningParams struct {
+	Name []byte
+}
+
+func (params *GetBucketVersioningParams) toRequest(header *pb.RequestHeader) *pb.GetBucketVersioningRequest {
+	return &pb.GetBucketVersioningRequest{
+		Header: header,
+		Name:   params.Name,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *GetBucketVersioningParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketGetVersioning{
+			BucketGetVersioning: params.toRequest(nil),
+		},
+	}
+}
+
+// GetBucketVersioningResponse response for GetBucketVersioning request.
+type GetBucketVersioningResponse struct {
+	Versioning int32
+}
+
+// GetBucketVersioning returns a bucket versioning state.
+func (client *Client) GetBucketVersioning(ctx context.Context, params GetBucketVersioningParams) (_ GetBucketVersioningResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetBucketVersioningResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetBucketVersioning(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return GetBucketVersioningResponse{}, Error.Wrap(err)
+	}
+
+	return GetBucketVersioningResponse{
+		Versioning: response.Versioning,
+	}, nil
+}
+
+// SetBucketVersioningParams parameters for SetBucketVersioning method.
+type SetBucketVersioningParams struct {
+	Name       []byte
+	Versioning bool
+}
+
+func (params *SetBucketVersioningParams) toRequest(header *pb.RequestHeader) *pb.SetBucketVersioningRequest {
+	return &pb.SetBucketVersioningRequest{
+		Header:     header,
+		Name:       params.Name,
+		Versioning: params.Versioning,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *SetBucketVersioningParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketSetVersioning{
+			BucketSetVersioning: params.toRequest(nil),
+		},
+	}
+}
+
+// SetBucketVersioning attempts to enable/disable versioning for a bucket.
+func (client *Client) SetBucketVersioning(ctx context.Context, params SetBucketVersioningParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetBucketVersioning(ctx, params.toRequest(client.header()))
+		return err
+	})
+	return Error.Wrap(err)
+}
+
 // DeleteBucketParams parameters for DeleteBucket method.
 type DeleteBucketParams struct {
 	Name      []byte
