@@ -116,4 +116,60 @@ func TestGetBucketLocation(t *testing.T) {
 	})
 }
 
-// TODO add test for set/get bucket level versioning
+func TestSetBucketVersioning(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		projectID := planet.Uplinks[0].Projects[0].ID
+		satellite := planet.Satellites[0]
+		enable := true
+		suspend := false
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		for _, tt := range []struct {
+			name                     string
+			bucketName               string
+			initialVersioningState   buckets.Versioning
+			versioning               bool
+			resultantVersioningState buckets.Versioning
+		}{
+			{"Enable unsupported bucket fails", "bucket1", buckets.VersioningUnsupported, enable, buckets.VersioningUnsupported},
+			{"Suspend unsupported bucket fails", "bucket2", buckets.VersioningUnsupported, suspend, buckets.VersioningUnsupported},
+			{"Enable unversioned bucket succeeds", "bucket3", buckets.Unversioned, enable, buckets.VersioningEnabled},
+			{"Suspend unversioned bucket fails", "bucket4", buckets.Unversioned, suspend, buckets.Unversioned},
+			{"Enable enabled bucket succeeds", "bucket5", buckets.VersioningEnabled, enable, buckets.VersioningEnabled},
+			{"Suspend enabled bucket succeeds", "bucket6", buckets.VersioningEnabled, suspend, buckets.VersioningSuspended},
+			{"Enable suspended bucket succeeds", "bucket7", buckets.VersioningSuspended, enable, buckets.VersioningEnabled},
+			{"Suspend suspended bucket succeeds", "bucket8", buckets.VersioningSuspended, suspend, buckets.VersioningSuspended},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				testBucket, err := satellite.API.DB.Buckets().CreateBucket(ctx, buckets.Bucket{
+					ProjectID:  projectID,
+					Name:       tt.bucketName,
+					Versioning: tt.initialVersioningState,
+				})
+				require.NoError(t, err)
+				require.NotNil(t, testBucket)
+				err = bucket.SetBucketVersioning(ctx, project, testBucket.Name, tt.versioning)
+				// only 3 error state transitions
+				if tt.initialVersioningState == buckets.VersioningUnsupported ||
+					(tt.initialVersioningState == buckets.Unversioned && tt.versioning == suspend) {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+				versioningState, err := bucket.GetBucketVersioning(ctx, project, testBucket.Name)
+				require.NoError(t, err)
+				require.Equal(t, tt.resultantVersioningState, buckets.Versioning(versioningState))
+			})
+		}
+	})
+}
