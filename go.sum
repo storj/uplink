@@ -115,7 +115,7 @@ storj.io/common v0.0.0-20231114142336-6bf1d675854d h1:GvyLJ7lh9cu1Y6CVrfYSqcgBHn
 storj.io/common v0.0.0-20231114142336-6bf1d675854d/go.mod h1:qjHfzW5RlGg5z04CwIEjJd1eQ3HCGhUNtxZ6K/W7yqM=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
-storj.io/infectious v0.0.1 h1:/EdG6zvf589iTaTBdv+7+Q34/gR/evAGyYT3I2XYRxw=
-storj.io/infectious v0.0.1/go.mod h1:QEjKKww28Sjl1x8iDsjBpOM4r1Yp8RsowNcItsZJ1Vs=
+storj.io/infectious v0.0.2 h1:rGIdDC/6gNYAStsxsZU79D/MqFjNyJc1tsyyj9sTl7Q=
+storj.io/infectious v0.0.2/go.mod h1:QEjKKww28Sjl1x8iDsjBpOM4r1Yp8RsowNcItsZJ1Vs=
 storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c h1:or/DtG5uaZpzimL61ahlgAA+MTYn/U3txz4fe+XBFUg=
 storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c/go.mod h1:JCuc3C0gzCJHQ4J6SOx/Yjg+QTpX0D+Fvs5H46FETCk=

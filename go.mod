@@ -10,7 +10,7 @@ require (
 	golang.org/x/sync v0.3.0
 	storj.io/common v0.0.0-20231114142336-6bf1d675854d
 	storj.io/drpc v0.0.33
-	storj.io/infectious v0.0.1
+	storj.io/infectious v0.0.2
 )
 
 require (
