@@ -6,8 +6,6 @@ package eestream
 import (
 	"context"
 	"io"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,24 +15,14 @@ import (
 	"storj.io/common/errs2"
 	"storj.io/common/ranger"
 	"storj.io/common/readcloser"
-	"storj.io/uplink/private/eestream/improved"
 )
-
-var disableNewStripeReader = map[string]bool{
-	"yes": true, "true": true, "1": true,
-}[strings.ToLower(os.Getenv("STORJ_UPLINK_DISABLE_NEW_STRIPE_READER"))]
-
-type stripeReader interface {
-	ReadStripes(context.Context, int64, []byte) ([]byte, int, error)
-	Close() error
-}
 
 type decodedReader struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	readers           map[int]io.ReadCloser
 	scheme            ErasureScheme
-	stripeReader      stripeReader
+	stripeReader      *StripeReader
 	outbuf, outbufmem []byte
 	err               error
 	currentStripe     int64
@@ -73,11 +61,7 @@ func DecodeReaders2(ctx context.Context, cancel func(), rs map[int]io.ReadCloser
 		expectedStripes: expectedStripes,
 	}
 
-	if disableNewStripeReader {
-		dr.stripeReader = NewStripeReader(rs, es, mbm, forceErrorDetection)
-	} else {
-		dr.stripeReader = improved.New(rs, es, int(expectedStripes), forceErrorDetection)
-	}
+	dr.stripeReader = NewStripeReader(rs, es, int(expectedStripes), forceErrorDetection)
 
 	dr.ctx, dr.cancel = ctx, cancel
 	// Kick off a goroutine to watch for context cancelation.

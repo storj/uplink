@@ -1,9 +1,7 @@
 // Copyright (C) 2023 Storj Labs, Inc.
 // See LICENSE for copying information.
 
-// Package improved provides an "improved" version of the venerable
-// eestream.StripeReader type from 2018.
-package improved
+package eestream
 
 import (
 	"context"
@@ -16,18 +14,10 @@ import (
 	"sync/atomic"
 
 	"github.com/spacemonkeygo/monkit/v3"
-	"github.com/zeebo/errs"
 
 	"storj.io/common/rpc/rpctracing"
 	"storj.io/common/sync2"
 	"storj.io/infectious"
-)
-
-var (
-	mon = monkit.Package()
-
-	// Error is an eestream/improved error.
-	Error = errs.Class("eestream/improved")
 )
 
 const debugEnabled = false
@@ -59,10 +49,10 @@ type StripeReader struct {
 	runningPieces   atomic.Int32
 }
 
-// New makes a new StripeReader using the provided map of share
+// NewStripeReader makes a new StripeReader using the provided map of share
 // number to io.ReadClosers, an ErasureScheme, the total number of stripes in
 // the stream, and whether or not to use the Erasure Scheme's error detection.
-func New(readers map[int]io.ReadCloser, scheme ErasureScheme, totalStripes int,
+func NewStripeReader(readers map[int]io.ReadCloser, scheme ErasureScheme, totalStripes int,
 	errorDetection bool) *StripeReader {
 
 	pool := NewBatchPool(scheme.ErasureShareSize())
