@@ -17,11 +17,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
 	"storj.io/infectious"
-	"storj.io/uplink/private/eestream/improved"
 )
-
-// ErasureScheme is an interface that defines erasure scheme methods.
-type ErasureScheme = improved.ErasureScheme
 
 // RedundancyStrategy is an ErasureScheme with a repair and optimal thresholds.
 type RedundancyStrategy struct {

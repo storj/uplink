@@ -4,8 +4,13 @@
 package eestream
 
 import (
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 )
 
-// Error is the default eestream errs class.
-var Error = errs.Class("eestream")
+var (
+	// Error is the default eestream errs class.
+	Error = errs.Class("eestream")
+
+	mon = monkit.Package()
+)
