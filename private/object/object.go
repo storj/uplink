@@ -5,11 +5,14 @@ package object
 
 import (
 	"context"
+	"errors"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/errs2"
+	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
@@ -20,6 +23,9 @@ var mon = monkit.Package()
 
 // Error is default error class for uplink.
 var packageError = errs.Class("object")
+
+// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
+var ErrMethodNotAllowed = errors.New("method not allowed")
 
 // IPSummary contains information about the object IP-s.
 type IPSummary = metaclient.GetObjectIPsResponse
@@ -128,13 +134,13 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 
 	db, err := dialMetainfoDB(ctx, project)
 	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	obj, err := db.GetObject(ctx, bucket, key, version)
 	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 
 	return convertObject(&obj), nil
@@ -148,13 +154,13 @@ func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key stri
 
 	db, err := dialMetainfoDB(ctx, project)
 	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	obj, err := db.DeleteObject(ctx, bucket, key, version)
 	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 
 	return convertObject(&obj), nil
@@ -181,7 +187,7 @@ func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key st
 
 	download, err := downloadObjectWithVersion(ctx, project, bucket, key, version, options)
 	if err != nil {
-		return
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 	return &VersionedDownload{
 		download: download,
@@ -232,6 +238,13 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 		Object:  *obj,
 		Version: objectVersion(obj),
 	}
+}
+
+func packageConvertKnownErrors(err error, bucket, key string) error {
+	if errs2.IsRPC(err, rpcstatus.MethodNotAllowed) {
+		return ErrMethodNotAllowed
+	}
+	return convertKnownErrors(err, bucket, key)
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors

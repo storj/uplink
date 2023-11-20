@@ -17,6 +17,7 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/uplink"
+	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/object"
 	"storj.io/uplink/private/testuplink"
 )
@@ -295,5 +296,48 @@ func TestDeleteObject(t *testing.T) {
 		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil)
 		require.NoError(t, err)
 		require.EqualExportedValues(t, *uploadInfoB, *deleteObj)
+	})
+}
+
+func TestObject_Versioning(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(100))
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].DeleteObject(ctx, planet.Satellites[0], bucketName, objectKey)
+		require.NoError(t, err)
+
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, 2)
+
+		version := objects[0].Version.Encode()
+		if objects[1].Status.IsDeleteMarker() {
+			version = objects[1].Version.Encode()
+		}
+
+		_, err = object.StatObject(ctx, project, bucketName, objectKey, version)
+		require.ErrorIs(t, err, object.ErrMethodNotAllowed)
+
+		_, err = object.DownloadObject(ctx, project, bucketName, objectKey, version, nil)
+		require.ErrorIs(t, err, object.ErrMethodNotAllowed)
 	})
 }
