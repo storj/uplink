@@ -5,11 +5,14 @@ package object
 
 import (
 	"context"
+	"errors"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/errs2"
+	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
@@ -20,6 +23,9 @@ var mon = monkit.Package()
 
 // Error is default error class for uplink.
 var packageError = errs.Class("object")
+
+// ErrMethodNotAllowed TBD
+var ErrMethodNotAllowed = errors.New("method not allowed")
 
 // IPSummary contains information about the object IP-s.
 type IPSummary = metaclient.GetObjectIPsResponse
@@ -134,6 +140,9 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 
 	obj, err := db.GetObject(ctx, bucket, key, version)
 	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.MethodNotAllowed) {
+			return nil, ErrMethodNotAllowed
+		}
 		return nil, convertKnownErrors(err, bucket, key)
 	}
 
@@ -181,7 +190,10 @@ func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key st
 
 	download, err := downloadObjectWithVersion(ctx, project, bucket, key, version, options)
 	if err != nil {
-		return
+		if errs2.IsRPC(err, rpcstatus.MethodNotAllowed) {
+			return nil, ErrMethodNotAllowed
+		}
+		return nil, err
 	}
 	return &VersionedDownload{
 		download: download,
