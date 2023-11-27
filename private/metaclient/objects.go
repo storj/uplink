@@ -715,11 +715,13 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 }
 
 func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
+	isDeleteMarer := listItem.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || listItem.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
 	object := Object{
-		Version:  listItem.Version,
-		Bucket:   Bucket{Name: bucket},
-		Path:     path,
-		IsPrefix: listItem.IsPrefix,
+		Version:        listItem.Version,
+		Bucket:         Bucket{Name: bucket},
+		Path:           path,
+		IsPrefix:       listItem.IsPrefix,
+		IsDeleteMarker: isDeleteMarer,
 
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field

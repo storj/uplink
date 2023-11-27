@@ -34,7 +34,8 @@ type IPSummary = metaclient.GetObjectIPsResponse
 // TODO find better place of name for this and related things.
 type VersionedObject struct {
 	uplink.Object
-	Version []byte
+	Version      []byte
+	DeleteMarker bool
 }
 
 // VersionedUpload represents upload which returnes object version at the end.
@@ -212,6 +213,64 @@ func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, upl
 	}
 
 	return convertUplinkObject(obj), nil
+}
+
+// ListObjectsOptions defines object listing options.
+type ListObjectVersionsOptions struct {
+	// Prefix allows to filter objects by a key prefix.
+	// If not empty, it must end with slash.
+	Prefix string
+	// Cursor sets the starting position of the iterator.
+	// The first item listed will be the one after the cursor.
+	// Cursor is relative to Prefix.
+	Cursor string
+	// Recursive iterates the objects without collapsing prefixes.
+	Recursive bool
+
+	// System includes SystemMetadata in the results.
+	System bool
+	// Custom includes CustomMetadata in the results.
+	Custom bool
+
+	Limit int
+}
+
+func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket string, options *ListObjectVersionsOptions) (objects []*VersionedObject, more bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	opts := metaclient.ListOptions{
+		IncludeAllVersions: true,
+	}
+	if options != nil {
+		opts.Prefix = options.Prefix
+		opts.Cursor = options.Cursor
+		opts.Recursive = options.Recursive
+
+		opts.IncludeSystemMetadata = options.System
+		opts.IncludeCustomMetadata = options.Custom
+		opts.Limit = options.Limit
+	}
+
+	result, err := db.ListObjects(ctx, bucket, opts)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+
+	for _, item := range result.Items {
+		obj := convertObject(&item)
+		if obj != nil {
+			obj.DeleteMarker = item.IsDeleteMarker
+			objects = append(objects, obj)
+		}
+	}
+
+	return objects, result.More, nil
 }
 
 // convertObject converts metainfo.Object to Version.
