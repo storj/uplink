@@ -223,7 +223,8 @@ type ListObjectVersionsOptions struct {
 	// Cursor sets the starting position of the iterator.
 	// The first item listed will be the one after the cursor.
 	// Cursor is relative to Prefix.
-	Cursor string
+	Cursor        string
+	VersionCursor []byte
 	// Recursive iterates the objects without collapsing prefixes.
 	Recursive bool
 
@@ -251,6 +252,7 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 	if options != nil {
 		opts.Prefix = options.Prefix
 		opts.Cursor = options.Cursor
+		opts.VersionCursor = options.VersionCursor
 		opts.Recursive = options.Recursive
 
 		opts.IncludeSystemMetadata = options.System
