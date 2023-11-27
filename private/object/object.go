@@ -288,7 +288,8 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 				Expires:       obj.Expires,
 				ContentLength: obj.Size,
 			},
-			Custom: obj.Metadata,
+			Custom:   obj.Metadata,
+			IsPrefix: obj.IsPrefix,
 		},
 		Version: obj.Version,
 	}
