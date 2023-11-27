@@ -246,6 +246,7 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 
 	opts := metaclient.ListOptions{
 		IncludeAllVersions: true,
+		Direction:          metaclient.After,
 	}
 	if options != nil {
 		opts.Prefix = options.Prefix
