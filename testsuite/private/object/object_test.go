@@ -341,3 +341,90 @@ func TestObject_Versioning(t *testing.T) {
 		require.ErrorIs(t, err, object.ErrMethodNotAllowed)
 	})
 }
+
+func TestListObjectVersions_SingleObject_TwoVersions(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		err = bucket.SetBucketVersioning(ctx, project, bucketName, true)
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		objects, more, err := object.ListObjectVersions(ctx, project, bucketName, nil)
+		require.NoError(t, err)
+		require.False(t, more)
+		require.Len(t, objects, 2)
+		require.Equal(t, objectKey, objects[0].Key)
+		require.Equal(t, objectKey, objects[1].Key)
+		require.NotEqual(t, objects[0].Version, objects[1].Version)
+	})
+}
+
+func TestListObjects_TwoObjects_TwoVersionsEach(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKeyA := "test-objectA"
+		objectKeyB := "test-objectB"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		err = bucket.SetBucketVersioning(ctx, project, bucketName, true)
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKeyA, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKeyA, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKeyB, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKeyB, testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		objects, more, err := object.ListObjectVersions(ctx, project, bucketName, nil)
+		require.NoError(t, err)
+		require.False(t, more)
+		require.Len(t, objects, 4)
+		require.Equal(t, objectKeyB, objects[0].Key)
+		require.Equal(t, objectKeyB, objects[1].Key)
+		require.Equal(t, objectKeyA, objects[2].Key)
+		require.Equal(t, objectKeyA, objects[3].Key)
+		require.NotEqual(t, objects[0].Version, objects[1].Version)
+		require.NotEqual(t, objects[2].Version, objects[3].Version)
+	})
+}
+
+// TODO(ver): add listObjectVersions tests with delete markers, suspended versioning buckets, cursors and limits

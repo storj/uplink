@@ -42,6 +42,17 @@ type VersionedUpload struct {
 	upload *uplink.Upload
 }
 
+// ListObjectVersionsOptions defines listing options for versioned objects.
+type ListObjectVersionsOptions struct {
+	Prefix        string
+	Cursor        string
+	VersionCursor []byte
+	Recursive     bool
+	System        bool
+	Custom        bool
+	Limit         int
+}
+
 // Info returns the last information about the uploaded object.
 func (upload *VersionedUpload) Info() *VersionedObject {
 	info := upload.upload.Info()
@@ -164,6 +175,44 @@ func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key stri
 	}
 
 	return convertObject(&obj), nil
+}
+
+// ListObjectVersions returns a list of objects and their versions.
+func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket string, options *ListObjectVersionsOptions) (_ []*VersionedObject, more bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	opts := metaclient.ListOptions{
+		Direction:          metaclient.After,
+		IncludeAllVersions: true,
+	}
+
+	if options != nil {
+		opts.Prefix = options.Prefix
+		opts.Cursor = options.Cursor
+		opts.VersionCursor = options.VersionCursor
+		opts.Recursive = options.Recursive
+		opts.IncludeCustomMetadata = options.Custom
+		opts.IncludeSystemMetadata = options.System
+		opts.Limit = options.Limit
+	}
+
+	obj, err := db.ListObjects(ctx, bucket, opts)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+
+	var versions []*VersionedObject
+	for _, o := range obj.Items {
+		versions = append(versions, convertObject(&o))
+	}
+
+	return versions, obj.More, nil
 }
 
 // UploadObject starts an upload to the specific key.
