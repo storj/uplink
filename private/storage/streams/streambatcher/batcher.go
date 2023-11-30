@@ -10,6 +10,7 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/common/pb"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
 )
@@ -108,7 +109,9 @@ func (s *Batcher) Batch(ctx context.Context, batchItems ...metaclient.BatchItem)
 			s.info = Info{
 				CreationDate: commitObject.Object.Created,
 				PlainSize:    commitObject.Object.PlainSize,
-				Version:      commitObject.Object.Version,
+			}
+			if commitObject.Object.Status == int32(pb.Object_COMMITTED_VERSIONED) {
+				s.info.Version = commitObject.Object.Version
 			}
 		}
 	}

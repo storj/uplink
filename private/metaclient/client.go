@@ -660,6 +660,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		Bucket:             string(object.Bucket),
 		EncryptedObjectKey: object.EncryptedObjectKey,
 		Version:            object.ObjectVersion,
+		Status:             int32(object.Status),
 
 		StreamID: object.StreamId,
 

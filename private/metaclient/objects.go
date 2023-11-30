@@ -662,7 +662,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 	}
 
 	object := Object{
-		Version:  objectInfo.Version,
+		Version:  version(objectInfo.Status, objectInfo.Version),
 		Bucket:   Bucket{Name: bucket},
 		Path:     key,
 		IsPrefix: false,
@@ -857,4 +857,11 @@ func getEncryptedKeyAndNonce(metadataKey []byte, metadataNonce storj.Nonce, m *p
 	copy(nonce[:], m.KeyNonce)
 
 	return m.EncryptedKey, &nonce
+}
+
+func version(status int32, version []byte) []byte {
+	if status == int32(pb.Object_COMMITTED_VERSIONED) || status == int32(pb.Object_DELETE_MARKER_VERSIONED) {
+		return version
+	}
+	return nil
 }

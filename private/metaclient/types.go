@@ -17,6 +17,7 @@ type RawObjectItem struct {
 	Version            []byte
 	Bucket             string
 	EncryptedObjectKey []byte
+	Status             int32
 
 	StreamID storj.StreamID
 

@@ -28,6 +28,11 @@ import (
 func TestStatObject(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
@@ -37,6 +42,8 @@ func TestStatObject(t *testing.T) {
 		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
 
 		_, err = object.StatObject(ctx, project, "", "", nil)
 		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
@@ -75,6 +82,11 @@ func TestStatObject(t *testing.T) {
 func TestCommitUpload(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
@@ -84,6 +96,8 @@ func TestCommitUpload(t *testing.T) {
 		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
 
 		uploadInfo, err := project.BeginUpload(ctx, bucketName, objectKey, nil)
 		require.NoError(t, err)
@@ -102,6 +116,11 @@ func TestCommitUpload(t *testing.T) {
 func TestUploadObject(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
@@ -115,7 +134,18 @@ func TestUploadObject(t *testing.T) {
 		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
 		require.NoError(t, err)
 
-		_, err = upload.Write([]byte("test"))
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.Empty(t, upload.Info().Version)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		upload, err = object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test2"))
 		require.NoError(t, err)
 
 		require.NoError(t, upload.Commit())
@@ -134,6 +164,11 @@ func TestUploadObject(t *testing.T) {
 func TestUploadObject_OldCodePath(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
@@ -145,6 +180,8 @@ func TestUploadObject_OldCodePath(t *testing.T) {
 		project, err := planet.Uplinks[0].OpenProject(uploadCtx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
 
 		upload, err := object.UploadObject(uploadCtx, project, bucketName, objectKey, nil)
 		require.NoError(t, err)
@@ -169,19 +206,24 @@ func TestDownloadObject(t *testing.T) {
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Metainfo.UseBucketLevelObjectVersioning = true
-				config.Metainfo.TestEnableBucketVersioning = true
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
-		expectedDataA := testrand.Bytes(10 * memory.KiB)
-		err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, expectedDataA)
+
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
 		require.NoError(t, err)
 
 		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		expectedDataA := testrand.Bytes(10 * memory.KiB)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, expectedDataA)
+		require.NoError(t, err)
 
 		downloadObject := func(version []byte) ([]byte, *object.VersionedObject) {
 			download, err := object.DownloadObject(ctx, project, bucketName, objectKey, version, nil)
@@ -250,6 +292,11 @@ func TestDownloadObject(t *testing.T) {
 func TestDeleteObject(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
@@ -259,6 +306,8 @@ func TestDeleteObject(t *testing.T) {
 		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
 
 		upload := func(key string) *object.VersionedObject {
 			upload, err := object.UploadObject(ctx, project, bucketName, key, nil)
@@ -281,9 +330,7 @@ func TestDeleteObject(t *testing.T) {
 
 		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA.Key, uploadInfoA.Version)
 		require.NoError(t, err)
-		require.NotNil(t, deleteObj)
-
-		require.EqualExportedValues(t, *uploadInfoA, *deleteObj)
+		require.NotEmpty(t, deleteObj.Version)
 
 		// delete non existing version of existing object
 		nonExistingVersion := slices.Clone(uploadInfoB.Version)
@@ -295,7 +342,7 @@ func TestDeleteObject(t *testing.T) {
 		// delete latest version with version nil
 		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil)
 		require.NoError(t, err)
-		require.EqualExportedValues(t, *uploadInfoB, *deleteObj)
+		require.NotEmpty(t, deleteObj.Version)
 	})
 }
 
@@ -428,3 +475,49 @@ func TestListObjects_TwoObjects_TwoVersionsEach(t *testing.T) {
 }
 
 // TODO(ver): add listObjectVersions tests with delete markers, suspended versioning buckets, cursors and limits
+
+func TestObject_Versioned_Unversioned(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		// upload unversioned object
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "objectA", testrand.Bytes(100))
+		require.NoError(t, err)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		stat, err := object.StatObject(ctx, project, bucketName, "objectA", nil)
+		require.NoError(t, err)
+		require.Empty(t, stat.Version)
+
+		// upload versioned object
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "objectA", testrand.Bytes(100))
+		require.NoError(t, err)
+
+		stat, err = object.StatObject(ctx, project, bucketName, "objectA", nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, stat.Version)
+
+		items, _, err := object.ListObjectVersions(ctx, project, bucketName, nil)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+
+		// with listing version should be always set
+		for _, item := range items {
+			require.NotEmpty(t, item.Version)
+		}
+	})
+}
