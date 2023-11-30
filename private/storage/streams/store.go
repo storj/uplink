@@ -8,7 +8,9 @@ import (
 	"crypto/rand"
 	"io"
 	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -755,8 +757,20 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 		return nil, errs.New("invalid final offset %d; expected %d", offset, object.Size)
 	}
 
-	return ranger.Concat(rangers...), nil
+	return ranger.ConcatWithOpts(ranger.ConcatOpts{
+		Prefetch:                   true,
+		ForceReads:                 prefetchForceReads,
+		PrefetchWhenBytesRemaining: prefetchBytesRemaining,
+	}, rangers...), nil
 }
+
+var (
+	// EXPERIMENTAL VALUES
+	// TODO: once we understand the usefulness of these, we should expose useful
+	// values as real options.
+	prefetchForceReads, _     = strconv.ParseBool(os.Getenv("STORJ_EXP_UPLINK_DOWNLOAD_PREFETCH_FORCE_READS"))
+	prefetchBytesRemaining, _ = strconv.ParseInt(os.Getenv("STORJ_EXP_UPLINK_DOWNLOAD_PREFETCH_BYTES_REMAINING"), 0, 64)
+)
 
 func deriveContentNonce(pos metaclient.SegmentPosition) (storj.Nonce, error) {
 	// The increment by 1 is to avoid nonce reuse with the metadata encryption,
