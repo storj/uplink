@@ -5,11 +5,11 @@ package object_test
 
 import (
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
@@ -321,16 +321,19 @@ func TestDeleteObject(t *testing.T) {
 			return upload.Info()
 		}
 
-		uploadInfoA := upload(objectKey)
+		_ = upload(objectKey)
+		uploadInfoA2 := upload(objectKey)
 		uploadInfoB := upload(objectKey + "B")
 
 		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
 		require.NoError(t, err)
-		require.Len(t, objects, 2)
+		require.Len(t, objects, 3)
 
-		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA.Key, uploadInfoA.Version)
+		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA2.Key, uploadInfoA2.Version)
 		require.NoError(t, err)
 		require.NotEmpty(t, deleteObj.Version)
+		// delete was done with specified version so no delete marker should be created
+		require.False(t, deleteObj.IsDeleteMarker)
 
 		// delete non existing version of existing object
 		nonExistingVersion := slices.Clone(uploadInfoB.Version)
@@ -343,6 +346,22 @@ func TestDeleteObject(t *testing.T) {
 		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, deleteObj.Version)
+		require.True(t, deleteObj.IsDeleteMarker)
+
+		items, _, err := object.ListObjectVersions(ctx, project, bucketName, nil)
+		require.NoError(t, err)
+
+		listedDeleteMarkers := 0
+		listedObjects := 0
+		for _, item := range items {
+			if item.IsDeleteMarker {
+				listedDeleteMarkers++
+			} else {
+				listedObjects++
+			}
+		}
+		require.Equal(t, 1, listedDeleteMarkers)
+		require.Equal(t, 2, listedObjects)
 	})
 }
 
@@ -461,14 +480,19 @@ func TestListObjects_TwoObjects_TwoVersionsEach(t *testing.T) {
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKeyB, testrand.Bytes(memory.KiB))
 		require.NoError(t, err)
 
+		err = planet.Uplinks[0].DeleteObject(ctx, planet.Satellites[0], bucketName, objectKeyB)
+		require.NoError(t, err)
+
 		objects, more, err := object.ListObjectVersions(ctx, project, bucketName, nil)
 		require.NoError(t, err)
 		require.False(t, more)
-		require.Len(t, objects, 4)
+		require.Len(t, objects, 5)
 		require.Equal(t, objectKeyB, objects[0].Key)
 		require.Equal(t, objectKeyB, objects[1].Key)
-		require.Equal(t, objectKeyA, objects[2].Key)
+		require.Equal(t, objectKeyB, objects[2].Key)
 		require.Equal(t, objectKeyA, objects[3].Key)
+		require.Equal(t, objectKeyA, objects[4].Key)
+		require.True(t, objects[2].IsDeleteMarker)
 		require.NotEqual(t, objects[0].Version, objects[1].Version)
 		require.NotEqual(t, objects[2].Version, objects[3].Version)
 	})

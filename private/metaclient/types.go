@@ -97,10 +97,11 @@ var (
 
 // Object contains information about a specific object.
 type Object struct {
-	Version  []byte
-	Bucket   Bucket
-	Path     string
-	IsPrefix bool
+	Version        []byte
+	Bucket         Bucket
+	Path           string
+	IsPrefix       bool
+	IsDeleteMarker bool
 
 	Metadata map[string]string
 

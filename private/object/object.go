@@ -34,7 +34,8 @@ type IPSummary = metaclient.GetObjectIPsResponse
 // TODO find better place of name for this and related things.
 type VersionedObject struct {
 	uplink.Object
-	Version []byte
+	Version        []byte
+	IsDeleteMarker bool
 }
 
 // VersionedUpload represents upload which returnes object version at the end.
@@ -160,6 +161,9 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 // DeleteObject deletes the object at the specific key.
 // Returned deleted is not nil when the access grant has read permissions and
 // the object was deleted.
+// TODO(ver) currently we are returning object that was returned by satellite
+// if its regular object (status != delete marker) it means no delete marker
+// was created.
 func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte) (info *VersionedObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
@@ -273,7 +277,8 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 			},
 			Custom: obj.Metadata,
 		},
-		Version: obj.Version,
+		Version:        obj.Version,
+		IsDeleteMarker: obj.IsDeleteMarker,
 	}
 }
 
