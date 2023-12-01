@@ -124,8 +124,8 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 			testuplink.Log(ctx, "Next returned nil segment")
 			break
 		}
-		testuplink.Log(ctx, "Got next segment. Inline:", segment.Inline())
 		segments = append(segments, segment)
+		testuplink.Log(ctx, "Got next segment. Inline:", segment.Inline())
 
 		if segment.Inline() {
 			tracker.SegmentDone(segment, segment.Begin())

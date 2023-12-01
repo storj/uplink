@@ -5,6 +5,7 @@ package buffer
 
 import (
 	"io"
+	"sync"
 	"sync/atomic"
 )
 
@@ -15,12 +16,30 @@ type Backend interface {
 	io.Closer
 }
 
+const (
+	standardMaxEncryptedSegmentSize = 67254016
+)
+
+var (
+	standardPool = sync.Pool{
+		New: func() interface{} {
+			// TODO: this pool approach is a bit of a bandaid - it would be good to
+			// rework this logic to not require this large allocation at all.
+			return new([standardMaxEncryptedSegmentSize]byte)
+		},
+	}
+)
+
 // NewMemoryBackend returns a MemoryBackend with the provided initial
 // capacity. It implements the Backend interface.
-func NewMemoryBackend(cap int64) *MemoryBackend {
-	return &MemoryBackend{
-		buf: make([]byte, cap),
+func NewMemoryBackend(cap int64) (rv *MemoryBackend) {
+	rv = &MemoryBackend{}
+	if cap == standardMaxEncryptedSegmentSize {
+		rv.buf = standardPool.Get().(*[standardMaxEncryptedSegmentSize]byte)[:]
+	} else {
+		rv.buf = make([]byte, cap)
 	}
+	return rv
 }
 
 // MemoryBackend implements the Backend interface backed by a slice.
@@ -58,7 +77,11 @@ func (u *MemoryBackend) ReadAt(p []byte, off int64) (n int, err error) {
 
 // Close releases memory and causes future calls to ReadAt and Write to fail.
 func (u *MemoryBackend) Close() error {
+	buf := u.buf
 	u.buf = nil
 	u.closed = true
+	if len(buf) == standardMaxEncryptedSegmentSize {
+		standardPool.Put((*[standardMaxEncryptedSegmentSize]byte)(buf))
+	}
 	return nil
 }

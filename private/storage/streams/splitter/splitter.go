@@ -175,16 +175,16 @@ func (s *Splitter) Next(ctx context.Context) (Segment, error) {
 	inline, eof, err := s.split.Next(ctx, encBuf)
 	switch {
 	case err != nil:
-		return nil, errs.Wrap(err)
+		return nil, errs.Combine(errs.Wrap(err), errs.Wrap(backend.Close()))
 
 	case eof:
-		return nil, nil
+		return nil, errs.Wrap(backend.Close())
 
 	case inline != nil:
 		// encrypt the inline data, and update the internal state if it succeeds.
 		encData, err := encryption.Encrypt(inline, s.opts.Params.CipherSuite, &contentKey, &nonce)
 		if err != nil {
-			return nil, errs.Wrap(err)
+			return nil, errs.Combine(errs.Wrap(err), errs.Wrap(backend.Close()))
 		}
 
 		// everything fallible is done. update the internal state.
@@ -198,7 +198,7 @@ func (s *Splitter) Next(ctx context.Context) (Segment, error) {
 
 			encData:   encData,
 			plainSize: int64(len(inline)),
-		}, nil
+		}, errs.Wrap(backend.Close())
 
 	default:
 		// everything fallible is done. update the internal state.
