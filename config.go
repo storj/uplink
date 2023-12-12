@@ -68,6 +68,11 @@ type Config struct {
 	//
 	// Object content is still encrypted as usual.
 	disableObjectKeyEncryption bool
+
+	// disableBackgroundQoS tells the uplink library to not try setting background
+	// QoS flags on the network sockets. This will impact the congestion control
+	// profile as well.
+	disableBackgroundQoS bool
 }
 
 // getDialer returns a new rpc.Dialer corresponding to the config.
@@ -92,7 +97,7 @@ func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (
 	}
 
 	dialer.DialTimeout = config.DialTimeout
-	dialer.AttemptBackgroundQoS = true
+	dialer.AttemptBackgroundQoS = !config.disableBackgroundQoS
 
 	if config.DialContext != nil {
 		// N.B.: It is okay to use NewDefaultTCPConnector here because we explicitly don't want
@@ -174,4 +179,16 @@ func (config Config) validateUserAgent(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// disableBackgroundQoS exposes setting Config.disableBackgroundQoS.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused
+//go:linkname config_disableBackgroundQoS
+func config_disableBackgroundQoS(config *Config, disabled bool) {
+	config.disableBackgroundQoS = disabled
 }

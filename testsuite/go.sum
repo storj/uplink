@@ -568,6 +568,7 @@ github.com/zeebo/pcg v1.0.1 h1:lyqfGeWiv4ahac6ttHs+I5hwtH/+1mrhlCtVNQM2kHo=
 github.com/zeebo/pcg v1.0.1/go.mod h1:09F0S9iiKrwn9rlI5yjLkmrug154/YRW6KnnXVDM/l4=
 github.com/zeebo/structs v1.0.3-0.20230601144555-f2db46069602 h1:nMxsvi3pTJapmPpdShLdCO8sbCqd8XkjKYMssSJrfiM=
 github.com/zeebo/structs v1.0.3-0.20230601144555-f2db46069602/go.mod h1:hthZGQud7FXSu0Rd7Q6LRMmJ2pvvBvCkZ/LAmpkn5u4=
+github.com/zeebo/sudo v1.0.2 h1:6RpQNYeWtd7ycPwYSRgceNdbjodamyyuapNB8mQ1V0M=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 github.com/zyedidia/generic v1.2.1 h1:Zv5KS/N2m0XZZiuLS82qheRG4X1o5gsWreGb0hR7XDc=
 github.com/zyedidia/generic v1.2.1/go.mod h1:ly2RBz4mnz1yeuVbQA/VFwGjK3mnHGRj1JuoG336Bis=

@@ -6,6 +6,7 @@ require (
 	github.com/spacemonkeygo/monkit/v3 v3.0.22
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/errs v1.3.0
+	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.5.0
 	storj.io/common v0.0.0-20231213124955-23aba17361c7
 	storj.io/drpc v0.0.33

@@ -29,3 +29,8 @@ func SetSatelliteConnectionPool(ctx context.Context, config *uplink.Config, pool
 func SetMaximumBufferSize(config *uplink.Config, maximumBufferSize int) {
 	expose.ConfigSetMaximumBufferSize(config, maximumBufferSize)
 }
+
+// DisableBackgroundQoS sets disableBackgroundQoS in config.
+func DisableBackgroundQoS(config *uplink.Config, disabled bool) {
+	expose.ConfigDisableBackgroundQoS(config, disabled)
+}

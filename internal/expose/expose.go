@@ -55,3 +55,8 @@ func AccessGetEncAccess(*uplink.Access) *grant.EncryptionAccess
 //nolint:revive
 //go:linkname ConfigRequestAccessWithPassphraseAndConcurrency storj.io/uplink.config_requestAccessWithPassphraseAndConcurrency
 func ConfigRequestAccessWithPassphraseAndConcurrency(config uplink.Config, ctx context.Context, satelliteAddress, apiKey, passphrase string, concurrency uint8) (*uplink.Access, error)
+
+// ConfigDisableBackgroundQoS exposes Config.disableBackgroundQoS.
+//
+//go:linkname ConfigDisableBackgroundQoS storj.io/uplink.config_disableBackgroundQoS
+func ConfigDisableBackgroundQoS(config *uplink.Config, disabled bool)
