@@ -7,8 +7,8 @@ require (
 	github.com/spacemonkeygo/monkit/v3 v3.0.22
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/errs v1.3.0
-	golang.org/x/sync v0.3.0
-	storj.io/common v0.0.0-20231130134106-1fa84867e323
+	golang.org/x/sync v0.5.0
+	storj.io/common v0.0.0-20231213124955-23aba17361c7
 	storj.io/drpc v0.0.33
 	storj.io/infectious v0.0.2
 )
@@ -25,8 +25,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect
