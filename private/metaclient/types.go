@@ -14,16 +14,14 @@ import (
 
 // RawObjectItem represents raw object item from get request.
 type RawObjectItem struct {
-	Version            []byte
 	Bucket             string
 	EncryptedObjectKey []byte
+	Version            []byte
+	StreamID           storj.StreamID
 	Status             int32
 
-	StreamID storj.StreamID
-
-	Created  time.Time
-	Modified time.Time
-	Expires  time.Time
+	Created time.Time
+	Expires time.Time
 
 	PlainSize int64
 
@@ -35,20 +33,34 @@ type RawObjectItem struct {
 	RedundancyScheme     storj.RedundancyScheme
 }
 
+// IsDeleteMarker returns true if object is a delete marker.
+func (r RawObjectItem) IsDeleteMarker() bool {
+	return r.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || r.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
+}
+
 // RawObjectListItem represents raw object item from list objects request.
 type RawObjectListItem struct {
-	EncryptedObjectKey            []byte
-	Version                       []byte
-	Status                        int32
-	CreatedAt                     time.Time
-	StatusAt                      time.Time
-	ExpiresAt                     time.Time
-	PlainSize                     int64
+	Bucket             string
+	EncryptedObjectKey []byte
+	Version            []byte
+	StreamID           storj.StreamID
+	Status             int32
+
+	CreatedAt time.Time
+	ExpiresAt time.Time
+
+	PlainSize int64
+
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadata             []byte
-	StreamID                      storj.StreamID
-	IsPrefix                      bool
+
+	IsPrefix bool
+}
+
+// IsDeleteMarker returns true if listed object item is a delete marker.
+func (r RawObjectListItem) IsDeleteMarker() bool {
+	return r.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || r.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
 }
 
 // SegmentPosition the segment position within its parent object.

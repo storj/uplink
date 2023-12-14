@@ -665,7 +665,6 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		StreamID: object.StreamId,
 
 		Created:                       object.CreatedAt,
-		Modified:                      object.CreatedAt,
 		PlainSize:                     object.PlainSize,
 		Expires:                       object.ExpiresAt,
 		EncryptedMetadata:             object.EncryptedMetadata,
@@ -918,7 +917,6 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			EncryptedObjectKey:            object.EncryptedObjectKey,
 			Version:                       object.ObjectVersion,
 			Status:                        int32(object.Status),
-			StatusAt:                      object.StatusAt,
 			CreatedAt:                     object.CreatedAt,
 			ExpiresAt:                     object.ExpiresAt,
 			PlainSize:                     object.PlainSize,
@@ -998,7 +996,6 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 			EncryptedObjectKey:     object.EncryptedObjectKey,
 			Version:                object.ObjectVersion,
 			Status:                 int32(object.Status),
-			StatusAt:               object.StatusAt,
 			CreatedAt:              object.CreatedAt,
 			ExpiresAt:              object.ExpiresAt,
 			PlainSize:              object.PlainSize,

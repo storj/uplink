@@ -661,17 +661,16 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		return Object{}, nil
 	}
 
-	isDeleteMarker := objectInfo.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || objectInfo.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
 	object := Object{
 		Version:        version(objectInfo.Status, objectInfo.Version),
 		Bucket:         Bucket{Name: bucket},
 		Path:           key,
 		IsPrefix:       false,
-		IsDeleteMarker: isDeleteMarker,
+		IsDeleteMarker: objectInfo.IsDeleteMarker(),
 
-		Created:  objectInfo.Modified, // TODO: use correct field
-		Modified: objectInfo.Modified, // TODO: use correct field
-		Expires:  objectInfo.Expires,  // TODO: use correct field
+		Created:  objectInfo.Created, // TODO: use correct field
+		Modified: objectInfo.Created, // TODO: use correct field
+		Expires:  objectInfo.Expires, // TODO: use correct field
 
 		Stream: Stream{
 			ID: objectInfo.StreamID,
@@ -717,13 +716,12 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 }
 
 func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
-	isDeleteMarker := listItem.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || listItem.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
 	object := Object{
 		Version:        listItem.Version,
 		Bucket:         Bucket{Name: bucket},
 		Path:           path,
 		IsPrefix:       listItem.IsPrefix,
-		IsDeleteMarker: isDeleteMarker,
+		IsDeleteMarker: listItem.IsDeleteMarker(),
 
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field
