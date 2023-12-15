@@ -10,13 +10,13 @@ import (
 	"strings"
 	_ "unsafe" // for go:linkname
 
-	"github.com/jtolio/eventkit"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
+	"storj.io/eventkit"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/piecestore"
 )

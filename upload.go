@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/leak"
 	"storj.io/common/pb"
+	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"

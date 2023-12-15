@@ -897,6 +897,8 @@ storj.io/common v0.0.0-20231213124955-23aba17361c7/go.mod h1:s3e2Lyg2jCwqL9TLFme
 storj.io/drpc v0.0.32/go.mod h1:6rcOyR/QQkSTX/9L5ZGtlZaE2PtXTTZl8d+ulSeeYEg=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
+storj.io/eventkit v0.0.0-20231215144225-968576eb7548 h1:Q5WvwNOxbjQM9vxTrh+Bk4EByY9WPh5GYwTKomC5VT4=
+storj.io/eventkit v0.0.0-20231215144225-968576eb7548/go.mod h1:PSyvD9QLKypn+5GsdAoOMwOxYR8tu5cEiNuIjmz0bc8=
 storj.io/infectious v0.0.2 h1:rGIdDC/6gNYAStsxsZU79D/MqFjNyJc1tsyyj9sTl7Q=
 storj.io/infectious v0.0.2/go.mod h1:QEjKKww28Sjl1x8iDsjBpOM4r1Yp8RsowNcItsZJ1Vs=
 storj.io/monkit-jaeger v0.0.0-20230707083646-f15e6e8b7e8c h1:92Hl7mBzjfMNNkkO3uVp62ZC8yZuBNcz20EVcKNzpkQ=

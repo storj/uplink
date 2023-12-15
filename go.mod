@@ -3,13 +3,13 @@ module storj.io/uplink
 go 1.19
 
 require (
-	github.com/jtolio/eventkit v0.0.0-20221004135224-074cf276595b
 	github.com/spacemonkeygo/monkit/v3 v3.0.22
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/errs v1.3.0
 	golang.org/x/sync v0.5.0
 	storj.io/common v0.0.0-20231213124955-23aba17361c7
 	storj.io/drpc v0.0.33
+	storj.io/eventkit v0.0.0-20231215144225-968576eb7548
 	storj.io/infectious v0.0.2
 )
 

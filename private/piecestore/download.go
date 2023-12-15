@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/context2"
@@ -20,6 +19,7 @@ import (
 	"storj.io/common/signing"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
+	"storj.io/eventkit"
 )
 
 var evs = eventkit.Package()

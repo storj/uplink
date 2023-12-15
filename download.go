@@ -14,11 +14,11 @@ import (
 	"time"
 	_ "unsafe" // for go:linkname
 
-	"github.com/jtolio/eventkit"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/leak"
 	"storj.io/common/paths"
+	"storj.io/eventkit"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"

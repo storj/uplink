@@ -106,6 +106,7 @@ require (
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	storj.io/eventkit v0.0.0-20231215144225-968576eb7548 // indirect
 	storj.io/monkit-jaeger v0.0.0-20230707083646-f15e6e8b7e8c // indirect
 	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect
 	storj.io/private v0.0.0-20231012141933-ae62725d6691 // indirect
