@@ -109,7 +109,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 		}
 	}
 
-	ec := ecclient.New(storagenodeDialer, 0)
+	ec := ecclient.New(storagenodeDialer, 0).WithForceErrorDetection(true)
 
 	tracker := leak.FromContext(ctx)
 	if tracker == (leak.Ref{}) { // TODO: handle this check better
