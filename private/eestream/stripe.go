@@ -347,14 +347,7 @@ func (s *StripeReader) ReadStripes(ctx context.Context, nextStripe int64, out []
 				Data:   data})
 		}
 
-		if s.errorDetection {
-			_, err = s.scheme.Decode(outslice, fecShares)
-		} else {
-			err = s.scheme.Rebuild(fecShares, func(r infectious.Share) {
-				copy(outslice[r.Number*len(r.Data):(r.Number+1)*len(r.Data)], r.Data)
-			})
-		}
-
+		_, err = s.scheme.Decode(outslice, fecShares)
 		for _, release := range releases {
 			release()
 		}
