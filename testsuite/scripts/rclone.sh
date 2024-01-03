@@ -19,8 +19,6 @@ trap cleanup EXIT
 STORJ_VERSION=$(go list -modfile "../go.mod" -m -f "{{.Version}}" storj.io/storj)
 COMMIT_HASH="${STORJ_VERSION##*-}"
 
-go install storj.io/storj/cmd/satellite@"$STORJ_VERSION"
-go install storj.io/storj/cmd/storagenode@"$STORJ_VERSION"
 go install storj.io/storj-up@main
 
 echo "Used storj version: $STORJ_VERSION"

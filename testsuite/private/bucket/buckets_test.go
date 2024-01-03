@@ -16,7 +16,6 @@ import (
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
 	"storj.io/storj/satellite/nodeselection"
-	"storj.io/storj/satellite/overlay"
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
 )
@@ -75,7 +74,7 @@ func TestGetBucketLocation(t *testing.T) {
 		SatelliteCount: 1, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Placement = overlay.ConfigurablePlacementRule{
+				config.Placement = nodeselection.ConfigurablePlacementRule{
 					PlacementRules: fmt.Sprintf(`40:annotated(annotated(country("PL"),annotation("%s","Poland")),annotation("%s","%s"))`,
 						nodeselection.Location, nodeselection.AutoExcludeSubnet, nodeselection.AutoExcludeSubnetOFF),
 				}

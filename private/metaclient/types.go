@@ -206,10 +206,10 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 	return ListOptions{
 		Prefix:                opts.Prefix,
 		CursorEnc:             list.Cursor,
+		VersionCursor:         list.VersionCursor,
 		Delimiter:             opts.Delimiter,
 		Recursive:             opts.Recursive,
 		IncludeAllVersions:    opts.IncludeAllVersions,
-		VersionCursor:         opts.VersionCursor,
 		IncludeSystemMetadata: opts.IncludeSystemMetadata,
 		IncludeCustomMetadata: opts.IncludeCustomMetadata,
 		Direction:             After,
@@ -220,10 +220,11 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 
 // ObjectList is a list of objects.
 type ObjectList struct {
-	Bucket string
-	Prefix string
-	More   bool
-	Cursor []byte
+	Bucket        string
+	Prefix        string
+	More          bool
+	Cursor        []byte
+	VersionCursor []byte
 
 	// Items paths are relative to Prefix
 	// To get the full path use list.Prefix + list.Items[0].Path

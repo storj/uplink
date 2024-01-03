@@ -396,9 +396,9 @@ func TestObject_Versioning(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, objects, 2)
 
-		version := objects[0].Version.Encode()
+		version := objects[0].StreamVersionID().Bytes()
 		if objects[1].Status.IsDeleteMarker() {
-			version = objects[1].Version.Encode()
+			version = objects[1].StreamVersionID().Bytes()
 		}
 
 		_, err = object.StatObject(ctx, project, bucketName, objectKey, version)

@@ -1188,3 +1188,102 @@ func assertUploadList(ctx context.Context, t *testing.T, project *uplink.Project
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())
 }
+
+func TestListUploadsDuplicates(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		u := planet.Uplinks[0]
+		s := planet.Satellites[0]
+
+		project, err := u.GetProject(ctx, s)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		const amount = 23
+
+		type TestCase struct {
+			Name       string
+			Bucket     string
+			Prefixes   []string
+			UploadFunc func(bucket string, prefixe string) map[string]struct{}
+		}
+
+		testCases := []TestCase{
+			{
+				Name:     "single location many pending objects",
+				Bucket:   "test1",
+				Prefixes: []string{"", "aprefix/"},
+				UploadFunc: func(bucket string, prefix string) map[string]struct{} {
+					// upload objects to the same location to have many pending objects
+					// with different versions
+					expectedKeys := make(map[string]struct{})
+					for i := 0; i < amount; i++ {
+						info, err := project.BeginUpload(ctx, bucket, prefix+"pending-object", nil)
+						require.NoError(t, err)
+						expectedKeys[info.Key+";"+info.UploadID] = struct{}{}
+					}
+					return expectedKeys
+				},
+			},
+			{
+				Name:     "many locations many pending objects",
+				Bucket:   "test2",
+				Prefixes: []string{"", "aprefix/"},
+				UploadFunc: func(bucket string, prefix string) map[string]struct{} {
+					// upload to the same location many times to have internally different versions
+					expectedKeys := make(map[string]struct{})
+					for i := 0; i < amount; i++ {
+						version := 1
+						if i%2 == 0 {
+							version = 2
+						} else if i%3 == 0 {
+							version = 3
+						}
+
+						for v := 0; v < version; v++ {
+							info, err := project.BeginUpload(ctx, bucket, prefix+fmt.Sprintf("file-%d", i), nil)
+							require.NoError(t, err)
+							expectedKeys[info.Key+";"+info.UploadID] = struct{}{}
+						}
+					}
+					return expectedKeys
+				},
+			},
+		}
+
+		for _, testCase := range testCases {
+			t.Run(testCase.Name, func(t *testing.T) {
+				require.NoError(t, u.CreateBucket(ctx, s, testCase.Bucket))
+
+				for _, prefix := range testCase.Prefixes {
+					expectedKeys := testCase.UploadFunc(testCase.Bucket, prefix)
+
+					prefixLabel := prefix
+					if prefixLabel == "" {
+						prefixLabel = "empty"
+					}
+
+					for _, listLimit := range []int{
+						0, 1, 2, 3, 7, amount - 1, amount, amount + 1,
+					} {
+						t.Run(fmt.Sprintf("prefix %s limit %d", prefixLabel, listLimit), func(t *testing.T) {
+							limitCtx := testuplink.WithListLimit(ctx, listLimit)
+
+							keys := make(map[string]struct{})
+							iter := project.ListUploads(limitCtx, testCase.Bucket, &uplink.ListUploadsOptions{
+								Prefix: prefix,
+							})
+							for iter.Next() {
+								item := iter.Item()
+								keys[item.Key+";"+item.UploadID] = struct{}{}
+							}
+							require.NoError(t, iter.Err())
+							require.Equal(t, expectedKeys, keys)
+						})
+					}
+				}
+			})
+		}
+	})
+}

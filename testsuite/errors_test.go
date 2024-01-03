@@ -40,7 +40,8 @@ func TestErrRateLimitExceeded(t *testing.T) {
 		// testplanet is doing one additional request to get access
 		time.Sleep(1 * time.Second)
 
-		err := satellite.DB.Console().Projects().UpdateRateLimit(ctx, project.ID, 1)
+		limit := 1
+		err := satellite.DB.Console().Projects().UpdateRateLimit(ctx, project.ID, &limit)
 		require.NoError(t, err)
 
 		apiKey := project.APIKey

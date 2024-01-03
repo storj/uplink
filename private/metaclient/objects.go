@@ -363,6 +363,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	if len(options.CursorEnc) > 0 {
 		startAfterEnc = options.CursorEnc
 	}
+	versionCursor := options.VersionCursor
 
 	var m bool
 	var objectsList []Object
@@ -378,7 +379,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 			Recursive:             options.Recursive,
 			Status:                options.Status,
 			IncludeAllVersions:    options.IncludeAllVersions,
-			VersionCursor:         options.VersionCursor,
+			VersionCursor:         versionCursor,
 		})
 		if err != nil {
 			return ObjectList{}, errClass.Wrap(err)
@@ -392,6 +393,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 
 		if len(items) > 0 {
 			startAfterEnc = items[len(items)-1].EncryptedObjectKey
+			versionCursor = items[len(items)-1].Version
 		}
 
 		if len(objectsList) != 0 || !more {
@@ -400,11 +402,12 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	}
 
 	return ObjectList{
-		Bucket: bucket,
-		Prefix: options.Prefix,
-		More:   m,
-		Items:  objectsList,
-		Cursor: startAfterEnc,
+		Bucket:        bucket,
+		Prefix:        options.Prefix,
+		More:          m,
+		Items:         objectsList,
+		Cursor:        startAfterEnc,
+		VersionCursor: versionCursor,
 	}, nil
 }
 
