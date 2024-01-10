@@ -493,7 +493,7 @@ func TestListObjects_TwoObjects_TwoVersionsEach_OneDeleteMarker(t *testing.T) {
 		require.Equal(t, objectKeyB, objects[2].Key)
 		require.Equal(t, objectKeyA, objects[3].Key)
 		require.Equal(t, objectKeyA, objects[4].Key)
-		require.True(t, objects[2].IsDeleteMarker)
+		require.True(t, objects[0].IsDeleteMarker)
 		require.NotEqual(t, objects[0].Version, objects[1].Version)
 		require.NotEqual(t, objects[2].Version, objects[3].Version)
 	})
