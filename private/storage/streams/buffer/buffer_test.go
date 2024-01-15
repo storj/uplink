@@ -47,12 +47,26 @@ func TestBuffer(t *testing.T) {
 }
 
 func TestBufferSimpleConcurrent(t *testing.T) {
-	buf := New(NewMemoryBackend(1024), 2)
+	t.Run("memory", func(t *testing.T) {
+		const amount = 10*1024 + 10
+		testBufferSimpleConcurrent(t, NewMemoryBackend(amount), amount)
+	})
+
+	t.Run("chunked", func(t *testing.T) {
+		const amount = chunkSize + 1
+		testBufferSimpleConcurrent(t, NewChunkBackend(amount), amount)
+	})
+}
+
+func testBufferSimpleConcurrent(t *testing.T, backend Backend, amount int64) {
+	buf := New(backend, 2)
+	defer buf.DoneReading(nil)
+
 	r := buf.Reader()
 
 	go func() {
 		var tmp [1]byte
-		for i := 0; i < 1024; i++ {
+		for i := int64(0); i < amount; i++ {
 			_, _ = buf.Write(tmp[:])
 		}
 		buf.DoneWriting(nil)
@@ -74,8 +88,18 @@ type eternalReader struct{}
 func (eternalReader) Read(p []byte) (int, error) { return len(p), nil }
 
 func TestWriteBufferConcurrent(t *testing.T) {
-	const amount = 10*1024 + 10
+	t.Run("memory", func(t *testing.T) {
+		const amount = 10*1024 + 10
+		testWriteBufferConcurrent(t, NewMemoryBackend(amount), amount)
+	})
 
+	t.Run("chunked", func(t *testing.T) {
+		const amount = 10*1024 + 10
+		testWriteBufferConcurrent(t, NewChunkBackend(amount), amount)
+	})
+}
+
+func testWriteBufferConcurrent(t *testing.T, backend Backend, amount int64) {
 	type result struct {
 		n   int64
 		err error
@@ -83,7 +107,7 @@ func TestWriteBufferConcurrent(t *testing.T) {
 	wrap := func(n int64, err error) result { return result{n, err} }
 
 	results := make(chan result)
-	buf := New(NewMemoryBackend(amount), 1024)
+	buf := New(backend, 1024)
 	defer buf.DoneReading(nil)
 
 	go func() {
