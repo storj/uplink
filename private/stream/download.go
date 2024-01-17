@@ -74,7 +74,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	}
 
 	if download.reader == nil {
-		err = download.resetReader()
+		err = download.resetReader(false)
 		if err != nil {
 			return 0, err
 		}
@@ -109,7 +109,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 			// force us to get new a new collection of limits.
 			download.info.DownloadedSegments = nil
 
-			err = download.resetReader()
+			err = download.resetReader(true)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (download *Download) Close() error {
 	return download.reader.Close()
 }
 
-func (download *Download) resetReader() error {
+func (download *Download) resetReader(nextSegmentErrorDetection bool) error {
 	if download.reader != nil {
 		err := download.reader.Close()
 		if err != nil {
@@ -141,7 +141,7 @@ func (download *Download) resetReader() error {
 
 	obj := download.info.Object
 
-	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, download.info)
+	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, download.info, nextSegmentErrorDetection)
 	if err != nil {
 		return err
 	}

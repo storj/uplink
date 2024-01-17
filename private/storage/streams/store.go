@@ -613,7 +613,7 @@ func deriveETagKey(key *storj.Key) (*storj.Key, error) {
 // Get returns a ranger that knows what the overall size is (from l/<key>)
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
-func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo, nextSegmentErrorDetection bool) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	object := info.Object
@@ -685,10 +685,11 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				listed = listed[1:]
 			}
 
-			encryptedRanger, err := s.Ranger(ctx, segment)
+			encryptedRanger, err := s.Ranger(ctx, segment, nextSegmentErrorDetection)
 			if err != nil {
 				return nil, errs.Wrap(err)
 			}
+			nextSegmentErrorDetection = false
 
 			contentNonce, err := deriveContentNonce(*segment.Info.Position)
 			if err != nil {
@@ -722,8 +723,10 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				derivedKey:           derivedKey,
 				startingNonce:        &contentNonce,
 				encryptionParameters: object.EncryptionParameters,
+				errorDetection:       nextSegmentErrorDetection,
 			})
 			offset += segment.PlainSize
+			nextSegmentErrorDetection = false
 
 		default:
 			return nil, errs.New("missing segment for offset %d", offset)
@@ -788,6 +791,7 @@ type lazySegmentRanger struct {
 	derivedKey           *storj.Key
 	startingNonce        *storj.Nonce
 	encryptionParameters storj.EncryptionParameters
+	errorDetection       bool
 }
 
 // Size implements Ranger.Size.
@@ -811,7 +815,7 @@ func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_
 			return nil, err
 		}
 
-		rr, err := lr.streams.Ranger(ctx, downloadResponse)
+		rr, err := lr.streams.Ranger(ctx, downloadResponse, lr.errorDetection)
 		if err != nil {
 			return nil, err
 		}
@@ -880,7 +884,7 @@ func (s *Store) deleteCancelledObject(ctx context.Context, bucketName, encrypted
 }
 
 // Ranger creates a ranger for downloading erasure codes from piece store nodes.
-func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentWithRSResponse) (rr ranger.Ranger, err error) {
+func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentWithRSResponse, errorDetection bool) (rr ranger.Ranger, err error) {
 	info := response.Info
 	limits := response.Limits
 
@@ -916,7 +920,7 @@ func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentW
 		return nil, err
 	}
 
-	rr, err = s.ec.Get(ctx, selected, info.PiecePrivateKey, redundancy, info.EncryptedSize)
+	rr, err = s.ec.GetWithOptions(ctx, selected, info.PiecePrivateKey, redundancy, info.EncryptedSize, ecclient.GetOptions{ErrorDetection: errorDetection})
 	return rr, err
 }
 

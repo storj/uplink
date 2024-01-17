@@ -27,10 +27,16 @@ import (
 
 var mon = monkit.Package()
 
+// GetOptions is a struct of options for GetWithOptions.
+type GetOptions struct {
+	ErrorDetection bool
+}
+
 // Client defines an interface for storing erasure coded data to piece store nodes.
 type Client interface {
 	PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error)
 	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (ranger.Ranger, error)
+	GetWithOptions(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (ranger.Ranger, error)
 	WithForceErrorDetection(force bool) Client
 	// PutPiece is not intended to be used by normal uplinks directly, but is exported to support storagenode graceful exit transfers.
 	PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, id *struct{}, err error)
@@ -46,7 +52,6 @@ type ecClient struct {
 
 // New creates a client from the given dialer and max buffer memory.
 func New(dialer rpc.Dialer, memoryLimit int) Client {
-
 	return &ecClient{
 		dialer:      dialer,
 		memoryLimit: memoryLimit,
@@ -251,6 +256,10 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 }
 
 func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (rr ranger.Ranger, err error) {
+	return ec.GetWithOptions(ctx, limits, privateKey, es, size, GetOptions{})
+}
+
+func (ec *ecClient) GetWithOptions(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(limits) != es.TotalCount() {
@@ -278,7 +287,7 @@ func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 		}
 	}
 
-	rr, err = eestream.Decode(rrs, es, ec.memoryLimit, ec.forceErrorDetection)
+	rr, err = eestream.Decode(rrs, es, ec.memoryLimit, opts.ErrorDetection || ec.forceErrorDetection)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
