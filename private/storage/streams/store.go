@@ -626,39 +626,19 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 		return nil, errs.Wrap(err)
 	}
 
-	// download all missing segments
-	if info.ListSegments.More {
-		for info.ListSegments.More {
-			var cursor metaclient.SegmentPosition
-			if len(info.ListSegments.Items) > 0 {
-				last := info.ListSegments.Items[len(info.ListSegments.Items)-1]
-				cursor = last.Position
-			}
-
-			result, err := s.metainfo.ListSegments(ctx, metaclient.ListSegmentsParams{
-				StreamID: object.ID,
-				Cursor:   cursor,
-				Range:    info.Range,
-			})
-			if err != nil {
-				return nil, errs.Wrap(err)
-			}
-
-			info.ListSegments.Items = append(info.ListSegments.Items, result.Items...)
-			info.ListSegments.More = result.More
-		}
-	}
-
-	downloaded := info.DownloadedSegments
-	listed := info.ListSegments.Items
+	// make copies of these slices so we aren't mutating data that was passed in
+	// to Get. even though info was passed by copy, the slices it contains weren't
+	// deep copied, so we'll copy them here and only use the copies below.
+	downloaded := append([]metaclient.DownloadSegmentWithRSResponse(nil), info.DownloadedSegments...)
+	listed := append([]metaclient.SegmentListItem(nil), info.ListSegments.Items...)
 
 	// calculate plain offset and plain size for migrated objects.
-	for i := 0; i < len(info.DownloadedSegments); i++ {
-		seg := &info.DownloadedSegments[i].Info
+	for i := 0; i < len(downloaded); i++ {
+		seg := &downloaded[i].Info
 		seg.PlainOffset, seg.PlainSize = calculatePlain(*seg.Position, seg.PlainOffset, seg.PlainSize, object)
 	}
-	for i := 0; i < len(info.ListSegments.Items); i++ {
-		seg := &info.ListSegments.Items[i]
+	for i := 0; i < len(listed); i++ {
+		seg := &listed[i]
 		seg.PlainOffset, seg.PlainSize = calculatePlain(seg.Position, seg.PlainOffset, seg.PlainSize, object)
 	}
 

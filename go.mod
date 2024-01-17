@@ -12,6 +12,7 @@ require (
 	storj.io/drpc v0.0.33
 	storj.io/eventkit v0.0.0-20231215144225-968576eb7548
 	storj.io/infectious v0.0.2
+	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c
 )
 
 require (
@@ -30,5 +31,4 @@ require (
 	golang.org/x/sys v0.15.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect
 )

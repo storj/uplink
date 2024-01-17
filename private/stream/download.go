@@ -5,10 +5,25 @@ package stream
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
 	"io"
 
+	"storj.io/common/encryption"
+	"storj.io/common/paths"
+	"storj.io/common/storj"
+	"storj.io/eventkit"
+	"storj.io/picobuf"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
+)
+
+const (
+	maxDecryptionRetries = 6
+)
+
+var (
+	evs = eventkit.Package()
 )
 
 // Download implements Reader, Seeker and Closer for reading from stream.
@@ -20,16 +35,13 @@ type Download struct {
 	offset  int64
 	length  int64
 	closed  bool
+
+	decryptionRetries int
 }
 
 // NewDownload creates new stream download.
 func NewDownload(ctx context.Context, info metaclient.DownloadInfo, streams *streams.Store) *Download {
-	return &Download{
-		ctx:     ctx,
-		info:    info,
-		streams: streams,
-		length:  info.Object.Size,
-	}
+	return NewDownloadRange(ctx, info, streams, 0, -1)
 }
 
 // NewDownloadRange creates new stream range download with range from start to start+length.
@@ -78,6 +90,29 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	download.length -= int64(n)
 	download.offset += int64(n)
 
+	if err == nil && n > 0 {
+		download.decryptionRetries = 0
+
+	} else if encryption.ErrDecryptFailed.Has(err) {
+		evs.Event("decryption-failure",
+			eventkit.Int64("decryption-retries", int64(download.decryptionRetries)),
+			eventkit.Int64("offset", download.offset),
+			eventkit.Int64("length", download.length),
+			eventkit.Bytes("path-checksum", pathChecksum(download.info.EncPath)),
+			eventkit.String("cipher-suite", download.info.Object.CipherSuite.String()),
+			eventkit.Bytes("stream-id", maybeSatStreamID(download.info.Object.Stream.ID)),
+		)
+
+		if download.decryptionRetries < maxDecryptionRetries {
+			download.decryptionRetries++
+
+			// force us to get new a new collection of limits.
+			download.info.DownloadedSegments = nil
+
+			err = download.resetReader()
+		}
+	}
+
 	return n, err
 }
 
@@ -117,4 +152,31 @@ func (download *Download) resetReader() error {
 	}
 
 	return nil
+}
+
+// pathChecksum matches uplink.pathChecksum.
+func pathChecksum(encPath paths.Encrypted) []byte {
+	mac := hmac.New(sha1.New, []byte(encPath.Raw()))
+	_, err := mac.Write([]byte("event"))
+	if err != nil {
+		panic(err)
+	}
+	return mac.Sum(nil)[:16]
+}
+
+// maybeSatStreamID returns the satellite-internal stream id for a given
+// uplink stream id, without needing access to the internalpb package.
+// it relies on the stream id being a protocol buffer with the internal id
+// as a bytes field at position 10. if this ever changes, then this will
+// just return nil, so callers should expect nil here.
+func maybeSatStreamID(streamID storj.StreamID) (rv []byte) {
+	const satStreamIDField = 10
+
+	decoder := picobuf.NewDecoder(streamID.Bytes())
+	decoder.Loop(func(d *picobuf.Decoder) { d.Bytes(satStreamIDField, &rv) })
+	if decoder.Err() != nil {
+		rv = nil
+	}
+
+	return rv
 }

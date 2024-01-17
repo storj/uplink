@@ -495,7 +495,32 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, version []
 		return DownloadInfo{}, err
 	}
 
-	return db.newDownloadInfo(ctx, bucket, key, encPath, resp, options.Range)
+	info, err = db.newDownloadInfo(ctx, bucket, key, encPath, resp, options.Range)
+	if err != nil {
+		return DownloadInfo{}, err
+	}
+
+	for info.ListSegments.More {
+		var cursor SegmentPosition
+		if len(info.ListSegments.Items) > 0 {
+			last := info.ListSegments.Items[len(info.ListSegments.Items)-1]
+			cursor = last.Position
+		}
+
+		result, err := db.ListSegments(ctx, ListSegmentsParams{
+			StreamID: info.Object.Stream.ID,
+			Cursor:   cursor,
+			Range:    info.Range,
+		})
+		if err != nil {
+			return DownloadInfo{}, err
+		}
+
+		info.ListSegments.Items = append(info.ListSegments.Items, result.Items...)
+		info.ListSegments.More = result.More
+	}
+
+	return info, nil
 }
 
 func (db *DB) newDownloadInfo(ctx context.Context, bucket, key string, encPath paths.Encrypted, response DownloadObjectResponse, streamRange StreamRange) (DownloadInfo, error) {

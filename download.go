@@ -98,9 +98,6 @@ func (project *Project) downloadObjectWithVersion(ctx context.Context, bucket, k
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	// TODO: handle DownloadObject & downloadInfo.ListSegments.More in the same location.
-	//       currently this code is rather disjoint.
-
 	objectDownload, err := db.DownloadObject(ctx, bucket, key, version, opts)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
