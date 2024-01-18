@@ -21,11 +21,13 @@ import (
 	"storj.io/common/ranger"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
+	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/piecestore"
 )
 
 var mon = monkit.Package()
+var evs = eventkit.Package()
 
 // GetOptions is a struct of options for GetWithOptions.
 type GetOptions struct {
@@ -208,19 +210,31 @@ func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, p
 }
 
 func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error) {
-	nodeName := "nil"
-	if limit != nil {
-		nodeName = limit.GetLimit().StorageNodeId.String()[0:8]
-	}
-	defer mon.Task()(&ctx, "node: "+nodeName)(&err)
-	defer func() { err = errs.Combine(err, data.Close()) }()
-
 	if limit == nil {
+		defer mon.Task()(&ctx, "node: nil")(&err)
+		defer func() { err = errs.Combine(err, data.Close()) }()
 		_, _ = io.Copy(io.Discard, data)
 		return nil, nil, nil
 	}
 
 	storageNodeID := limit.GetLimit().StorageNodeId
+	defer mon.Task()(&ctx, "node: "+storageNodeID.String()[0:8])(&err)
+	start := time.Now()
+	defer func() {
+		var errstr string
+		if err != nil {
+			errstr = err.Error()
+		}
+		evs.Event("piece-upload",
+			eventkit.Bytes("node_id", storageNodeID.Bytes()),
+			eventkit.Bytes("piece_id", limit.GetLimit().PieceId.Bytes()),
+			eventkit.Duration("upload_time", time.Since(start)),
+			eventkit.Bool("success", err == nil),
+			eventkit.String("error", errstr),
+		)
+	}()
+	defer func() { err = errs.Combine(err, data.Close()) }()
+
 	ps, err := ec.dialPiecestore(ctx, limitToNodeURL(limit))
 	if err != nil {
 		return nil, nil, Error.New("failed to dial (node:%v): %w", storageNodeID, err)

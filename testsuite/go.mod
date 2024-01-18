@@ -13,8 +13,8 @@ require (
 	storj.io/common v0.0.0-20240116121339-670742423093
 	storj.io/drpc v0.0.33
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20240117191343-790683669cc1
-	storj.io/uplink v1.12.3-0.20240109153045-80e6e9470964
+	storj.io/storj v1.91.0-alpha.0.20240118160914-4dbd4ef06791
+	storj.io/uplink v1.12.3-0.20240118012909-fe904c4d39e0
 )
 
 require (
@@ -114,5 +114,5 @@ require (
 	storj.io/eventkit v0.0.0-20231215144225-968576eb7548 // indirect
 	storj.io/monkit-jaeger v0.0.0-20230707083646-f15e6e8b7e8c // indirect
 	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c // indirect
-	storj.io/private v0.0.0-20231215152845-c5d4aba552e2 // indirect
+	storj.io/private v0.0.0-20240112163619-cfc17a2921bf // indirect
 )
