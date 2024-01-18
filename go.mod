@@ -7,6 +7,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/errs v1.3.0
 	github.com/zeebo/sudo v1.0.2
+	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db
 	golang.org/x/sync v0.5.0
 	storj.io/common v0.0.0-20240116121339-670742423093
 	storj.io/drpc v0.0.33

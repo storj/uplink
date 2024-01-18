@@ -7,7 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
-	mathrand "math/rand" // Using mathrand here because crypto-graphic randomness is not required.
+	mathrand "math/rand" // Using mathrand here because cryptographic randomness is not required.
 	"os"
 	"sort"
 	"strconv"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
+	"golang.org/x/exp/slices"
 
 	"storj.io/common/context2"
 	"storj.io/common/encryption"
@@ -629,8 +630,8 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 	// make copies of these slices so we aren't mutating data that was passed in
 	// to Get. even though info was passed by copy, the slices it contains weren't
 	// deep copied, so we'll copy them here and only use the copies below.
-	downloaded := append([]metaclient.DownloadSegmentWithRSResponse(nil), info.DownloadedSegments...)
-	listed := append([]metaclient.SegmentListItem(nil), info.ListSegments.Items...)
+	downloaded := slices.Clone(info.DownloadedSegments)
+	listed := slices.Clone(info.ListSegments.Items)
 
 	// calculate plain offset and plain size for migrated objects.
 	for i := 0; i < len(downloaded); i++ {
