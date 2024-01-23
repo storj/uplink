@@ -22,5 +22,5 @@ func GetPieceHashAlgo(ctx context.Context) (algo pb.PieceHashAlgorithm) {
 	if override != nil {
 		return override.(pb.PieceHashAlgorithm)
 	}
-	return pb.PieceHashAlgorithm_SHA256
+	return pb.PieceHashAlgorithm_BLAKE3
 }
