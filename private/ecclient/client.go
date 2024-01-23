@@ -220,10 +220,19 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	storageNodeID := limit.GetLimit().StorageNodeId
 	defer mon.Task()(&ctx, "node: "+storageNodeID.String()[0:8])(&err)
 	start := time.Now()
+	measuredReader := countingReader{R: data}
 	defer func() {
 		var errstr string
 		if err != nil {
 			errstr = err.Error()
+		}
+		var pieceSize int64
+		var pieceTimestamp time.Time
+		var hashAlgo int64
+		if hash != nil {
+			pieceSize = hash.PieceSize
+			pieceTimestamp = hash.Timestamp
+			hashAlgo = int64(hash.HashAlgorithm)
 		}
 		evs.Event("piece-upload",
 			eventkit.Bytes("node_id", storageNodeID.Bytes()),
@@ -231,6 +240,10 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 			eventkit.Duration("upload_time", time.Since(start)),
 			eventkit.Bool("success", err == nil),
 			eventkit.String("error", errstr),
+			eventkit.Int64("bytes", measuredReader.N),
+			eventkit.Int64("piece_size", pieceSize),
+			eventkit.Timestamp("piece_timestamp", pieceTimestamp),
+			eventkit.Int64("hash_algo", hashAlgo),
 		)
 	}()
 	defer func() { err = errs.Combine(err, data.Close()) }()
@@ -241,7 +254,7 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	}
 	defer func() { err = errs.Combine(err, ps.Close()) }()
 
-	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
+	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, &measuredReader)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) {
 			// Canceled context means the piece upload was interrupted by user or due
@@ -267,6 +280,17 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 	}
 
 	return hash, nil, nil
+}
+
+type countingReader struct {
+	N int64
+	R io.Reader
+}
+
+func (c *countingReader) Read(p []byte) (n int, err error) {
+	n, err = c.R.Read(p)
+	c.N += int64(n)
+	return n, err
 }
 
 func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (rr ranger.Ranger, err error) {
