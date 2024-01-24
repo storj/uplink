@@ -11,9 +11,9 @@ require (
 	golang.org/x/sync v0.5.0
 	storj.io/common v0.0.0-20240116121339-670742423093
 	storj.io/drpc v0.0.33
-	storj.io/eventkit v0.0.0-20231215144225-968576eb7548
+	storj.io/eventkit v0.0.0-20240124151417-4355f49e625a
 	storj.io/infectious v0.0.2
-	storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c
+	storj.io/picobuf v0.0.3
 )
 
 require (
@@ -30,6 +30,5 @@ require (
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.16.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -13,8 +13,6 @@ github.com/flynn/noise v1.0.0/go.mod h1:xbMo+0i6+IGbYdJhF31t2eR1BIU0CYc12+BNAKwU
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 h1:tfuBGBXKqDEevZMzYi5KSi8KkcZtzBcTgAUUtapy0OI=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
-github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
-github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/pprof v0.0.0-20211108044417-e9b028704de0 h1:rsq1yB2xiFLDYYaYdlGBsSkwVzsCo500wMhxvW5A/bk=
 github.com/google/pprof v0.0.0-20211108044417-e9b028704de0/go.mod h1:KgnwoLYCZ8IQu3XUZ8Nc/bM9CCZFOyjUNOSygVozoDg=
 github.com/ianlancetaylor/demangle v0.0.0-20210905161508-09a460cdf81d/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
@@ -101,9 +99,6 @@ golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
-google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
-google.golang.org/protobuf v1.28.1 h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=
-google.golang.org/protobuf v1.28.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
@@ -114,9 +109,9 @@ storj.io/common v0.0.0-20240116121339-670742423093 h1:tdIfoS97TtVaPTRgdSjwLn4IIW
 storj.io/common v0.0.0-20240116121339-670742423093/go.mod h1:s3e2Lyg2jCwqL9TLFmesDgoZBPQIByBiKZ+AJOI9qvc=
 storj.io/drpc v0.0.33 h1:yCGZ26r66ZdMP0IcTYsj7WDAUIIjzXk6DJhbhvt9FHI=
 storj.io/drpc v0.0.33/go.mod h1:vR804UNzhBa49NOJ6HeLjd2H3MakC1j5Gv8bsOQT6N4=
-storj.io/eventkit v0.0.0-20231215144225-968576eb7548 h1:Q5WvwNOxbjQM9vxTrh+Bk4EByY9WPh5GYwTKomC5VT4=
-storj.io/eventkit v0.0.0-20231215144225-968576eb7548/go.mod h1:PSyvD9QLKypn+5GsdAoOMwOxYR8tu5cEiNuIjmz0bc8=
+storj.io/eventkit v0.0.0-20240124151417-4355f49e625a h1:pflLiKE5qo3u4j/HSjUqxAtOGSnXGO3uaBnmEUaX2Nc=
+storj.io/eventkit v0.0.0-20240124151417-4355f49e625a/go.mod h1:OwscKxRxPLl1Xa3pQ0P1D/4S3yo0Sn6BFa4IWbauAfk=
 storj.io/infectious v0.0.2 h1:rGIdDC/6gNYAStsxsZU79D/MqFjNyJc1tsyyj9sTl7Q=
 storj.io/infectious v0.0.2/go.mod h1:QEjKKww28Sjl1x8iDsjBpOM4r1Yp8RsowNcItsZJ1Vs=
-storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c h1:or/DtG5uaZpzimL61ahlgAA+MTYn/U3txz4fe+XBFUg=
-storj.io/picobuf v0.0.2-0.20230906122608-c4ba17033c6c/go.mod h1:JCuc3C0gzCJHQ4J6SOx/Yjg+QTpX0D+Fvs5H46FETCk=
+storj.io/picobuf v0.0.3 h1:xAUPB5ZUGfxkqd3bnw3zp01kkWb9wlhg4vtZWUs2S9A=
+storj.io/picobuf v0.0.3/go.mod h1:4V4xelV1RSCck5GgmkL/Txw9l6IfX3XcBzegmL5Kudo=
