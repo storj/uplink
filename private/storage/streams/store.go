@@ -7,11 +7,9 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
-	mathrand "math/rand" // Using mathrand here because cryptographic randomness is not required.
 	"os"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -70,9 +68,6 @@ type Store struct {
 	encStore             *encryption.Store
 	encryptionParameters storj.EncryptionParameters
 	inlineThreshold      int
-
-	rngMu sync.Mutex
-	rng   *mathrand.Rand
 }
 
 // NewStreamStore constructs a stream store.
@@ -100,7 +95,6 @@ func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize
 		encStore:             encStore,
 		encryptionParameters: encryptionParameters,
 		inlineThreshold:      inlineThreshold,
-		rng:                  mathrand.New(mathrand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -896,32 +890,12 @@ func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentW
 		return ranger.ByteRanger(info.EncryptedInlineData), nil
 	}
 
-	needed := info.RedundancyScheme.DownloadNodes()
-	selected := make([]*pb.AddressedOrderLimit, len(limits))
-	s.rngMu.Lock()
-	perm := s.rng.Perm(len(limits))
-	s.rngMu.Unlock()
-
-	for _, i := range perm {
-		limit := limits[i]
-		if limit == nil {
-			continue
-		}
-
-		selected[i] = limit
-
-		needed--
-		if needed <= 0 {
-			break
-		}
-	}
-
 	redundancy, err := eestream.NewRedundancyStrategyFromStorj(info.RedundancyScheme)
 	if err != nil {
 		return nil, err
 	}
 
-	rr, err = s.ec.GetWithOptions(ctx, selected, info.PiecePrivateKey, redundancy, info.EncryptedSize, ecclient.GetOptions{ErrorDetection: errorDetection})
+	rr, err = s.ec.GetWithOptions(ctx, limits, info.PiecePrivateKey, redundancy, info.EncryptedSize, ecclient.GetOptions{ErrorDetection: errorDetection})
 	return rr, err
 }
 
