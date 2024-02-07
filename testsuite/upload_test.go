@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -368,9 +367,7 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 
 		bucket := createBucket(t, ctx, project, "testbucket")
 
-		data := make([]byte, 1*memory.MiB)
-		_, err = rand.Read(data)
-		require.NoError(t, err)
+		data := testrand.Bytes(1 * memory.MiB)
 
 		upload, err := project.UploadObject(ctx, bucket.Name, "test/path", nil)
 		require.NoError(t, err)
