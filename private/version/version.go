@@ -7,14 +7,14 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/useragent"
-	"storj.io/common/version"
+	"storj.io/common/version/buildinfo"
 )
 
 // AppendVersionToUserAgent appends uplink product and version to user agent string.
 //
 // This doesn't work in test environment.
 func AppendVersionToUserAgent(useragentStr string) (string, error) {
-	version, err := version.FromBuild("storj.io/uplink")
+	version, err := buildinfo.FromBuild("storj.io/uplink")
 	if err != nil {
 		return useragentStr, nil //nolint: nilerr // passthrough
 	}

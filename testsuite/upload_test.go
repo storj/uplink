@@ -12,13 +12,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	"storj.io/common/memory"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/satellite"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -447,11 +445,6 @@ func TestConcurrentUploadToSamePath(t *testing.T) {
 func TestUploadLimits(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 2,
-		Reconfigure: testplanet.Reconfigure{
-			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.ProjectLimit.CacheCapacity = 0
-			},
-		},
 	}, func(t *testing.T, tpCtx *testcontext.Context, planet *testplanet.Planet) {
 		data := testrand.Bytes(6 * memory.KiB)
 

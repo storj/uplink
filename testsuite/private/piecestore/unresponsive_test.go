@@ -31,6 +31,8 @@ type piecestoreMock struct {
 	completed chan struct{}
 }
 
+var _ pb.DRPCPiecestoreServer = &piecestoreMock{}
+
 func (mock *piecestoreMock) Upload(server pb.DRPCPiecestore_UploadStream) error {
 	return mock.stall(server.Context())
 }
@@ -49,6 +51,10 @@ func (mock *piecestoreMock) DeletePieces(ctx context.Context, delete *pb.DeleteP
 
 func (mock *piecestoreMock) Retain(ctx context.Context, retain *pb.RetainRequest) (_ *pb.RetainResponse, err error) {
 	return nil, nil
+}
+
+func (mock *piecestoreMock) RetainBig(stream pb.DRPCPiecestore_RetainBigStream) error {
+	return nil
 }
 
 func (mock *piecestoreMock) RestoreTrash(context.Context, *pb.RestoreTrashRequest) (*pb.RestoreTrashResponse, error) {
