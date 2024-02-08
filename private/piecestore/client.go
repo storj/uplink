@@ -4,6 +4,7 @@
 package piecestore
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -23,6 +24,12 @@ import (
 var NoiseEnabled = os.Getenv("STORJ_NOISE_DISABLED_EXPERIMENTAL") != "true"
 
 var errMessageTimeout = errors.New("message timeout")
+
+const (
+	// retainMessageLimit defines the max size which can be sent via normal request/response protocol.
+	// 4MB is the absolute max, defined by DRPC RPC, but we need a few bytes for protobuf overhead / filter header.
+	retainMessageLimit = 4100000
+)
 
 var (
 	// Error is the default error class for piecestore client.
@@ -104,8 +111,85 @@ func DialReplaySafe(ctx context.Context, dialer rpc.Dialer, nodeURL storj.NodeUR
 // Retain uses a bloom filter to tell the piece store which pieces to keep.
 func (client *Client) Retain(ctx context.Context, req *pb.RetainRequest) (err error) {
 	defer mon.Task()(&ctx)(&err)
-	_, err = client.client.Retain(ctx, req)
+
+	// TODO: eventually we will switch to the new protocol by default (because it has hash)
+	// but it requires more changes in storj.io/storj/storagenode first
+	// until that, we can use the old protocol, by default.
+	if len(req.Filter) <= retainMessageLimit {
+		_, err = client.client.Retain(ctx, req)
+		return err
+	}
+
+	// it's a big message, we will use the RetainBig, stream-based protocol
+
+	// hash is calculated on the full message, splitting error can also be detected.
+	hasher := pb.NewHashFromAlgorithm(pb.PieceHashAlgorithm_BLAKE3)
+	hasher.Write(req.Filter)
+	hash := hasher.Sum([]byte{})
+
+	stream, err := client.client.RetainBig(ctx)
+	if err != nil {
+		return Error.Wrap(err)
+	}
+	var lastMessage bool
+	for i := 0; i <= len(req.Filter); i += retainMessageLimit {
+
+		endOffset := i + retainMessageLimit
+
+		if endOffset > len(req.Filter) {
+			lastMessage = true
+			endOffset = len(req.Filter)
+
+		}
+		req := &pb.RetainRequest{
+			CreationDate: req.CreationDate,
+			Filter:       req.Filter[i:endOffset],
+		}
+
+		if lastMessage {
+			req.HashAlgorithm = pb.PieceHashAlgorithm_BLAKE3
+			req.Hash = hash
+		}
+
+		err = stream.Send(req)
+		if err != nil {
+			// this is too big, no hope to send with the legacy endpoint
+			return Error.Wrap(errs.Combine(err, stream.CloseSend()))
+		}
+	}
+	err = stream.Close()
 	return Error.Wrap(err)
+}
+
+// RetainRequestFromStream is the inverse logic of Client.Retain method, which splits the retain messages to smaller chunks.
+// strictly speaking, it's a server side code, but it's easier to maintain and test here, as it should be the
+// opposite of the Retain method.
+func RetainRequestFromStream(stream pb.DRPCPiecestore_RetainBigStream) (pb.RetainRequest, error) {
+	resp := pb.RetainRequest{
+		Filter: make([]byte, 0),
+	}
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			return resp, err
+		}
+		if resp.CreationDate.IsZero() {
+			resp.CreationDate = req.CreationDate
+		}
+		resp.Filter = append(resp.Filter, req.Filter...)
+		if len(req.Hash) > 0 {
+			hasher := pb.NewHashFromAlgorithm(req.HashAlgorithm)
+			_, err := hasher.Write(resp.Filter)
+			if err != nil {
+				return resp, errs.Wrap(err)
+			}
+			if !bytes.Equal(req.Hash, hasher.Sum(nil)) {
+				return resp, errs.New("Hash mismatch")
+			}
+			break
+		}
+	}
+	return resp, stream.Close()
 }
 
 // Close closes the underlying connection.
