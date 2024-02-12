@@ -186,7 +186,7 @@ func (project *Project) dialMetainfoDB(ctx context.Context) (_ *metaclient.DB, e
 		return nil, packageError.Wrap(err)
 	}
 
-	return metaclient.New(metainfoClient, project.access.encAccess.Store), nil
+	return metaclient.New(metainfoClient, project.encryptionParameters, project.access.encAccess.Store), nil
 }
 
 func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.Client, err error) {

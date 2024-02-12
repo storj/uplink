@@ -105,6 +105,7 @@ func validateMoveCopyInput(oldbucket, oldkey, newbucket, newkey string) error {
 	return nil
 }
 
+// TODO for now this method is duplicted in private/metainfo package, duplication will be removed later.
 func (project *Project) reencryptKeys(keys []metaclient.EncryptedKeyAndNonce, oldDerivedKey, newDerivedKey *storj.Key) ([]metaclient.EncryptedKeyAndNonce, error) {
 	cipherSuite := project.encryptionParameters.CipherSuite
 
@@ -139,6 +140,7 @@ func (project *Project) reencryptKeys(keys []metaclient.EncryptedKeyAndNonce, ol
 	return newKeys, nil
 }
 
+// TODO for now this method is duplicted in private/metainfo package, duplication will be removed later.
 func (project *Project) reencryptMetadataKey(encryptedMetadataKey []byte, encryptedMetadataKeyNonce storj.Nonce, oldDerivedKey, newDerivedKey *storj.Key) ([]byte, storj.Nonce, error) {
 	if len(encryptedMetadataKey) == 0 {
 		return nil, storj.Nonce{}, nil

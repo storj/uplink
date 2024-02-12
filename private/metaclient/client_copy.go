@@ -14,6 +14,7 @@ import (
 type BeginCopyObjectParams struct {
 	Bucket                []byte
 	EncryptedObjectKey    []byte
+	Version               []byte
 	NewBucket             []byte
 	NewEncryptedObjectKey []byte
 }
@@ -31,6 +32,7 @@ func (params *BeginCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.Obj
 		Header:                header,
 		Bucket:                params.Bucket,
 		EncryptedObjectKey:    params.EncryptedObjectKey,
+		ObjectVersion:         params.Version,
 		NewBucket:             params.NewBucket,
 		NewEncryptedObjectKey: params.NewEncryptedObjectKey,
 	}

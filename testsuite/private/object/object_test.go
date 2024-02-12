@@ -338,7 +338,7 @@ func TestDeleteObject(t *testing.T) {
 
 		// delete non existing version of existing object
 		nonExistingVersion := slices.Clone(uploadInfoB.Version)
-		nonExistingVersion[0]++ // change oriinal version
+		nonExistingVersion[0]++ // change original version
 		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nonExistingVersion)
 		require.NoError(t, err)
 		require.Nil(t, deleteObj)
@@ -363,6 +363,50 @@ func TestDeleteObject(t *testing.T) {
 		}
 		require.Equal(t, 1, listedDeleteMarkers)
 		require.Equal(t, 2, listedObjects)
+	})
+}
+
+func TestCopyObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		expectedData := testrand.Bytes(5 * memory.KiB)
+		// upload first version of object
+		obj, err := planet.Uplinks[0].UploadWithOptions(ctx, planet.Satellites[0], bucketName, objectKey, expectedData, nil)
+		require.NoError(t, err)
+
+		// upload second version of object
+		_, err = planet.Uplinks[0].UploadWithOptions(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(6*memory.KiB), nil)
+		require.NoError(t, err)
+
+		copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, copiedObject.Version)
+
+		data, err := planet.Uplinks[0].Download(ctx, planet.Satellites[0], bucketName, objectKey+"-copy")
+		require.NoError(t, err)
+		require.Equal(t, expectedData, data)
+
+		nonExistingVersion := slices.Clone(obj.Version)
+		nonExistingVersion[0]++ // change original version
+		_, err = object.CopyObject(ctx, project, bucketName, objectKey, nonExistingVersion, bucketName, objectKey+"-copy", nil)
+		require.ErrorIs(t, err, uplink.ErrObjectNotFound)
 	})
 }
 

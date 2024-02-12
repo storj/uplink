@@ -284,5 +284,5 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return metaclient.New(metainfoClient, encStore), streams, metainfoClient.Close, nil
+	return metaclient.New(metainfoClient, storj.EncryptionParameters{}, encStore), streams, metainfoClient.Close, nil
 }
