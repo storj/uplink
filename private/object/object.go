@@ -122,6 +122,8 @@ func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Acce
 
 // GetObjectIPSummary returns the object IP summary.
 func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (_ *IPSummary, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	dialer, err := expose.ConfigGetDialer(config, ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
@@ -134,7 +136,7 @@ func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplin
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	db := metaclient.New(metainfoClient, expose.AccessGetEncAccess(access).Store)
+	db := metaclient.New(metainfoClient, storj.EncryptionParameters{}, expose.AccessGetEncAccess(access).Store)
 
 	summary, err := db.GetObjectIPs(ctx, metaclient.Bucket{Name: bucket}, key)
 	return summary, packageError.Wrap(err)
@@ -259,6 +261,24 @@ func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, upl
 	}
 
 	return convertUplinkObject(obj), nil
+}
+
+// CopyObject atomically copies object to a different bucket or/and key.
+func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sourceKey string, sourceVersion []byte, targetBucket, targetKey string, options *uplink.CopyObjectOptions) (_ *VersionedObject, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, sourceBucket, sourceKey)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey)
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, sourceBucket, sourceKey)
+	}
+
+	return convertObject(obj), nil
 }
 
 // convertObject converts metainfo.Object to Version.

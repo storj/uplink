@@ -9,22 +9,25 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
+	"storj.io/common/storj"
 )
 
 var errClass = errs.Class("metainfo")
 
 // DB implements metainfo database.
 type DB struct {
-	metainfo *Client
+	metainfo             *Client
+	encryptionParameters storj.EncryptionParameters
 
 	encStore *encryption.Store
 }
 
 // New creates a new metainfo database.
-func New(metainfo *Client, encStore *encryption.Store) *DB {
+func New(metainfo *Client, encryptionParameters storj.EncryptionParameters, encStore *encryption.Store) *DB {
 	return &DB{
-		metainfo: metainfo,
-		encStore: encStore,
+		metainfo:             metainfo,
+		encryptionParameters: encryptionParameters,
+		encStore:             encStore,
 	}
 }
 
