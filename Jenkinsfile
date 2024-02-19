@@ -88,7 +88,7 @@ pipeline {
                             post {
                                 always {
                                     sh script: 'cat .build/tests.json | xunit -out .build/tests.xml', returnStatus: true
-                                    sh script: 'cat .build/tests.json | tparse -all -top -slow 100', returnStatus: true
+                                    sh script: 'cat .build/tests.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/tests.json'
                                     junit '.build/tests.xml'
 
@@ -126,7 +126,7 @@ pipeline {
                                     dir('testsuite'){
                                         sh script: 'cat ../.build/testsuite.json | xunit -out ../.build/testsuite.xml', returnStatus: true
                                     }
-                                    sh script: 'cat .build/testsuite.json | tparse -all -top -slow 100', returnStatus: true
+                                    sh script: 'cat .build/testsuite.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/testsuite.json'
                                     junit '.build/testsuite.xml'
 
@@ -161,7 +161,7 @@ pipeline {
 
                             post {
                                 always {
-                                    sh script: 'cat .build/testsuite-storj.json | tparse -all -top -slow 100', returnStatus: true
+                                    sh script: 'cat .build/testsuite-storj.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/testsuite-storj.json'
                                     junit '.build/testsuite-storj.xml'
                                 }
