@@ -165,9 +165,7 @@ func (client *Client) Retain(ctx context.Context, req *pb.RetainRequest) (err er
 // strictly speaking, it's a server side code, but it's easier to maintain and test here, as it should be the
 // opposite of the Retain method.
 func RetainRequestFromStream(stream pb.DRPCPiecestore_RetainBigStream) (pb.RetainRequest, error) {
-	resp := pb.RetainRequest{
-		Filter: make([]byte, 0),
-	}
+	resp := pb.RetainRequest{}
 	for {
 		req, err := stream.Recv()
 		if err != nil {
