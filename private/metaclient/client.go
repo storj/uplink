@@ -6,9 +6,11 @@ package metaclient
 import (
 	"bytes"
 	"context"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
@@ -26,6 +28,16 @@ var (
 
 	// Error is the errs class of standard metainfo errors.
 	Error = errs.Class("metaclient")
+
+	zstdDecoder = func() *zstd.Decoder {
+		decoder, err := zstd.NewReader(nil,
+			zstd.WithDecoderMaxMemory(64<<20),
+		)
+		if err != nil {
+			panic(err)
+		}
+		return decoder
+	}()
 )
 
 // Client creates a grpcClient.
@@ -36,16 +48,6 @@ type Client struct {
 	apiKeyRaw []byte
 
 	userAgent string
-}
-
-// NewClient creates Metainfo API client.
-func NewClient(client pb.DRPCMetainfoClient, apiKey *macaroon.APIKey, userAgent string) *Client {
-	return &Client{
-		client:    client,
-		apiKeyRaw: apiKey.SerializeRaw(),
-
-		userAgent: userAgent,
-	}
 }
 
 // DialNodeURL dials to metainfo endpoint with the specified api key.
@@ -68,6 +70,7 @@ func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey 
 		conn:      conn,
 		client:    pb.NewDRPCMetainfoClient(conn),
 		apiKeyRaw: apiKey.SerializeRaw(),
+
 		userAgent: userAgent,
 	}, nil
 }
@@ -202,10 +205,10 @@ func newGetBucketResponse(response *pb.BucketGetResponse) (GetBucketResponse, er
 func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (respBucket Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	var response *pb.BucketGetResponse
+	var items []BatchResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		// TODO(moby) make sure bucket not found is properly handled
-		response, err = client.client.GetBucket(ctx, params.toRequest(client.header()))
+		items, err = client.Batch(ctx, &params)
 		return err
 	})
 	if err != nil {
@@ -214,8 +217,15 @@ func (client *Client) GetBucket(ctx context.Context, params GetBucketParams) (re
 		}
 		return Bucket{}, Error.Wrap(err)
 	}
+	if len(items) != 1 {
+		return Bucket{}, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_BucketGet)
+	if !ok {
+		return Bucket{}, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
 
-	respBucket, err = convertProtoToBucket(response.Bucket)
+	respBucket, err = convertProtoToBucket(response.BucketGet.Bucket)
 	if err != nil {
 		return Bucket{}, Error.Wrap(err)
 	}
@@ -697,9 +707,9 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ RawObjectItem, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	var response *pb.ObjectGetResponse
+	var items []BatchResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
-		response, err = client.client.GetObject(ctx, params.toRequest(client.header()))
+		items, err = client.Batch(ctx, &params)
 		return err
 	})
 	if err != nil {
@@ -708,8 +718,15 @@ func (client *Client) GetObject(ctx context.Context, params GetObjectParams) (_ 
 		}
 		return RawObjectItem{}, Error.Wrap(err)
 	}
+	if len(items) != 1 {
+		return RawObjectItem{}, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_ObjectGet)
+	if !ok {
+		return RawObjectItem{}, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
 
-	getResponse := newGetObjectResponse(response)
+	getResponse := newGetObjectResponse(response.ObjectGet)
 	return getResponse.Info, nil
 }
 
@@ -942,16 +959,23 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []RawObjectListItem, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	var response *pb.ObjectListResponse
+	var items []BatchResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
-		response, err = client.client.ListObjects(ctx, params.toRequest(client.header()))
+		items, err = client.Batch(ctx, &params)
 		return err
 	})
 	if err != nil {
 		return []RawObjectListItem{}, false, Error.Wrap(err)
 	}
+	if len(items) != 1 {
+		return []RawObjectListItem{}, false, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_ObjectList)
+	if !ok {
+		return []RawObjectListItem{}, false, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
 
-	listResponse := newListObjectsResponse(response, params.EncryptedPrefix, params.Recursive)
+	listResponse := newListObjectsResponse(response.ObjectList, params.EncryptedPrefix, params.Recursive)
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 
@@ -1469,6 +1493,10 @@ func newDownloadObjectResponse(response *pb.ObjectDownloadResponse) DownloadObje
 func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if os.Getenv("STORJ_COMPRESSED_BATCH") != "" {
+		return client.batchDownloadObject(ctx, params)
+	}
+
 	var response *pb.ObjectDownloadResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		response, err = client.client.DownloadObject(ctx, params.toRequest(client.header()))
@@ -1480,8 +1508,33 @@ func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectP
 		}
 		return DownloadObjectResponse{}, Error.Wrap(err)
 	}
-
 	return newDownloadObjectResponse(response), nil
+}
+
+// batchDownloadObject is DownloadObject but goes through the batch rpc.
+func (client *Client) batchDownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var items []BatchResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		items, err = client.Batch(ctx, &params)
+		return err
+	})
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return DownloadObjectResponse{}, ErrObjectNotFound.Wrap(err)
+		}
+		return DownloadObjectResponse{}, Error.Wrap(err)
+	}
+	if len(items) != 1 {
+		return DownloadObjectResponse{}, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_ObjectDownload)
+	if !ok {
+		return DownloadObjectResponse{}, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
+
+	return newDownloadObjectResponse(response.ObjectDownload), nil
 }
 
 // DownloadSegmentParams parameters for DownloadSegment method.
@@ -1614,9 +1667,9 @@ func newDownloadSegmentResponseWithRS(response *pb.SegmentDownloadResponse) Down
 func (client *Client) DownloadSegmentWithRS(ctx context.Context, params DownloadSegmentParams) (_ DownloadSegmentWithRSResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	var response *pb.SegmentDownloadResponse
+	var items []BatchResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
-		response, err = client.client.DownloadSegment(ctx, params.toRequest(client.header()))
+		items, err = client.Batch(ctx, &params)
 		return err
 	})
 	if err != nil {
@@ -1625,8 +1678,15 @@ func (client *Client) DownloadSegmentWithRS(ctx context.Context, params Download
 		}
 		return DownloadSegmentWithRSResponse{}, Error.Wrap(err)
 	}
+	if len(items) != 1 {
+		return DownloadSegmentWithRSResponse{}, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_SegmentDownload)
+	if !ok {
+		return DownloadSegmentWithRSResponse{}, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
 
-	return newDownloadSegmentResponseWithRS(response), nil
+	return newDownloadSegmentResponseWithRS(response.SegmentDownload), nil
 }
 
 // RevokeAPIKey revokes the APIKey provided in the params.
@@ -1655,6 +1715,10 @@ func (r RevokeAPIKeyParams) toRequest(header *pb.RequestHeader) *pb.RevokeAPIKey
 func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []BatchResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if os.Getenv("STORJ_COMPRESSED_BATCH") != "" {
+		return client.compressedBatch(ctx, requests...)
+	}
+
 	batchItems := make([]*pb.BatchRequestItem, len(requests))
 	for i, request := range requests {
 		batchItems[i] = request.BatchItem()
@@ -1668,6 +1732,51 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 	}
 
 	resp = make([]BatchResponse, len(response.Responses))
+	for i, response := range response.Responses {
+		resp[i] = MakeBatchResponse(batchItems[i], response)
+	}
+
+	return resp, nil
+}
+
+// compressedBatch sends multiple requests in one batch supporting compressed responses.
+func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem) (_ []BatchResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	batchItems := make([]*pb.BatchRequestItem, len(requests))
+	for i, request := range requests {
+		batchItems[i] = request.BatchItem()
+	}
+	data, err := pb.Marshal(&pb.BatchRequest{
+		Header:   client.header(),
+		Requests: batchItems,
+	})
+	compResponse, err := client.client.CompressedBatch(ctx, &pb.CompressedBatchRequest{
+		Supported: []pb.CompressedBatchRequest_CompressionType{pb.CompressedBatchRequest_ZSTD},
+		Data:      data,
+	})
+	if err != nil {
+		return []BatchResponse{}, Error.Wrap(err)
+	}
+
+	var respData []byte
+	switch compResponse.Selected {
+	case pb.CompressedBatchRequest_NONE:
+		respData = compResponse.Data
+	case pb.CompressedBatchRequest_ZSTD:
+		respData, err = zstdDecoder.DecodeAll(compResponse.Data, nil)
+	default:
+		err = Error.New("unsupported compression type: %v", compResponse.Selected)
+	}
+	if err != nil {
+		return []BatchResponse{}, Error.Wrap(err)
+	}
+
+	var response pb.BatchResponse
+	if err := pb.Unmarshal(respData, &response); err != nil {
+		return []BatchResponse{}, Error.Wrap(err)
+	}
+	resp := make([]BatchResponse, len(response.Responses))
 	for i, response := range response.Responses {
 		resp[i] = MakeBatchResponse(batchItems[i], response)
 	}

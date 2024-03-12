@@ -3,6 +3,7 @@ module storj.io/uplink
 go 1.20
 
 require (
+	github.com/klauspost/compress v1.17.7
 	github.com/spacemonkeygo/monkit/v3 v3.0.22
 	github.com/stretchr/testify v1.9.0
 	github.com/zeebo/errs v1.3.0
