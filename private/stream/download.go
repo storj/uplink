@@ -14,12 +14,13 @@ import (
 	"storj.io/common/storj"
 	"storj.io/eventkit"
 	"storj.io/picobuf"
+	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 )
 
 const (
-	maxDecryptionRetries = 6
+	maxDownloadRetries = 6
 )
 
 var (
@@ -37,6 +38,7 @@ type Download struct {
 	closed  bool
 
 	decryptionRetries int
+	quiescenceRetries int
 }
 
 // NewDownload creates new stream download.
@@ -96,6 +98,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	} else if encryption.ErrDecryptFailed.Has(err) {
 		evs.Event("decryption-failure",
 			eventkit.Int64("decryption-retries", int64(download.decryptionRetries)),
+			eventkit.Int64("quiescence-retries", int64(download.quiescenceRetries)),
 			eventkit.Int64("offset", download.offset),
 			eventkit.Int64("length", download.length),
 			eventkit.Bytes("path-checksum", pathChecksum(download.info.EncPath)),
@@ -103,13 +106,31 @@ func (download *Download) Read(data []byte) (n int, err error) {
 			eventkit.Bytes("stream-id", maybeSatStreamID(download.info.Object.Stream.ID)),
 		)
 
-		if download.decryptionRetries < maxDecryptionRetries {
+		if download.decryptionRetries+download.quiescenceRetries < maxDownloadRetries {
 			download.decryptionRetries++
 
 			// force us to get new a new collection of limits.
 			download.info.DownloadedSegments = nil
 
 			err = download.resetReader(true)
+		}
+	} else if eestream.QuiescentError.Has(err) {
+		evs.Event("quiescence-failure",
+			eventkit.Int64("decryption-retries", int64(download.decryptionRetries)),
+			eventkit.Int64("quiescence-retries", int64(download.quiescenceRetries)),
+			eventkit.Int64("offset", download.offset),
+			eventkit.Int64("length", download.length),
+			eventkit.Bytes("path-checksum", pathChecksum(download.info.EncPath)),
+			eventkit.String("cipher-suite", download.info.Object.CipherSuite.String()),
+			eventkit.Bytes("stream-id", maybeSatStreamID(download.info.Object.Stream.ID)),
+		)
+
+		if download.decryptionRetries+download.quiescenceRetries < maxDownloadRetries {
+			download.quiescenceRetries++
+
+			download.info.DownloadedSegments = nil
+
+			err = download.resetReader(false)
 		}
 	}
 

@@ -12,16 +12,22 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"golang.org/x/exp/slices"
 
 	"storj.io/common/rpc/rpctracing"
 	"storj.io/common/sync2"
 	"storj.io/infectious"
 )
 
-const debugEnabled = false
-const maxStripesAhead = 256 // might be interesting to test different values later
+const (
+	debugEnabled             = false
+	maxStripesAhead          = 256 // might be interesting to test different values later
+	quiescentCheckInterval   = time.Second
+	quiescentIntervalTrigger = 5 // number of quiescent check intervals before triggering
+)
 
 // pieceReader represents the stream of shares within one piece.
 type pieceReader struct {
@@ -47,6 +53,7 @@ type StripeReader struct {
 	totalStripes    int32
 	errorDetection  bool
 	runningPieces   atomic.Int32
+	quiescent       atomic.Bool
 }
 
 // NewStripeReader makes a new StripeReader using the provided map of share
@@ -92,11 +99,16 @@ func (s *StripeReader) start() {
 	if debugEnabled {
 		fmt.Println("starting", len(s.pieces), "readers")
 	}
+
+	var pwg sync.WaitGroup
 	s.runningPieces.Store(int32(len(s.pieces)))
+
 	for idx := range s.pieces {
 		s.wg.Add(1)
+		pwg.Add(1)
 		go func(idx int) {
 			defer s.wg.Done()
+			defer pwg.Done()
 
 			// whenever a share reader is done, we should wake up the core in case
 			// this share reader just exited unsuccessfully and this represents a
@@ -110,6 +122,47 @@ func (s *StripeReader) start() {
 			s.readShares(idx)
 		}(idx)
 	}
+
+	done := make(chan struct{})
+	go func() {
+		pwg.Wait()
+		close(done)
+	}()
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		s1 := s.bundy.ProgressSnapshot(nil)
+		var s2 []int32
+
+		t := time.NewTicker(quiescentCheckInterval)
+		defer t.Stop()
+
+		match := 0
+		for {
+			select {
+			case <-t.C:
+				s2 = s.bundy.ProgressSnapshot(s2[:0])
+
+				if !slices.Equal(s1, s2) {
+					match = 0
+					s2, s1 = s1, s2
+					continue
+				}
+
+				match++
+				if match == quiescentIntervalTrigger {
+					s.quiescent.Store(true)
+					s.stripeReady.Signal()
+					return
+				}
+
+			case <-done:
+				return
+			}
+		}
+	}()
 }
 
 // readShares is the method that does the actual work of reading an individual
@@ -265,6 +318,11 @@ func (s *StripeReader) ReadStripes(ctx context.Context, nextStripe int64, out []
 	ready := make([]int, 0, len(s.pieces))
 
 	for {
+		// check if we were woken from quiescence. if so, error out.
+		if s.quiescent.Load() {
+			return nil, 0, QuiescentError.New("")
+		}
+
 		// okay let's tell the bundy clock we're awake and it should be okay to
 		// wake us up again next time we sleep.
 		s.bundy.AcknowledgeNewStripes()

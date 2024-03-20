@@ -53,6 +53,16 @@ func NewPiecesProgress(minimum, total int32) *PiecesProgress {
 	}
 }
 
+// ProgressSnapshot returns a snapshot of the current progress. No locks are held
+// so it doesn't represent a single point in time in the presence of concurrent
+// mutations.
+func (y *PiecesProgress) ProgressSnapshot(out []int32) []int32 {
+	for i := range y.pieceSharesReceived {
+		out = append(out, y.pieceSharesReceived[i].Load())
+	}
+	return out
+}
+
 // SetStripesNeeded tells PiecesProgress what neededShares stripe is needed next.
 func (y *PiecesProgress) SetStripesNeeded(required int32) {
 	y.stripesNeeded.Store(required)
