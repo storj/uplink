@@ -823,14 +823,13 @@ func (object *MutableObject) CreateStream(ctx context.Context) (_ *MutableStream
 }
 
 // CreateDynamicStream creates a new dynamic stream for the object.
-func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta, expires time.Time) (_ *MutableStream, err error) {
+func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata SerializableMeta) (_ *MutableStream, err error) {
 	defer mon.Task()(&ctx)(&err)
 	return &MutableStream{
 		info: object.info,
 
 		dynamic:         true,
 		dynamicMetadata: metadata,
-		dynamicExpires:  expires,
 	}, nil
 }
 

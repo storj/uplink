@@ -29,6 +29,8 @@ type UploadOptions struct {
 	Expires time.Time
 
 	CustomMetadata uplink.CustomMetadata
+
+	Retention metaclient.Retention
 }
 
 // BeginUpload begins a new multipart upload to bucket and key.
@@ -79,6 +81,8 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 		EncryptedMetadata:             metadata.EncryptedContent,
 		EncryptedMetadataEncryptedKey: metadata.EncryptedKey,
 		EncryptedMetadataNonce:        metadata.EncryptedKeyNonce,
+
+		Retention: options.Retention,
 	})
 	if err != nil {
 		return uplink.UploadInfo{}, convertKnownErrors(err, bucket, key)

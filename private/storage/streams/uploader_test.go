@@ -202,7 +202,9 @@ func TestUpload(t *testing.T) {
 
 	t.Run("Object", func(t *testing.T) {
 		testUpload(t, func(uploader *Uploader, c config) (*Upload, error) {
-			return uploader.UploadObject(context.Background(), c.bucket, c.key, c.metadata, expiration, noopScheduler{})
+			return uploader.UploadObject(context.Background(), c.bucket, c.key, c.metadata, noopScheduler{}, &metaclient.UploadOptions{
+				Expires: expiration,
+			})
 		})
 	})
 

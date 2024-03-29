@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	_ "unsafe" // for go:linkname
 
 	"github.com/zeebo/errs"
 
@@ -17,6 +18,7 @@ import (
 	"storj.io/common/pb"
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -34,6 +36,14 @@ type UploadOptions struct {
 //
 // It is not guaranteed that the uncommitted object is visible through ListUploads while uploading.
 func (project *Project) UploadObject(ctx context.Context, bucket, key string, options *UploadOptions) (_ *Upload, err error) {
+	metaOpts := &metaclient.UploadOptions{}
+	if options != nil {
+		metaOpts.Expires = options.Expires
+	}
+	return project.uploadObjectWithRetention(ctx, bucket, key, metaOpts)
+}
+
+func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, key string, options *metaclient.UploadOptions) (_ *Upload, err error) {
 	upload := &Upload{
 		bucket: bucket,
 		stats:  newOperationStats(ctx, project.access.satelliteURL),
@@ -56,7 +66,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	}
 
 	if options == nil {
-		options = &UploadOptions{}
+		options = &metaclient.UploadOptions{}
 	}
 
 	// N.B. we always call dbCleanup which closes the db because
@@ -79,10 +89,10 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	ctx, cancel := context.WithCancel(ctx)
 
 	upload.cancel = cancel
-	upload.object = convertObject(&info)
+	upload.object = &info
 
 	meta := dynamicMetadata{upload.object}
-	mutableStream, err := obj.CreateDynamicStream(ctx, meta, options.Expires)
+	mutableStream, err := obj.CreateDynamicStream(ctx, meta)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -104,10 +114,10 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	upload.streams = streams
 
 	if project.concurrentSegmentUploadConfig == nil {
-		upload.upload = stream.NewUpload(ctx, mutableStream, streams)
+		upload.upload = stream.NewUpload(ctx, mutableStream, streams, options)
 	} else {
 		sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
-		u, err := streams.UploadObject(ctx, mutableStream.BucketName(), mutableStream.Path(), mutableStream, mutableStream.Expires(), sched)
+		u, err := streams.UploadObject(ctx, mutableStream.BucketName(), mutableStream.Path(), mutableStream, sched, options)
 		if err != nil {
 			return nil, convertKnownErrors(err, bucket, key)
 		}
@@ -118,11 +128,11 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	return upload, nil
 }
 
-type dynamicMetadata struct{ *Object }
+type dynamicMetadata struct{ *metaclient.Object }
 
 func (dyn dynamicMetadata) Metadata() ([]byte, error) {
 	return pb.Marshal(&pb.SerializableMeta{
-		UserDefined: dyn.Object.Custom.Clone(),
+		UserDefined: CustomMetadata(dyn.Object.Metadata).Clone(),
 	})
 }
 
@@ -141,7 +151,7 @@ type Upload struct {
 	cancel  context.CancelFunc
 	upload  streamUpload
 	bucket  string
-	object  *Object
+	object  *metaclient.Object
 	streams *streams.Store
 
 	stats operationStats
@@ -152,13 +162,17 @@ type Upload struct {
 
 // Info returns the last information about the uploaded object.
 func (upload *Upload) Info() *Object {
+	if upload.object == nil {
+		return nil
+	}
+	obj := convertObject(upload.object)
 	meta := upload.upload.Meta()
 	if meta != nil {
-		upload.object.System.ContentLength = meta.Size
-		upload.object.System.Created = meta.Modified
-		upload.object.version = meta.Version
+		obj.System.ContentLength = meta.Size
+		obj.System.Created = meta.Modified
+		obj.version = meta.Version
 	}
-	return upload.object
+	return obj
 }
 
 // Write uploads len(p) bytes from p to the object's data stream.
@@ -172,7 +186,7 @@ func (upload *Upload) Write(p []byte) (n int, err error) {
 	upload.stats.flagFailure(err)
 	track()
 	upload.mu.Unlock()
-	return n, convertKnownErrors(err, upload.bucket, upload.object.Key)
+	return n, convertKnownErrors(err, upload.bucket, upload.object.Path)
 }
 
 // Commit commits data to the store.
@@ -202,7 +216,7 @@ func (upload *Upload) Commit() error {
 	track()
 	upload.emitEvent(false)
 
-	return convertKnownErrors(err, upload.bucket, upload.object.Key)
+	return convertKnownErrors(err, upload.bucket, upload.object.Path)
 }
 
 // Abort aborts the upload.
@@ -234,7 +248,7 @@ func (upload *Upload) Abort() error {
 	upload.stats.flagFailure(err)
 	upload.emitEvent(true)
 
-	return convertKnownErrors(err, upload.bucket, upload.object.Key)
+	return convertKnownErrors(err, upload.bucket, upload.object.Path)
 }
 
 func (upload *Upload) emitEvent(aborted bool) {
@@ -290,8 +304,40 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 		if err := custom.Verify(); err != nil {
 			return packageError.Wrap(err)
 		}
-		upload.object.Custom = custom.Clone()
+		upload.object.Metadata = custom.Clone()
 	}
 
 	return nil
 }
+
+// uploadObjectWithRetention exposes the private project.uploadObjectWithRetention method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname uploadObjectWithRetention
+func uploadObjectWithRetention(ctx context.Context, project *Project, bucket, key string, options *metaclient.UploadOptions) (_ *Upload, err error) {
+	return project.uploadObjectWithRetention(ctx, bucket, key, options)
+}
+
+// upload_getMetaclientObject exposes the upload's private metaclient.Object.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname upload_getMetaclientObject
+func upload_getMetaclientObject(u *Upload) *metaclient.Object { return u.object }
+
+// upload_getStreamMeta exposes the upload's stream metadata.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname upload_getStreamMeta
+func upload_getStreamMeta(u *Upload) *streams.Meta { return u.upload.Meta() }

@@ -33,7 +33,7 @@ type Upload struct {
 }
 
 // NewUpload creates new stream upload.
-func NewUpload(ctx context.Context, stream *metaclient.MutableStream, streamsStore *streams.Store) *Upload {
+func NewUpload(ctx context.Context, stream *metaclient.MutableStream, streamsStore *streams.Store, opts *metaclient.UploadOptions) *Upload {
 	reader, writer := io.Pipe()
 
 	upload := Upload{
@@ -44,7 +44,7 @@ func NewUpload(ctx context.Context, stream *metaclient.MutableStream, streamsSto
 	}
 
 	upload.errgroup.Go(func() error {
-		m, err := streamsStore.Put(ctx, stream.BucketName(), stream.Path(), reader, stream, stream.Expires())
+		m, err := streamsStore.Put(ctx, stream.BucketName(), stream.Path(), reader, stream, opts)
 		if err != nil {
 			err = Error.Wrap(err)
 			return errs.Combine(err, reader.CloseWithError(err))

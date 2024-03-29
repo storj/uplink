@@ -15,7 +15,6 @@ type MutableStream struct {
 
 	dynamic         bool
 	dynamicMetadata SerializableMeta
-	dynamicExpires  time.Time
 }
 
 // SerializableMeta is an interface for getting pb.SerializableMeta.
@@ -33,12 +32,7 @@ func (stream *MutableStream) Path() string { return stream.info.Path }
 func (stream *MutableStream) Info() Object { return stream.info }
 
 // Expires returns stream expiration time.
-func (stream *MutableStream) Expires() time.Time {
-	if stream.dynamic {
-		return stream.dynamicExpires
-	}
-	return stream.info.Expires
-}
+func (stream *MutableStream) Expires() time.Time { return stream.info.Expires }
 
 // Metadata returns metadata associated with the stream.
 func (stream *MutableStream) Metadata() ([]byte, error) {
@@ -60,4 +54,12 @@ func (stream *MutableStream) Metadata() ([]byte, error) {
 	return pb.Marshal(&pb.SerializableMeta{
 		UserDefined: stream.info.Metadata,
 	})
+}
+
+// UploadOptions contains additional options for uploading.
+type UploadOptions struct {
+	// When Expires is zero, there is no expiration.
+	Expires time.Time
+
+	Retention Retention
 }

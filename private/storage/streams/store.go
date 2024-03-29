@@ -42,6 +42,7 @@ type Meta struct {
 	Size       int64
 	Data       []byte
 	Version    []byte
+	Retention  metaclient.Retention
 }
 
 // Part info about a part.
@@ -109,7 +110,7 @@ func (s *Store) Close() error {
 // of segments, in a new protobuf, in the metadata of l/<key>.
 //
 // If there is an error, it cleans up any uploaded segment before returning.
-func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.Reader, metadata Metadata, expiration time.Time) (_ Meta, err error) {
+func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.Reader, metadata Metadata, opts *metaclient.UploadOptions) (_ Meta, err error) {
 	defer mon.Task()(&ctx)(&err)
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(unencryptedKey), s.encStore)
 	if err != nil {
@@ -123,8 +124,12 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	beginObjectReq := &metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedObjectKey:   []byte(encPath.Raw()),
-		ExpiresAt:            expiration,
 		EncryptionParameters: s.encryptionParameters,
+	}
+
+	if opts != nil {
+		beginObjectReq.ExpiresAt = opts.Expires
+		beginObjectReq.Retention = opts.Retention
 	}
 
 	var streamID storj.StreamID
@@ -381,10 +386,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 
 	resultMeta := Meta{
 		Modified:   rawObject.Created,
-		Expiration: expiration,
+		Expiration: rawObject.Expires,
 		Size:       streamSize,
 		Data:       metadataBytes,
 		Version:    rawObject.Version,
+		Retention:  *rawObject.Retention,
 	}
 
 	return resultMeta, nil

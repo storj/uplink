@@ -17,6 +17,7 @@ import (
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/storage/streams"
 )
 
 var mon = monkit.Package()
@@ -44,6 +45,9 @@ type VersionedUpload struct {
 	upload *uplink.Upload
 }
 
+// UploadOptions contains additional options for uploading objects.
+type UploadOptions = metaclient.UploadOptions
+
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
@@ -57,8 +61,18 @@ type ListObjectVersionsOptions struct {
 
 // Info returns the last information about the uploaded object.
 func (upload *VersionedUpload) Info() *VersionedObject {
-	info := upload.upload.Info()
-	return convertUplinkObject(info)
+	metaObj := upload_getMetaclientObject(upload.upload)
+	if metaObj == nil {
+		return nil
+	}
+	obj := convertObject(metaObj)
+	if meta := upload_getStreamMeta(upload.upload); meta != nil {
+		obj.System.ContentLength = meta.Size
+		obj.System.Created = meta.Modified
+		obj.Version = meta.Version
+		obj.Retention = &meta.Retention
+	}
+	return obj
 }
 
 // Write uploads len(p) bytes from p to the object's data stream.
@@ -224,10 +238,10 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 // UploadObject starts an upload to the specific key.
 //
 // It is not guaranteed that the uncommitted object is visible through ListUploads while uploading.
-func UploadObject(ctx context.Context, project *uplink.Project, bucket, key string, options *uplink.UploadOptions) (_ *VersionedUpload, err error) {
+func UploadObject(ctx context.Context, project *uplink.Project, bucket, key string, options *UploadOptions) (_ *VersionedUpload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	upload, err := project.UploadObject(ctx, bucket, key, options)
+	upload, err := uploadObjectWithRetention(ctx, project, bucket, key, options)
 	if err != nil {
 		return
 	}
@@ -340,3 +354,12 @@ func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, buc
 
 //go:linkname download_getMetaclientObject storj.io/uplink.download_getMetaclientObject
 func download_getMetaclientObject(dl *uplink.Download) *metaclient.Object
+
+//go:linkname uploadObjectWithRetention storj.io/uplink.uploadObjectWithRetention
+func uploadObjectWithRetention(ctx context.Context, project *uplink.Project, bucket, key string, options *metaclient.UploadOptions) (_ *uplink.Upload, err error)
+
+//go:linkname upload_getMetaclientObject storj.io/uplink.upload_getMetaclientObject
+func upload_getMetaclientObject(u *uplink.Upload) *metaclient.Object
+
+//go:linkname upload_getStreamMeta storj.io/uplink.upload_getStreamMeta
+func upload_getStreamMeta(u *uplink.Upload) *streams.Meta

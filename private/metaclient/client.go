@@ -541,10 +541,12 @@ type BeginObjectParams struct {
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadataNonce        storj.Nonce
+
+	Retention Retention
 }
 
 func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginRequest {
-	return &pb.ObjectBeginRequest{
+	req := &pb.ObjectBeginRequest{
 		Header:             header,
 		Bucket:             params.Bucket,
 		EncryptedObjectKey: params.EncryptedObjectKey,
@@ -567,6 +569,15 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 	}
+
+	if params.Retention != (Retention{}) {
+		req.Retention = &pb.Retention{
+			Mode:        pb.Retention_Mode(params.Retention.Mode),
+			RetainUntil: params.Retention.RetainUntil,
+		}
+	}
+
+	return req
 }
 
 // BatchItem returns single item for batch request.

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
-	"time"
 
 	"github.com/zeebo/errs"
 
@@ -182,7 +181,7 @@ var uploadCounter int64
 
 // UploadObject starts an upload of an object to the given location. The object
 // contents can be written to the returned upload, which can then be committed.
-func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey string, metadata Metadata, expiration time.Time, sched segmentupload.Scheduler) (_ *Upload, err error) {
+func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey string, metadata Metadata, sched segmentupload.Scheduler, opts *metaclient.UploadOptions) (_ *Upload, err error) {
 	ctx = testuplink.WithLogWriterContext(ctx, "upload", fmt.Sprint(atomic.AddInt64(&uploadCounter, 1)))
 	testuplink.Log(ctx, "Starting upload")
 	defer testuplink.Log(ctx, "Done starting upload")
@@ -223,8 +222,12 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 	beginObject := &metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedObjectKey:   []byte(encPath.Raw()),
-		ExpiresAt:            expiration,
 		EncryptionParameters: u.encryptionParameters,
+	}
+
+	if opts != nil {
+		beginObject.ExpiresAt = opts.Expires
+		beginObject.Retention = opts.Retention
 	}
 
 	uploader := segmentUploader{metainfo: u.metainfo, piecePutter: u.piecePutter, sched: sched, longTailMargin: u.longTailMargin}
