@@ -36,6 +36,7 @@ type VersionedObject struct {
 	uplink.Object
 	Version        []byte
 	IsDeleteMarker bool
+	Retention      *metaclient.Retention
 }
 
 // VersionedUpload represents upload which returnes object version at the end.
@@ -94,8 +95,7 @@ type VersionedDownload struct {
 
 // Info returns the last information about the object.
 func (download *VersionedDownload) Info() *VersionedObject {
-	info := download.download.Info()
-	return convertUplinkObject(info)
+	return convertObject(download_getMetaclientObject(download.download))
 }
 
 // Read downloads up to len(p) bytes into p from the object's data stream.
@@ -283,7 +283,7 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 
 // convertObject converts metainfo.Object to Version.
 func convertObject(obj *metaclient.Object) *VersionedObject {
-	if obj.Bucket.Name == "" { // zero object
+	if obj == nil || obj.Bucket.Name == "" { // nil or zero object
 		return nil
 	}
 
@@ -300,6 +300,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 		},
 		Version:        obj.Version,
 		IsDeleteMarker: obj.IsDeleteMarker,
+		Retention:      obj.Retention,
 	}
 }
 
@@ -336,3 +337,6 @@ func objectVersion(object *uplink.Object) []byte
 
 //go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
 func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *uplink.Download, err error)
+
+//go:linkname download_getMetaclientObject storj.io/uplink.download_getMetaclientObject
+func download_getMetaclientObject(dl *uplink.Download) *metaclient.Object

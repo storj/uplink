@@ -142,9 +142,9 @@ func (project *Project) UpdateObjectMetadata(ctx context.Context, bucket, key st
 	return nil
 }
 
-// convertObject converts metainfo.Object to uplink.Object.
+// convertObject converts metaclient.Object to uplink.Object.
 func convertObject(obj *metaclient.Object) *Object {
-	if obj.Bucket.Name == "" { // zero object
+	if obj == nil || obj.Bucket.Name == "" { // nil or zero object
 		return nil
 	}
 

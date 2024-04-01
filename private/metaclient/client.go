@@ -682,6 +682,13 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 	}
 
+	if object.Retention != nil {
+		info.Retention = &Retention{
+			Mode:        storj.RetentionMode(object.Retention.Mode),
+			RetainUntil: object.Retention.RetainUntil,
+		}
+	}
+
 	if object.EncryptionParameters != nil {
 		info.EncryptionParameters = storj.EncryptionParameters{
 			CipherSuite: storj.CipherSuite(object.EncryptionParameters.CipherSuite),

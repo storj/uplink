@@ -123,7 +123,7 @@ func (project *Project) downloadObjectWithVersion(ctx context.Context, bucket, k
 	}
 	download.streams = streams
 
-	download.object = convertObject(&objectDownload.Object)
+	download.object = &objectDownload.Object
 	download.download = stream.NewDownloadRange(ctx, objectDownload, streams, streamRange.Start, streamRange.Limit-streamRange.Start)
 	download.tracker = project.tracker.Child("download", 1)
 	return download, nil
@@ -133,7 +133,7 @@ func (project *Project) downloadObjectWithVersion(ctx context.Context, bucket, k
 type Download struct {
 	mu       sync.Mutex
 	download *stream.Download
-	object   *Object
+	object   *metaclient.Object
 	bucket   string
 	streams  *streams.Store
 
@@ -149,7 +149,7 @@ type Download struct {
 
 // Info returns the last information about the object.
 func (download *Download) Info() *Object {
-	return download.object
+	return convertObject(download.object)
 }
 
 // Read downloads up to len(p) bytes into p from the object's data stream.
@@ -167,7 +167,7 @@ func (download *Download) Read(p []byte) (n int, err error) {
 	}
 	track()
 	download.mu.Unlock()
-	return n, convertKnownErrors(err, download.bucket, download.object.Key)
+	return n, convertKnownErrors(err, download.bucket, download.object.Path)
 }
 
 // Close closes the reader of the download.
@@ -183,7 +183,7 @@ func (download *Download) Close() error {
 	download.stats.flagFailure(err)
 	download.emitEvent()
 	download.mu.Unlock()
-	return convertKnownErrors(err, download.bucket, download.object.Key)
+	return convertKnownErrors(err, download.bucket, download.object.Path)
 }
 
 func pathChecksum(encPath paths.Encrypted) []byte {
@@ -232,3 +232,13 @@ func (download *Download) emitEvent() {
 func downloadObjectWithVersion(ctx context.Context, project *Project, bucket, key string, version []byte, options *DownloadOptions) (_ *Download, err error) {
 	return project.downloadObjectWithVersion(ctx, bucket, key, version, options)
 }
+
+// download_getMetaclientObject exposes the object downloaded from the metainfo database.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname download_getMetaclientObject
+func download_getMetaclientObject(dl *Download) *metaclient.Object { return dl.object }

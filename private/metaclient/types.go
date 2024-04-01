@@ -31,6 +31,14 @@ type RawObjectItem struct {
 
 	EncryptionParameters storj.EncryptionParameters
 	RedundancyScheme     storj.RedundancyScheme
+
+	Retention *Retention
+}
+
+// Retention represents an object's Object Lock retention information.
+type Retention struct {
+	Mode        storj.RetentionMode
+	RetainUntil time.Time
 }
 
 // IsDeleteMarker returns true if object is a delete marker.
@@ -126,6 +134,8 @@ type Object struct {
 	Created     time.Time
 	Modified    time.Time
 	Expires     time.Time
+
+	Retention *Retention
 
 	Stream
 }
