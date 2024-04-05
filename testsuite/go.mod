@@ -5,6 +5,7 @@ go 1.20
 replace storj.io/uplink => ../
 
 require (
+	github.com/klauspost/compress v1.17.7
 	github.com/stretchr/testify v1.9.0
 	github.com/zeebo/errs v1.3.0
 	go.uber.org/zap v1.27.0
@@ -13,8 +14,8 @@ require (
 	storj.io/common v0.0.0-20240325183111-3a1a80390ccd
 	storj.io/drpc v0.0.34
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20240322043303-7802e1b9a00c
-	storj.io/uplink v1.12.3-0.20240227083244-7974a2e1a6c2
+	storj.io/storj v1.91.0-alpha.0.20240402100624-858a5767e8c9
+	storj.io/uplink v1.12.3-0.20240325204957-7e1a1e616922
 )
 
 require (
@@ -55,7 +56,6 @@ require (
 	github.com/jtolio/crawlspace/tools v0.0.0-20231116162947-3ec5cc6b36c5 // indirect
 	github.com/jtolio/mito v0.0.0-20230523171229-d78ef06bb77b // indirect
 	github.com/jtolio/noiseconn v0.0.0-20230301220541-88105e6c8ac6 // indirect
-	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect

@@ -752,5 +752,5 @@ storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd h1:XkLxAvogynNQu/1gM/F
 storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd/go.mod h1:nwyyJiAFAPRu81qBfAE5cBGkVXROYSNJu9pGXLtStHE=
 storj.io/picobuf v0.0.3 h1:xAUPB5ZUGfxkqd3bnw3zp01kkWb9wlhg4vtZWUs2S9A=
 storj.io/picobuf v0.0.3/go.mod h1:4V4xelV1RSCck5GgmkL/Txw9l6IfX3XcBzegmL5Kudo=
-storj.io/storj v1.91.0-alpha.0.20240322043303-7802e1b9a00c h1:+OCPZjIci/mg/VG2klsX4eG+qSKiOvT9bgdi9Eew7TM=
-storj.io/storj v1.91.0-alpha.0.20240322043303-7802e1b9a00c/go.mod h1:70fMbNZ/uurft7KTq6kjPaiDzQFodh4AMy1zCrliB9g=
+storj.io/storj v1.91.0-alpha.0.20240402100624-858a5767e8c9 h1:IZx3DUa5YxFxAOaOnRe70pCzF1rPAcCjxQ6vrNmVPsM=
+storj.io/storj v1.91.0-alpha.0.20240402100624-858a5767e8c9/go.mod h1:yodDOtqRUl5I826lmPzxuahsBHjaScBi9LTE6tRDhPw=

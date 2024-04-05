@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
@@ -126,7 +127,7 @@ func TestSatelliteRoundTrip(t *testing.T) {
 			require.NoError(t, project.Close())
 
 			require.Equal(t, []string{
-				`/metainfo.Metainfo/Batch`,
+				`/metainfo.Metainfo/CompressedBatch`,
 				`->*pb.BatchRequestItem_ObjectBegin`,
 				`->*pb.BatchRequestItem_SegmentMakeInline`,
 				`->*pb.BatchRequestItem_ObjectCommit`,
@@ -151,10 +152,10 @@ func TestSatelliteRoundTrip(t *testing.T) {
 			require.NoError(t, project.Close())
 
 			require.Equal(t, []string{
-				`/metainfo.Metainfo/Batch`,
+				`/metainfo.Metainfo/CompressedBatch`,
 				`->*pb.BatchRequestItem_ObjectBegin`,
 				`->*pb.BatchRequestItem_SegmentBegin`,
-				`/metainfo.Metainfo/Batch`,
+				`/metainfo.Metainfo/CompressedBatch`,
 				`->*pb.BatchRequestItem_SegmentCommit`,
 				`->*pb.BatchRequestItem_ObjectCommit`,
 			}, discardFromHistory(callRecorder.History(), "/piecestore"))
@@ -177,12 +178,12 @@ func TestSatelliteRoundTrip(t *testing.T) {
 			require.NoError(t, project.Close())
 
 			require.Equal(t, []string{
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_ObjectBegin",
 				"->*pb.BatchRequestItem_SegmentBegin",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentBegin",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentCommit",
 				"->*pb.BatchRequestItem_SegmentCommit",
 				"->*pb.BatchRequestItem_ObjectCommit",
@@ -209,9 +210,9 @@ func TestSatelliteRoundTrip(t *testing.T) {
 
 			require.Equal(t, []string{
 				"/metainfo.Metainfo/BeginObject",
-				`/metainfo.Metainfo/Batch`,
+				`/metainfo.Metainfo/CompressedBatch`,
 				`->*pb.BatchRequestItem_SegmentBegin`,
-				`/metainfo.Metainfo/Batch`,
+				`/metainfo.Metainfo/CompressedBatch`,
 				`->*pb.BatchRequestItem_SegmentCommit`,
 				`/metainfo.Metainfo/CommitObject`,
 			}, discardFromHistory(callRecorder.History(), "/piecestore"))
@@ -245,13 +246,13 @@ func TestSatelliteRoundTrip(t *testing.T) {
 
 			require.Equal(t, []string{
 				"/metainfo.Metainfo/BeginObject",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentBegin",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentCommit",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentBegin",
-				"/metainfo.Metainfo/Batch",
+				"/metainfo.Metainfo/CompressedBatch",
 				"->*pb.BatchRequestItem_SegmentCommit",
 				"/metainfo.Metainfo/CommitObject",
 			}, discardFromHistory(callRecorder.History(), "/piecestore"))
@@ -274,7 +275,8 @@ func TestSatelliteRoundTrip(t *testing.T) {
 			require.NoError(t, project.Close())
 
 			require.Equal(t, []string{
-				`/metainfo.Metainfo/DownloadObject`,
+				`/metainfo.Metainfo/CompressedBatch`,
+				`->*pb.BatchRequestItem_ObjectDownload`,
 			}, discardFromHistory(callRecorder.History(), "/piecestore"))
 		})
 	})
@@ -319,6 +321,26 @@ func (r *CallRecorder) RecordCall(rpc string, message drpc.Message) {
 	defer r.mu.Unlock()
 
 	r.calls = append(r.calls, rpc)
+
+	if compressed, ok := message.(*pb.CompressedBatchRequest); ok {
+		var data []byte
+		switch compressed.Selected {
+		case pb.CompressedBatchRequest_ZSTD:
+			if decoder, err := zstd.NewReader(nil); err == nil {
+				if uncompressed, err := decoder.DecodeAll(compressed.Data, nil); err == nil {
+					data = uncompressed
+				}
+			}
+		case pb.CompressedBatchRequest_NONE:
+			data = compressed.Data
+		}
+		if len(data) > 0 {
+			var internal pb.BatchRequest
+			if err := pb.Unmarshal(data, &internal); err == nil {
+				message = &internal
+			}
+		}
+	}
 	if batch, ok := message.(*pb.BatchRequest); ok {
 		for _, req := range batch.Requests {
 			r.calls = append(r.calls, "->"+fmt.Sprintf("%T", req.Request))

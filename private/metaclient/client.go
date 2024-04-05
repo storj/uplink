@@ -1493,7 +1493,7 @@ func newDownloadObjectResponse(response *pb.ObjectDownloadResponse) DownloadObje
 func (client *Client) DownloadObject(ctx context.Context, params DownloadObjectParams) (_ DownloadObjectResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if os.Getenv("STORJ_COMPRESSED_BATCH") != "" {
+	if os.Getenv("STORJ_COMPRESSED_BATCH") != "false" {
 		return client.batchDownloadObject(ctx, params)
 	}
 
@@ -1715,7 +1715,7 @@ func (r RevokeAPIKeyParams) toRequest(header *pb.RequestHeader) *pb.RevokeAPIKey
 func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []BatchResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if os.Getenv("STORJ_COMPRESSED_BATCH") != "" {
+	if os.Getenv("STORJ_COMPRESSED_BATCH") != "false" {
 		return client.compressedBatch(ctx, requests...)
 	}
 
