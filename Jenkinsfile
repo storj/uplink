@@ -15,7 +15,7 @@ pipeline {
                     label 'main'
                     image 'storjlabs/ci:latest'
                     alwaysPull true
-                    args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod'
+                    args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod -v /tmp/golangci-lint:/root/.cache/golangci-lint -v /tmp/gocache:/root/.cache/go-build'
                 }
             }
             stages {
@@ -36,7 +36,7 @@ pipeline {
                                 sh 'service postgresql start'
 
                                 dir('.build') {
-                                    sh 'cockroach start-single-node --insecure --store=\'/tmp/crdb\' --listen-addr=localhost:26257 --http-addr=localhost:8080 --cache 512MiB --max-sql-memory 512MiB --background'
+                                    sh 'cockroach start-single-node --insecure --store=type=mem,size=4GiB --listen-addr=localhost:26257 --http-addr=localhost:8086 --cache 1024MiB --max-sql-memory 1024MiB --background'
                                 }
                             }
                         }
