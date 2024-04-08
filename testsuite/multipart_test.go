@@ -20,7 +20,6 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/satellite/metabase"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -436,15 +435,7 @@ func TestUploadPart_CheckNoEmptyInlineSegment(t *testing.T) {
 		require.Equal(t, expectedData, data)
 
 		// verify that part has 3 segments and no empty inline segment at the end
-		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, bucket)
-		require.NoError(t, err)
-		require.Len(t, objects, 1)
-
-		segments, err := planet.Satellites[0].Metabase.DB.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
-			ProjectID:  planet.Uplinks[0].Projects[0].ID,
-			BucketName: bucket,
-			ObjectKey:  objects[0].ObjectKey,
-		})
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
 		require.Len(t, segments, 3)
 		require.NotZero(t, segments[2].PlainSize)

@@ -22,7 +22,7 @@ func TestGetObject_RedundancySchemePerSegment(t *testing.T) {
 		err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "super-bucket", "super-object", testrand.Bytes(10*memory.KiB))
 		require.NoError(t, err)
 
-		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "super-bucket")
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
 		require.NoError(t, err)
 		require.Len(t, objects, 1)
 

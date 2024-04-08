@@ -12,7 +12,6 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/satellite/metabase"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -38,15 +37,7 @@ func TestMultisegmentUploadWithoutInlineSegment(t *testing.T) {
 		// in the past object with size equal to multiplication of max segment size was uploaded
 		// as remote segments + one additional inline segment, after upload code path refactor we
 		// are uploading now only 2 remote segments without last inline segment
-		objects, err := planet.Satellites[0].Metabase.DB.TestingAllCommittedObjects(ctx, planet.Uplinks[0].Projects[0].ID, "testbucket")
-		require.NoError(t, err)
-		require.Len(t, objects, 1)
-
-		segments, err := planet.Satellites[0].Metabase.DB.TestingAllObjectSegments(ctx, metabase.ObjectLocation{
-			ProjectID:  planet.Uplinks[0].Projects[0].ID,
-			BucketName: "testbucket",
-			ObjectKey:  objects[0].ObjectKey,
-		})
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
 		require.Len(t, segments, 2)
 		require.EqualValues(t, 20*memory.KiB, segments[0].PlainSize)
