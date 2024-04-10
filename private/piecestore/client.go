@@ -28,7 +28,7 @@ var errMessageTimeout = errors.New("message timeout")
 const (
 	// retainMessageLimit defines the max size which can be sent via normal request/response protocol.
 	// 4MB is the absolute max, defined by DRPC RPC, but we need a few bytes for protobuf overhead / filter header.
-	retainMessageLimit = 4100000
+	retainMessageLimit = 4100050
 )
 
 var (
