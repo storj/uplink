@@ -1,11 +1,15 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/storj/.github/main/assets/storj-logo-full-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/storj/.github/main/assets/storj-logo-full-color.png">
+  <img alt="Storj logo" src="https://raw.githubusercontent.com/storj/.github/main/assets/storj-logo-full-color.png" width="140">
+</picture>
+
 # Libuplink
 
 Go library for Storj V3 Network.
 
 [![Go Report Card](https://goreportcard.com/badge/storj.io/uplink)](https://goreportcard.com/report/storj.io/uplink)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://pkg.go.dev/storj.io/uplink)
-
-<img src="https://github.com/storj/storj/raw/main/resources/logo.png" width="100">
 
 Storj is building a decentralized cloud storage network.
 [Check out our white paper for more info!](https://storj.io/whitepaper)
