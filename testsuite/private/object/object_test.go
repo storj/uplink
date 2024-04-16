@@ -728,3 +728,74 @@ func TestObject_Versioned_Unversioned(t *testing.T) {
 		}
 	})
 }
+
+func TestListObjectVersions(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "foo/bar/A", testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "foo/bar/test/B", testrand.Bytes(memory.KiB))
+		require.NoError(t, err)
+
+		type testCase struct {
+			Prefix   string
+			Prefixes []string
+			Objects  []string
+		}
+
+		for _, tc := range []testCase{
+			{
+				Prefix:   "",
+				Prefixes: []string{"foo/"},
+			},
+			{
+				Prefix:   "foo/",
+				Prefixes: []string{"bar/"},
+			},
+			{
+				Prefix:   "foo/bar/",
+				Prefixes: []string{"test/"},
+				Objects:  []string{"A"},
+			},
+			{
+				Prefix:  "foo/bar/test/",
+				Objects: []string{"B"},
+			},
+		} {
+			result, _, err := object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+				Prefix: tc.Prefix,
+			})
+			require.NoError(t, err)
+
+			prefixes := []string{}
+			objects := []string{}
+			for _, item := range result {
+				if item.IsPrefix {
+					prefixes = append(prefixes, item.Key)
+				} else {
+					objects = append(objects, item.Key)
+				}
+			}
+
+			require.ElementsMatch(t, tc.Prefixes, prefixes)
+			require.ElementsMatch(t, tc.Objects, objects)
+		}
+	})
+}

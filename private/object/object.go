@@ -289,7 +289,8 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 
 	return &VersionedObject{
 		Object: uplink.Object{
-			Key: obj.Path,
+			Key:      obj.Path,
+			IsPrefix: obj.IsPrefix,
 			System: uplink.SystemMetadata{
 				Created:       obj.Created,
 				Expires:       obj.Expires,
