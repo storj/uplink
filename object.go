@@ -149,7 +149,8 @@ func convertObject(obj *metaclient.Object) *Object {
 	}
 
 	object := &Object{
-		Key: obj.Path,
+		Key:      obj.Path,
+		IsPrefix: obj.IsPrefix,
 		System: SystemMetadata{
 			Created:       obj.Created,
 			Expires:       obj.Expires,

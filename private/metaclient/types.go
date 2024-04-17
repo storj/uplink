@@ -38,6 +38,11 @@ func (r RawObjectItem) IsDeleteMarker() bool {
 	return r.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || r.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
 }
 
+// IsPrefix returns true if object is a prefix.
+func (r RawObjectItem) IsPrefix() bool {
+	return r.Status == int32(pb.Object_PREFIX)
+}
+
 // RawObjectListItem represents raw object item from list objects request.
 type RawObjectListItem struct {
 	Bucket             string

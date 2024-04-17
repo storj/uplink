@@ -693,7 +693,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		Version:        version(objectInfo.Status, objectInfo.Version),
 		Bucket:         Bucket{Name: bucket},
 		Path:           key,
-		IsPrefix:       false,
+		IsPrefix:       objectInfo.IsPrefix(),
 		IsDeleteMarker: objectInfo.IsDeleteMarker(),
 
 		Created:  objectInfo.Created, // TODO: use correct field
