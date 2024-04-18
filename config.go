@@ -9,6 +9,8 @@ import (
 	"time"
 	_ "unsafe" // for go:linkname
 
+	"storj.io/common/identity"
+	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/useragent"
@@ -47,6 +49,12 @@ type Config struct {
 	// connections. This value is a hammer where we need a scalpel.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
+	// ChainPEM and KeyPEM are optional fields that specify the tls identity used by
+	// the uplink while talking to other peers on the network. Don't set just one.
+	// It is expected that generally these will be left unset and a new tls identity
+	// will be generated.
+	ChainPEM, KeyPEM []byte
+
 	// satellitePool is a connection pool dedicated for satellite connections.
 	// If not set, the normal pool / default will be used.
 	satellitePool *rpcpool.Pool
@@ -82,7 +90,17 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 
 // getDialerForPool returns a new rpc.Dialer corresponding to the config, using the chosen pool (or config.pool if pool is nil).
 func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (_ rpc.Dialer, err error) {
-	tlsOptions, err := getProcessTLSOptions(ctx)
+	var tlsOptions *tlsopts.Options
+	if len(config.ChainPEM) > 0 && len(config.KeyPEM) > 0 {
+		var ident *identity.FullIdentity
+		ident, err = identity.FullIdentityFromPEM(config.ChainPEM, config.KeyPEM)
+		if err != nil {
+			return rpc.Dialer{}, packageError.Wrap(err)
+		}
+		tlsOptions, err = tlsOptionsFromIdentity(ident)
+	} else {
+		tlsOptions, err = getProcessTLSOptions(ctx)
+	}
 	if err != nil {
 		return rpc.Dialer{}, packageError.Wrap(err)
 	}

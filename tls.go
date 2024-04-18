@@ -32,16 +32,23 @@ func getProcessTLSOptions(ctx context.Context) (*tlsopts.Options, error) {
 		return nil, packageError.Wrap(err)
 	}
 
-	tlsConfig := tlsopts.Config{
-		UsePeerCAWhitelist: false,
-		PeerIDVersions:     "0",
-	}
-
-	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
+	tlsOptions, err := tlsOptionsFromIdentity(ident)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
 
 	processTLSOptions.tlsOptions = tlsOptions
+	return tlsOptions, nil
+}
+
+func tlsOptionsFromIdentity(ident *identity.FullIdentity) (*tlsopts.Options, error) {
+	tlsConfig := tlsopts.Config{
+		UsePeerCAWhitelist: false,
+		PeerIDVersions:     "0",
+	}
+	tlsOptions, err := tlsopts.NewOptions(ident, tlsConfig, nil)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
 	return tlsOptions, nil
 }
