@@ -6,7 +6,6 @@ package piecestore
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -302,8 +301,11 @@ func (client *Download) Close() error {
 
 	err := client.closingError.Get()
 	if err != nil {
-		details := errs.Class(fmt.Sprintf("(Node ID: %s, Piece ID: %s)", client.limit.StorageNodeId.String(), client.limit.PieceId.String()))
-		err = details.Wrap(Error.Wrap(err))
+		err = Error.New("(Node ID: %s, Piece ID: %s) %w",
+			client.limit.StorageNodeId.String(),
+			client.limit.PieceId.String(),
+			err,
+		)
 	}
 
 	return err
