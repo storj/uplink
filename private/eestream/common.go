@@ -12,9 +12,9 @@ var (
 	// Error is the default eestream errs class.
 	Error = errs.Class("eestream")
 
-	// QuiescentError is the class of errors returned when a stream is quiescent
+	// ErrInactive is the class of errors returned when a stream is inactive
 	// and should be restarted.
-	QuiescentError = errs.Class("quiescence")
+	ErrInactive = errs.Class("quiescence")
 
 	mon = monkit.Package()
 )

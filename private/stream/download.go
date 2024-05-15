@@ -114,7 +114,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 
 			err = download.resetReader(true)
 		}
-	} else if eestream.QuiescentError.Has(err) {
+	} else if eestream.ErrInactive.Has(err) {
 		evs.Event("quiescence-failure",
 			eventkit.Int64("decryption-retries", int64(download.decryptionRetries)),
 			eventkit.Int64("quiescence-retries", int64(download.quiescenceRetries)),

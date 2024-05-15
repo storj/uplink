@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	debugEnabled             = false
-	maxStripesAhead          = 256 // might be interesting to test different values later
-	quiescentCheckInterval   = time.Second
-	quiescentIntervalTrigger = 5 // number of quiescent check intervals before triggering
+	debugEnabled          = false
+	maxStripesAhead       = 256         // might be interesting to test different values later
+	inactiveCheckInterval = time.Second // how frequently to check for inactivity
+	inactiveCheckMaxCount = 5           // number of inactive checks before triggering
 )
 
 // pieceReader represents the stream of shares within one piece.
@@ -53,7 +53,7 @@ type StripeReader struct {
 	totalStripes    int32
 	errorDetection  bool
 	runningPieces   atomic.Int32
-	quiescent       atomic.Bool
+	inactive        atomic.Bool
 }
 
 // NewStripeReader makes a new StripeReader using the provided map of share
@@ -136,7 +136,7 @@ func (s *StripeReader) start() {
 		s1 := s.bundy.ProgressSnapshot(nil)
 		var s2 []int32
 
-		t := time.NewTicker(quiescentCheckInterval)
+		t := time.NewTicker(inactiveCheckInterval)
 		defer t.Stop()
 
 		match := 0
@@ -152,8 +152,8 @@ func (s *StripeReader) start() {
 				}
 
 				match++
-				if match == quiescentIntervalTrigger {
-					s.quiescent.Store(true)
+				if match == inactiveCheckMaxCount {
+					s.inactive.Store(true)
 					s.stripeReady.Signal()
 					return
 				}
@@ -319,8 +319,8 @@ func (s *StripeReader) ReadStripes(ctx context.Context, nextStripe int64, out []
 
 	for {
 		// check if we were woken from quiescence. if so, error out.
-		if s.quiescent.Load() {
-			return nil, 0, QuiescentError.New("")
+		if s.inactive.Load() {
+			return nil, 0, ErrInactive.New("")
 		}
 
 		// okay let's tell the bundy clock we're awake and it should be okay to
