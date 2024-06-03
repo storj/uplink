@@ -115,7 +115,8 @@ func TestBaseSplitter(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			splitter := newBaseSplitter(split, minimum)
+			splitter, err := newBaseSplitter(split, minimum)
+			require.NoError(t, err)
 			go func() {
 				n, err := io.CopyN(randomWriter{splitter}, emptyReader{}, tc.write)
 				splitter.Finish(tc.finish)
@@ -137,6 +138,14 @@ func TestBaseSplitter(t *testing.T) {
 	}
 }
 
+func TestBaseSplitter_MinimumLarger(t *testing.T) {
+	_, err := newBaseSplitter(500, 1000)
+	require.Error(t, err)
+
+	_, err = newBaseSplitter(1000, 1000)
+	require.Error(t, err)
+}
+
 func BenchmarkBaseSplitter(b *testing.B) {
 	ctx := context.Background()
 
@@ -151,7 +160,8 @@ func BenchmarkBaseSplitter(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			splitter := newBaseSplitter(split, minimum)
+			splitter, err := newBaseSplitter(split, minimum)
+			require.NoError(b, err)
 
 			go func() {
 				_, _ = io.Copy(splitter, &emptyLimitReader{size})

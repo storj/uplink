@@ -37,7 +37,11 @@ type baseSplitter struct {
 	current    WriteFinisher      // current split being written to
 }
 
-func newBaseSplitter(split, minimum int64) *baseSplitter {
+func newBaseSplitter(split, minimum int64) (*baseSplitter, error) {
+	if split <= minimum {
+		return nil, errs.New("split must be greater than minimum")
+	}
+
 	return &baseSplitter{
 		split:   split,
 		minimum: minimum,
@@ -45,7 +49,7 @@ func newBaseSplitter(split, minimum int64) *baseSplitter {
 		term: make(chan struct{}),
 		temp: make([]byte, 0, minimum),
 		next: make(chan WriteFinisher),
-	}
+	}, nil
 }
 
 func (bs *baseSplitter) Finish(err error) {

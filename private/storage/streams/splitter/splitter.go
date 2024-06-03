@@ -100,13 +100,17 @@ func New(opts Options) (*Splitter, error) {
 	if err != nil {
 		return nil, errs.Wrap(err)
 	}
+	split, err := newBaseSplitter(opts.Split, opts.Minimum)
+	if err != nil {
+		return nil, errs.Wrap(err)
+	}
 
 	return &Splitter{
 		NewBackend: func() (buffer.Backend, error) {
 			return buffer.NewChunkBackend(maxSegmentSize), nil
 		},
 
-		split:          newBaseSplitter(opts.Split, opts.Minimum),
+		split:          split,
 		opts:           opts,
 		maxSegmentSize: maxSegmentSize,
 	}, nil
