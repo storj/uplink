@@ -6,6 +6,7 @@ package uplink
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"storj.io/common/identity"
 	"storj.io/common/peertls/tlsopts"
@@ -13,15 +14,47 @@ import (
 
 var processTLSOptions struct {
 	mu         sync.Mutex
-	tlsOptions *tlsopts.Options
+	tlsOptions atomic.Pointer[tlsopts.Options]
+}
+
+var processTLSOptionsByPEM sync.Map
+
+func getProcessTLSOptionsFromPEM(chainPEM, keyPEM []byte) (*tlsopts.Options, error) {
+	if len(chainPEM) == 0 || len(keyPEM) == 0 {
+		return nil, packageError.New("both chain and key PEM must be provided")
+	}
+	lookupKey := [2]*byte{&chainPEM[0], &keyPEM[0]}
+
+	// first check the memoized value as a fast path with no locks
+	tlsOptionsI, ok := processTLSOptionsByPEM.Load(lookupKey)
+	if ok {
+		return tlsOptionsI.(*tlsopts.Options), nil
+	}
+
+	// it was a miss so create an identity from the pem data and make the tls options
+	ident, err := identity.FullIdentityFromPEM(chainPEM, keyPEM)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+	tlsOptions, err := tlsOptionsFromIdentity(ident)
+	if err != nil {
+		return nil, packageError.Wrap(err)
+	}
+
+	tlsOptionsI, _ = processTLSOptionsByPEM.LoadOrStore(lookupKey, tlsOptions)
+	return tlsOptionsI.(*tlsopts.Options), nil
 }
 
 func getProcessTLSOptions(ctx context.Context) (*tlsopts.Options, error) {
+	if tlsOptions := processTLSOptions.tlsOptions.Load(); tlsOptions != nil {
+		return tlsOptions, nil
+	}
+
 	processTLSOptions.mu.Lock()
 	defer processTLSOptions.mu.Unlock()
 
-	if processTLSOptions.tlsOptions != nil {
-		return processTLSOptions.tlsOptions, nil
+	if tlsOptions := processTLSOptions.tlsOptions.Load(); tlsOptions != nil {
+		return tlsOptions, nil
 	}
 
 	ident, err := identity.NewFullIdentity(ctx, identity.NewCAOptions{
@@ -37,7 +70,8 @@ func getProcessTLSOptions(ctx context.Context) (*tlsopts.Options, error) {
 		return nil, packageError.Wrap(err)
 	}
 
-	processTLSOptions.tlsOptions = tlsOptions
+	processTLSOptions.tlsOptions.Store(tlsOptions)
+
 	return tlsOptions, nil
 }
 

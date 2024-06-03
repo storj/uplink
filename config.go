@@ -9,7 +9,6 @@ import (
 	"time"
 	_ "unsafe" // for go:linkname
 
-	"storj.io/common/identity"
 	"storj.io/common/peertls/tlsopts"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
@@ -92,12 +91,7 @@ func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
 func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (_ rpc.Dialer, err error) {
 	var tlsOptions *tlsopts.Options
 	if len(config.ChainPEM) > 0 && len(config.KeyPEM) > 0 {
-		var ident *identity.FullIdentity
-		ident, err = identity.FullIdentityFromPEM(config.ChainPEM, config.KeyPEM)
-		if err != nil {
-			return rpc.Dialer{}, packageError.Wrap(err)
-		}
-		tlsOptions, err = tlsOptionsFromIdentity(ident)
+		tlsOptions, err = getProcessTLSOptionsFromPEM(config.ChainPEM, config.KeyPEM)
 	} else {
 		tlsOptions, err = getProcessTLSOptions(ctx)
 	}
