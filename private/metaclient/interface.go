@@ -34,8 +34,7 @@ func (create CreateObject) Object(bucket Bucket, path string) Object {
 			Size:             -1, // unknown
 			SegmentCount:     -1, // unknown
 			FixedSegmentSize: -1, // unknown
-
-			RedundancyScheme:     create.RedundancyScheme,
+			
 			EncryptionParameters: create.EncryptionParameters,
 		},
 	}

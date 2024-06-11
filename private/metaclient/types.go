@@ -30,7 +30,6 @@ type RawObjectItem struct {
 	EncryptedMetadata             []byte
 
 	EncryptionParameters storj.EncryptionParameters
-	RedundancyScheme     storj.RedundancyScheme
 
 	Retention *Retention
 }
@@ -153,8 +152,6 @@ type Stream struct {
 	// when all segments have the same size. It is -1 otherwise.
 	FixedSegmentSize int64
 
-	// RedundancyScheme specifies redundancy strategy used for this stream
-	storj.RedundancyScheme
 	// EncryptionParameters specifies encryption strategy used for this stream
 	storj.EncryptionParameters
 

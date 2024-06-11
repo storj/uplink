@@ -71,7 +71,6 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 		info.Metadata = createInfo.Metadata
 		info.ContentType = createInfo.ContentType
 		info.Expires = createInfo.Expires
-		info.RedundancyScheme = createInfo.RedundancyScheme
 		info.EncryptionParameters = createInfo.EncryptionParameters
 	}
 
@@ -707,7 +706,6 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 
 			Size: objectInfo.PlainSize,
 
-			RedundancyScheme:     objectInfo.RedundancyScheme,
 			EncryptionParameters: objectInfo.EncryptionParameters,
 		},
 	}

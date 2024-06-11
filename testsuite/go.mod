@@ -11,7 +11,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.6.0
-	storj.io/common v0.0.0-20240424123607-5f226fc92c16
+	storj.io/common v0.0.0-20240611143318-a6f1908a63e9
 	storj.io/drpc v0.0.34
 	storj.io/infectious v0.0.2
 	storj.io/storj v1.91.0-alpha.0.20240405184421-d601509eca53
@@ -105,7 +105,7 @@ require (
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
@@ -113,7 +113,7 @@ require (
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	storj.io/eventkit v0.0.0-20240306141230-6cb545e5f892 // indirect
+	storj.io/eventkit v0.0.0-20240415002644-1d9596fee086 // indirect
 	storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd // indirect
 	storj.io/picobuf v0.0.3 // indirect
 )

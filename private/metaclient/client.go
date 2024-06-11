@@ -696,17 +696,6 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		}
 	}
 
-	pbRS := object.RedundancyScheme
-	if pbRS != nil {
-		info.RedundancyScheme = storj.RedundancyScheme{
-			Algorithm:      storj.RedundancyAlgorithm(pbRS.Type),
-			ShareSize:      pbRS.ErasureShareSize,
-			RequiredShares: int16(pbRS.MinReq),
-			RepairShares:   int16(pbRS.RepairThreshold),
-			OptimalShares:  int16(pbRS.SuccessThreshold),
-			TotalShares:    int16(pbRS.Total),
-		}
-	}
 	return info
 }
 
