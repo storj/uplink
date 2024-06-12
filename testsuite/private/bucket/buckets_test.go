@@ -10,11 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"storj.io/common/macaroon"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
+	"storj.io/storj/satellite/console"
 	"storj.io/storj/satellite/nodeselection"
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
@@ -170,5 +172,102 @@ func TestSetBucketVersioning(t *testing.T) {
 				require.Equal(t, tt.resultantVersioningState, buckets.Versioning(versioningState))
 			})
 		}
+	})
+}
+
+func TestCreateBucketWithObjectLock(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectLock = true
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+		userID := upl.Projects[0].Owner.ID
+
+		userCtx, err := sat.UserContext(ctx, userID)
+		require.NoError(t, err)
+
+		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionMin)
+		require.NoError(t, err)
+
+		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		// permission denied for older API key version
+		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+
+		// permission denied for older API key version
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              "some-bucket",
+			ObjectLockEnabled: true,
+		})
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+
+		err = project.Close()
+		require.NoError(t, err)
+
+		_, key, err = sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key2", macaroon.APIKeyVersionObjectLock)
+		require.NoError(t, err)
+
+		access, err = uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err = upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		// bucket not exists
+		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		require.ErrorIs(t, err, uplink.ErrBucketNotFound)
+
+		// no bucket name
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              "",
+			ObjectLockEnabled: false,
+		})
+		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              "test-bucket",
+			ObjectLockEnabled: false,
+		})
+		require.NoError(t, err)
+
+		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		require.ErrorIs(t, err, bucket.ErrBucketObjectLockConfigurationNotFound)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              "test-bucket",
+			ObjectLockEnabled: true,
+		})
+		require.ErrorIs(t, err, uplink.ErrBucketAlreadyExists)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              "test-bucket2",
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		enabled, err := bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
+		require.NoError(t, err)
+		require.True(t, enabled)
 	})
 }

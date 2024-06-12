@@ -111,13 +111,15 @@ func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectI
 
 // CreateBucketParams parameters for CreateBucket method.
 type CreateBucketParams struct {
-	Name []byte
+	Name              []byte
+	ObjectLockEnabled bool
 }
 
 func (params *CreateBucketParams) toRequest(header *pb.RequestHeader) *pb.BucketCreateRequest {
 	return &pb.BucketCreateRequest{
-		Header: header,
-		Name:   params.Name,
+		Header:            header,
+		Name:              params.Name,
+		ObjectLockEnabled: params.ObjectLockEnabled,
 	}
 }
 
@@ -352,6 +354,50 @@ func (client *Client) SetBucketVersioning(ctx context.Context, params SetBucketV
 		return err
 	})
 	return Error.Wrap(err)
+}
+
+// GetBucketObjectLockConfigurationParams parameters for GetBucketObjectLockConfiguration method.
+type GetBucketObjectLockConfigurationParams struct {
+	Name []byte
+}
+
+func (params *GetBucketObjectLockConfigurationParams) toRequest(header *pb.RequestHeader) *pb.GetBucketObjectLockConfigurationRequest {
+	return &pb.GetBucketObjectLockConfigurationRequest{
+		Header: header,
+		Name:   params.Name,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *GetBucketObjectLockConfigurationParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketGetObjectLockConfiguration{
+			BucketGetObjectLockConfiguration: params.toRequest(nil),
+		},
+	}
+}
+
+// GetBucketObjectLockConfigurationResponse response for GetBucketObjectLockConfiguration request.
+type GetBucketObjectLockConfigurationResponse struct {
+	Enabled bool
+}
+
+// GetBucketObjectLockConfiguration returns a bucket object lock configuration.
+func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, params GetBucketObjectLockConfigurationParams) (_ GetBucketObjectLockConfigurationResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetBucketObjectLockConfigurationResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetBucketObjectLockConfiguration(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return GetBucketObjectLockConfigurationResponse{}, Error.Wrap(err)
+	}
+
+	return GetBucketObjectLockConfigurationResponse{
+		Enabled: response.Configuration.Enabled,
+	}, nil
 }
 
 // DeleteBucketParams parameters for DeleteBucket method.
