@@ -5,6 +5,7 @@ package testsuite_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -22,6 +23,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/storagenode/pieces"
 	"storj.io/uplink"
 	privateAccess "storj.io/uplink/private/access"
 )
@@ -933,9 +935,13 @@ func TestAccessMaxObjectTTL(t *testing.T) {
 		require.NoError(t, objects.Err())
 
 		for _, node := range planet.StorageNodes {
-			pieces, err := node.DB.PieceExpirationDB().GetExpired(ctx, now.Add(oneHour+10*time.Minute), 10)
+			expired := make([]pieces.ExpiredInfo, 0)
+			err = node.DB.PieceExpirationDB().GetExpired(ctx, now.Add(oneHour+10*time.Minute), func(_ context.Context, info pieces.ExpiredInfo) bool {
+				expired = append(expired, info)
+				return len(expired) < 10
+			})
 			require.NoError(t, err)
-			require.Len(t, pieces, 1)
+			require.Len(t, expired, 1)
 		}
 	})
 }

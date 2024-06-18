@@ -20,6 +20,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/storagenode/pieces"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -112,9 +113,13 @@ func TestBeginUpload_Expires(t *testing.T) {
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
 
+		expiredInfos := make([]pieces.ExpiredInfo, 0)
 		// check that storage nodes have pieces that will expire
 		for _, sn := range planet.StorageNodes {
-			expiredInfos, err := sn.Storage2.Store.GetExpired(ctx, expiresAt.Add(time.Hour), 100)
+			err = sn.Storage2.Store.GetExpired(ctx, expiresAt.Add(time.Hour), func(_ context.Context, info pieces.ExpiredInfo) bool {
+				expiredInfos = append(expiredInfos, info)
+				return len(expiredInfos) < 100
+			})
 			require.NoError(t, err)
 			require.NotEmpty(t, expiredInfos)
 		}
