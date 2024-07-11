@@ -21,13 +21,11 @@ import (
 	"storj.io/common/ranger"
 	"storj.io/common/rpc"
 	"storj.io/common/storj"
-	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/piecestore"
 )
 
 var mon = monkit.Package()
-var evs = eventkit.Package()
 
 // GetOptions is a struct of options for GetWithOptions.
 type GetOptions struct {
@@ -219,33 +217,7 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 
 	storageNodeID := limit.GetLimit().StorageNodeId
 	defer mon.Task()(&ctx, "node: "+storageNodeID.String()[0:8])(&err)
-	start := time.Now()
 	measuredReader := countingReader{R: data}
-	defer func() {
-		var errstr string
-		if err != nil {
-			errstr = err.Error()
-		}
-		var pieceSize int64
-		var pieceTimestamp time.Time
-		var hashAlgo int64
-		if hash != nil {
-			pieceSize = hash.PieceSize
-			pieceTimestamp = hash.Timestamp
-			hashAlgo = int64(hash.HashAlgorithm)
-		}
-		evs.Event("piece-upload",
-			eventkit.Bytes("node_id", storageNodeID.Bytes()),
-			eventkit.Bytes("piece_id", limit.GetLimit().PieceId.Bytes()),
-			eventkit.Duration("upload_time", time.Since(start)),
-			eventkit.Bool("success", err == nil),
-			eventkit.String("error", errstr),
-			eventkit.Int64("bytes", measuredReader.N),
-			eventkit.Int64("piece_size", pieceSize),
-			eventkit.Timestamp("piece_timestamp", pieceTimestamp),
-			eventkit.Int64("hash_algo", hashAlgo),
-		)
-	}()
 	defer func() { err = errs.Combine(err, data.Close()) }()
 
 	ps, err := ec.dialPiecestore(ctx, limitToNodeURL(limit))
