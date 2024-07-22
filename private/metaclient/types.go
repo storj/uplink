@@ -116,6 +116,9 @@ var (
 	// ErrObjectNotFound is an error class for non-existing object.
 	ErrObjectNotFound = errs.Class("object not found")
 
+	// ErrRetentionNotFound is an error class for non-existing object retention.
+	ErrRetentionNotFound = errs.Class("object retention not found")
+
 	// ErrUploadIDInvalid is an error class for invalid upload ID.
 	ErrUploadIDInvalid = errs.Class("upload ID invalid")
 )

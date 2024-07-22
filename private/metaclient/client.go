@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -875,6 +876,108 @@ func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObj
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return ErrObjectNotFound.Wrap(err)
 		}
+	}
+
+	return Error.Wrap(err)
+}
+
+// SetObjectRetentionParams are params for the SetObjectRetention request.
+type SetObjectRetentionParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	ObjectVersion      []byte
+
+	Retention Retention
+}
+
+func (params *SetObjectRetentionParams) toRequest(header *pb.RequestHeader) *pb.SetObjectRetentionRequest {
+	req := &pb.SetObjectRetentionRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		ObjectVersion:      params.ObjectVersion,
+	}
+
+	if params.Retention != (Retention{}) {
+		req.Retention = &pb.Retention{
+			Mode:        pb.Retention_Mode(params.Retention.Mode),
+			RetainUntil: params.Retention.RetainUntil,
+		}
+	}
+
+	return req
+}
+
+// SetObjectRetention sets retention on the object.
+func (client *Client) SetObjectRetention(ctx context.Context, params SetObjectRetentionParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetObjectRetention(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return convertNotFoundErr(err)
+		}
+	}
+
+	return Error.Wrap(err)
+}
+
+// GetObjectRetentionParams are params for the GetObjectRetention request.
+type GetObjectRetentionParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	ObjectVersion      []byte
+}
+
+func (params *GetObjectRetentionParams) toRequest(header *pb.RequestHeader) *pb.GetObjectRetentionRequest {
+	return &pb.GetObjectRetentionRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		ObjectVersion:      params.ObjectVersion,
+	}
+}
+
+// GetObjectRetention retrieves object's retention.
+func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRetentionParams) (r *Retention, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetObjectRetentionResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetObjectRetention(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return nil, convertNotFoundErr(err)
+		}
+
+		return nil, Error.Wrap(err)
+	}
+
+	return &Retention{
+		Mode:        storj.RetentionMode(response.Retention.Mode),
+		RetainUntil: response.Retention.RetainUntil,
+	}, nil
+}
+
+func convertNotFoundErr(err error) error {
+	const (
+		bucketNotFoundPrefix = "bucket not found"
+		objectNotFoundPrefix = "object not found"
+		noRetentionPrefix    = "object does not have a retention configuration"
+	)
+
+	message := errs.Unwrap(err).Error()
+	if strings.HasPrefix(message, bucketNotFoundPrefix) {
+		return ErrBucketNotFound.Wrap(err)
+	} else if strings.HasPrefix(message, objectNotFoundPrefix) {
+		return ErrObjectNotFound.Wrap(err)
+	} else if strings.HasPrefix(message, noRetentionPrefix) {
+		return ErrRetentionNotFound.Wrap(err)
 	}
 
 	return Error.Wrap(err)

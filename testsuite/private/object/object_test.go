@@ -6,19 +6,26 @@ package object_test
 import (
 	"io"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
+	"storj.io/common/macaroon"
 	"storj.io/common/memory"
+	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
+	"storj.io/storj/satellite/console"
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/object"
 	"storj.io/uplink/private/testuplink"
 )
@@ -159,6 +166,94 @@ func TestUploadObject(t *testing.T) {
 		uploadObject.Custom = uplink.CustomMetadata{}
 		statObj.Custom = uplink.CustomMetadata{}
 		require.EqualExportedValues(t, *uploadObject, *statObj)
+	})
+}
+
+func TestGetAndSetObjectRetention(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.UseBucketLevelObjectLock = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+		userID := upl.Projects[0].Owner.ID
+
+		userCtx, err := sat.UserContext(ctx, userID)
+		require.NoError(t, err)
+
+		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
+		require.NoError(t, err)
+
+		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		wrongBucket := "random-bucket"
+		wrongKey := "random-key"
+
+		objRetention, err := object.GetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+		require.Nil(t, objRetention)
+
+		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, wrongKey, upload.Info().Version)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+		require.Nil(t, objRetention)
+
+		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.True(t, metaclient.ErrRetentionNotFound.Has(err))
+		require.Nil(t, objRetention)
+
+		retention := metaclient.Retention{
+			Mode:        storj.ComplianceMode,
+			RetainUntil: time.Now().Add(time.Hour),
+		}
+
+		err = object.SetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version, retention)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+
+		err = object.SetObjectRetention(ctx, project, bucketName, wrongKey, upload.Info().Version, retention)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+
+		err = object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention)
+		require.NoError(t, err)
+
+		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+		require.NotNil(t, objRetention)
+		require.Equal(t, retention.Mode, objRetention.Mode)
+		require.WithinDuration(t, retention.RetainUntil.UTC(), objRetention.RetainUntil, time.Minute)
 	})
 }
 

@@ -42,7 +42,7 @@ type Meta struct {
 	Size       int64
 	Data       []byte
 	Version    []byte
-	Retention  metaclient.Retention
+	Retention  *metaclient.Retention
 }
 
 // Part info about a part.
@@ -390,7 +390,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		Size:       streamSize,
 		Data:       metadataBytes,
 		Version:    rawObject.Version,
-		Retention:  *rawObject.Retention,
+		Retention:  rawObject.Retention,
 	}
 
 	return resultMeta, nil

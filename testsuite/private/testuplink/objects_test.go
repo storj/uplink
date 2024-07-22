@@ -130,7 +130,7 @@ func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *strea
 	str, err := obj.CreateStream(ctx)
 	require.NoError(t, err)
 
-	upload := stream.NewUpload(ctx, str, streams)
+	upload := stream.NewUpload(ctx, str, streams, nil)
 
 	_, err = upload.Write(data)
 	require.NoError(t, err)

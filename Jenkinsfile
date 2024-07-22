@@ -152,8 +152,6 @@ pipeline {
                                 STORJ_TEST_DATABASES = 'pg|pgx|postgres://postgres@localhost/testmetabase?sslmode=disable'
                             }
                             steps {
-                                sh 'echo "Disabled due to the circular dependency. Will be re-enabled as soon storj/storj starts to use this commit."'
-                                /*
                                 sh 'psql -U postgres -c \'create database teststorj2;\''
                                 sh 'psql -U postgres -c \'create database testmetabase;\''
                                 dir('testsuite'){
@@ -169,7 +167,6 @@ pipeline {
                                     archiveArtifacts artifacts: '.build/testsuite-storj.json'
                                     junit '.build/testsuite-storj.xml'
                                 }
-                                */
                             }
                         }
                         stage('Go Compatibility') {

@@ -70,7 +70,7 @@ func (upload *VersionedUpload) Info() *VersionedObject {
 		obj.System.ContentLength = meta.Size
 		obj.System.Created = meta.Modified
 		obj.Version = meta.Version
-		obj.Retention = &meta.Retention
+		obj.Retention = meta.Retention
 	}
 	return obj
 }
@@ -295,13 +295,43 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	return convertObject(obj), nil
 }
 
+// SetObjectRetention sets the retention for the object at the specific key and version ID.
+func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, retention metaclient.Retention) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	err = db.SetObjectRetention(ctx, bucket, key, version, retention)
+
+	return convertKnownErrors(err, bucket, key)
+}
+
+// GetObjectRetention retrieves the retention for the object at the specific key and version ID.
+func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, key string, version []byte) (retention *metaclient.Retention, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	retention, err = db.GetObjectRetention(ctx, bucket, key, version)
+
+	return retention, convertKnownErrors(err, bucket, key)
+}
+
 // convertObject converts metainfo.Object to Version.
 func convertObject(obj *metaclient.Object) *VersionedObject {
 	if obj == nil || obj.Bucket.Name == "" { // nil or zero object
 		return nil
 	}
 
-	return &VersionedObject{
+	object := &VersionedObject{
 		Object: uplink.Object{
 			Key:      obj.Path,
 			IsPrefix: obj.IsPrefix,
@@ -316,6 +346,12 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 		IsDeleteMarker: obj.IsDeleteMarker,
 		Retention:      obj.Retention,
 	}
+
+	if object.Custom == nil {
+		object.Custom = uplink.CustomMetadata{}
+	}
+
+	return object
 }
 
 // convertObject converts metainfo.Object to Version.

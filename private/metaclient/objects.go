@@ -193,6 +193,55 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 	})
 }
 
+// SetObjectRetention sets the retention for the object at the specific key and version ID.
+func (db *DB) SetObjectRetention(ctx context.Context, bucket, key string, version []byte, retention Retention) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return ErrNoBucket.New("")
+	}
+
+	if key == "" {
+		return ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return err
+	}
+
+	return db.metainfo.SetObjectRetention(ctx, SetObjectRetentionParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		ObjectVersion:      version,
+		Retention:          retention,
+	})
+}
+
+// GetObjectRetention retrieves the retention for the object at the specific key and version ID.
+func (db *DB) GetObjectRetention(ctx context.Context, bucket, key string, version []byte) (retention *Retention, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return nil, ErrNoBucket.New("")
+	}
+
+	if key == "" {
+		return nil, ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.metainfo.GetObjectRetention(ctx, GetObjectRetentionParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		ObjectVersion:      version,
+	})
+}
+
 // DeleteObject deletes an object from database.
 func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []byte) (_ Object, err error) {
 	defer mon.Task()(&ctx)(&err)
