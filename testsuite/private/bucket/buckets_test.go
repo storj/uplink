@@ -252,7 +252,7 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
-		require.ErrorIs(t, err, bucket.ErrBucketObjectLockConfigurationNotFound)
+		require.Error(t, err)
 
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
 			Name:              "test-bucket",

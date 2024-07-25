@@ -10,9 +10,9 @@ require (
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.6.0
-	storj.io/common v0.0.0-20240424123607-5f226fc92c16
-	storj.io/drpc v0.0.33
-	storj.io/eventkit v0.0.0-20240306141230-6cb545e5f892
+	storj.io/common v0.0.0-20240719140949-cd5473569103
+	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
+	storj.io/eventkit v0.0.0-20240415002644-1d9596fee086
 	storj.io/infectious v0.0.2
 	storj.io/picobuf v0.0.3
 )
@@ -28,6 +28,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

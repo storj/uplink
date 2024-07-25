@@ -108,6 +108,7 @@ pipeline {
                             environment {
                                 STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
                                 STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
+                                STORJ_TEST_SPANNER = 'omit'
                                 STORJ_TEST_COCKROACH_NODROP = 'true'
                                 STORJ_TEST_LOG_LEVEL = 'info'
                                 COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
@@ -146,6 +147,7 @@ pipeline {
                             environment {
                                 STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
                                 STORJ_TEST_COCKROACH = 'omit'
+                                STORJ_TEST_SPANNER = 'omit'
                                 // TODO add 'omit' for metabase STORJ_TEST_DATABASES
                                 STORJ_TEST_DATABASES = 'pg|pgx|postgres://postgres@localhost/testmetabase?sslmode=disable'
                             }

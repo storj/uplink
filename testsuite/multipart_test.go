@@ -20,7 +20,6 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
-	"storj.io/storj/storagenode/pieces"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -83,7 +82,8 @@ func TestBeginUpload_Expires(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 
-		expiresAt := time.Now().Add(time.Hour)
+		now := time.Now()
+		expiresAt := now.Add(time.Hour)
 		info, err := project.BeginUpload(ctx, "testbucket", "multipart-object", &uplink.UploadOptions{
 			Expires: expiresAt,
 		})
@@ -113,15 +113,11 @@ func TestBeginUpload_Expires(t *testing.T) {
 		require.NoError(t, list.Err())
 		require.Nil(t, list.Item())
 
-		expiredInfos := make([]pieces.ExpiredInfo, 0)
 		// check that storage nodes have pieces that will expire
 		for _, sn := range planet.StorageNodes {
-			err = sn.Storage2.Store.GetExpired(ctx, expiresAt.Add(time.Hour), func(_ context.Context, info pieces.ExpiredInfo) bool {
-				expiredInfos = append(expiredInfos, info)
-				return len(expiredInfos) < 100
-			})
+			expired, err := sn.DB.PieceExpirationDB().GetExpired(ctx, now.Add(time.Hour+10*time.Minute), -1)
 			require.NoError(t, err)
-			require.NotEmpty(t, expiredInfos)
+			require.NotEmpty(t, expired)
 		}
 	})
 }
