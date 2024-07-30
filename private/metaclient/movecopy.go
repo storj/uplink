@@ -22,8 +22,13 @@ type EncryptedKeyAndNonce struct {
 	EncryptedKey      []byte
 }
 
+// CopyObjectOptions options for CopyObject method.
+type CopyObjectOptions struct {
+	Retention Retention
+}
+
 // CopyObject atomically copies object to a different bucket or/and key. Source object version can be specified.
-func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, sourceVersion []byte, targetBucket, targetKey string) (_ *Object, err error) {
+func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, sourceVersion []byte, targetBucket, targetKey string, opts CopyObjectOptions) (_ *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	err = validateMoveCopyInput(sourceBucket, sourceKey, targetBucket, targetKey)
@@ -72,14 +77,18 @@ func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, so
 		return nil, errs.Wrap(err)
 	}
 
-	obj, err := db.metainfo.FinishCopyObject(ctx, FinishCopyObjectParams{
+	params := FinishCopyObjectParams{
 		StreamID:                     response.StreamID,
 		NewBucket:                    []byte(targetBucket),
 		NewEncryptedObjectKey:        []byte(targetEncKey.Raw()),
 		NewEncryptedMetadataKeyNonce: newMetadataKeyNonce,
 		NewEncryptedMetadataKey:      newMetadataEncryptedKey,
 		NewSegmentKeys:               newKeys,
-	})
+	}
+	if opts != (CopyObjectOptions{}) {
+		params.Retention = opts.Retention
+	}
+	obj, err := db.metainfo.FinishCopyObject(ctx, params)
 	if err != nil {
 		return nil, errs.Wrap(err)
 	}

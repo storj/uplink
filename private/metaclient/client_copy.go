@@ -92,6 +92,7 @@ type FinishCopyObjectParams struct {
 	NewEncryptedMetadataKeyNonce storj.Nonce
 	NewEncryptedMetadataKey      []byte
 	NewSegmentKeys               []EncryptedKeyAndNonce
+	Retention                    Retention
 }
 
 func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectFinishCopyRequest {
@@ -106,7 +107,7 @@ func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 			EncryptedKey:      keyAndNonce.EncryptedKey,
 		}
 	}
-	return &pb.ObjectFinishCopyRequest{
+	request := &pb.ObjectFinishCopyRequest{
 		Header:                       header,
 		StreamId:                     params.StreamID,
 		NewBucket:                    params.NewBucket,
@@ -115,6 +116,13 @@ func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 		NewEncryptedMetadataKey:      params.NewEncryptedMetadataKey,
 		NewSegmentKeys:               keys,
 	}
+	if params.Retention != (Retention{}) {
+		request.Retention = &pb.Retention{
+			Mode:        pb.Retention_Mode(params.Retention.Mode),
+			RetainUntil: params.Retention.RetainUntil,
+		}
+	}
+	return request
 }
 
 // BatchItem returns single item for batch request.

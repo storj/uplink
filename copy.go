@@ -7,6 +7,8 @@ import (
 	"context"
 
 	"github.com/zeebo/errs"
+
+	"storj.io/uplink/private/metaclient"
 )
 
 // CopyObjectOptions options for CopyObject method.
@@ -24,7 +26,7 @@ func (project *Project) CopyObject(ctx context.Context, oldBucket, oldKey, newBu
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.CopyObject(ctx, oldBucket, oldKey, nil, newBucket, newKey)
+	obj, err := db.CopyObject(ctx, oldBucket, oldKey, nil, newBucket, newKey, metaclient.CopyObjectOptions{})
 	if err != nil {
 		return nil, convertKnownErrors(err, oldBucket, oldKey)
 	}

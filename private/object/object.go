@@ -6,6 +6,7 @@ package object
 import (
 	"context"
 	"errors"
+	"strings"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -27,6 +28,9 @@ var packageError = errs.Class("object")
 
 // ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
 var ErrMethodNotAllowed = errors.New("method not allowed")
+
+// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
+var ErrNoObjectLockConfiguration = errors.New("destination bucket has no object lock configuration")
 
 // IPSummary contains information about the object IP-s.
 type IPSummary = metaclient.GetObjectIPsResponse
@@ -57,6 +61,11 @@ type ListObjectVersionsOptions struct {
 	System        bool
 	Custom        bool
 	Limit         int
+}
+
+// CopyObjectOptions options for CopyObject method.
+type CopyObjectOptions struct {
+	Retention metaclient.Retention
 }
 
 // Info returns the last information about the uploaded object.
@@ -278,7 +287,7 @@ func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, upl
 }
 
 // CopyObject atomically copies object to a different bucket or/and key.
-func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sourceKey string, sourceVersion []byte, targetBucket, targetKey string, options *uplink.CopyObjectOptions) (_ *VersionedObject, err error) {
+func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sourceKey string, sourceVersion []byte, targetBucket, targetKey string, options CopyObjectOptions) (_ *VersionedObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	db, err := dialMetainfoDB(ctx, project)
@@ -287,7 +296,11 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey)
+	metaOpts := metaclient.CopyObjectOptions{}
+	if options != (CopyObjectOptions{}) {
+		metaOpts.Retention = options.Retention
+	}
+	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey, metaOpts)
 	if err != nil {
 		return nil, packageConvertKnownErrors(err, sourceBucket, sourceKey)
 	}
@@ -369,6 +382,11 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 func packageConvertKnownErrors(err error, bucket, key string) error {
 	if errs2.IsRPC(err, rpcstatus.MethodNotAllowed) {
 		return ErrMethodNotAllowed
+	}
+	if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
+		if strings.HasSuffix(errs.Unwrap(err).Error(), "cannot specify Object Lock settings when uploading into a bucket without Object Lock enabled") {
+			return ErrNoObjectLockConfiguration
+		}
 	}
 	return convertKnownErrors(err, bucket, key)
 }

@@ -490,7 +490,7 @@ func TestCopyObject(t *testing.T) {
 		_, err = planet.Uplinks[0].UploadWithOptions(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(6*memory.KiB), nil)
 		require.NoError(t, err)
 
-		copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", nil)
+		copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", object.CopyObjectOptions{})
 		require.NoError(t, err)
 		require.NotEmpty(t, copiedObject.Version)
 
@@ -500,8 +500,88 @@ func TestCopyObject(t *testing.T) {
 
 		nonExistingVersion := slices.Clone(obj.Version)
 		nonExistingVersion[0]++ // change original version
-		_, err = object.CopyObject(ctx, project, bucketName, objectKey, nonExistingVersion, bucketName, objectKey+"-copy", nil)
+		_, err = object.CopyObject(ctx, project, bucketName, objectKey, nonExistingVersion, bucketName, objectKey+"-copy", object.CopyObjectOptions{})
 		require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+	})
+}
+
+func TestCopyObjectWithObjectLock(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.UseBucketLevelObjectLock = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+		userID := upl.Projects[0].Owner.ID
+
+		userCtx, err := sat.UserContext(ctx, userID)
+		require.NoError(t, err)
+
+		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
+		require.NoError(t, err)
+
+		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		obj, err := planet.Uplinks[0].UploadWithOptions(ctx, planet.Satellites[0], bucketName, objectKey, testrand.Bytes(5*memory.KiB), nil)
+		require.NoError(t, err)
+
+		retention := metaclient.Retention{
+			Mode:        storj.ComplianceMode,
+			RetainUntil: time.Now().Add(time.Hour),
+		}
+		err = object.SetObjectRetention(ctx, project, bucketName, objectKey, obj.Version, retention)
+		require.NoError(t, err)
+
+		copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", object.CopyObjectOptions{
+			Retention: retention,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, copiedObject.Retention)
+		require.Equal(t, retention.Mode, copiedObject.Retention.Mode)
+		require.WithinDuration(t, retention.RetainUntil.UTC(), copiedObject.Retention.RetainUntil, time.Minute)
+
+		objectInfo, err := object.StatObject(ctx, project, bucketName, copiedObject.Key, copiedObject.Version)
+		require.NoError(t, err)
+		require.Equal(t, retention.Mode, objectInfo.Retention.Mode)
+		require.WithinDuration(t, retention.RetainUntil.UTC(), objectInfo.Retention.RetainUntil, time.Minute)
+
+		noLockBucket := "no-lock-bucket"
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              noLockBucket,
+			ObjectLockEnabled: false,
+		})
+		require.NoError(t, err)
+
+		// cannot copy a locked object to a bucket without object lock
+		_, err = object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, noLockBucket, objectKey, object.CopyObjectOptions{
+			Retention: retention,
+		})
+		require.ErrorIs(t, err, object.ErrNoObjectLockConfiguration)
 	})
 }
 
