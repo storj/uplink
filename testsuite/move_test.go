@@ -31,13 +31,15 @@ func TestMoveObject(t *testing.T) {
 		createBucket(t, ctx, project, "testbucket")
 		createBucket(t, ctx, project, "new-testbucket")
 
-		testCases := []struct {
+		type testCase struct {
 			Bucket     string
 			Key        string
 			NewBucket  string
 			NewKey     string
 			ObjectSize memory.Size
-		}{
+		}
+
+		testCases := []testCase{
 			// the same bucket
 			{"testbucket", "empty", "testbucket", "new-empty", 0},
 			{"testbucket", "inline", "testbucket", "new-inline", memory.KiB},
@@ -47,7 +49,7 @@ func TestMoveObject(t *testing.T) {
 			{"testbucket", "remote+inline", "testbucket", "new-remote+inline", 11 * memory.KiB},
 			// 3 remote segment
 			{"testbucket", "multiple-remote-segments", "testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
-			{"testbucket", "remote-with-prefix", "testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
+			{"testbucket", "remote-with-delimiters", "testbucket", "a/prefix/remote-with-delimiters", 9 * memory.KiB},
 
 			// different bucket
 			{"testbucket", "empty", "new-testbucket", "new-empty", 0},
@@ -58,14 +60,37 @@ func TestMoveObject(t *testing.T) {
 			{"testbucket", "remote+inline", "new-testbucket", "new-remote+inline", 11 * memory.KiB},
 			// 3 remote segment
 			{"testbucket", "multiple-remote-segments", "new-testbucket", "new-multiple-remote-segments", 29 * memory.KiB},
-			{"testbucket", "remote-with-prefix", "new-testbucket", "a/prefix/remote-with-prefix", 9 * memory.KiB},
+			{"testbucket", "remote-with-delimiters", "new-testbucket", "a/prefix/remote-with-delimiters", 9 * memory.KiB},
 
 			// TODO write tests to move to existing key
 		}
 
+		for _, destBucket := range []string{"testbucket", "new-testbucket"} {
+			for _, objectSize := range []memory.Size{1 * memory.KiB, 9 * memory.KiB, 21 * memory.KiB} {
+				for _, sourceKey := range []string{"an/object/key", "an/object/key/"} {
+					for _, destTrailingSlash := range []bool{true, false} {
+						for _, destKey := range []string{
+							"an/object/key2",
+							"an/object/key/2",
+							"an/object2",
+							"an/object",
+							"another/object",
+						} {
+							if destTrailingSlash {
+								destKey += "/"
+							}
+							testCases = append(testCases, testCase{
+								"testbucket", sourceKey, destBucket, destKey, objectSize,
+							})
+						}
+					}
+				}
+			}
+		}
+
 		for _, tc := range testCases {
 			tc := tc
-			t.Run(tc.Key, func(t *testing.T) {
+			t.Run(tc.Bucket+"/"+tc.Key+" to "+tc.NewBucket+"/"+tc.NewKey+" "+tc.ObjectSize.Base2String(), func(t *testing.T) {
 				expectedData := testrand.Bytes(tc.ObjectSize)
 				err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], tc.Bucket, tc.Key, expectedData)
 				require.NoError(t, err)
@@ -88,6 +113,10 @@ func TestMoveObject(t *testing.T) {
 
 				_, err = project.StatObject(ctx, tc.Bucket, tc.Key)
 				require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
+
+				// cleanup
+				_, err = project.DeleteObject(ctx, tc.NewBucket, tc.NewKey)
+				require.NoError(t, err)
 			})
 		}
 	})
@@ -128,7 +157,7 @@ func TestMoveObject_Errors(t *testing.T) {
 		require.Contains(t, err.Error(), "(\"non-existing-bucket\")")
 
 		err = project.MoveObject(ctx, "testbucket", "prefix/", "testbucket", "new-key", nil)
-		require.Error(t, err)
+		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 
 		err = project.MoveObject(ctx, "testbucket", "key", "testbucket", "prefix/", nil)
 		require.Error(t, err)

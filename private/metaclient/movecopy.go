@@ -6,7 +6,6 @@ package metaclient
 import (
 	"context"
 	"crypto/rand"
-	"strings"
 
 	"github.com/zeebo/errs"
 
@@ -173,14 +172,10 @@ func validateMoveCopyInput(oldbucket, oldkey, newbucket, newkey string) error {
 		return ErrNoBucket.New(oldbucket)
 	case oldkey == "":
 		return ErrNoPath.New(oldkey)
-	case strings.HasSuffix(oldkey, "/"):
-		return errs.New("oldkey cannot be a prefix")
 	case newbucket == "": // TODO should we make this error different
 		return ErrNoBucket.New(newbucket)
 	case newkey == "": // TODO should we make this error different
 		return ErrNoPath.New(newkey)
-	case strings.HasSuffix(newkey, "/"):
-		return errs.New("newkey cannot be a prefix")
 	}
 
 	return nil

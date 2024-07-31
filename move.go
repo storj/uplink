@@ -6,7 +6,6 @@ package uplink
 import (
 	"context"
 	"crypto/rand"
-	"strings"
 
 	"github.com/zeebo/errs"
 
@@ -92,14 +91,10 @@ func validateMoveCopyInput(oldbucket, oldkey, newbucket, newkey string) error {
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, oldbucket)
 	case oldkey == "":
 		return errwrapf("%w (%q)", ErrObjectKeyInvalid, oldkey)
-	case strings.HasSuffix(oldkey, "/"):
-		return packageError.New("oldkey cannot be a prefix")
 	case newbucket == "": // TODO should we make this error different
 		return errwrapf("%w (%q)", ErrBucketNameInvalid, newbucket)
 	case newkey == "": // TODO should we make this error different
 		return errwrapf("%w (%q)", ErrObjectKeyInvalid, newkey)
-	case strings.HasSuffix(newkey, "/"):
-		return packageError.New("newkey cannot be a prefix")
 	}
 
 	return nil
