@@ -194,7 +194,7 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		Name: []byte(bucketName),
 	})
 	if errs2.IsRPC(err, rpcstatus.NotFound) {
-		if strings.HasSuffix(errs.Unwrap(err).Error(), "no Object Lock configuration") {
+		if strings.HasPrefix(errs.Unwrap(err).Error(), "Object Lock is not enabled for this") {
 			err = ErrBucketObjectLockConfigurationNotFound
 		}
 	}
