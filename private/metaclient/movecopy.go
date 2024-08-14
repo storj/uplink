@@ -178,13 +178,13 @@ func convertKeys(input []*pb.EncryptedKeyAndNonce) []EncryptedKeyAndNonce {
 func validateMoveCopyInput(oldbucket, oldkey, newbucket, newkey string) error {
 	switch {
 	case oldbucket == "":
-		return ErrNoBucket.New(oldbucket)
+		return ErrNoBucket.New("%v", oldbucket)
 	case oldkey == "":
-		return ErrNoPath.New(oldkey)
+		return ErrNoPath.New("%v", oldkey)
 	case newbucket == "": // TODO should we make this error different
-		return ErrNoBucket.New(newbucket)
+		return ErrNoBucket.New("%v", newbucket)
 	case newkey == "": // TODO should we make this error different
-		return ErrNoPath.New(newkey)
+		return ErrNoPath.New("%v", newkey)
 	}
 
 	return nil
