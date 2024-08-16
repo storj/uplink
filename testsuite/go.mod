@@ -14,8 +14,8 @@ require (
 	storj.io/common v0.0.0-20240812101423-26b53789c348
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20240813081830-abe40d719e07
-	storj.io/uplink v1.13.1-0.20240812140457-26efd9c765f3
+	storj.io/storj v1.91.0-alpha.0.20240819160745-c496f3a5adce
+	storj.io/uplink v1.13.1-0.20240813112806-9c782c9201df
 )
 
 require (
@@ -73,7 +73,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.5 // indirect
-	github.com/googleapis/go-sql-spanner v1.6.0 // indirect
+	github.com/googleapis/go-sql-spanner v1.6.1-0.20240816093805-21f8b75ae3fc // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

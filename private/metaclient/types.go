@@ -121,6 +121,9 @@ var (
 
 	// ErrUploadIDInvalid is an error class for invalid upload ID.
 	ErrUploadIDInvalid = errs.Class("upload ID invalid")
+
+	// ErrProjectNoLock is an error class for cases when object lock is not enabled for a project.
+	ErrProjectNoLock = errs.Class("no project object lock")
 )
 
 // Object contains information about a specific object.
@@ -180,6 +183,9 @@ var (
 
 	// ErrBucketNotFound is an error class for non-existing bucket.
 	ErrBucketNotFound = errs.Class("bucket not found")
+
+	// ErrBucketNoLock is an error class for cases when object lock is not enabled for a bucket.
+	ErrBucketNoLock = errs.Class("no bucket object lock")
 )
 
 // Bucket contains information about a specific bucket.

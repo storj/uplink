@@ -6,7 +6,6 @@ package bucket
 import (
 	"context"
 	"errors"
-	"strings"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -16,12 +15,13 @@ import (
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
+	privateProject "storj.io/uplink/private/project"
 )
 
 var mon = monkit.Package()
 
-// ErrBucketObjectLockConfigurationNotFound is returned when a bucket has no object lock configuration.
-var ErrBucketObjectLockConfigurationNotFound = errors.New("bucket has no Object Lock configuration")
+// ErrBucketNoLock is returned when a bucket has object lock disabled.
+var ErrBucketNoLock = errors.New("object lock is not enabled for this bucket")
 
 // Bucket contains information about the bucket.
 type Bucket metaclient.Bucket
@@ -193,11 +193,13 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 	response, err := metainfoClient.GetBucketObjectLockConfiguration(ctx, metaclient.GetBucketObjectLockConfigurationParams{
 		Name: []byte(bucketName),
 	})
-	if errs2.IsRPC(err, rpcstatus.NotFound) {
-		if strings.HasPrefix(errs.Unwrap(err).Error(), "Object Lock is not enabled for this") {
-			err = ErrBucketObjectLockConfigurationNotFound
-		}
+	// TODO: remove when we expose those in convertKnownErrors
+	if metaclient.ErrProjectNoLock.Has(err) {
+		err = privateProject.ErrProjectNoLock
+	} else if metaclient.ErrBucketNoLock.Has(err) {
+		err = ErrBucketNoLock
 	}
+
 	return response.Enabled, convertKnownErrors(err, bucketName, "")
 }
 

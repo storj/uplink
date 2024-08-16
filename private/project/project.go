@@ -5,6 +5,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -20,6 +21,9 @@ var (
 	mon          = monkit.Package()
 	packageError = errs.Class("project")
 )
+
+// ErrProjectNoLock is returned when a project has object lock disabled.
+var ErrProjectNoLock = errors.New("object lock is not enabled for this project")
 
 // GetPublicID gets the public project ID for the given access grant.
 func GetPublicID(ctx context.Context, config uplink.Config, access *uplink.Access) (id uuid.UUID, err error) {

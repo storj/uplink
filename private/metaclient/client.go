@@ -393,6 +393,16 @@ func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, para
 		return err
 	})
 	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
+			return GetBucketObjectLockConfigurationResponse{}, convertFailedPreconditionErr(err)
+		}
+		if errs2.IsRPC(err, rpcstatus.NotFound) {
+			return GetBucketObjectLockConfigurationResponse{}, convertNotFoundErr(err)
+		}
+		if errs2.IsRPC(err, rpcstatus.Unimplemented) {
+			return GetBucketObjectLockConfigurationResponse{}, ErrBucketNoLock.Wrap(err)
+		}
+
 		return GetBucketObjectLockConfigurationResponse{}, Error.Wrap(err)
 	}
 
@@ -917,6 +927,9 @@ func (client *Client) SetObjectRetention(ctx context.Context, params SetObjectRe
 		return err
 	})
 	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
+			return convertFailedPreconditionErr(err)
+		}
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return convertNotFoundErr(err)
 		}
@@ -951,6 +964,9 @@ func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRe
 		return err
 	})
 	if err != nil {
+		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
+			return nil, convertFailedPreconditionErr(err)
+		}
 		if errs2.IsRPC(err, rpcstatus.NotFound) {
 			return nil, convertNotFoundErr(err)
 		}
@@ -978,6 +994,22 @@ func convertNotFoundErr(err error) error {
 		return ErrObjectNotFound.Wrap(err)
 	} else if strings.HasPrefix(message, noRetentionPrefix) {
 		return ErrRetentionNotFound.Wrap(err)
+	}
+
+	return Error.Wrap(err)
+}
+
+func convertFailedPreconditionErr(err error) error {
+	const (
+		projectNoLockErrMsg = "Object Lock is not enabled for this project"
+		bucketNoLockErrMsg  = "Object Lock is not enabled for this bucket"
+	)
+
+	message := errs.Unwrap(err).Error()
+	if strings.HasPrefix(message, projectNoLockErrMsg) {
+		return ErrProjectNoLock.Wrap(err)
+	} else if strings.HasPrefix(message, bucketNoLockErrMsg) {
+		return ErrBucketNoLock.Wrap(err)
 	}
 
 	return Error.Wrap(err)

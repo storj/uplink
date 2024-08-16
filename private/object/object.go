@@ -17,7 +17,9 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
+	privateBucket "storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
+	privateProject "storj.io/uplink/private/project"
 	"storj.io/uplink/private/storage/streams"
 )
 
@@ -319,6 +321,12 @@ func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	err = db.SetObjectRetention(ctx, bucket, key, version, retention)
+	// TODO: remove when we expose those in convertKnownErrors
+	if metaclient.ErrProjectNoLock.Has(err) {
+		err = privateProject.ErrProjectNoLock
+	} else if metaclient.ErrBucketNoLock.Has(err) {
+		err = privateBucket.ErrBucketNoLock
+	}
 
 	return convertKnownErrors(err, bucket, key)
 }
@@ -334,6 +342,12 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	retention, err = db.GetObjectRetention(ctx, bucket, key, version)
+	// TODO: remove when we expose those in convertKnownErrors
+	if metaclient.ErrProjectNoLock.Has(err) {
+		err = privateProject.ErrProjectNoLock
+	} else if metaclient.ErrBucketNoLock.Has(err) {
+		err = privateBucket.ErrBucketNoLock
+	}
 
 	return retention, convertKnownErrors(err, bucket, key)
 }

@@ -202,8 +202,39 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		bucketName := "test-bucket"
+		invalidBucket := "invalid-bucket"
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              invalidBucket,
+			ObjectLockEnabled: false,
+		})
+		require.NoError(t, err)
+
 		objectKey := "test-object"
+
+		upload, err := object.UploadObject(ctx, project, invalidBucket, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		objRetention, err := object.GetObjectRetention(ctx, project, invalidBucket, objectKey, upload.Info().Version)
+		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+		require.Nil(t, objRetention)
+
+		retention := metaclient.Retention{
+			Mode:        storj.ComplianceMode,
+			RetainUntil: time.Now().Add(time.Hour),
+		}
+
+		err = object.SetObjectRetention(ctx, project, invalidBucket, objectKey, upload.Info().Version, retention)
+		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+		require.Nil(t, objRetention)
+
+		bucketName := "test-bucket"
 
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
 			Name:              bucketName,
@@ -211,7 +242,7 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		upload, err = object.UploadObject(ctx, project, bucketName, objectKey, nil)
 		require.NoError(t, err)
 
 		_, err = upload.Write([]byte("test1"))
@@ -223,7 +254,7 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		wrongBucket := "random-bucket"
 		wrongKey := "random-key"
 
-		objRetention, err := object.GetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version)
+		objRetention, err = object.GetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version)
 		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
 		require.Nil(t, objRetention)
 
@@ -234,11 +265,6 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
 		require.True(t, metaclient.ErrRetentionNotFound.Has(err))
 		require.Nil(t, objRetention)
-
-		retention := metaclient.Retention{
-			Mode:        storj.ComplianceMode,
-			RetainUntil: time.Now().Add(time.Hour),
-		}
 
 		err = object.SetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version, retention)
 		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
