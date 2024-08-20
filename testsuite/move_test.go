@@ -290,3 +290,30 @@ func TestMoveObject_Metadata(t *testing.T) {
 		}
 	})
 }
+
+func TestMoveObject_Overwrite(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1,
+		UplinkCount:    1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		type testCase struct {
+			Bucket     string
+			Key        string
+			NewBucket  string
+			NewKey     string
+			ObjectSize memory.Size
+		}
+
+		tc := testCase{"testbucket", "an/object/key", "testbucket", "an/object/key2", memory.KiB}
+
+		for i := 0; i < 10; i++ {
+			uploadObject(t, ctx, project, tc.Bucket, tc.Key, tc.ObjectSize)
+			require.NoError(t, project.MoveObject(ctx, tc.Bucket, tc.Key, tc.NewBucket, tc.NewKey, nil))
+		}
+	})
+}
