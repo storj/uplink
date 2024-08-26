@@ -24,6 +24,7 @@ pipeline {
                         stage('Checkout') {
                             steps {
                                 checkout scm
+                                sh 'git restore-mtime'
 
                                 sh 'mkdir -p .build'
                                 // make a backup of the mod file in case, for later linting
