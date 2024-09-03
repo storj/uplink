@@ -180,7 +180,7 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		SatelliteCount: 1, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Metainfo.UseBucketLevelObjectLock = true
+				config.Metainfo.ObjectLockEnabled = true
 				config.Metainfo.UseBucketLevelObjectVersioning = true
 			},
 		},

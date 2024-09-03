@@ -175,27 +175,18 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Metainfo.UseBucketLevelObjectVersioning = true
-				config.Metainfo.UseBucketLevelObjectLock = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		sat := planet.Satellites[0]
 		upl := planet.Uplinks[0]
 		projectID := upl.Projects[0].ID
-		userID := upl.Projects[0].Owner.ID
 
-		userCtx, err := sat.UserContext(ctx, userID)
-		require.NoError(t, err)
-
-		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
-		require.NoError(t, err)
-
-		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
-		require.NoError(t, err)
-
-		upl.Access[sat.ID()] = access
-
-		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		err := sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
 		require.NoError(t, err)
 
 		project, err := upl.OpenProject(ctx, sat)
@@ -537,27 +528,18 @@ func TestCopyObjectWithObjectLock(t *testing.T) {
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Metainfo.UseBucketLevelObjectVersioning = true
-				config.Metainfo.UseBucketLevelObjectLock = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		sat := planet.Satellites[0]
 		upl := planet.Uplinks[0]
 		projectID := upl.Projects[0].ID
-		userID := upl.Projects[0].Owner.ID
 
-		userCtx, err := sat.UserContext(ctx, userID)
-		require.NoError(t, err)
-
-		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
-		require.NoError(t, err)
-
-		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
-		require.NoError(t, err)
-
-		upl.Access[sat.ID()] = access
-
-		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		err := sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
 		require.NoError(t, err)
 
 		project, err := upl.OpenProject(ctx, sat)

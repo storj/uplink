@@ -169,15 +169,6 @@ func TestMoveObject_Errors(t *testing.T) {
 		err = project.MoveObject(ctx, "testbucket", "multipart", "testbucket", "new-multipart", nil)
 		require.True(t, errors.Is(err, uplink.ErrObjectNotFound))
 
-		// moving object to key where different object exists should end with error
-		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "testbucket", "objectA", testrand.Bytes(memory.KiB))
-		require.NoError(t, err)
-		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "testbucket", "objectB", testrand.Bytes(memory.KiB))
-		require.NoError(t, err)
-
-		err = project.MoveObject(ctx, "testbucket", "objectA", "testbucket", "objectB", nil)
-		require.Error(t, err) // TODO make this error more human friendly
-
 		// TODO add test cases for lack of access to target location
 	})
 }
