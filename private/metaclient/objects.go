@@ -749,6 +749,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		Modified: objectInfo.Created, // TODO: use correct field
 		Expires:  objectInfo.Expires, // TODO: use correct field
 
+		LegalHold: objectInfo.LegalHold,
 		Retention: objectInfo.Retention,
 
 		Stream: Stream{

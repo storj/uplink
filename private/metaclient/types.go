@@ -32,6 +32,7 @@ type RawObjectItem struct {
 	EncryptionParameters storj.EncryptionParameters
 	RedundancyScheme     storj.RedundancyScheme
 
+	LegalHold bool
 	Retention *Retention
 }
 
@@ -141,6 +142,7 @@ type Object struct {
 	Modified    time.Time
 	Expires     time.Time
 
+	LegalHold bool
 	Retention *Retention
 
 	Stream

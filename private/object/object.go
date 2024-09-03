@@ -43,6 +43,7 @@ type VersionedObject struct {
 	uplink.Object
 	Version        []byte
 	IsDeleteMarker bool
+	LegalHold      bool
 	Retention      *metaclient.Retention
 }
 
@@ -371,6 +372,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 		},
 		Version:        obj.Version,
 		IsDeleteMarker: obj.IsDeleteMarker,
+		LegalHold:      obj.LegalHold,
 		Retention:      obj.Retention,
 	}
 
