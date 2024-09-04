@@ -27,8 +27,8 @@ var mon = monkit.Package()
 // Error is default error class for uplink.
 var packageError = errs.Class("object")
 
-// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
 var (
+	// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
 	ErrMethodNotAllowed = errors.New("method not allowed")
 
 	// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
@@ -320,6 +320,42 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	return convertObject(obj), nil
 }
 
+// SetObjectLegalHold sets a legal hold configuration for the object at the specific key and version ID.
+func SetObjectLegalHold(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, enabled bool) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	err = db.SetObjectLegalHold(ctx, bucket, key, version, enabled)
+	if err != nil {
+		err = convertErrors(err)
+	}
+
+	return convertKnownErrors(err, bucket, key)
+}
+
+// GetObjectLegalHold retrieves a legal hold configuration for the object at the specific key and version ID.
+func GetObjectLegalHold(ctx context.Context, project *uplink.Project, bucket, key string, version []byte) (enabled bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return false, convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	enabled, err = db.GetObjectLegalHold(ctx, bucket, key, version)
+	if err != nil {
+		err = convertErrors(err)
+	}
+
+	return enabled, convertKnownErrors(err, bucket, key)
+}
+
 // SetObjectRetention sets the retention for the object at the specific key and version ID.
 func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, retention metaclient.Retention) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -331,14 +367,8 @@ func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	err = db.SetObjectRetention(ctx, bucket, key, version, retention)
-	// TODO: remove when we expose those in convertKnownErrors
-	switch {
-	case metaclient.ErrProjectNoLock.Has(err):
-		err = privateProject.ErrProjectNoLock
-	case metaclient.ErrBucketNoLock.Has(err):
-		err = privateBucket.ErrBucketNoLock
-	case metaclient.ErrRetentionNotFound.Has(err):
-		err = ErrRetentionNotFound
+	if err != nil {
+		err = convertErrors(err)
 	}
 
 	return convertKnownErrors(err, bucket, key)
@@ -355,14 +385,8 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	retention, err = db.GetObjectRetention(ctx, bucket, key, version)
-	// TODO: remove when we expose those in convertKnownErrors
-	switch {
-	case metaclient.ErrProjectNoLock.Has(err):
-		err = privateProject.ErrProjectNoLock
-	case metaclient.ErrBucketNoLock.Has(err):
-		err = privateBucket.ErrBucketNoLock
-	case metaclient.ErrRetentionNotFound.Has(err):
-		err = ErrRetentionNotFound
+	if err != nil {
+		err = convertErrors(err)
 	}
 
 	return retention, convertKnownErrors(err, bucket, key)
@@ -421,6 +445,23 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 	default:
 		return convertKnownErrors(err, bucket, key)
 	}
+}
+
+func convertErrors(err error) error {
+	switch {
+	case metaclient.ErrProjectNoLock.Has(err):
+		err = privateProject.ErrProjectNoLock
+	case metaclient.ErrBucketNoLock.Has(err):
+		err = privateBucket.ErrBucketNoLock
+	case metaclient.ErrRetentionNotFound.Has(err):
+		err = ErrRetentionNotFound
+	case metaclient.ErrLockNotEnabled.Has(err):
+		err = privateProject.ErrLockNotEnabled
+	case metaclient.ErrMethodNotAllowed.Has(err):
+		err = ErrMethodNotAllowed
+	}
+
+	return err
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors

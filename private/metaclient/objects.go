@@ -193,6 +193,55 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 	})
 }
 
+// SetObjectLegalHold sets a legal hold configuration for the object at the specific key and version ID.
+func (db *DB) SetObjectLegalHold(ctx context.Context, bucket, key string, version []byte, enabled bool) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return ErrNoBucket.New("")
+	}
+
+	if key == "" {
+		return ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return err
+	}
+
+	return db.metainfo.SetObjectLegalHold(ctx, SetObjectLegalHoldParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		ObjectVersion:      version,
+		Enabled:            enabled,
+	})
+}
+
+// GetObjectLegalHold retrieves a legal hold configuration for the object at the specific key and version ID.
+func (db *DB) GetObjectLegalHold(ctx context.Context, bucket, key string, version []byte) (_ bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return false, ErrNoBucket.New("")
+	}
+
+	if key == "" {
+		return false, ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return false, err
+	}
+
+	return db.metainfo.GetObjectLegalHold(ctx, GetObjectLegalHoldParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		ObjectVersion:      version,
+	})
+}
+
 // SetObjectRetention sets the retention for the object at the specific key and version ID.
 func (db *DB) SetObjectRetention(ctx context.Context, bucket, key string, version []byte, retention Retention) (err error) {
 	defer mon.Task()(&ctx)(&err)

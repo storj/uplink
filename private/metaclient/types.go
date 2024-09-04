@@ -125,6 +125,12 @@ var (
 
 	// ErrProjectNoLock is an error class for cases when object lock is not enabled for a project.
 	ErrProjectNoLock = errs.Class("no project object lock")
+
+	// ErrLockNotEnabled is an error class for cases when object lock is not enabled as a feature.
+	ErrLockNotEnabled = errs.Class("object lock not enabled")
+
+	// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
+	ErrMethodNotAllowed = errs.Class("method not allowed")
 )
 
 // Object contains information about a specific object.

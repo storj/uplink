@@ -22,8 +22,13 @@ var (
 	packageError = errs.Class("project")
 )
 
-// ErrProjectNoLock is returned when a project has object lock disabled.
-var ErrProjectNoLock = errors.New("object lock is not enabled for this project")
+var (
+	// ErrProjectNoLock is returned when a project has object lock disabled.
+	ErrProjectNoLock = errors.New("object lock is not enabled for this project")
+
+	// ErrLockNotEnabled is returned when object lock is disabled as a feature.
+	ErrLockNotEnabled = errors.New("object lock is not enabled")
+)
 
 // GetPublicID gets the public project ID for the given access grant.
 func GetPublicID(ctx context.Context, config uplink.Config, access *uplink.Access) (id uuid.UUID, err error) {

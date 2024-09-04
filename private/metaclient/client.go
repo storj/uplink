@@ -885,6 +885,74 @@ func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObj
 	return Error.Wrap(err)
 }
 
+// SetObjectLegalHoldParams are params for the SetObjectLegalHold request.
+type SetObjectLegalHoldParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	ObjectVersion      []byte
+
+	Enabled bool
+}
+
+func (params *SetObjectLegalHoldParams) toRequest(header *pb.RequestHeader) *pb.SetObjectLegalHoldRequest {
+	req := &pb.SetObjectLegalHoldRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		ObjectVersion:      params.ObjectVersion,
+		Enabled:            params.Enabled,
+	}
+
+	return req
+}
+
+// SetObjectLegalHold sets legal hold status on the object.
+func (client *Client) SetObjectLegalHold(ctx context.Context, params SetObjectLegalHoldParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetObjectLegalHold(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return Error.Wrap(convertErrors(err))
+	}
+
+	return Error.Wrap(err)
+}
+
+// GetObjectLegalHoldParams are params for the GetObjectLegalHold request.
+type GetObjectLegalHoldParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	ObjectVersion      []byte
+}
+
+func (params *GetObjectLegalHoldParams) toRequest(header *pb.RequestHeader) *pb.GetObjectLegalHoldRequest {
+	return &pb.GetObjectLegalHoldRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		ObjectVersion:      params.ObjectVersion,
+	}
+}
+
+// GetObjectLegalHold retrieves object's legal hold configuration.
+func (client *Client) GetObjectLegalHold(ctx context.Context, params GetObjectLegalHoldParams) (_ bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetObjectLegalHoldResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetObjectLegalHold(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return false, Error.Wrap(convertErrors(err))
+	}
+
+	return response.Enabled, nil
+}
+
 // SetObjectRetentionParams are params for the SetObjectRetention request.
 type SetObjectRetentionParams struct {
 	Bucket             []byte
@@ -969,6 +1037,10 @@ func convertErrors(err error) error {
 		return ErrBucketNotFound.Wrap(err)
 	case strings.HasPrefix(message, "object not found"):
 		return ErrObjectNotFound.Wrap(err)
+	case strings.HasPrefix(message, "method not allowed"):
+		return ErrMethodNotAllowed.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockEndpointsDisabled):
+		return ErrLockNotEnabled.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockDisabledForProject):
 		return ErrProjectNoLock.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockBucketRetentionConfigurationMissing):

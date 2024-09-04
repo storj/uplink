@@ -169,6 +169,99 @@ func TestUploadObject(t *testing.T) {
 	})
 }
 
+func TestGetAndSetObjectLegalHold(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+
+		err := sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		invalidBucket := "invalid-bucket"
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              invalidBucket,
+			ObjectLockEnabled: false,
+		})
+		require.NoError(t, err)
+
+		objectKey := "test-object"
+
+		upload, err := object.UploadObject(ctx, project, invalidBucket, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		legalHoldStatus, err := object.GetObjectLegalHold(ctx, project, invalidBucket, objectKey, upload.Info().Version)
+		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+		require.False(t, legalHoldStatus)
+
+		err = object.SetObjectLegalHold(ctx, project, invalidBucket, objectKey, upload.Info().Version, true)
+		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+
+		bucketName := "test-bucket"
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		upload, err = object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+		require.NotEmpty(t, upload.Info().Version)
+
+		wrongBucket := "random-bucket"
+		wrongKey := "random-key"
+
+		legalHoldStatus, err = object.GetObjectLegalHold(ctx, project, wrongBucket, objectKey, upload.Info().Version)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+		require.False(t, legalHoldStatus)
+
+		legalHoldStatus, err = object.GetObjectLegalHold(ctx, project, bucketName, wrongKey, upload.Info().Version)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+		require.False(t, legalHoldStatus)
+
+		err = object.SetObjectLegalHold(ctx, project, wrongBucket, objectKey, upload.Info().Version, true)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+
+		err = object.SetObjectLegalHold(ctx, project, bucketName, wrongKey, upload.Info().Version, true)
+		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+
+		err = object.SetObjectLegalHold(ctx, project, bucketName, objectKey, upload.Info().Version, true)
+		require.NoError(t, err)
+
+		legalHoldStatus, err = object.GetObjectLegalHold(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+		require.True(t, legalHoldStatus)
+	})
+}
+
 func TestGetAndSetObjectRetention(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
