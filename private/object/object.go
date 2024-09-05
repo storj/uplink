@@ -69,6 +69,7 @@ type ListObjectVersionsOptions struct {
 // CopyObjectOptions options for CopyObject method.
 type CopyObjectOptions struct {
 	Retention metaclient.Retention
+	LegalHold bool
 }
 
 // Info returns the last information about the uploaded object.
@@ -302,6 +303,7 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	metaOpts := metaclient.CopyObjectOptions{}
 	if options != (CopyObjectOptions{}) {
 		metaOpts.Retention = options.Retention
+		metaOpts.LegalHold = options.LegalHold
 	}
 	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey, metaOpts)
 	if err != nil {

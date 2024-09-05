@@ -25,6 +25,7 @@ type EncryptedKeyAndNonce struct {
 // CopyObjectOptions options for CopyObject method.
 type CopyObjectOptions struct {
 	Retention Retention
+	LegalHold bool
 }
 
 // CopyObject atomically copies object to a different bucket or/and key. Source object version can be specified.
@@ -87,6 +88,7 @@ func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, so
 	}
 	if opts != (CopyObjectOptions{}) {
 		params.Retention = opts.Retention
+		params.LegalHold = opts.LegalHold
 	}
 	obj, err := db.metainfo.FinishCopyObject(ctx, params)
 	if err != nil {
