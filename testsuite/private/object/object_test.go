@@ -560,58 +560,46 @@ func TestCopyObjectWithObjectLock(t *testing.T) {
 
 		retention := metaclient.Retention{
 			Mode:        storj.ComplianceMode,
-			RetainUntil: time.Now().Add(time.Hour),
+			RetainUntil: time.Now().Add(time.Hour).Truncate(time.Hour).UTC(),
 		}
 
 		for _, testCase := range []struct {
-			name      string
-			retention *metaclient.Retention
-			legalHold bool
+			name              string
+			expectedRetention *metaclient.Retention
+			legalHold         bool
 		}{
 			{
 				name: "no retention, no legal hold",
 			},
 			{
-				name:      "retention, no legal hold",
-				retention: &retention,
+				name:              "retention, no legal hold",
+				expectedRetention: &retention,
 			},
 			{
 				name:      "no retention, legal hold",
 				legalHold: true,
 			},
 			{
-				name:      "retention, legal hold",
-				retention: &retention,
-				legalHold: true,
+				name:              "retention, legal hold",
+				expectedRetention: &retention,
+				legalHold:         true,
 			},
 		} {
 			t.Run(testCase.name, func(t *testing.T) {
 				options := object.CopyObjectOptions{
 					LegalHold: testCase.legalHold,
 				}
-				if testCase.retention != nil {
-					options.Retention = *testCase.retention
+				if testCase.expectedRetention != nil {
+					options.Retention = *testCase.expectedRetention
 				}
 				copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", options)
 				require.NoError(t, err)
-				if testCase.retention != nil {
-					require.NotNil(t, copiedObject.Retention)
-					require.Equal(t, testCase.retention.Mode, copiedObject.Retention.Mode)
-					require.WithinDuration(t, testCase.retention.RetainUntil.UTC(), copiedObject.Retention.RetainUntil, time.Minute)
-				} else {
-					require.Nil(t, copiedObject.Retention)
-				}
+				require.Equal(t, testCase.expectedRetention, copiedObject.Retention)
 				require.Equal(t, testCase.legalHold, copiedObject.LegalHold)
 
 				objectInfo, err := object.StatObject(ctx, project, bucketName, copiedObject.Key, copiedObject.Version)
 				require.NoError(t, err)
-				if testCase.retention != nil {
-					require.NotNil(t, objectInfo.Retention)
-					require.Equal(t, testCase.retention.Mode, objectInfo.Retention.Mode)
-					require.WithinDuration(t, testCase.retention.RetainUntil.UTC(), objectInfo.Retention.RetainUntil, time.Minute)
-				} else {
-					require.Nil(t, objectInfo.Retention)
-				}
+				require.Equal(t, testCase.expectedRetention, objectInfo.Retention)
 				require.Equal(t, testCase.legalHold, objectInfo.LegalHold)
 			})
 		}
@@ -623,7 +611,7 @@ func TestCopyObjectWithObjectLock(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// cannot set retention on object in bucket without object lock
+		// cannot set expectedRetention on object in bucket without object lock
 		_, err = object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, noLockBucket, objectKey, object.CopyObjectOptions{
 			Retention: retention,
 		})
