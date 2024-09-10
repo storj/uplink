@@ -989,15 +989,16 @@ func convertNotFoundErr(err error) error {
 	)
 
 	message := errs.Unwrap(err).Error()
-	if strings.HasPrefix(message, bucketNotFoundPrefix) {
+	switch {
+	case strings.HasPrefix(message, bucketNotFoundPrefix):
 		return ErrBucketNotFound.Wrap(err)
-	} else if strings.HasPrefix(message, objectNotFoundPrefix) {
+	case strings.HasPrefix(message, objectNotFoundPrefix):
 		return ErrObjectNotFound.Wrap(err)
-	} else if strings.HasPrefix(message, noRetentionPrefix) {
+	case strings.HasPrefix(message, noRetentionPrefix):
 		return ErrRetentionNotFound.Wrap(err)
+	default:
+		return Error.Wrap(err)
 	}
-
-	return Error.Wrap(err)
 }
 
 func convertFailedPreconditionErr(err error) error {

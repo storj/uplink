@@ -29,10 +29,18 @@ var mon = monkit.Package()
 var packageError = errs.Class("object")
 
 // ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
-var ErrMethodNotAllowed = errors.New("method not allowed")
+var (
+	ErrMethodNotAllowed = errors.New("method not allowed")
 
-// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
-var ErrNoObjectLockConfiguration = errors.New("destination bucket has no object lock configuration")
+	// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
+	ErrNoObjectLockConfiguration = errors.New("destination bucket has no object lock configuration")
+
+	// ErrBucketNoVersioningObjectLock is returned when attempting to set object lock without versioning enabled.
+	ErrBucketNoVersioningObjectLock = errors.New("destination bucket does not have versioning enabled required for object lock")
+
+	// ErrRetentionNotFound is returned when getting object retention for an object that has none.
+	ErrRetentionNotFound = errors.New("object has no retention configuration")
+)
 
 // IPSummary contains information about the object IP-s.
 type IPSummary = metaclient.GetObjectIPsResponse
@@ -99,7 +107,7 @@ func (upload *VersionedUpload) Write(p []byte) (n int, err error) {
 //
 // Returns ErrUploadDone when either Abort or Commit has already been called.
 func (upload *VersionedUpload) Commit() error {
-	return upload.upload.Commit()
+	return packageConvertKnownErrors(upload.upload.Commit(), "", "")
 }
 
 // SetCustomMetadata updates custom metadata to be included with the object.
@@ -325,10 +333,13 @@ func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 
 	err = db.SetObjectRetention(ctx, bucket, key, version, retention)
 	// TODO: remove when we expose those in convertKnownErrors
-	if metaclient.ErrProjectNoLock.Has(err) {
+	switch {
+	case metaclient.ErrProjectNoLock.Has(err):
 		err = privateProject.ErrProjectNoLock
-	} else if metaclient.ErrBucketNoLock.Has(err) {
+	case metaclient.ErrBucketNoLock.Has(err):
 		err = privateBucket.ErrBucketNoLock
+	case metaclient.ErrRetentionNotFound.Has(err):
+		err = ErrRetentionNotFound
 	}
 
 	return convertKnownErrors(err, bucket, key)
@@ -346,10 +357,13 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 
 	retention, err = db.GetObjectRetention(ctx, bucket, key, version)
 	// TODO: remove when we expose those in convertKnownErrors
-	if metaclient.ErrProjectNoLock.Has(err) {
+	switch {
+	case metaclient.ErrProjectNoLock.Has(err):
 		err = privateProject.ErrProjectNoLock
-	} else if metaclient.ErrBucketNoLock.Has(err) {
+	case metaclient.ErrBucketNoLock.Has(err):
 		err = privateBucket.ErrBucketNoLock
+	case metaclient.ErrRetentionNotFound.Has(err):
+		err = ErrRetentionNotFound
 	}
 
 	return retention, convertKnownErrors(err, bucket, key)
@@ -404,6 +418,9 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 	if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
 		if strings.HasSuffix(errs.Unwrap(err).Error(), "cannot specify Object Lock settings when uploading into a bucket without Object Lock enabled") {
 			return ErrNoObjectLockConfiguration
+		}
+		if strings.HasSuffix(errs.Unwrap(err).Error(), "cannot specify Object Lock settings when uploading into a bucket without Versioning enabled") {
+			return ErrBucketNoVersioningObjectLock
 		}
 	}
 	return convertKnownErrors(err, bucket, key)
