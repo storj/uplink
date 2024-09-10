@@ -194,9 +194,10 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		Name: []byte(bucketName),
 	})
 	// TODO: remove when we expose those in convertKnownErrors
-	if metaclient.ErrProjectNoLock.Has(err) {
+	switch {
+	case metaclient.ErrProjectNoLock.Has(err):
 		err = privateProject.ErrProjectNoLock
-	} else if metaclient.ErrBucketNoLock.Has(err) {
+	case metaclient.ErrBucketNoLock.Has(err):
 		err = ErrBucketNoLock
 	}
 

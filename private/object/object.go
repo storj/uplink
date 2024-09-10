@@ -6,7 +6,6 @@ package object
 import (
 	"context"
 	"errors"
-	"strings"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -412,18 +411,16 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 }
 
 func packageConvertKnownErrors(err error, bucket, key string) error {
-	if errs2.IsRPC(err, rpcstatus.MethodNotAllowed) {
+	switch {
+	case errs2.IsRPC(err, rpcstatus.MethodNotAllowed):
 		return ErrMethodNotAllowed
+	case errs2.IsRPC(err, rpcstatus.ObjectLockBucketRetentionConfigurationMissing):
+		return ErrNoObjectLockConfiguration
+	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
+		return ErrBucketNoVersioningObjectLock
+	default:
+		return convertKnownErrors(err, bucket, key)
 	}
-	if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-		if strings.HasSuffix(errs.Unwrap(err).Error(), "cannot specify Object Lock settings when uploading into a bucket without Object Lock enabled") {
-			return ErrNoObjectLockConfiguration
-		}
-		if strings.HasSuffix(errs.Unwrap(err).Error(), "cannot specify Object Lock settings when uploading into a bucket without Versioning enabled") {
-			return ErrBucketNoVersioningObjectLock
-		}
-	}
-	return convertKnownErrors(err, bucket, key)
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors

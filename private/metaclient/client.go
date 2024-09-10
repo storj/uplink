@@ -393,17 +393,7 @@ func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, para
 		return err
 	})
 	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-			return GetBucketObjectLockConfigurationResponse{}, convertFailedPreconditionErr(err)
-		}
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return GetBucketObjectLockConfigurationResponse{}, convertNotFoundErr(err)
-		}
-		if errs2.IsRPC(err, rpcstatus.Unimplemented) {
-			return GetBucketObjectLockConfigurationResponse{}, ErrBucketNoLock.Wrap(err)
-		}
-
-		return GetBucketObjectLockConfigurationResponse{}, Error.Wrap(err)
+		return GetBucketObjectLockConfigurationResponse{}, Error.Wrap(convertErrors(err))
 	}
 
 	return GetBucketObjectLockConfigurationResponse{
@@ -928,15 +918,10 @@ func (client *Client) SetObjectRetention(ctx context.Context, params SetObjectRe
 		return err
 	})
 	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-			return convertFailedPreconditionErr(err)
-		}
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return convertNotFoundErr(err)
-		}
+		return Error.Wrap(convertErrors(err))
 	}
 
-	return Error.Wrap(err)
+	return nil
 }
 
 // GetObjectRetentionParams are params for the GetObjectRetention request.
@@ -965,14 +950,7 @@ func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRe
 		return err
 	})
 	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.FailedPrecondition) {
-			return nil, convertFailedPreconditionErr(err)
-		}
-		if errs2.IsRPC(err, rpcstatus.NotFound) {
-			return nil, convertNotFoundErr(err)
-		}
-
-		return nil, Error.Wrap(err)
+		return nil, Error.Wrap(convertErrors(err))
 	}
 
 	return &Retention{
@@ -981,40 +959,22 @@ func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRe
 	}, nil
 }
 
-func convertNotFoundErr(err error) error {
-	const (
-		bucketNotFoundPrefix = "bucket not found"
-		objectNotFoundPrefix = "object not found"
-		noRetentionPrefix    = "object does not have a retention configuration"
-	)
-
+func convertErrors(err error) error {
 	message := errs.Unwrap(err).Error()
 	switch {
-	case strings.HasPrefix(message, bucketNotFoundPrefix):
+	case strings.HasPrefix(message, "bucket not found"):
 		return ErrBucketNotFound.Wrap(err)
-	case strings.HasPrefix(message, objectNotFoundPrefix):
+	case strings.HasPrefix(message, "object not found"):
 		return ErrObjectNotFound.Wrap(err)
-	case strings.HasPrefix(message, noRetentionPrefix):
+	case errs2.IsRPC(err, rpcstatus.ObjectLockDisabledForProject):
+		return ErrProjectNoLock.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockBucketRetentionConfigurationMissing):
+		return ErrBucketNoLock.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectRetentionConfigurationMissing):
 		return ErrRetentionNotFound.Wrap(err)
 	default:
-		return Error.Wrap(err)
+		return err
 	}
-}
-
-func convertFailedPreconditionErr(err error) error {
-	const (
-		projectNoLockErrMsg = "Object Lock is not enabled for this project"
-		bucketNoLockErrMsg  = "Object Lock is not enabled for this bucket"
-	)
-
-	message := errs.Unwrap(err).Error()
-	if strings.HasPrefix(message, projectNoLockErrMsg) {
-		return ErrProjectNoLock.Wrap(err)
-	} else if strings.HasPrefix(message, bucketNoLockErrMsg) {
-		return ErrBucketNoLock.Wrap(err)
-	}
-
-	return Error.Wrap(err)
 }
 
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.
