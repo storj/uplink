@@ -50,7 +50,7 @@ type VersionedObject struct {
 	uplink.Object
 	Version        []byte
 	IsDeleteMarker bool
-	LegalHold      bool
+	LegalHold      *bool
 	Retention      *metaclient.Retention
 }
 

@@ -10,7 +10,7 @@ require (
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.7.0
-	storj.io/common v0.0.0-20240911161944-293dbaeb442c
+	storj.io/common v0.0.0-20240912052752-c0c47dc29560
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/eventkit v0.0.0-20240415002644-1d9596fee086
 	storj.io/infectious v0.0.2
@@ -29,5 +29,6 @@ require (
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

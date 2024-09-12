@@ -65,6 +65,8 @@ pipeline {
                                 sh './scripts/check-libuplink-size.sh'
                                 sh 'check-mod-tidy -mod .build/go.mod.orig'
 
+                                // TODO: Re-enable after storj/storj has been updated.
+                                /*
                                 dir("testsuite") {
                                     sh 'check-imports ./...'
                                     sh 'check-atomic-align ./...'
@@ -74,6 +76,7 @@ pipeline {
                                     sh 'golangci-lint --config /go/ci/.golangci.yml -j=2 run'
                                     sh 'check-mod-tidy -mod ../.build/testsuite.go.mod.orig'
                                 }
+                                */
                             }
                         }
 
@@ -105,6 +108,8 @@ pipeline {
                             }
                         }
 
+                        // TODO: Re-enable after storj/storj has been updated.
+                        /*
                         stage('Testsuite') {
                             environment {
                                 STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
@@ -143,7 +148,10 @@ pipeline {
                                 }
                             }
                         }
+                        */
 
+                        // TODO: Re-enable after storj/storj has been updated.
+                        /*
                         stage('Integration [storj/storj]') {
                             environment {
                                 STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
@@ -170,6 +178,7 @@ pipeline {
                                 }
                             }
                         }
+                        */
                         stage('Go Compatibility') {
                             steps {
                                 sh 'check-cross-compile -compiler "go,go.min" storj.io/uplink/...'

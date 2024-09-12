@@ -601,12 +601,14 @@ func TestCopyObjectWithObjectLock(t *testing.T) {
 				copiedObject, err := object.CopyObject(ctx, project, bucketName, objectKey, obj.Version, bucketName, objectKey+"-copy", options)
 				require.NoError(t, err)
 				require.Equal(t, testCase.expectedRetention, copiedObject.Retention)
-				require.Equal(t, testCase.legalHold, copiedObject.LegalHold)
+				require.NotNil(t, copiedObject.LegalHold)
+				require.Equal(t, testCase.legalHold, *copiedObject.LegalHold)
 
 				objectInfo, err := object.StatObject(ctx, project, bucketName, copiedObject.Key, copiedObject.Version)
 				require.NoError(t, err)
 				require.Equal(t, testCase.expectedRetention, objectInfo.Retention)
-				require.Equal(t, testCase.legalHold, objectInfo.LegalHold)
+				require.NotNil(t, copiedObject.LegalHold)
+				require.Equal(t, testCase.legalHold, *objectInfo.LegalHold)
 			})
 		}
 

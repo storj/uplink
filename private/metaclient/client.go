@@ -738,7 +738,6 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		EncryptedMetadata:             object.EncryptedMetadata,
 		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
-		LegalHold:                     object.LegalHold,
 	}
 
 	if object.Retention != nil {
@@ -746,6 +745,10 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 			Mode:        storj.RetentionMode(object.Retention.Mode),
 			RetainUntil: object.Retention.RetainUntil,
 		}
+	}
+
+	if object.LegalHold != nil {
+		info.LegalHold = &object.LegalHold.Value
 	}
 
 	if object.EncryptionParameters != nil {
