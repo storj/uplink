@@ -169,6 +169,109 @@ func TestUploadObject(t *testing.T) {
 	})
 }
 
+func TestUploadObjectWithObjectLock(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+			},
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		retention := metaclient.Retention{
+			Mode:        storj.ComplianceMode,
+			RetainUntil: time.Now().Add(time.Hour).Truncate(time.Hour).UTC(),
+		}
+		govRetention := metaclient.Retention{
+			Mode:        storj.GovernanceMode,
+			RetainUntil: time.Now().Add(time.Hour).Truncate(time.Hour).UTC(),
+		}
+
+		for _, testCase := range []struct {
+			name              string
+			expectedRetention *metaclient.Retention
+			legalHold         bool
+		}{
+			{
+				name: "no retention, no legal hold",
+			},
+			{
+				name:              "retention - compliance, no legal hold",
+				expectedRetention: &retention,
+			},
+			{
+				name:              "retention - governance, no legal hold",
+				expectedRetention: &govRetention,
+			},
+			{
+				name:      "no retention, legal hold",
+				legalHold: true,
+			},
+			{
+				name:              "retention - compliance, legal hold",
+				expectedRetention: &retention,
+				legalHold:         true,
+			},
+			{
+				name:              "retention - governance, legal hold",
+				expectedRetention: &govRetention,
+				legalHold:         true,
+			},
+		} {
+			t.Run(testCase.name, func(t *testing.T) {
+				opts := &object.UploadOptions{
+					LegalHold: testCase.legalHold,
+				}
+				if testCase.expectedRetention != nil {
+					opts.Retention = *testCase.expectedRetention
+				}
+				upload, err := object.UploadObject(ctx, project, bucketName, objectKey, opts)
+				require.NoError(t, err)
+
+				_, err = upload.Write([]byte("test1"))
+				require.NoError(t, err)
+
+				require.NoError(t, upload.Commit())
+				require.NotEmpty(t, upload.Info().Version)
+
+				statObj, err := object.StatObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+				require.NoError(t, err)
+				require.Equal(t, testCase.expectedRetention, statObj.Retention)
+				require.Equal(t, &testCase.legalHold, statObj.LegalHold)
+
+				uploadObject := upload.Info()
+				uploadObject.Custom = uplink.CustomMetadata{}
+				statObj.Custom = uplink.CustomMetadata{}
+				statObj.LegalHold = nil
+				statObj.Retention = nil
+				require.EqualExportedValues(t, *uploadObject, *statObj)
+
+				if testCase.expectedRetention != nil || testCase.legalHold {
+					_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+					require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+				}
+			})
+		}
+	})
+}
+
 func TestGetAndSetObjectLegalHold(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,

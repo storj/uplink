@@ -544,6 +544,7 @@ type BeginObjectParams struct {
 	EncryptedMetadataNonce        storj.Nonce
 
 	Retention Retention
+	LegalHold bool
 }
 
 func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginRequest {
@@ -569,6 +570,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		LegalHold:                     params.LegalHold,
 	}
 
 	if params.Retention != (Retention{}) {

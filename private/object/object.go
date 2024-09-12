@@ -88,6 +88,7 @@ func (upload *VersionedUpload) Info() *VersionedObject {
 		obj.System.Created = meta.Modified
 		obj.Version = meta.Version
 		obj.Retention = meta.Retention
+		obj.LegalHold = meta.LegalHold
 	}
 	return obj
 }

@@ -43,6 +43,7 @@ type Meta struct {
 	Data       []byte
 	Version    []byte
 	Retention  *metaclient.Retention
+	LegalHold  *bool
 }
 
 // Part info about a part.
@@ -130,6 +131,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	if opts != nil {
 		beginObjectReq.ExpiresAt = opts.Expires
 		beginObjectReq.Retention = opts.Retention
+		beginObjectReq.LegalHold = opts.LegalHold
 	}
 
 	var streamID storj.StreamID
@@ -391,6 +393,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		Data:       metadataBytes,
 		Version:    rawObject.Version,
 		Retention:  rawObject.Retention,
+		LegalHold:  rawObject.LegalHold,
 	}
 
 	return resultMeta, nil

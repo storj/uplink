@@ -62,4 +62,5 @@ type UploadOptions struct {
 	Expires time.Time
 
 	Retention Retention
+	LegalHold bool
 }
