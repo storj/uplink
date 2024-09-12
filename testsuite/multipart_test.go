@@ -678,13 +678,23 @@ func TestListUploads_Paging(t *testing.T) {
 			}
 		}
 
+		// Upload 10 objects with exactly the same key.
+		for i := 0; i < 10; i++ {
+			// We use a key that precedes lexicographically the previous BeginUpload calls that use
+			// keys that start with the non-empty prefix or the "object" word, to not mix the results with
+			// the tests that set the cursor.
+			_, err := project.BeginUpload(ctx, "testbucket", "00-same-key", nil)
+			require.NoError(t, err)
+			numberOfObjects++
+		}
+
 		testCases := []struct {
 			Prefix          string
 			Cursor          string
 			Recursive       bool
 			ExpectedResults int
 		}{
-			{"", "", false, 11}, // 10 objects + prefix
+			{"", "", false, 21}, // 11 objects + prefix
 			{"aprefix/", "", false, 10},
 			{"", "", true, numberOfObjects},
 			{"aprefix/", "", true, 10},
@@ -694,6 +704,10 @@ func TestListUploads_Paging(t *testing.T) {
 			{"", "object1", false, 5},
 			{"", "object1", true, 5},
 			{"aprefix/", "object1", true, 8},
+			{"00-same-key", "", false, 10},
+			{"00-same-key", "", true, 10},
+			{"does-not-exist", "", false, 0},
+			{"does-not-exist", "", true, 0},
 		}
 
 		for i, testCase := range testCases {
