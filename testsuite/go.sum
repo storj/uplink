@@ -2223,5 +2223,5 @@ storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd h1:XkLxAvogynNQu/1gM/F
 storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd/go.mod h1:nwyyJiAFAPRu81qBfAE5cBGkVXROYSNJu9pGXLtStHE=
 storj.io/picobuf v0.0.3 h1:xAUPB5ZUGfxkqd3bnw3zp01kkWb9wlhg4vtZWUs2S9A=
 storj.io/picobuf v0.0.3/go.mod h1:4V4xelV1RSCck5GgmkL/Txw9l6IfX3XcBzegmL5Kudo=
-storj.io/storj v1.91.0-alpha.0.20240911210650-473d58a9107b h1:BBFcFqELapWUpmncBgpm1ec1oDkjAfgMNIWxgfzd/B0=
-storj.io/storj v1.91.0-alpha.0.20240911210650-473d58a9107b/go.mod h1:YwNxOL5tMkV0VAKPyj9+v2EMzWTGP6iQpb/dX2qsBj0=
+storj.io/storj v1.91.0-alpha.0.20240913122908-dba2d2e6f96a h1:2qleCRhma9FbgU9V8hbJwWIh8KSBkybACrmLB3BKYPE=
+storj.io/storj v1.91.0-alpha.0.20240913122908-dba2d2e6f96a/go.mod h1:K2OSf5W/3ijq/mr2NUaBdRq6E5TloR24wjQaKvTq7EQ=
