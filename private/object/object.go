@@ -59,6 +59,9 @@ type VersionedUpload struct {
 // UploadOptions contains additional options for uploading objects.
 type UploadOptions = metaclient.UploadOptions
 
+// DeleteObjectOptions contains additional options for deleting objects.
+type DeleteObjectOptions = metaclient.DeleteObjectOptions
+
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
@@ -198,8 +201,12 @@ func StatObject(ctx context.Context, project *uplink.Project, bucket, key string
 // TODO(ver) currently we are returning object that was returned by satellite
 // if its regular object (status != delete marker) it means no delete marker
 // was created.
-func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte) (info *VersionedObject, err error) {
+func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *DeleteObjectOptions) (info *VersionedObject, err error) {
 	defer mon.Task()(&ctx)(&err)
+
+	if options == nil {
+		options = &DeleteObjectOptions{}
+	}
 
 	db, err := dialMetainfoDB(ctx, project)
 	if err != nil {
@@ -207,7 +214,7 @@ func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key stri
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.DeleteObject(ctx, bucket, key, version)
+	obj, err := db.DeleteObject(ctx, bucket, key, version, *options)
 	if err != nil {
 		return nil, packageConvertKnownErrors(err, bucket, key)
 	}

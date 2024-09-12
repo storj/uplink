@@ -111,7 +111,7 @@ func (project *Project) DeleteObject(ctx context.Context, bucket, key string) (d
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.DeleteObject(ctx, bucket, key, nil)
+	obj, err := db.DeleteObject(ctx, bucket, key, nil, metaclient.DeleteObjectOptions{})
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

@@ -291,8 +291,13 @@ func (db *DB) GetObjectRetention(ctx context.Context, bucket, key string, versio
 	})
 }
 
+// DeleteObjectOptions contains additional options for deleting objects.
+type DeleteObjectOptions struct {
+	BypassGovernanceRetention bool
+}
+
 // DeleteObject deletes an object from database.
-func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []byte) (_ Object, err error) {
+func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []byte, options DeleteObjectOptions) (_ Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -309,9 +314,10 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []by
 	}
 
 	object, err := db.metainfo.BeginDeleteObject(ctx, BeginDeleteObjectParams{
-		Bucket:             []byte(bucket),
-		EncryptedObjectKey: []byte(encPath.Raw()),
-		Version:            version,
+		Bucket:                    []byte(bucket),
+		EncryptedObjectKey:        []byte(encPath.Raw()),
+		Version:                   version,
+		BypassGovernanceRetention: options.BypassGovernanceRetention,
 	})
 	if err != nil {
 		return Object{}, err

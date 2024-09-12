@@ -1056,21 +1056,23 @@ func convertErrors(err error) error {
 
 // BeginDeleteObjectParams parameters for BeginDeleteObject method.
 type BeginDeleteObjectParams struct {
-	Bucket             []byte
-	EncryptedObjectKey []byte
-	Version            []byte
-	StreamID           storj.StreamID
-	Status             int32
+	Bucket                    []byte
+	EncryptedObjectKey        []byte
+	Version                   []byte
+	StreamID                  storj.StreamID
+	Status                    int32
+	BypassGovernanceRetention bool
 }
 
 func (params *BeginDeleteObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginDeleteRequest {
 	return &pb.ObjectBeginDeleteRequest{
-		Header:             header,
-		Bucket:             params.Bucket,
-		EncryptedObjectKey: params.EncryptedObjectKey,
-		ObjectVersion:      params.Version,
-		StreamId:           &params.StreamID,
-		Status:             params.Status,
+		Header:                    header,
+		Bucket:                    params.Bucket,
+		EncryptedObjectKey:        params.EncryptedObjectKey,
+		ObjectVersion:             params.Version,
+		StreamId:                  &params.StreamID,
+		Status:                    params.Status,
+		BypassGovernanceRetention: params.BypassGovernanceRetention,
 	}
 }
 

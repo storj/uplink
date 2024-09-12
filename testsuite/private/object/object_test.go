@@ -264,7 +264,7 @@ func TestUploadObjectWithObjectLock(t *testing.T) {
 				require.EqualExportedValues(t, *uploadObject, *statObj)
 
 				if testCase.expectedRetention != nil || testCase.legalHold {
-					_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+					_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version, nil)
 					require.ErrorIs(t, err, uplink.ErrPermissionDenied)
 				}
 			})
@@ -644,7 +644,7 @@ func TestDeleteObject(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, objects, 3)
 
-		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA2.Key, uploadInfoA2.Version)
+		deleteObj, err := object.DeleteObject(ctx, project, bucketName, uploadInfoA2.Key, uploadInfoA2.Version, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, deleteObj.Version)
 		// delete was done with specified version so no delete marker should be created
@@ -653,12 +653,12 @@ func TestDeleteObject(t *testing.T) {
 		// delete non existing version of existing object
 		nonExistingVersion := slices.Clone(uploadInfoB.Version)
 		nonExistingVersion[0]++ // change original version
-		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nonExistingVersion)
+		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nonExistingVersion, nil)
 		require.NoError(t, err)
 		require.Nil(t, deleteObj)
 
 		// delete latest version with version nil
-		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil)
+		deleteObj, err = object.DeleteObject(ctx, project, bucketName, uploadInfoB.Key, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, deleteObj.Version)
 		require.True(t, deleteObj.IsDeleteMarker)
@@ -677,6 +677,85 @@ func TestDeleteObject(t *testing.T) {
 		}
 		require.Equal(t, 1, listedDeleteMarkers)
 		require.Equal(t, 2, listedObjects)
+	})
+}
+
+func TestDeleteObject_BypassGovernanceRetention(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		const (
+			bucketName = "test-bucket"
+			objectKey  = "test-object"
+		)
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+		projectID := up.Projects[0].ID
+		userID := up.Projects[0].Owner.ID
+
+		project, err := up.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &metaclient.UploadOptions{
+			Retention: metaclient.Retention{
+				Mode:        storj.GovernanceMode,
+				RetainUntil: time.Now().Add(time.Hour),
+			},
+		})
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+
+		// TODO: Use the up.Access[sat.ID()].Share method once it has been updated to support Object Lock permissions.
+
+		userCtx, err := sat.UserContext(ctx, userID)
+		require.NoError(t, err)
+
+		_, restrictedAPIKey, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
+		require.NoError(t, err)
+
+		restrictedAPIKey, err = restrictedAPIKey.Restrict(macaroon.Caveat{DisallowBypassGovernanceRetention: true})
+		require.NoError(t, err)
+
+		restrictedAccess, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), restrictedAPIKey.Serialize(), "")
+		require.NoError(t, err)
+
+		restrictedProject, err := uplink.OpenProject(ctx, restrictedAccess)
+		require.NoError(t, err)
+
+		opts := &metaclient.DeleteObjectOptions{BypassGovernanceRetention: true}
+		_, err = object.DeleteObject(ctx, restrictedProject, bucketName, objectKey, upload.Info().Version, opts)
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+
+		objects, err := sat.Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, 1)
+
+		_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version, opts)
+		require.NoError(t, err)
+
+		objects, err = sat.Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Empty(t, objects)
 	})
 }
 
