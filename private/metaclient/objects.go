@@ -291,7 +291,7 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 		return ObjectList{}, ErrNoBucket.New("")
 	}
 
-	var startAfter string
+	var startAfter []byte
 	switch options.Direction {
 	// TODO for now we are supporting only After
 	// case Forward:
@@ -299,7 +299,7 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 	// 	startAfter = keyBefore(options.Cursor)
 	case After:
 		// after lists forwards from cursor, without cursor
-		startAfter = options.Cursor
+		startAfter = options.CursorEnc
 	default:
 		return ObjectList{}, errClass.New("invalid direction %d", options.Direction)
 	}
@@ -312,14 +312,14 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 	resp, err := db.metainfo.ListPendingObjectStreams(ctx, ListPendingObjectStreamsParams{
 		Bucket:             []byte(bucket),
 		EncryptedObjectKey: []byte(pi.PathEnc.Raw()),
-		EncryptedCursor:    []byte(startAfter),
+		EncryptedCursor:    startAfter,
 		Limit:              int32(options.Limit),
 	})
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
-	objectsList, err := db.pendingObjectsFromRawObjectList(ctx, resp.Items, pi, startAfter)
+	objectsList, err := db.pendingObjectsFromRawObjectList(ctx, resp.Items, pi)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
 	}
@@ -329,10 +329,11 @@ func (db *DB) ListPendingObjectStreams(ctx context.Context, bucket string, optio
 		Prefix: options.Prefix,
 		More:   resp.More,
 		Items:  objectsList,
+		Cursor: objectsList[len(objectsList)-1].Stream.ID.Bytes(),
 	}, nil
 }
 
-func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo, startAfter string) (objectList []Object, err error) {
+func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo) (objectList []Object, err error) {
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
