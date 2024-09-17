@@ -34,8 +34,9 @@ var (
 	// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
 	ErrNoObjectLockConfiguration = errors.New("destination bucket has no object lock configuration")
 
-	// ErrBucketNoVersioningObjectLock is returned when attempting to set object lock without versioning enabled.
-	ErrBucketNoVersioningObjectLock = errors.New("destination bucket does not have versioning enabled required for object lock")
+	// ErrBucketInvalidStateObjectLock is returned when attempting to set object lock without versioning enabled.
+	// This error is also returned when attempting to suspend versioning when object lock is enabled on the bucket.
+	ErrBucketInvalidStateObjectLock = errors.New("object lock requires bucket versioning to be enabled")
 
 	// ErrRetentionNotFound is returned when getting object retention for an object that has none.
 	ErrRetentionNotFound = errors.New("object has no retention configuration")
@@ -441,7 +442,7 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 	case errs2.IsRPC(err, rpcstatus.ObjectLockBucketRetentionConfigurationMissing):
 		return ErrNoObjectLockConfiguration
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
-		return ErrBucketNoVersioningObjectLock
+		return ErrBucketInvalidStateObjectLock
 	default:
 		return convertKnownErrors(err, bucket, key)
 	}
