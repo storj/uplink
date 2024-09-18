@@ -20,8 +20,14 @@ import (
 
 var mon = monkit.Package()
 
-// ErrBucketNoLock is returned when a bucket has object lock disabled.
-var ErrBucketNoLock = errors.New("object lock is not enabled for this bucket")
+var (
+	// ErrBucketNoLock is returned when a bucket has object lock disabled.
+	ErrBucketNoLock = errors.New("object lock is not enabled for this bucket")
+
+	// ErrBucketInvalidStateObjectLock is returned when attempting to set object lock without versioning enabled.
+	// This error is also returned when attempting to suspend versioning when object lock is enabled on the bucket.
+	ErrBucketInvalidStateObjectLock = errors.New("object lock requires bucket versioning to be enabled")
+)
 
 // Bucket contains information about the bucket.
 type Bucket metaclient.Bucket
@@ -140,6 +146,10 @@ func SetBucketVersioning(ctx context.Context, project *uplink.Project, bucketNam
 		Name:       []byte(bucketName),
 		Versioning: versioning,
 	})
+	if errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState) {
+		err = ErrBucketInvalidStateObjectLock
+	}
+
 	return convertKnownErrors(err, bucketName, "")
 }
 

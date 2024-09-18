@@ -271,3 +271,36 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		require.True(t, enabled)
 	})
 }
+
+func TestSuspendVersioningObjectLock(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ObjectLockEnabled = true
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = sat.API.DB.Buckets().CreateBucket(ctx, buckets.Bucket{
+			ProjectID:         projectID,
+			Name:              "test-bucket",
+			Versioning:        buckets.VersioningEnabled,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		require.ErrorIs(t, bucket.SetBucketVersioning(ctx, project, "test-bucket", false), bucket.ErrBucketInvalidStateObjectLock)
+	})
+}
