@@ -264,7 +264,7 @@ func UploadObject(ctx context.Context, project *uplink.Project, bucket, key stri
 
 	upload, err := uploadObjectWithRetention(ctx, project, bucket, key, options)
 	if err != nil {
-		return
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 	return &VersionedUpload{
 		upload: upload,
