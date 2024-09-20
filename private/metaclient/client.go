@@ -1049,6 +1049,8 @@ func convertErrors(err error) error {
 		return ErrBucketNoLock.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectRetentionConfigurationMissing):
 		return ErrRetentionNotFound.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectProtected):
+		return ErrObjectProtected.Wrap(err)
 	default:
 		return err
 	}

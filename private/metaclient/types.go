@@ -131,6 +131,9 @@ var (
 
 	// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
 	ErrMethodNotAllowed = errs.Class("method not allowed")
+
+	// ErrObjectProtected is an error class for cases when object is protected by Object Lock settings.
+	ErrObjectProtected = errs.Class("object protected")
 )
 
 // Object contains information about a specific object.

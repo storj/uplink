@@ -36,6 +36,9 @@ var (
 
 	// ErrRetentionNotFound is returned when getting object retention for an object that has none.
 	ErrRetentionNotFound = errors.New("object has no retention configuration")
+
+	// ErrObjectProtected is returned when object is protected due to applied Object Lock settings.
+	ErrObjectProtected = errors.New("object is protected by Object Lock settings")
 )
 
 // IPSummary contains information about the object IP-s.
@@ -447,6 +450,8 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 		return ErrNoObjectLockConfiguration
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
 		return privateBucket.ErrBucketInvalidStateObjectLock
+	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectProtected):
+		return ErrObjectProtected
 	default:
 		return convertKnownErrors(err, bucket, key)
 	}
@@ -464,6 +469,8 @@ func convertErrors(err error) error {
 		err = privateProject.ErrLockNotEnabled
 	case metaclient.ErrMethodNotAllowed.Has(err):
 		err = ErrMethodNotAllowed
+	case metaclient.ErrObjectProtected.Has(err):
+		err = ErrObjectProtected
 	}
 
 	return err

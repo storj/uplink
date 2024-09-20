@@ -265,7 +265,7 @@ func TestUploadObjectWithObjectLock(t *testing.T) {
 
 				if testCase.expectedRetention != nil || testCase.legalHold {
 					_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version, nil)
-					require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+					require.ErrorIs(t, err, object.ErrObjectProtected)
 				}
 			})
 		}
@@ -465,14 +465,17 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		err = object.SetObjectRetention(ctx, project, bucketName, wrongKey, upload.Info().Version, retention)
 		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
 
-		err = object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention)
-		require.NoError(t, err)
+		require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention))
 
 		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
 		require.NoError(t, err)
 		require.NotNil(t, objRetention)
 		require.Equal(t, retention.Mode, objRetention.Mode)
 		require.WithinDuration(t, retention.RetainUntil.UTC(), objRetention.RetainUntil, time.Minute)
+
+		retention.Mode = storj.GovernanceMode
+		err = object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention)
+		require.ErrorIs(t, err, object.ErrObjectProtected)
 	})
 }
 
