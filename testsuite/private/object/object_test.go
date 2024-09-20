@@ -208,34 +208,40 @@ func TestUploadObjectWithObjectLock(t *testing.T) {
 		}
 
 		for _, testCase := range []struct {
-			name              string
-			expectedRetention *metaclient.Retention
-			legalHold         bool
+			name                    string
+			expectedRetention       *metaclient.Retention
+			legalHold               bool
+			expectedDeleteObjectErr error
 		}{
 			{
 				name: "no retention, no legal hold",
 			},
 			{
-				name:              "retention - compliance, no legal hold",
-				expectedRetention: &retention,
+				name:                    "retention - compliance, no legal hold",
+				expectedRetention:       &retention,
+				expectedDeleteObjectErr: object.ErrObjectProtected,
 			},
 			{
-				name:              "retention - governance, no legal hold",
-				expectedRetention: &govRetention,
+				name:                    "retention - governance, no legal hold",
+				expectedRetention:       &govRetention,
+				expectedDeleteObjectErr: object.ErrObjectProtected,
 			},
 			{
-				name:      "no retention, legal hold",
-				legalHold: true,
+				name:                    "no retention, legal hold",
+				legalHold:               true,
+				expectedDeleteObjectErr: object.ErrObjectProtected,
 			},
 			{
-				name:              "retention - compliance, legal hold",
-				expectedRetention: &retention,
-				legalHold:         true,
+				name:                    "retention - compliance, legal hold",
+				expectedRetention:       &retention,
+				legalHold:               true,
+				expectedDeleteObjectErr: object.ErrObjectProtected,
 			},
 			{
-				name:              "retention - governance, legal hold",
-				expectedRetention: &govRetention,
-				legalHold:         true,
+				name:                    "retention - governance, legal hold",
+				expectedRetention:       &govRetention,
+				legalHold:               true,
+				expectedDeleteObjectErr: object.ErrObjectProtected,
 			},
 		} {
 			t.Run(testCase.name, func(t *testing.T) {
@@ -266,10 +272,8 @@ func TestUploadObjectWithObjectLock(t *testing.T) {
 				statObj.Retention = nil
 				require.EqualExportedValues(t, *uploadObject, *statObj)
 
-				if testCase.expectedRetention != nil || testCase.legalHold {
-					_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version, nil)
-					require.ErrorIs(t, err, object.ErrObjectProtected)
-				}
+				_, err = object.DeleteObject(ctx, project, bucketName, objectKey, upload.Info().Version, nil)
+				require.ErrorIs(t, err, testCase.expectedDeleteObjectErr)
 			})
 		}
 	})
