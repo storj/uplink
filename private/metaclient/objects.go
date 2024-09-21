@@ -242,8 +242,13 @@ func (db *DB) GetObjectLegalHold(ctx context.Context, bucket, key string, versio
 	})
 }
 
+// SetObjectRetentionOptions contains additional options for setting an object's retention.
+type SetObjectRetentionOptions struct {
+	BypassGovernanceRetention bool
+}
+
 // SetObjectRetention sets the retention for the object at the specific key and version ID.
-func (db *DB) SetObjectRetention(ctx context.Context, bucket, key string, version []byte, retention Retention) (err error) {
+func (db *DB) SetObjectRetention(ctx context.Context, bucket, key string, version []byte, retention Retention, opts SetObjectRetentionOptions) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -260,10 +265,11 @@ func (db *DB) SetObjectRetention(ctx context.Context, bucket, key string, versio
 	}
 
 	return db.metainfo.SetObjectRetention(ctx, SetObjectRetentionParams{
-		Bucket:             []byte(bucket),
-		EncryptedObjectKey: []byte(encPath.Raw()),
-		ObjectVersion:      version,
-		Retention:          retention,
+		Bucket:                    []byte(bucket),
+		EncryptedObjectKey:        []byte(encPath.Raw()),
+		ObjectVersion:             version,
+		Retention:                 retention,
+		BypassGovernanceRetention: opts.BypassGovernanceRetention,
 	})
 }
 

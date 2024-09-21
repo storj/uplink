@@ -4,6 +4,7 @@
 package object_test
 
 import (
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -23,6 +24,8 @@ import (
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
 	"storj.io/storj/satellite/console"
+	"storj.io/storj/satellite/metabase"
+	"storj.io/storj/satellite/metabase/metabasetest"
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
@@ -365,7 +368,185 @@ func TestGetAndSetObjectLegalHold(t *testing.T) {
 	})
 }
 
-func TestGetAndSetObjectRetention(t *testing.T) {
+func runRetentionModeTests(t *testing.T, name string, fn func(t *testing.T, mode storj.RetentionMode)) {
+	for _, tt := range []struct {
+		name string
+		mode storj.RetentionMode
+	}{
+		{name: "Compliance", mode: storj.ComplianceMode},
+		{name: "Governance", mode: storj.GovernanceMode},
+	} {
+		t.Run(fmt.Sprintf("%s (%s)", name, tt.name), func(t *testing.T) {
+			fn(t, tt.mode)
+		})
+	}
+}
+
+func TestSetObjectRetention(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+				config.DefaultPathCipher = storj.EncNull
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+
+		project, err := up.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucketName := testrand.BucketName()
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: true,
+		})
+		require.NoError(t, err)
+
+		createObjectWithRetention := func(t *testing.T, project *uplink.Project, bucketName string, retention metaclient.Retention) string {
+			objectKey := testrand.Path()
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &metaclient.UploadOptions{
+				Retention: retention,
+			})
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+			return objectKey
+		}
+
+		future := time.Now().Add(time.Hour)
+		bypassOpts := &metaclient.SetObjectRetentionOptions{BypassGovernanceRetention: true}
+
+		runRetentionModeTests(t, "Set", func(t *testing.T, mode storj.RetentionMode) {
+			objectKey := createObjectWithRetention(t, project, bucketName, metaclient.Retention{})
+			require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, metaclient.Retention{
+				Mode:        mode,
+				RetainUntil: future,
+			}, nil))
+		})
+
+		runRetentionModeTests(t, "Extend", func(t *testing.T, mode storj.RetentionMode) {
+			retention := metaclient.Retention{
+				Mode:        mode,
+				RetainUntil: future,
+			}
+			objectKey := createObjectWithRetention(t, project, bucketName, retention)
+			retention.RetainUntil = retention.RetainUntil.Add(time.Minute)
+			require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, nil))
+		})
+
+		runRetentionModeTests(t, "Shorten", func(t *testing.T, mode storj.RetentionMode) {
+			retention := metaclient.Retention{
+				Mode:        mode,
+				RetainUntil: future,
+			}
+			objectKey := createObjectWithRetention(t, project, bucketName, retention)
+
+			retention.RetainUntil = retention.RetainUntil.Add(-time.Minute)
+			err := object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, nil)
+			require.ErrorIs(t, err, object.ErrObjectProtected)
+
+			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, bypassOpts)
+			if mode == storj.GovernanceMode {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, object.ErrObjectProtected)
+			}
+		})
+
+		t.Run("Change mode", func(t *testing.T) {
+			retention := metaclient.Retention{
+				Mode:        storj.GovernanceMode,
+				RetainUntil: future,
+			}
+			objectKey := createObjectWithRetention(t, project, bucketName, retention)
+
+			retention.Mode = storj.ComplianceMode
+			err := object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, nil)
+			require.ErrorIs(t, err, object.ErrObjectProtected)
+
+			require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, bypassOpts))
+
+			retention.Mode = storj.GovernanceMode
+			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, nil)
+			require.ErrorIs(t, err, object.ErrObjectProtected)
+
+			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, bypassOpts)
+			require.ErrorIs(t, err, object.ErrObjectProtected)
+		})
+
+		runRetentionModeTests(t, "Remove active", func(t *testing.T, mode storj.RetentionMode) {
+			objectKey := createObjectWithRetention(t, project, bucketName, metaclient.Retention{
+				Mode:        mode,
+				RetainUntil: future,
+			})
+
+			err := object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, metaclient.Retention{}, nil)
+			require.ErrorIs(t, err, object.ErrObjectProtected)
+
+			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, metaclient.Retention{}, bypassOpts)
+			if mode == storj.GovernanceMode {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, object.ErrObjectProtected)
+			}
+		})
+
+		runRetentionModeTests(t, "Remove expired", func(t *testing.T, mode storj.RetentionMode) {
+			objectKey := testrand.Path()
+			objStream := metabase.ObjectStream{
+				ProjectID:  up.Projects[0].ID,
+				BucketName: metabase.BucketName(bucketName),
+				ObjectKey:  metabase.ObjectKey(objectKey),
+				Version:    1,
+				StreamID:   testrand.UUID(),
+			}
+
+			metabasetest.CreateTestObject{
+				BeginObjectExactVersion: &metabase.BeginObjectExactVersion{
+					ObjectStream: objStream,
+					Encryption:   metabasetest.DefaultEncryption,
+					Retention: metabase.Retention{
+						Mode:        mode,
+						RetainUntil: time.Now().Add(-time.Hour),
+					},
+				},
+			}.Run(ctx, t, sat.Metabase.DB, objStream, 0)
+
+			require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, metaclient.Retention{}, nil))
+		})
+
+		retention := metaclient.Retention{
+			Mode:        storj.ComplianceMode,
+			RetainUntil: future,
+		}
+
+		t.Run("Missing object", func(t *testing.T) {
+			err = object.SetObjectRetention(ctx, project, bucketName, testrand.Path(), nil, retention, bypassOpts)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+		})
+
+		t.Run("Object Lock disabled for bucket", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			_, err := bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+				Name:              bucketName,
+				ObjectLockEnabled: false,
+			})
+			require.NoError(t, err)
+
+			err = object.SetObjectRetention(ctx, project, bucketName, testrand.Path(), nil, retention, bypassOpts)
+			require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+		})
+	})
+}
+
+func TestGetObjectRetention(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
@@ -379,103 +560,68 @@ func TestGetAndSetObjectRetention(t *testing.T) {
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		sat := planet.Satellites[0]
-		upl := planet.Uplinks[0]
-		projectID := upl.Projects[0].ID
+		up := planet.Uplinks[0]
 
-		err := sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
-		require.NoError(t, err)
-
-		project, err := upl.OpenProject(ctx, sat)
+		project, err := up.OpenProject(ctx, sat)
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		invalidBucket := "invalid-bucket"
-
-		retention := metaclient.Retention{
-			Mode:        storj.ComplianceMode,
-			RetainUntil: time.Now().Add(time.Hour),
-		}
-
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
-			Name:              invalidBucket,
-			ObjectLockEnabled: false,
-		})
-		require.NoError(t, err)
-
-		upload, err := object.UploadObject(ctx, project, invalidBucket, "random-key", &object.UploadOptions{
-			Retention: retention,
-		})
-		require.NoError(t, err)
-		require.ErrorIs(t, upload.Commit(), object.ErrNoObjectLockConfiguration)
-
-		objectKey := "test-object"
-
-		upload, err = object.UploadObject(ctx, project, invalidBucket, objectKey, nil)
-		require.NoError(t, err)
-
-		_, err = upload.Write([]byte("test1"))
-		require.NoError(t, err)
-
-		require.NoError(t, upload.Commit())
-		require.NotEmpty(t, upload.Info().Version)
-
-		objRetention, err := object.GetObjectRetention(ctx, project, invalidBucket, objectKey, upload.Info().Version)
-		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
-		require.Nil(t, objRetention)
-
-		err = object.SetObjectRetention(ctx, project, invalidBucket, objectKey, upload.Info().Version, retention)
-		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
-		require.Nil(t, objRetention)
-
-		bucketName := "test-bucket"
-
+		bucketName := testrand.BucketName()
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
 			Name:              bucketName,
 			ObjectLockEnabled: true,
 		})
 		require.NoError(t, err)
 
-		upload, err = object.UploadObject(ctx, project, bucketName, objectKey, nil)
-		require.NoError(t, err)
+		runRetentionModeTests(t, "Success", func(t *testing.T, mode storj.RetentionMode) {
+			objectKey := testrand.Path()
+			retainUntil := time.Now().Add(time.Hour).Truncate(time.Microsecond).UTC()
 
-		_, err = upload.Write([]byte("test1"))
-		require.NoError(t, err)
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &metaclient.UploadOptions{
+				Retention: metaclient.Retention{
+					Mode:        mode,
+					RetainUntil: retainUntil,
+				},
+			})
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
 
-		require.NoError(t, upload.Commit())
-		require.NotEmpty(t, upload.Info().Version)
+			retention, err := object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NotNil(t, retention)
+			require.Equal(t, mode, retention.Mode)
+			require.Equal(t, retainUntil, retention.RetainUntil)
+		})
 
-		wrongBucket := "random-bucket"
-		wrongKey := "random-key"
+		t.Run("No retention", func(t *testing.T) {
+			objectKey := testrand.Path()
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
 
-		objRetention, err = object.GetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
-		require.Nil(t, objRetention)
+			retention, err := object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
+			require.ErrorIs(t, err, object.ErrRetentionNotFound)
+			require.Nil(t, retention)
+		})
 
-		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, wrongKey, upload.Info().Version)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
-		require.Nil(t, objRetention)
+		t.Run("Missing object", func(t *testing.T) {
+			retention, err := object.GetObjectRetention(ctx, project, bucketName, testrand.Path(), nil)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+			require.Nil(t, retention)
+		})
 
-		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
-		require.ErrorIs(t, err, object.ErrRetentionNotFound)
-		require.Nil(t, objRetention)
+		t.Run("Object Lock disabled for bucket", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			_, err := bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+				Name:              bucketName,
+				ObjectLockEnabled: false,
+			})
+			require.NoError(t, err)
 
-		err = object.SetObjectRetention(ctx, project, wrongBucket, objectKey, upload.Info().Version, retention)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
-
-		err = object.SetObjectRetention(ctx, project, bucketName, wrongKey, upload.Info().Version, retention)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
-
-		require.NoError(t, object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention))
-
-		objRetention, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version)
-		require.NoError(t, err)
-		require.NotNil(t, objRetention)
-		require.Equal(t, retention.Mode, objRetention.Mode)
-		require.WithinDuration(t, retention.RetainUntil.UTC(), objRetention.RetainUntil, time.Minute)
-
-		retention.Mode = storj.GovernanceMode
-		err = object.SetObjectRetention(ctx, project, bucketName, objectKey, upload.Info().Version, retention)
-		require.ErrorIs(t, err, object.ErrObjectProtected)
+			retention, err := object.GetObjectRetention(ctx, project, bucketName, testrand.Path(), nil)
+			require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+			require.Nil(t, retention)
+		})
 	})
 }
 

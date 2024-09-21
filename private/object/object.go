@@ -65,6 +65,9 @@ type UploadOptions = metaclient.UploadOptions
 // DeleteObjectOptions contains additional options for deleting objects.
 type DeleteObjectOptions = metaclient.DeleteObjectOptions
 
+// SetObjectRetentionOptions contains additional options for setting an object's retention.
+type SetObjectRetentionOptions = metaclient.SetObjectRetentionOptions
+
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
@@ -365,7 +368,7 @@ func GetObjectLegalHold(ctx context.Context, project *uplink.Project, bucket, ke
 }
 
 // SetObjectRetention sets the retention for the object at the specific key and version ID.
-func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, retention metaclient.Retention) (err error) {
+func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, retention metaclient.Retention, opts *SetObjectRetentionOptions) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	db, err := dialMetainfoDB(ctx, project)
@@ -374,7 +377,11 @@ func SetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	err = db.SetObjectRetention(ctx, bucket, key, version, retention)
+	if opts == nil {
+		opts = &SetObjectRetentionOptions{}
+	}
+
+	err = db.SetObjectRetention(ctx, bucket, key, version, retention, *opts)
 	if err != nil {
 		err = convertErrors(err)
 	}

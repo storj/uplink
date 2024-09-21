@@ -961,15 +961,17 @@ type SetObjectRetentionParams struct {
 	EncryptedObjectKey []byte
 	ObjectVersion      []byte
 
-	Retention Retention
+	Retention                 Retention
+	BypassGovernanceRetention bool
 }
 
 func (params *SetObjectRetentionParams) toRequest(header *pb.RequestHeader) *pb.SetObjectRetentionRequest {
 	req := &pb.SetObjectRetentionRequest{
-		Header:             header,
-		Bucket:             params.Bucket,
-		EncryptedObjectKey: params.EncryptedObjectKey,
-		ObjectVersion:      params.ObjectVersion,
+		Header:                    header,
+		Bucket:                    params.Bucket,
+		EncryptedObjectKey:        params.EncryptedObjectKey,
+		ObjectVersion:             params.ObjectVersion,
+		BypassGovernanceRetention: params.BypassGovernanceRetention,
 	}
 
 	if params.Retention != (Retention{}) {
