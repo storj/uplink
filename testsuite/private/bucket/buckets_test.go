@@ -260,6 +260,10 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		})
 		require.ErrorIs(t, err, uplink.ErrBucketAlreadyExists)
 
+		// force deleting bucket without object lock enabled should be allowed
+		_, err = project.DeleteBucketWithObjects(ctx, "test-bucket")
+		require.NoError(t, err)
+
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
 			Name:              "test-bucket2",
 			ObjectLockEnabled: true,
@@ -269,6 +273,10 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		enabled, err := bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
 		require.NoError(t, err)
 		require.True(t, enabled)
+
+		// force deleting bucket with object lock enabled should not be allowed
+		_, err = project.DeleteBucketWithObjects(ctx, "test-bucket2")
+		require.Error(t, err)
 	})
 }
 
