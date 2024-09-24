@@ -547,6 +547,18 @@ func TestSetObjectRetention(t *testing.T) {
 			err = object.SetObjectRetention(ctx, project, bucketName, testrand.Path(), nil, retention, bypassOpts)
 			require.ErrorIs(t, err, bucket.ErrBucketNoLock)
 		})
+
+		t.Run("Invalid object state with expiring object", func(t *testing.T) {
+			objectKey := testrand.Path()
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &object.UploadOptions{
+				Expires: time.Now().Add(time.Minute),
+			})
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, bypassOpts)
+			require.ErrorIs(t, err, object.ErrObjectLockInvalidState)
+		})
 	})
 }
 
@@ -625,6 +637,19 @@ func TestGetObjectRetention(t *testing.T) {
 			retention, err := object.GetObjectRetention(ctx, project, bucketName, testrand.Path(), nil)
 			require.ErrorIs(t, err, bucket.ErrBucketNoLock)
 			require.Nil(t, retention)
+		})
+
+		t.Run("Invalid object state with delete marker", func(t *testing.T) {
+			objectKey := testrand.Path()
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			_, err = object.DeleteObject(ctx, project, bucketName, objectKey, nil, nil)
+			require.NoError(t, err)
+
+			_, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
+			require.ErrorIs(t, err, object.ErrObjectLockInvalidState)
 		})
 	})
 }
