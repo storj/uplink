@@ -1054,7 +1054,7 @@ func convertErrors(err error) error {
 	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectProtected):
 		return ErrObjectProtected.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidObjectState):
-		return ErrObjectLockInvalidState.Wrap(err)
+		return ErrObjectLockInvalidObjectState.Wrap(err)
 	default:
 		return err
 	}

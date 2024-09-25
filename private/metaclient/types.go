@@ -135,8 +135,8 @@ var (
 	// ErrObjectProtected is an error class for cases when object is protected by Object Lock settings.
 	ErrObjectProtected = errs.Class("object protected")
 
-	// ErrObjectLockInvalidState is an error class for cases where an object is in an invalid state for Object Lock operations.
-	ErrObjectLockInvalidState = errs.Class("object lock invalid state")
+	// ErrObjectLockInvalidObjectState is an error class for cases where an object is in an invalid state for Object Lock operations.
+	ErrObjectLockInvalidObjectState = errs.Class("invalid object state for object lock")
 )
 
 // Object contains information about a specific object.

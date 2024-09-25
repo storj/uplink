@@ -40,8 +40,8 @@ var (
 	// ErrObjectProtected is returned when object is protected due to applied Object Lock settings.
 	ErrObjectProtected = errors.New("object is protected by Object Lock settings")
 
-	// ErrObjectLockInvalidState is returned when attempting to perform Object Lock operations on an object in an invalid state.
-	ErrObjectLockInvalidState = errors.New("object state is invalid for Object Lock")
+	// ErrObjectLockInvalidObjectState is returned when attempting to perform Object Lock operations on an object in an invalid state.
+	ErrObjectLockInvalidObjectState = errors.New("object state is invalid for Object Lock")
 )
 
 // IPSummary contains information about the object IP-s.
@@ -463,7 +463,7 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectProtected):
 		return ErrObjectProtected
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidObjectState):
-		return ErrObjectLockInvalidState
+		return ErrObjectLockInvalidObjectState
 	default:
 		return convertKnownErrors(err, bucket, key)
 	}
@@ -483,8 +483,8 @@ func convertErrors(err error) error {
 		err = ErrMethodNotAllowed
 	case metaclient.ErrObjectProtected.Has(err):
 		err = ErrObjectProtected
-	case metaclient.ErrObjectLockInvalidState.Has(err):
-		err = ErrObjectLockInvalidState
+	case metaclient.ErrObjectLockInvalidObjectState.Has(err):
+		err = ErrObjectLockInvalidObjectState
 	}
 
 	return err

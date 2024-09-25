@@ -557,7 +557,7 @@ func TestSetObjectRetention(t *testing.T) {
 			require.NoError(t, upload.Commit())
 
 			err = object.SetObjectRetention(ctx, project, bucketName, objectKey, nil, retention, bypassOpts)
-			require.ErrorIs(t, err, object.ErrObjectLockInvalidState)
+			require.ErrorIs(t, err, object.ErrObjectLockInvalidObjectState)
 		})
 	})
 }
@@ -649,7 +649,7 @@ func TestGetObjectRetention(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
-			require.ErrorIs(t, err, object.ErrObjectLockInvalidState)
+			require.ErrorIs(t, err, object.ErrObjectLockInvalidObjectState)
 		})
 	})
 }
