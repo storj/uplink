@@ -270,9 +270,10 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		enabled, err := bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
+		configuration, err := bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
 		require.NoError(t, err)
-		require.True(t, enabled)
+		require.True(t, configuration.Enabled)
+		require.Nil(t, configuration.DefaultRetention)
 
 		// force deleting bucket with object lock enabled should not be allowed
 		_, err = project.DeleteBucketWithObjects(ctx, "test-bucket2")

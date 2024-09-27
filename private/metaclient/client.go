@@ -381,6 +381,7 @@ func (params *GetBucketObjectLockConfigurationParams) BatchItem() *pb.BatchReque
 // GetBucketObjectLockConfigurationResponse response for GetBucketObjectLockConfiguration request.
 type GetBucketObjectLockConfigurationResponse struct {
 	Enabled bool
+	*DefaultRetention
 }
 
 // GetBucketObjectLockConfiguration returns a bucket object lock configuration.
@@ -396,8 +397,20 @@ func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, para
 		return GetBucketObjectLockConfigurationResponse{}, Error.Wrap(convertErrors(err))
 	}
 
+	if response.Configuration == nil {
+		return GetBucketObjectLockConfigurationResponse{}, Error.New("missing object lock configuration")
+	}
+	var defaultRetention *DefaultRetention
+	if response.Configuration.DefaultRetention != nil {
+		defaultRetention = &DefaultRetention{
+			Mode:  storj.RetentionMode(response.Configuration.DefaultRetention.Mode),
+			Years: response.Configuration.DefaultRetention.GetYears(),
+			Days:  response.Configuration.DefaultRetention.GetDays(),
+		}
+	}
 	return GetBucketObjectLockConfigurationResponse{
-		Enabled: response.Configuration.Enabled,
+		Enabled:          response.Configuration.Enabled,
+		DefaultRetention: defaultRetention,
 	}, nil
 }
 

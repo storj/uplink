@@ -209,6 +209,20 @@ type Bucket struct {
 	Attribution string
 }
 
+// DefaultRetention contains information about a bucket's default retention.
+type DefaultRetention struct {
+	Mode  storj.RetentionMode
+	Years int32
+	Days  int32
+}
+
+// BucketObjectLockConfiguration contains information about a bucket's
+// object lock configuration.
+type BucketObjectLockConfiguration struct {
+	Enabled          bool
+	DefaultRetention *DefaultRetention
+}
+
 // ListDirection specifies listing direction.
 type ListDirection = pb.ListDirection
 

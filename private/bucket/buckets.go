@@ -187,16 +187,16 @@ func CreateBucketWithObjectLock(ctx context.Context, project *uplink.Project, pa
 }
 
 // GetBucketObjectLockConfiguration returns bucket object lock configuration.
-func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Project, bucketName string) (_ bool, err error) {
+func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Project, bucketName string) (_ *metaclient.BucketObjectLockConfiguration, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucketName == "" {
-		return false, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+		return nil, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
 	}
 
 	metainfoClient, err := dialMetainfoClient(ctx, project)
 	if err != nil {
-		return false, convertKnownErrors(err, bucketName, "")
+		return nil, convertKnownErrors(err, bucketName, "")
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
@@ -211,7 +211,10 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		err = ErrBucketNoLock
 	}
 
-	return response.Enabled, convertKnownErrors(err, bucketName, "")
+	return &metaclient.BucketObjectLockConfiguration{
+		Enabled:          response.Enabled,
+		DefaultRetention: response.DefaultRetention,
+	}, convertKnownErrors(err, bucketName, "")
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
