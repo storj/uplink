@@ -414,6 +414,63 @@ func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, para
 	}, nil
 }
 
+// SetBucketObjectLockConfigurationParams parameters for SetBucketObjectLockConfiguration method.
+type SetBucketObjectLockConfigurationParams struct {
+	Name    []byte
+	Enabled bool
+	*DefaultRetention
+}
+
+func (params *SetBucketObjectLockConfigurationParams) toRequest(header *pb.RequestHeader) *pb.SetBucketObjectLockConfigurationRequest {
+	configuration := &pb.ObjectLockConfiguration{
+		Enabled: params.Enabled,
+	}
+
+	if params.DefaultRetention != nil {
+		defaultRetention := &pb.DefaultRetention{
+			Mode: pb.Retention_Mode(params.DefaultRetention.Mode),
+		}
+
+		if params.DefaultRetention.Days > 0 {
+			defaultRetention.Duration = &pb.DefaultRetention_Days{Days: params.DefaultRetention.Days}
+		} else if params.DefaultRetention.Years > 0 {
+			defaultRetention.Duration = &pb.DefaultRetention_Years{Years: params.DefaultRetention.Years}
+		}
+
+		configuration.DefaultRetention = defaultRetention
+	}
+
+	return &pb.SetBucketObjectLockConfigurationRequest{
+		Header:        header,
+		Name:          params.Name,
+		Configuration: configuration,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *SetBucketObjectLockConfigurationParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketSetObjectLockConfiguration{
+			BucketSetObjectLockConfiguration: params.toRequest(nil),
+		},
+	}
+}
+
+// SetBucketObjectLockConfiguration updates a bucket object lock configuration.
+func (client *Client) SetBucketObjectLockConfiguration(ctx context.Context, params SetBucketObjectLockConfigurationParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetBucketObjectLockConfiguration(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return Error.Wrap(convertErrors(err))
+	}
+
+	return nil
+}
+
 // DeleteBucketParams parameters for DeleteBucket method.
 type DeleteBucketParams struct {
 	Name      []byte
@@ -1070,6 +1127,8 @@ func convertErrors(err error) error {
 		return ErrObjectProtected.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidObjectState):
 		return ErrObjectLockInvalidObjectState.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketRetentionConfiguration):
+		return ErrBucketInvalidObjectLockConfig.Wrap(err)
 	default:
 		return err
 	}

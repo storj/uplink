@@ -20,6 +20,7 @@ import (
 	"storj.io/storj/satellite/nodeselection"
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
+	"storj.io/uplink/private/metaclient"
 )
 
 func TestListBucketsWithAttribution(t *testing.T) {
@@ -278,6 +279,114 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		// force deleting bucket with object lock enabled should not be allowed
 		_, err = project.DeleteBucketWithObjects(ctx, "test-bucket2")
 		require.Error(t, err)
+	})
+}
+
+func TestSetBucketObjectLockConfig(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ObjectLockEnabled = true
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+		userID := upl.Projects[0].Owner.ID
+
+		userCtx, err := sat.UserContext(ctx, userID)
+		require.NoError(t, err)
+
+		_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionMin)
+		require.NoError(t, err)
+
+		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucketName := "test-bucket"
+
+		// permission denied for older API key version
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, &metaclient.BucketObjectLockConfiguration{})
+		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
+
+		err = project.Close()
+		require.NoError(t, err)
+
+		_, key, err = sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key2", macaroon.APIKeyVersionObjectLock)
+		require.NoError(t, err)
+
+		access, err = uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+		require.NoError(t, err)
+
+		upl.Access[sat.ID()] = access
+
+		err = sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err = upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		config := &metaclient.BucketObjectLockConfiguration{Enabled: true}
+
+		// no bucket name
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, "", config)
+		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
+
+		// bucket not exists
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.ErrorIs(t, err, uplink.ErrBucketNotFound)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:              bucketName,
+			ObjectLockEnabled: false,
+		})
+		require.NoError(t, err)
+
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.NoError(t, err)
+
+		configResp, err := bucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
+		require.NoError(t, err)
+		require.True(t, configResp.Enabled)
+
+		duration := int32(5)
+		config.DefaultRetention = &metaclient.DefaultRetention{
+			Mode:  storj.ComplianceMode,
+			Years: duration,
+			Days:  duration,
+		}
+
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.ErrorIs(t, err, bucket.ErrBucketInvalidObjectLockConfig)
+
+		config.DefaultRetention.Years = 0
+		config.DefaultRetention.Mode = storj.NoRetention
+
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.ErrorIs(t, err, bucket.ErrBucketInvalidObjectLockConfig)
+
+		config.DefaultRetention.Mode = storj.GovernanceMode
+
+		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.NoError(t, err)
+
+		configResp, err = bucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
+		require.NoError(t, err)
+		require.True(t, configResp.Enabled)
+		require.NotNil(t, configResp.DefaultRetention)
+		require.Equal(t, config.DefaultRetention.Mode, configResp.DefaultRetention.Mode)
+		require.Equal(t, config.DefaultRetention.Days, configResp.DefaultRetention.Days)
+		require.Equal(t, config.DefaultRetention.Years, configResp.DefaultRetention.Years)
 	})
 }
 

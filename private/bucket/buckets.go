@@ -24,6 +24,9 @@ var (
 	// ErrBucketNoLock is returned when a bucket has object lock disabled.
 	ErrBucketNoLock = errors.New("object lock is not enabled for this bucket")
 
+	// ErrBucketInvalidObjectLockConfig is returned when bucket object lock config is invalid.
+	ErrBucketInvalidObjectLockConfig = errors.New("bucket object lock configuration is invalid")
+
 	// ErrBucketInvalidStateObjectLock is returned when attempting to set object lock without versioning enabled.
 	// This error is also returned when attempting to suspend versioning when object lock is enabled on the bucket.
 	ErrBucketInvalidStateObjectLock = errors.New("object lock requires bucket versioning to be enabled")
@@ -215,6 +218,41 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		Enabled:          response.Enabled,
 		DefaultRetention: response.DefaultRetention,
 	}, convertKnownErrors(err, bucketName, "")
+}
+
+// SetBucketObjectLockConfiguration updates bucket object lock configuration.
+func SetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Project, bucketName string, config *metaclient.BucketObjectLockConfiguration) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	if config == nil {
+		return convertKnownErrors(ErrBucketInvalidObjectLockConfig, bucketName, "")
+	}
+
+	if config.DefaultRetention != nil && config.DefaultRetention.Days > 0 && config.DefaultRetention.Years > 0 {
+		return convertKnownErrors(ErrBucketInvalidObjectLockConfig, bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	err = metainfoClient.SetBucketObjectLockConfiguration(ctx, metaclient.SetBucketObjectLockConfigurationParams{
+		Name:             []byte(bucketName),
+		Enabled:          config.Enabled,
+		DefaultRetention: config.DefaultRetention,
+	})
+
+	if metaclient.ErrBucketInvalidObjectLockConfig.Has(err) {
+		err = ErrBucketInvalidObjectLockConfig
+	}
+
+	return convertKnownErrors(err, bucketName, "")
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
