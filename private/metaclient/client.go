@@ -809,10 +809,11 @@ type GetObjectIPsParams struct {
 
 // GetObjectIPsResponse is the response from GetObjectIPs.
 type GetObjectIPsResponse struct {
-	IPPorts            [][]byte
-	SegmentCount       int64
-	PieceCount         int64
-	ReliablePieceCount int64
+	IPPorts             [][]byte
+	SegmentCount        int64
+	PieceCount          int64
+	ReliablePieceCount  int64
+	PlacementConstraint uint32
 }
 
 func (params *GetObjectIPsParams) toRequest(header *pb.RequestHeader) *pb.ObjectGetIPsRequest {
@@ -840,10 +841,11 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParam
 	}
 
 	return &GetObjectIPsResponse{
-		IPPorts:            response.Ips,
-		SegmentCount:       response.SegmentCount,
-		PieceCount:         response.PieceCount,
-		ReliablePieceCount: response.ReliablePieceCount,
+		IPPorts:             response.Ips,
+		SegmentCount:        response.SegmentCount,
+		PieceCount:          response.PieceCount,
+		ReliablePieceCount:  response.ReliablePieceCount,
+		PlacementConstraint: response.PlacementConstraint,
 	}, nil
 }
 
