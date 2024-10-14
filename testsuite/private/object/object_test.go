@@ -1290,11 +1290,11 @@ func TestListObjectVersions_Suspended(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, false))
-		versionignState, err := bucket.GetBucketVersioning(ctx, project, bucketName)
+		versioningState, err := bucket.GetBucketVersioning(ctx, project, bucketName)
 		require.NoError(t, err)
-		require.Equal(t, buckets.VersioningSuspended, buckets.Versioning(versionignState))
+		require.Equal(t, buckets.VersioningSuspended, buckets.Versioning(versioningState))
 
-		// upload unversioned object in suspended bucket. should overwright previous unversioned object
+		// upload unversioned object in suspended bucket. should overwrite previous unversioned object
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "objectA", testrand.Bytes(100))
 		require.NoError(t, err)
 
@@ -1302,10 +1302,15 @@ func TestListObjectVersions_Suspended(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 
+		var versioned int
 		// with listing version should be always set
 		for _, item := range items {
 			require.NotEmpty(t, item.Version)
+			if item.IsVersioned {
+				versioned++
+			}
 		}
+		require.Equal(t, 1, versioned)
 	})
 }
 
@@ -1384,6 +1389,7 @@ func TestObject_Versioned_Unversioned(t *testing.T) {
 		stat, err := object.StatObject(ctx, project, bucketName, "objectA", nil)
 		require.NoError(t, err)
 		require.Empty(t, stat.Version)
+		require.False(t, stat.IsVersioned)
 
 		// upload versioned object
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "objectA", testrand.Bytes(100))
@@ -1392,15 +1398,21 @@ func TestObject_Versioned_Unversioned(t *testing.T) {
 		stat, err = object.StatObject(ctx, project, bucketName, "objectA", nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, stat.Version)
+		require.True(t, stat.IsVersioned)
 
 		items, _, err := object.ListObjectVersions(ctx, project, bucketName, nil)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 
+		var versioned int
 		// with listing version should be always set
 		for _, item := range items {
 			require.NotEmpty(t, item.Version)
+			if item.IsVersioned {
+				versioned++
+			}
 		}
+		require.Equal(t, 1, versioned)
 	})
 }
 

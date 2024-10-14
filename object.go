@@ -32,7 +32,8 @@ type Object struct {
 	System SystemMetadata
 	Custom CustomMetadata
 
-	version []byte
+	version     []byte
+	isVersioned bool
 }
 
 // SystemMetadata contains information about the object that cannot be changed directly.
@@ -158,7 +159,8 @@ func convertObject(obj *metaclient.Object) *Object {
 		},
 		Custom: obj.Metadata,
 
-		version: obj.Version,
+		version:     obj.Version,
+		isVersioned: obj.IsVersioned,
 	}
 
 	if object.Custom == nil {
@@ -178,4 +180,16 @@ func convertObject(obj *metaclient.Object) *Object {
 //go:linkname objectVersion
 func objectVersion(object *Object) []byte {
 	return object.version
+}
+
+// objectIsVersioned is exposing object.isVersioned field.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname objectIsVersioned
+func objectIsVersioned(object *Object) bool {
+	return object.isVersioned
 }

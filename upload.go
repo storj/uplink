@@ -171,6 +171,7 @@ func (upload *Upload) Info() *Object {
 		obj.System.ContentLength = meta.Size
 		obj.System.Created = meta.Modified
 		obj.version = meta.Version
+		obj.isVersioned = meta.IsVersioned
 	}
 	return obj
 }

@@ -51,7 +51,13 @@ type IPSummary = metaclient.GetObjectIPsResponse
 // TODO find better place of name for this and related things.
 type VersionedObject struct {
 	uplink.Object
-	Version        []byte
+	Version []byte
+	// IsVersioned reports whether VersionedObject is a truly versioned
+	// object, such as an object uploaded to a bucket with versioning
+	// active. VersionedObject not being versioned can happen when it's
+	// an object uploaded to a bucket with versioning disabled or
+	// suspended.
+	IsVersioned    bool
 	IsDeleteMarker bool
 	LegalHold      *bool
 	Retention      *metaclient.Retention
@@ -99,6 +105,7 @@ func (upload *VersionedUpload) Info() *VersionedObject {
 		obj.System.ContentLength = meta.Size
 		obj.System.Created = meta.Modified
 		obj.Version = meta.Version
+		obj.IsVersioned = meta.IsVersioned
 		obj.Retention = meta.Retention
 		obj.LegalHold = meta.LegalHold
 	}
@@ -428,6 +435,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 			Custom: obj.Metadata,
 		},
 		Version:        obj.Version,
+		IsVersioned:    obj.IsVersioned,
 		IsDeleteMarker: obj.IsDeleteMarker,
 		LegalHold:      obj.LegalHold,
 		Retention:      obj.Retention,
@@ -447,8 +455,9 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 	}
 
 	return &VersionedObject{
-		Object:  *obj,
-		Version: objectVersion(obj),
+		Object:      *obj,
+		Version:     objectVersion(obj),
+		IsVersioned: objectIsVersioned(obj),
 	}
 }
 
@@ -501,6 +510,9 @@ func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
 
 //go:linkname objectVersion storj.io/uplink.objectVersion
 func objectVersion(object *uplink.Object) []byte
+
+//go:linkname objectIsVersioned storj.io/uplink.objectIsVersioned
+func objectIsVersioned(object *uplink.Object) bool
 
 //go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
 func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *uplink.Download, err error)

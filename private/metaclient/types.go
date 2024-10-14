@@ -42,6 +42,11 @@ type Retention struct {
 	RetainUntil time.Time
 }
 
+// IsVersioned returns true if the item is an Object Versioning-versioned item.
+func (r RawObjectItem) IsVersioned() bool {
+	return version(r.Status, r.Version) != nil
+}
+
 // IsDeleteMarker returns true if object is a delete marker.
 func (r RawObjectItem) IsDeleteMarker() bool {
 	return r.Status == int32(pb.Object_DELETE_MARKER_UNVERSIONED) || r.Status == int32(pb.Object_DELETE_MARKER_VERSIONED)
@@ -70,6 +75,11 @@ type RawObjectListItem struct {
 	EncryptedMetadata             []byte
 
 	IsPrefix bool
+}
+
+// IsVersioned returns true if the listed item is an Object Versioning-versioned item.
+func (r RawObjectListItem) IsVersioned() bool {
+	return version(r.Status, r.Version) != nil
 }
 
 // IsDeleteMarker returns true if listed object item is a delete marker.
@@ -145,6 +155,7 @@ type Object struct {
 	Bucket         Bucket
 	Path           string
 	IsPrefix       bool
+	IsVersioned    bool
 	IsDeleteMarker bool
 
 	Metadata map[string]string

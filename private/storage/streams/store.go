@@ -37,13 +37,14 @@ var mon = monkit.Package()
 
 // Meta info about a stream.
 type Meta struct {
-	Modified   time.Time
-	Expiration time.Time
-	Size       int64
-	Data       []byte
-	Version    []byte
-	Retention  *metaclient.Retention
-	LegalHold  *bool
+	Modified    time.Time
+	Expiration  time.Time
+	Size        int64
+	Data        []byte
+	Version     []byte
+	IsVersioned bool
+	Retention   *metaclient.Retention
+	LegalHold   *bool
 }
 
 // Part info about a part.
@@ -387,13 +388,14 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	resultMeta := Meta{
-		Modified:   rawObject.Created,
-		Expiration: rawObject.Expires,
-		Size:       streamSize,
-		Data:       metadataBytes,
-		Version:    rawObject.Version,
-		Retention:  rawObject.Retention,
-		LegalHold:  rawObject.LegalHold,
+		Modified:    rawObject.Created,
+		Expiration:  rawObject.Expires,
+		Size:        streamSize,
+		Data:        metadataBytes,
+		Version:     rawObject.Version,
+		IsVersioned: rawObject.IsVersioned(),
+		Retention:   rawObject.Retention,
+		LegalHold:   rawObject.LegalHold,
 	}
 
 	return resultMeta, nil
