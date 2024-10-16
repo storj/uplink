@@ -302,10 +302,12 @@ func TestSuspendVersioningObjectLock(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		_, err = sat.API.DB.Buckets().CreateBucket(ctx, buckets.Bucket{
-			ProjectID:         projectID,
-			Name:              "test-bucket",
-			Versioning:        buckets.VersioningEnabled,
-			ObjectLockEnabled: true,
+			ProjectID:  projectID,
+			Name:       "test-bucket",
+			Versioning: buckets.VersioningEnabled,
+			ObjectLock: buckets.ObjectLockSettings{
+				Enabled: true,
+			},
 		})
 		require.NoError(t, err)
 

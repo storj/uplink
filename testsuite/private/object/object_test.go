@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
 	"storj.io/common/macaroon"
@@ -350,18 +349,18 @@ func TestGetAndSetObjectLegalHold(t *testing.T) {
 		wrongKey := "random-key"
 
 		legalHoldStatus, err = object.GetObjectLegalHold(ctx, project, wrongBucket, objectKey, upload.Info().Version)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+		require.True(t, strings.Contains(err.Error(), string(metaclient.ErrBucketNotFound)))
 		require.False(t, legalHoldStatus)
 
 		legalHoldStatus, err = object.GetObjectLegalHold(ctx, project, bucketName, wrongKey, upload.Info().Version)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+		require.True(t, strings.Contains(err.Error(), string(metaclient.ErrObjectNotFound)))
 		require.False(t, legalHoldStatus)
 
 		err = object.SetObjectLegalHold(ctx, project, wrongBucket, objectKey, upload.Info().Version, true)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrBucketNotFound)))
+		require.True(t, strings.Contains(err.Error(), string(metaclient.ErrBucketNotFound)))
 
 		err = object.SetObjectLegalHold(ctx, project, bucketName, wrongKey, upload.Info().Version, true)
-		require.True(t, strings.HasPrefix(errs.Unwrap(err).Error(), string(metaclient.ErrObjectNotFound)))
+		require.True(t, strings.Contains(err.Error(), string(metaclient.ErrObjectNotFound)))
 
 		err = object.SetObjectLegalHold(ctx, project, bucketName, objectKey, upload.Info().Version, true)
 		require.NoError(t, err)
