@@ -203,6 +203,9 @@ var (
 
 	// ErrBucketInvalidObjectLockConfig is an error class for cases when provided an invalid bucket object lock config.
 	ErrBucketInvalidObjectLockConfig = errs.Class("invalid bucket object lock config")
+
+	// ErrBucketInvalidStateObjectLock is an error class for when a bucket's state conflicts with Object Lock settings.
+	ErrBucketInvalidStateObjectLock = errs.Class("bucket state incompatible with object lock")
 )
 
 // Bucket contains information about a specific bucket.

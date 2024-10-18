@@ -248,8 +248,11 @@ func SetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		DefaultRetention: config.DefaultRetention,
 	})
 
-	if metaclient.ErrBucketInvalidObjectLockConfig.Has(err) {
+	switch {
+	case metaclient.ErrBucketInvalidObjectLockConfig.Has(err):
 		err = ErrBucketInvalidObjectLockConfig
+	case metaclient.ErrBucketInvalidStateObjectLock.Has(err):
+		err = ErrBucketInvalidStateObjectLock
 	}
 
 	return convertKnownErrors(err, bucketName, "")

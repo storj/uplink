@@ -1129,6 +1129,8 @@ func convertErrors(err error) error {
 		return ErrObjectLockInvalidObjectState.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketRetentionConfiguration):
 		return ErrBucketInvalidObjectLockConfig.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
+		return ErrBucketInvalidStateObjectLock.Wrap(err)
 	default:
 		return err
 	}
