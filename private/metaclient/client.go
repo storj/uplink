@@ -21,6 +21,7 @@ import (
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
+	"storj.io/uplink/internal"
 	"storj.io/uplink/private/eestream"
 )
 
@@ -1107,7 +1108,7 @@ func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRe
 }
 
 func convertErrors(err error) error {
-	message := errs.Unwrap(err).Error()
+	message := internal.RootError(err).Error()
 	switch {
 	case strings.HasPrefix(message, "bucket not found"):
 		return ErrBucketNotFound.Wrap(err)

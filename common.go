@@ -17,6 +17,7 @@ import (
 	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/eventkit"
+	"storj.io/uplink/internal"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/piecestore"
 )
@@ -65,7 +66,7 @@ func convertKnownErrors(err error, bucket, key string) error {
 		return errwrapf("%w (%q)", ErrPermissionDenied, key)
 	case errs2.IsRPC(err, rpcstatus.ResourceExhausted):
 		// TODO is a better way to do this?
-		message := errs.Unwrap(err).Error()
+		message := internal.RootError(err).Error()
 		if strings.HasSuffix(message, "Exceeded Usage Limit") {
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrBandwidthLimitExceeded))
 		} else if strings.HasSuffix(message, "Too Many Requests") {
@@ -83,7 +84,7 @@ func convertKnownErrors(err error, bucket, key string) error {
 			objectNotFoundPrefix = "object not found"
 		)
 
-		message := errs.Unwrap(err).Error()
+		message := internal.RootError(err).Error()
 		if strings.HasPrefix(message, bucketNotFoundPrefix) {
 			// remove error prefix + ": " from message
 			bucket := strings.TrimPrefix(message[len(bucketNotFoundPrefix):], ": ")
