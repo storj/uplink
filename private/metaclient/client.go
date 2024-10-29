@@ -399,7 +399,7 @@ func (client *Client) GetBucketObjectLockConfiguration(ctx context.Context, para
 	}
 
 	if response.Configuration == nil {
-		return GetBucketObjectLockConfigurationResponse{}, Error.New("missing object lock configuration")
+		return GetBucketObjectLockConfigurationResponse{}, ErrBucketNoLock.New("missing object lock configuration")
 	}
 	var defaultRetention *DefaultRetention
 	if response.Configuration.DefaultRetention != nil {
