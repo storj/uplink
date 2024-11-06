@@ -242,11 +242,20 @@ func (client *Download) Read(data []byte) (read int, err error) {
 
 		if !client.restoredFromTrashSent && response != nil && response.RestoredFromTrash {
 			client.restoredFromTrashSent = true
-			evs.Event("piece-download",
+
+			tags := []eventkit.Tag{
 				eventkit.String("node_id", client.limit.StorageNodeId.String()),
 				eventkit.String("piece_id", client.limit.PieceId.String()),
 				eventkit.Bool("restored_from_trash", true),
-			)
+			}
+			valuesMap, ok := client.ctx.Value("restored_from_trash").(map[string]string)
+			if ok {
+				for key, value := range valuesMap {
+					tags = append(tags, eventkit.String(key, value))
+				}
+			}
+
+			evs.Event("piece-download", tags...)
 		}
 
 		// we may have some data buffered, so we cannot immediately return the error
