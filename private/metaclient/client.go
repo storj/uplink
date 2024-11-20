@@ -114,6 +114,7 @@ func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectI
 // CreateBucketParams parameters for CreateBucket method.
 type CreateBucketParams struct {
 	Name              []byte
+	Placement         []byte
 	ObjectLockEnabled bool
 }
 
@@ -121,6 +122,7 @@ func (params *CreateBucketParams) toRequest(header *pb.RequestHeader) *pb.Bucket
 	return &pb.BucketCreateRequest{
 		Header:            header,
 		Name:              params.Name,
+		Placement:         params.Placement,
 		ObjectLockEnabled: params.ObjectLockEnabled,
 	}
 }
@@ -159,12 +161,12 @@ func (client *Client) CreateBucket(ctx context.Context, params CreateBucketParam
 		return err
 	})
 	if err != nil {
-		return Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(convertErrors(err))
 	}
 
 	respBucket, err = convertProtoToBucket(response.Bucket)
 	if err != nil {
-		return Bucket{}, Error.Wrap(err)
+		return Bucket{}, Error.Wrap(convertErrors(err))
 	}
 	return respBucket, nil
 }
@@ -1132,6 +1134,10 @@ func convertErrors(err error) error {
 		return ErrBucketInvalidObjectLockConfig.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
 		return ErrBucketInvalidStateObjectLock.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.PlacementInvalidValue):
+		return ErrInvalidPlacement.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.PlacementConflictingValues):
+		return ErrConflictingPlacement.Wrap(err)
 	default:
 		return err
 	}

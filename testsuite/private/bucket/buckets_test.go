@@ -118,6 +118,77 @@ func TestGetBucketLocation(t *testing.T) {
 	})
 }
 
+func TestCreateBucketWithLocation(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Placement = nodeselection.ConfigurablePlacementRule{
+					PlacementRules: "buckets_test_placement.yaml",
+				}
+				config.Console.Placement.SelfServeEnabled = true
+				config.Console.Placement.SelfServeNames = []string{"Poland"}
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		projectID := planet.Uplinks[0].Projects[0].ID
+		bucketName := "bucket"
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		// change the default_placement of the project
+		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, storj.EU)
+		require.NoError(t, err)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:      bucketName,
+			Placement: "Poland",
+		})
+		// cannot create bucket with custom placement if there is project default.
+		require.True(t, metaclient.ErrConflictingPlacement.Has(err))
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name: bucketName,
+		})
+		require.NoError(t, err)
+
+		// check if placement is set to project default
+		placement, err := planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName), projectID)
+		require.NoError(t, err)
+		require.Equal(t, storj.EU, placement)
+
+		// delete the bucket
+		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName), projectID)
+		require.NoError(t, err)
+
+		// change the default_placement of the project
+		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, storj.DefaultPlacement)
+		require.NoError(t, err)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:      bucketName,
+			Placement: "Poland",
+		})
+		require.NoError(t, err)
+
+		placement, err = planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName), projectID)
+		require.NoError(t, err)
+		require.Equal(t, storj.PlacementConstraint(40), placement)
+
+		// delete the bucket
+		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName), projectID)
+		require.NoError(t, err)
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+			Name:      bucketName,
+			Placement: "EU", // invalid placement
+		})
+		require.True(t, metaclient.ErrInvalidPlacement.Has(err))
+	})
+}
+
 func TestSetBucketVersioning(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, UplinkCount: 1,

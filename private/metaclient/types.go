@@ -217,6 +217,12 @@ var (
 
 	// ErrBucketInvalidStateObjectLock is an error class for when a bucket's state conflicts with Object Lock settings.
 	ErrBucketInvalidStateObjectLock = errs.Class("bucket state incompatible with object lock")
+
+	// ErrInvalidPlacement is an error class for invalid placement.
+	ErrInvalidPlacement = errs.Class("invalid placement")
+	// ErrConflictingPlacement is an error class for conflicting placement
+	// between a project default and a new bucket.
+	ErrConflictingPlacement = errs.Class("conflicting placement")
 )
 
 // Bucket contains information about a specific bucket.

@@ -160,6 +160,7 @@ func SetBucketVersioning(ctx context.Context, project *uplink.Project, bucketNam
 type CreateBucketWithObjectLockParams struct {
 	Name              string
 	ObjectLockEnabled bool
+	Placement         string
 }
 
 // CreateBucketWithObjectLock creates a new bucket with object lock enabled/disabled.
@@ -178,6 +179,7 @@ func CreateBucketWithObjectLock(ctx context.Context, project *uplink.Project, pa
 
 	response, err := metainfoClient.CreateBucket(ctx, metaclient.CreateBucketParams{
 		Name:              []byte(params.Name),
+		Placement:         []byte(params.Placement),
 		ObjectLockEnabled: params.ObjectLockEnabled,
 	})
 	if err != nil {
