@@ -114,10 +114,14 @@ func TestBeginUpload_Expires(t *testing.T) {
 		require.Nil(t, list.Item())
 
 		// check that storage nodes have pieces that will expire
-		for _, sn := range planet.StorageNodes {
-			expired, err := sn.DB.PieceExpirationDB().GetExpired(ctx, now.Add(time.Hour+10*time.Minute), -1)
-			require.NoError(t, err)
-			require.NotEmpty(t, expired)
+		for i, node := range planet.StorageNodes {
+			if i%2 != 0 {
+				// only every other node would have pieces that will expire
+				// because the others have hashstore enabled.
+				expired, err := node.StorageOld.Store.GetExpired(ctx, now.Add(time.Hour+10*time.Minute))
+				require.NoError(t, err)
+				require.NotEmpty(t, expired)
+			}
 		}
 	})
 }

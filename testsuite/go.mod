@@ -11,10 +11,10 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.9.0
-	storj.io/common v0.0.0-20241119131735-4ff8230c41d4
+	storj.io/common v0.0.0-20241122160459-7ebb6c97b77d
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20241120103610-d28523d2f690
+	storj.io/storj v1.91.0-alpha.0.20241126183739-927e1154578f
 	storj.io/uplink v1.13.2-0.20241106140533-61d511a04894
 )
 
