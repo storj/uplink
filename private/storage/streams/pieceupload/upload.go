@@ -5,10 +5,12 @@ package pieceupload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
 	"storj.io/common/storj"
@@ -25,10 +27,14 @@ type PiecePutter interface {
 	PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error)
 }
 
+var (
+	errTryAgain = errors.New("try upload again")
+)
+
 // UploadOne uploads one piece from the manager using the given private key. If
 // it fails, it will attempt to upload another until either the upload context,
 // or the long tail context is cancelled.
-func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey) (_ bool, err error) {
+func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey, stalls *StallManager) (_ bool, err error) {
 	defer mon.Task()(&longTailCtx)(&err)
 
 	// If the long tail context is cancelled, then return a nil error.
@@ -61,24 +67,36 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 			"noise", noise,
 		)
 
-		testuplink.Log(logCtx, "Uploading piece...")
-		hash, _, err := putter.PutPiece(longTailCtx, uploadCtx, limit, privateKey, io.NopCloser(piece))
-		testuplink.Log(logCtx, "Done uploading piece. err:", err)
-		done(hash, err == nil)
-		if err == nil {
-			return true, nil
-		}
+		success, err := func() (bool, error) {
+			stallCtx, cleanup := stalls.Watch(longTailCtx)
+			defer cleanup()
 
-		if err := uploadCtx.Err(); err != nil {
-			return false, err
-		}
+			testuplink.Log(logCtx, "Uploading piece...")
+			hash, _, err := putter.PutPiece(stallCtx, uploadCtx, limit, privateKey, io.NopCloser(piece))
+			testuplink.Log(logCtx, "Done uploading piece. err:", err)
+			done(hash, err == nil)
+			if err == nil {
+				return true, nil
+			}
 
-		if longTailCtx.Err() != nil {
-			// If this context is done but the uploadCtx context isn't, then the
-			// download was cancelled for long tail optimization purposes. This
-			// is expected. Return that there was no error but that the upload
-			// did not complete.
-			return false, nil
+			if err := uploadCtx.Err(); err != nil {
+				return false, err
+			}
+
+			if longTailCtx.Err() != nil {
+				// If this context is done but the uploadCtx context isn't, then the
+				// download was cancelled for long tail optimization purposes. This
+				// is expected. Return that there was no error but that the upload
+				// did not complete.
+				return false, nil
+			}
+
+			return false, errTryAgain
+		}()
+
+		if errors.Is(err, errTryAgain) {
+			continue
 		}
+		return success, err
 	}
 }

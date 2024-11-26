@@ -9,6 +9,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
@@ -25,6 +26,19 @@ import (
 var (
 	mon        = monkit.Package()
 	uploadTask = mon.TaskNamed("segment-upload")
+)
+
+const (
+	// stallDetectionMinUpload is the number of successful uploads that need to
+	// occur before we start considering whether remaining uploads have stalled.
+	stallDetectionMinUpload = 3
+	// once the stallDetectionMin'th success occurs, remaining uploads will be
+	// considered stalled if they take longer than the stallDetectionMin'th
+	// duration times stallDetectionFactor.
+	stallDetectionFactor = 2
+	// stallDetectionMinStall is the minimum amount of time that can be considered
+	// a stall.
+	stallDetectionMinStall = 10 * time.Second
 )
 
 // Scheduler is used to coordinate and constrain resources between
@@ -114,6 +128,9 @@ func Begin(ctx context.Context,
 		}
 	}()
 
+	uploadStart := time.Now()
+	stalls := pieceupload.NewStallManager()
+
 	results := make(chan segmentResult, uploaderCount)
 	var successful int32
 	for i := 0; i < uploaderCount; i++ {
@@ -130,12 +147,20 @@ func Begin(ctx context.Context,
 			// function returns, the scheduler resource MUST be released to
 			// allow other piece uploads to take place.
 			defer res.Done()
-			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey)
+			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stalls)
 			results <- segmentResult{uploaded: uploaded, err: err}
 			if uploaded {
 				// Piece upload was successful. If we have met the optimal threshold, we
 				// can cancel the rest.
-				if int(atomic.AddInt32(&successful, 1)) == optimalThreshold {
+				successfulSoFar := int(atomic.AddInt32(&successful, 1))
+				if successfulSoFar == stallDetectionMinUpload {
+					duration := time.Since(uploadStart) * time.Duration(stallDetectionFactor)
+					if duration < stallDetectionMinStall {
+						duration = stallDetectionMinStall
+					}
+					stalls.SetMaxDuration(duration)
+				}
+				if successfulSoFar == optimalThreshold {
 					testuplink.Log(ctx, "Segment reached optimal threshold of", optimalThreshold, "pieces.")
 					cancel()
 				}

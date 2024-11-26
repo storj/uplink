@@ -73,7 +73,7 @@ func TestUploadOne(t *testing.T) {
 
 			manager := newManagerWithExchanger(2, failExchange{})
 			putter := &fakePutter{t: t, failPuts: tc.failPuts}
-			uploaded, err := UploadOne(longTailCtx, uploadCtx, manager, putter, fakePrivateKey)
+			uploaded, err := UploadOne(longTailCtx, uploadCtx, manager, putter, fakePrivateKey, NewStallManager())
 			if tc.expectErr != "" {
 				require.EqualError(t, err, tc.expectErr)
 				return
