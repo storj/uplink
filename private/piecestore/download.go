@@ -246,6 +246,7 @@ func (client *Download) Read(data []byte) (read int, err error) {
 			tags := []eventkit.Tag{
 				eventkit.String("node_id", client.limit.StorageNodeId.String()),
 				eventkit.String("piece_id", client.limit.PieceId.String()),
+				eventkit.String("satellite_id", client.limit.SatelliteId.String()),
 				eventkit.Bool("restored_from_trash", true),
 			}
 			valuesMap, ok := client.ctx.Value("restored_from_trash").(map[string]string)
