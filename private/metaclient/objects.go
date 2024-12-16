@@ -812,6 +812,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		IsPrefix:       objectInfo.IsPrefix(),
 		IsVersioned:    objectInfo.IsVersioned(),
 		IsDeleteMarker: objectInfo.IsDeleteMarker(),
+		IsLatest:       false,
 
 		Created:  objectInfo.Created, // TODO: use correct field
 		Modified: objectInfo.Created, // TODO: use correct field
@@ -871,6 +872,7 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		IsPrefix:       listItem.IsPrefix,
 		IsVersioned:    listItem.IsVersioned(),
 		IsDeleteMarker: listItem.IsDeleteMarker(),
+		IsLatest:       listItem.IsLatest,
 
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field

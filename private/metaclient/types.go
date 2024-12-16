@@ -64,6 +64,7 @@ type RawObjectListItem struct {
 	Version            []byte
 	StreamID           storj.StreamID
 	Status             int32
+	IsLatest           bool
 
 	CreatedAt time.Time
 	ExpiresAt time.Time
@@ -157,6 +158,7 @@ type Object struct {
 	IsPrefix       bool
 	IsVersioned    bool
 	IsDeleteMarker bool
+	IsLatest       bool
 
 	Metadata map[string]string
 

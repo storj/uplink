@@ -94,8 +94,8 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntN
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-storj.io/common v0.0.0-20241122160459-7ebb6c97b77d h1:mSt6sU+Av4d9NARKbLOBWLyPnetvWfwn6f7zT11xQqk=
-storj.io/common v0.0.0-20241122160459-7ebb6c97b77d/go.mod h1:CpSUpwG0nOkKMfDI/mqdogMccFP+zFvbTq6LbUCtUPQ=
+storj.io/common v0.0.0-20241216122958-b7b1937644d2 h1:BWq8CErG5ZTJrAmwZarKfocXWwir+squTyBLuDXisao=
+storj.io/common v0.0.0-20241216122958-b7b1937644d2/go.mod h1:CpSUpwG0nOkKMfDI/mqdogMccFP+zFvbTq6LbUCtUPQ=
 storj.io/drpc v0.0.35-0.20240709171858-0075ac871661 h1:hLvEV2RMTscX3JHPd+LSQCeTt8i1Q0Yt7U2EdfyMnaQ=
 storj.io/drpc v0.0.35-0.20240709171858-0075ac871661/go.mod h1:Y9LZaa8esL1PW2IDMqJE7CFSNq7d5bQ3RI7mGPtmKMg=
 storj.io/eventkit v0.0.0-20240415002644-1d9596fee086 h1:TkytkGUI6zGtH5Qx/O0VxQCcYJqOOiwRq0oMi4uM5Tg=

@@ -11,11 +11,11 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.9.0
-	storj.io/common v0.0.0-20241122160459-7ebb6c97b77d
+	storj.io/common v0.0.0-20241216122958-b7b1937644d2
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20241126183739-927e1154578f
-	storj.io/uplink v1.13.2-0.20241106140533-61d511a04894
+	storj.io/storj v1.91.0-alpha.0.20241217092049-79bf6e55183d
+	storj.io/uplink v1.13.2-0.20241209213014-e5f3beed1a59
 )
 
 require (
@@ -120,7 +120,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.21.3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/spacemonkeygo/monkit/v3 v3.0.23 // indirect
+	github.com/spacemonkeygo/monkit/v3 v3.0.24 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spacemonkeygo/tlshowdy v0.0.0-20160207005338-8fa2cec1d7cd // indirect
 	github.com/spf13/afero v1.11.0 // indirect

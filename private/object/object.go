@@ -59,6 +59,7 @@ type VersionedObject struct {
 	// suspended.
 	IsVersioned    bool
 	IsDeleteMarker bool
+	IsLatest       bool
 	LegalHold      *bool
 	Retention      *metaclient.Retention
 }
@@ -437,6 +438,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 		Version:        obj.Version,
 		IsVersioned:    obj.IsVersioned,
 		IsDeleteMarker: obj.IsDeleteMarker,
+		IsLatest:       obj.IsLatest,
 		LegalHold:      obj.LegalHold,
 		Retention:      obj.Retention,
 	}
@@ -458,6 +460,7 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 		Object:      *obj,
 		Version:     objectVersion(obj),
 		IsVersioned: objectIsVersioned(obj),
+		IsLatest:    objectIsLatest(obj),
 	}
 }
 
@@ -513,6 +516,9 @@ func objectVersion(object *uplink.Object) []byte
 
 //go:linkname objectIsVersioned storj.io/uplink.objectIsVersioned
 func objectIsVersioned(object *uplink.Object) bool
+
+//go:linkname objectIsLatest storj.io/uplink.objectIsLatest
+func objectIsLatest(object *uplink.Object) bool
 
 //go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
 func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *uplink.Download, err error)
