@@ -1693,3 +1693,187 @@ func TestListObjectVersions(t *testing.T) {
 		}
 	})
 }
+
+func TestListObjectVersionsIsLatest(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.UseListObjectsForListing = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := testrand.BucketName()
+
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		for range 3 {
+			require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "foo/bar/A", testrand.Bytes(memory.KiB)))
+		}
+		for range 2 {
+			require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "B", testrand.Bytes(memory.KiB)))
+		}
+		// recursive
+		objs, more, err := object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Recursive: true,
+			System:    true,
+			Custom:    true,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, objs)
+		require.False(t, more)
+
+		var fooBarAObserved, BObserved bool
+		for _, obj := range objs {
+			switch obj.Key {
+			case "foo/bar/A":
+				if fooBarAObserved {
+					require.False(t, obj.IsLatest)
+				} else {
+					require.True(t, obj.IsLatest)
+					fooBarAObserved = true
+				}
+			case "B":
+				if BObserved {
+					require.False(t, obj.IsLatest)
+				} else {
+					require.True(t, obj.IsLatest)
+					BObserved = true
+				}
+			default:
+				require.Fail(t, "unexpected object", obj.Key)
+			}
+		}
+		// recursive (limit check)
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Recursive: true,
+			System:    true,
+			Custom:    true,
+			Limit:     4,
+		})
+		require.NoError(t, err)
+		require.Len(t, objs, 4)
+		require.True(t, more)
+		// non-recursive (limit check)
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Prefix: "foo/bar/",
+			System: true,
+			Custom: true,
+			Limit:  2,
+		})
+		require.NoError(t, err)
+		require.Len(t, objs, 2)
+		require.True(t, more)
+		// non-recursive
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Prefix: "foo/bar/",
+			System: true,
+			Custom: true,
+			Limit:  3,
+		})
+		require.NoError(t, err)
+		require.Len(t, objs, 3)
+		require.False(t, more)
+
+		fooBarAObserved = false
+		for _, obj := range objs {
+			switch obj.Key {
+			case "A":
+				if fooBarAObserved {
+					require.False(t, obj.IsLatest)
+				} else {
+					require.True(t, obj.IsLatest)
+					fooBarAObserved = true
+				}
+			default:
+				require.Fail(t, "unexpected object", obj.Key)
+			}
+		}
+		// non-recursive
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			System: true,
+			Custom: true,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, objs)
+		require.False(t, more)
+
+		BObserved = false
+		for _, obj := range objs {
+			switch obj.Key {
+			case "B":
+				if BObserved {
+					require.False(t, obj.IsLatest)
+				} else {
+					require.True(t, obj.IsLatest)
+					BObserved = true
+				}
+			case "foo/":
+				require.True(t, obj.IsPrefix)
+			default:
+				require.Fail(t, "unexpected object", obj.Key)
+			}
+		}
+		// non-recursive
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			System: true,
+			Custom: true,
+			Limit:  1,
+		})
+		require.NoError(t, err)
+		require.Len(t, objs, 1)
+		require.True(t, more)
+		nextCursor, nextVersion := objs[0].Key, objs[0].Version
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Cursor:        nextCursor,
+			VersionCursor: nextVersion,
+			System:        true,
+			Custom:        true,
+			Limit:         12,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, objs)
+		require.False(t, more)
+
+		if nextCursor == "B" {
+			BObserved = true
+		} else {
+			BObserved = false
+		}
+
+		for _, obj := range objs {
+			switch obj.Key {
+			case "B":
+				if BObserved {
+					require.False(t, obj.IsLatest)
+				} else {
+					require.True(t, obj.IsLatest)
+					BObserved = true
+				}
+			case "foo/":
+				require.True(t, obj.IsPrefix)
+			default:
+				require.Fail(t, "unexpected object", obj.Key)
+			}
+		}
+		// non-recursive
+		objs, more, err = object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+			Cursor: "B",
+			System: true,
+			Custom: true,
+		})
+		require.NoError(t, err)
+		require.False(t, more)
+
+		for _, obj := range objs {
+			require.True(t, obj.IsPrefix)
+		}
+	})
+}
