@@ -278,6 +278,213 @@ func TestUploadObjectWithObjectLock(t *testing.T) {
 	})
 }
 
+func TestUploadObjectWithDefaultRetention(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+				config.Metainfo.ObjectLockEnabled = true
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionObjectLock
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+
+		err := sat.API.DB.Console().Projects().UpdateDefaultVersioning(ctx, projectID, console.DefaultVersioning(buckets.VersioningEnabled))
+		require.NoError(t, err)
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		type testOpts struct {
+			defaultRetention  metaclient.DefaultRetention
+			overrideRetention metaclient.Retention
+			expectedRetention metaclient.Retention
+		}
+
+		test := func(t *testing.T, opts testOpts) {
+			bucketName := testrand.BucketName()
+			_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+				Name:              bucketName,
+				ObjectLockEnabled: true,
+			})
+			require.NoError(t, err)
+
+			err := bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, &metaclient.BucketObjectLockConfiguration{
+				Enabled:          true,
+				DefaultRetention: &opts.defaultRetention,
+			})
+			require.NoError(t, err)
+
+			objectKey := testrand.Path()
+
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &metaclient.UploadOptions{
+				Retention: opts.overrideRetention,
+			})
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			retention, err := object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			require.Equal(t, opts.expectedRetention.Mode, retention.Mode)
+			require.WithinDuration(t, opts.expectedRetention.RetainUntil, retention.RetainUntil, time.Minute)
+		}
+
+		t.Run("Use default retention", func(t *testing.T) {
+			t.Run("Days, Compliance mode", func(t *testing.T) {
+				test(t, testOpts{
+					defaultRetention: metaclient.DefaultRetention{
+						Mode: storj.ComplianceMode,
+						Days: 3,
+					},
+					expectedRetention: metaclient.Retention{
+						Mode:        storj.ComplianceMode,
+						RetainUntil: time.Now().AddDate(0, 0, 3),
+					},
+				})
+			})
+
+			t.Run("Years, Governance mode", func(t *testing.T) {
+				test(t, testOpts{
+					defaultRetention: metaclient.DefaultRetention{
+						Mode:  storj.GovernanceMode,
+						Years: 5,
+					},
+					expectedRetention: metaclient.Retention{
+						Mode:        storj.GovernanceMode,
+						RetainUntil: time.Now().AddDate(5, 0, 0),
+					},
+				})
+			})
+
+			t.Run("Leap year", func(t *testing.T) {
+				// Find the nearest date N years after the current date that lies after a leap day.
+				now := time.Now()
+				leapYear := now.Year()
+				var leapDay time.Time
+				for {
+					if (leapYear%4 == 0 && leapYear%100 != 0) || (leapYear%400 == 0) {
+						leapDay = time.Date(leapYear, time.February, 29, 0, 0, 0, 0, time.UTC)
+						if leapDay.After(now) {
+							break
+						}
+					}
+					leapYear++
+				}
+				years := leapYear - now.Year()
+				if now.AddDate(years, 0, 0).Before(leapDay) {
+					years++
+				}
+
+				t.Run("Days", func(t *testing.T) {
+					// Expect 1 day to always be considered a 24-hour period, with no adjustments
+					// made to accommodate the leap day.
+					test(t, testOpts{
+						defaultRetention: metaclient.DefaultRetention{
+							Mode: storj.ComplianceMode,
+							Days: int32(365 * years),
+						},
+						expectedRetention: metaclient.Retention{
+							Mode:        storj.ComplianceMode,
+							RetainUntil: time.Now().AddDate(0, 0, 365*years),
+						},
+					})
+				})
+
+				t.Run("Years", func(t *testing.T) {
+					// Expect the retention period duration to take the leap day into account.
+					test(t, testOpts{
+						defaultRetention: metaclient.DefaultRetention{
+							Mode:  storj.ComplianceMode,
+							Years: int32(years),
+						},
+						expectedRetention: metaclient.Retention{
+							Mode:        storj.ComplianceMode,
+							RetainUntil: time.Now().AddDate(0, 0, 365*years+1),
+						},
+					})
+				})
+			})
+		})
+
+		t.Run("Override default retention", func(t *testing.T) {
+			override := metaclient.Retention{
+				Mode:        storj.GovernanceMode,
+				RetainUntil: time.Now().AddDate(0, 0, 5),
+			}
+
+			test(t, testOpts{
+				defaultRetention: metaclient.DefaultRetention{
+					Mode:  storj.ComplianceMode,
+					Years: 3,
+				},
+				overrideRetention: override,
+				expectedRetention: override,
+			})
+		})
+
+		t.Run("TTL is disallowed", func(t *testing.T) {
+			test := func(t *testing.T, project *uplink.Project, objectTTL time.Time, expectedError error) {
+				bucketName := testrand.BucketName()
+				_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+					Name:              bucketName,
+					ObjectLockEnabled: true,
+				})
+				require.NoError(t, err)
+
+				err := bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, &metaclient.BucketObjectLockConfiguration{
+					Enabled: true,
+					DefaultRetention: &metaclient.DefaultRetention{
+						Mode:  storj.ComplianceMode,
+						Years: 5,
+					},
+				})
+				require.NoError(t, err)
+
+				objectKey := testrand.Path()
+
+				upload, err := object.UploadObject(ctx, project, bucketName, objectKey, &metaclient.UploadOptions{
+					Expires: objectTTL,
+				})
+				require.NoError(t, err)
+				require.ErrorIs(t, upload.Commit(), expectedError)
+			}
+
+			t.Run("TTL set on object", func(t *testing.T) {
+				test(t, project, time.Now().Add(time.Hour), object.ErrObjectLockUploadWithTTLAndDefaultRetention)
+			})
+
+			t.Run("TTL set on API key", func(t *testing.T) {
+				userCtx, err := sat.UserContext(ctx, upl.Projects[0].Owner.ID)
+				require.NoError(t, err)
+
+				_, key, err := sat.API.Console.Service.CreateAPIKey(userCtx, projectID, "test key", macaroon.APIKeyVersionObjectLock)
+				require.NoError(t, err)
+
+				// TODO: Use the (*uplink.Access).Share method once it has been updated to support Object Lock permissions.
+				dur := time.Hour
+				key, err = key.Restrict(macaroon.Caveat{MaxObjectTtl: &dur})
+				require.NoError(t, err)
+
+				access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), key.Serialize(), "")
+				require.NoError(t, err)
+
+				project, err := uplink.OpenProject(ctx, access)
+				require.NoError(t, err)
+
+				test(t, project, time.Time{}, object.ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention)
+			})
+		})
+	})
+}
+
 func TestGetAndSetObjectLegalHold(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,

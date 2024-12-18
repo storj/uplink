@@ -42,6 +42,14 @@ var (
 
 	// ErrObjectLockInvalidObjectState is returned when attempting to perform Object Lock operations on an object in an invalid state.
 	ErrObjectLockInvalidObjectState = errors.New("object state is invalid for Object Lock")
+
+	// ErrObjectLockUploadWithTTLAndDefaultRetention is returned when attempting to specify an object expiration time
+	// when uploading into a bucket with default retention settings.
+	ErrObjectLockUploadWithTTLAndDefaultRetention = errors.New("cannot specify an object expiration time when uploading into a bucket with default retention settings")
+
+	// ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention is returned when attempting to upload into a bucket
+	// with default retention settings using an API key that enforces an object expiration time.
+	ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention = errors.New("cannot upload into a bucket with default retention settings using an API key that enforces an object expiration time")
 )
 
 // IPSummary contains information about the object IP-s.
@@ -476,6 +484,10 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 		return ErrObjectProtected
 	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidObjectState):
 		return ErrObjectLockInvalidObjectState
+	case errs2.IsRPC(err, rpcstatus.ObjectLockUploadWithTTLAndDefaultRetention):
+		return ErrObjectLockUploadWithTTLAndDefaultRetention
+	case errs2.IsRPC(err, rpcstatus.ObjectLockUploadWithTTLAPIKeyAndDefaultRetention):
+		return ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention
 	default:
 		return convertKnownErrors(err, bucket, key)
 	}
