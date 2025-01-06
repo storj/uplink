@@ -40,6 +40,11 @@ func ConfigSetMaximumBufferSize(*uplink.Config, int)
 //go:linkname ConfigDisableObjectKeyEncryption storj.io/uplink.config_disableObjectKeyEncryption
 func ConfigDisableObjectKeyEncryption(config *uplink.Config)
 
+// ConfigDisableObjectMetadataEncryption exposes Config.disableObjectMetadataEncryption.
+//
+//go:linkname ConfigDisableObjectMetadataEncryption storj.io/uplink.config_disableObjectMetadataEncryption
+func ConfigDisableObjectMetadataEncryption(config *uplink.Config)
+
 // AccessGetAPIKey exposes Access.getAPIKey.
 //
 //go:linkname AccessGetAPIKey storj.io/uplink.access_getAPIKey

@@ -76,6 +76,16 @@ type Config struct {
 	// Object content is still encrypted as usual.
 	disableObjectKeyEncryption bool
 
+	// disableObjectMetadataEncryption disables the encryption of object
+	// metadata for newly uploaded objects.
+	//
+	// Disabling the encryption of object metadata means that the object
+	// metadata is stored in plain text in the satellite database. This allows
+	// object search based on metadata values.
+	//
+	// Object content encryption is not affected by this flag.
+	disableObjectMetadataEncryption bool
+
 	// disableBackgroundQoS tells the uplink library to not try setting background
 	// QoS flags on the network sockets. This will impact the congestion control
 	// profile as well.
@@ -179,6 +189,18 @@ func config_setMaximumBufferSize(config *Config, maximumBufferSize int) {
 //go:linkname config_disableObjectKeyEncryption
 func config_disableObjectKeyEncryption(config *Config) {
 	config.disableObjectKeyEncryption = true
+}
+
+// disableObjectMetadataEncryption exposes setting disableObjectMetadataEncryption.
+//
+// NB: this is used with linkname in internal/expose.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused
+//go:linkname config_disableObjectMetadataEncryption
+func config_disableObjectMetadataEncryption(config *Config) {
+	config.disableObjectMetadataEncryption = true
 }
 
 func (config Config) validateUserAgent(ctx context.Context) error {
