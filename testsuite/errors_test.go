@@ -70,6 +70,7 @@ func TestErrResourceExhausted(t *testing.T) {
 				// disable AOST
 				config.LiveAccounting.AsOfSystemInterval = 0
 			},
+			SatelliteDBOptions: testplanet.SatelliteDBDisableCaches,
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]

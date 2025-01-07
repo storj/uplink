@@ -445,6 +445,9 @@ func TestConcurrentUploadToSamePath(t *testing.T) {
 func TestUploadLimits(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 2,
+		Reconfigure: testplanet.Reconfigure{
+			SatelliteDBOptions: testplanet.SatelliteDBDisableCaches,
+		},
 	}, func(t *testing.T, tpCtx *testcontext.Context, planet *testplanet.Planet) {
 		data := testrand.Bytes(6 * memory.KiB)
 

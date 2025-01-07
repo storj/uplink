@@ -792,6 +792,9 @@ func TestDeleteObject_EncryptionBypass(t *testing.T) {
 func TestRevokeAccess(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			SatelliteDBOptions: testplanet.SatelliteDBDisableCaches,
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
 

@@ -144,17 +144,20 @@ pipeline {
                             }
                         }
 
-                        stage('Integration [storj/storj]') {
+                        stage('Integration using Spanner [storj/storj]') {
                             environment {
-                                STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj2?sslmode=disable'
+                                STORJ_TEST_POSTGRES = 'omit'
                                 STORJ_TEST_COCKROACH = 'omit'
-                                STORJ_TEST_SPANNER = 'omit'
-                                // TODO add 'omit' for metabase STORJ_TEST_DATABASES
-                                STORJ_TEST_DATABASES = 'pg|pgx|postgres://postgres@localhost/testmetabase?sslmode=disable'
+                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|spanner://127.0.0.1:9011?emulator|spanner://127.0.0.1:9012?emulator|spanner://127.0.0.1:9013?emulator|spanner://127.0.0.1:9014?emulator|spanner://127.0.0.1:9015?emulator'
                             }
                             steps {
-                                sh 'psql -U postgres -c \'create database teststorj2;\''
-                                sh 'psql -U postgres -c \'create database testmetabase;\''
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9010 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9011 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9012 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9013 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9014 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9015 &'
+
                                 dir('testsuite'){
                                     sh 'cp go.mod go-temp.mod'
                                     sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
