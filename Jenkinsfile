@@ -32,15 +32,6 @@ pipeline {
                                 sh 'cp testsuite/go.mod .build/testsuite.go.mod.orig'
                             }
                         }
-                        stage('Start databases') {
-                            steps {
-                                sh 'service postgresql start'
-
-                                dir('.build') {
-                                    sh 'cockroach start-single-node --insecure --store=type=mem,size=4GiB --listen-addr=localhost:26257 --http-addr=localhost:8086 --cache 1024MiB --max-sql-memory 1024MiB --background'
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -107,16 +98,18 @@ pipeline {
 
                         stage('Testsuite') {
                             environment {
-                                STORJ_TEST_COCKROACH = 'cockroach://root@localhost:26257/testcockroach?sslmode=disable'
-                                STORJ_TEST_POSTGRES = 'postgres://postgres@localhost/teststorj?sslmode=disable'
-                                STORJ_TEST_SPANNER = 'omit'
-                                STORJ_TEST_COCKROACH_NODROP = 'true'
+                                STORJ_TEST_COCKROACH = 'omit'
+                                STORJ_TEST_POSTGRES = 'omit'
+                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|spanner://127.0.0.1:9011?emulator|spanner://127.0.0.1:9012?emulator|spanner://127.0.0.1:9013?emulator'
                                 STORJ_TEST_LOG_LEVEL = 'info'
                                 COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
                             }
                             steps {
-                                sh 'cockroach sql --insecure --host=localhost:26257 -e \'create database testcockroach;\''
-                                sh 'psql -U postgres -c \'create database teststorj;\''
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9010 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9011 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9012 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9013 &'
+
                                 dir('testsuite'){
                                     sh 'go vet ./...'
                                     sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... > ../.build/testsuite.json'
