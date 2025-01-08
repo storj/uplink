@@ -615,6 +615,7 @@ type BeginObjectParams struct {
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadataNonce        storj.Nonce
+	ClearMetadata                 []byte
 
 	Retention Retention
 	LegalHold bool
@@ -643,6 +644,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		ClearMetadata:                 params.ClearMetadata,
 		LegalHold:                     params.LegalHold,
 	}
 

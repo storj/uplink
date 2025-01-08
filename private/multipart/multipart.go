@@ -74,19 +74,25 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 		return uplink.UploadInfo{}, convertKnownErrors(err, bucket, key)
 	}
 
-	response, err := metainfoClient.BeginObject(ctx, metaclient.BeginObjectParams{
+	params := metaclient.BeginObjectParams{
 		Bucket:               []byte(bucket),
 		EncryptedObjectKey:   []byte(encPath.Raw()),
 		ExpiresAt:            options.Expires,
 		EncryptionParameters: encryptionParameters(project),
 
-		EncryptedMetadata:             metadata.EncryptedContent,
-		EncryptedMetadataEncryptedKey: metadata.EncryptedKey,
-		EncryptedMetadataNonce:        metadata.EncryptedKeyNonce,
-
 		Retention: options.Retention,
 		LegalHold: options.LegalHold,
-	})
+	}
+
+	if metadata.EncryptedKey != nil {
+		params.EncryptedMetadata = metadata.EncryptedContent
+		params.EncryptedMetadataEncryptedKey = metadata.EncryptedKey
+		params.EncryptedMetadataNonce = metadata.EncryptedKeyNonce
+	} else {
+		params.ClearMetadata = metadata.EncryptedContent
+	}
+
+	response, err := metainfoClient.BeginObject(ctx, params)
 	if err != nil {
 		return uplink.UploadInfo{}, convertKnownErrors(err, bucket, key)
 	}
