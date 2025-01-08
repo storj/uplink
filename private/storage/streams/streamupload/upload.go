@@ -193,17 +193,24 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 func createCommitObjectParams(lastSegment splitter.Segment, encMeta EncryptedMetadata) (*metaclient.CommitObjectParams, error) {
 	info := lastSegment.Finalize()
 
-	encryptedMetadata, encryptedMetadataKey, encryptedMetadataKeyNonce, err := encMeta.EncryptedMetadata(info.PlainSize)
+	metadata, encryptedMetadataKey, encryptedMetadataKeyNonce, err := encMeta.EncryptedMetadata(info.PlainSize)
 	if err != nil {
 		return nil, err
 	}
 
-	return &metaclient.CommitObjectParams{
-		StreamID:                      nil, // set by the stream batcher
-		EncryptedMetadataNonce:        *encryptedMetadataKeyNonce,
-		EncryptedMetadataEncryptedKey: *encryptedMetadataKey,
-		EncryptedMetadata:             encryptedMetadata,
-	}, nil
+	if encryptedMetadataKey == nil {
+		return &metaclient.CommitObjectParams{
+			StreamID:      nil, // set by the stream batcher
+			ClearMetadata: metadata,
+		}, nil
+	} else {
+		return &metaclient.CommitObjectParams{
+			StreamID:                      nil, // set by the stream batcher
+			EncryptedMetadataNonce:        *encryptedMetadataKeyNonce,
+			EncryptedMetadataEncryptedKey: *encryptedMetadataKey,
+			EncryptedMetadata:             metadata,
+		}, nil
+	}
 }
 
 func deleteCancelledObject(ctx context.Context, batcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, streamID storj.StreamID) (err error) {

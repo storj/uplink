@@ -66,6 +66,30 @@ func encryptPath(project *Project, bucket, key string) (paths.Encrypted, error) 
 	return encPath, err
 }
 
+// getMetadataCipher is exposing helper method to get cipher for a key using project internals.
+//
+// NB: this is used with linkname in private/multipart.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:unused
+//go:linkname getMetadataCipher
+func getMetadataCipher(project *Project, bucket, key string) storj.CipherSuite {
+	encStore := project.access.encAccess.Store
+	path := paths.NewUnencrypted(key)
+
+	if !path.Valid() {
+		return encStore.GetDefaultMetadataCipher()
+	}
+
+	_, _, base := encStore.LookupUnencrypted(bucket, path)
+	if base == nil {
+		return encStore.GetDefaultMetadataCipher()
+	}
+
+	return base.MetadataCipher
+}
+
 // deriveContentKey is exposing helper method to derive content key with project internals.
 //
 // NB: this is used with linkname in private/multipart.

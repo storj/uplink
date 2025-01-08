@@ -699,6 +699,7 @@ type CommitObjectParams struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
+	ClearMetadata                 []byte
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
@@ -708,6 +709,7 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		ClearMetadata:                 params.ClearMetadata,
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/common/usermeta"
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
 )
@@ -112,11 +113,16 @@ func encryptMetadata(project *uplink.Project, bucket, key string, metadata uplin
 		return encryptedMetadata{}, nil
 	}
 
-	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
-		UserDefined: metadata.Clone(),
-	})
+	metadataBytes, err := usermeta.Marshal(usermeta.UserMeta(metadata))
 	if err != nil {
 		return encryptedMetadata{}, errs.Wrap(err)
+	}
+
+	metadataCipher := getMetadataCipher(project, bucket, key)
+	if metadataCipher == storj.EncNull {
+		return encryptedMetadata{
+			EncryptedContent: metadataBytes,
+		}, nil
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
@@ -145,14 +151,13 @@ func encryptMetadata(project *uplink.Project, bucket, key string, metadata uplin
 		return encryptedMetadata{}, errs.Wrap(err)
 	}
 
-	encryptionParameters := encryptionParameters(project)
-	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
+	encryptedKey, err := encryption.EncryptKey(&metadataKey, metadataCipher, derivedKey, &encryptedKeyNonce)
 	if err != nil {
 		return encryptedMetadata{}, errs.Wrap(err)
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
-	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
+	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, metadataCipher, &metadataKey, &storj.Nonce{})
 	if err != nil {
 		return encryptedMetadata{}, errs.Wrap(err)
 	}
@@ -183,6 +188,9 @@ func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
 
 //go:linkname encryptPath storj.io/uplink.encryptPath
 func encryptPath(project *uplink.Project, bucket, key string) (paths.Encrypted, error)
+
+//go:linkname getMetadataCipher storj.io/uplink.getMetadataCipher
+func getMetadataCipher(project *uplink.Project, bucket, key string) storj.CipherSuite
 
 //go:linkname deriveContentKey storj.io/uplink.deriveContentKey
 func deriveContentKey(project *uplink.Project, bucket, key string) (*storj.Key, error)

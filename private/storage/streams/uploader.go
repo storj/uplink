@@ -233,7 +233,8 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 
 	uploader := segmentUploader{metainfo: u.metainfo, piecePutter: u.piecePutter, sched: sched, longTailMargin: u.longTailMargin}
 
-	encMeta := u.newEncryptedMetadata(metadata, derivedKey)
+	metadataCipher := u.getMetadataCipher(bucket, paths.NewUnencrypted(unencryptedKey))
+	encMeta := u.newEncryptedMetadata(metadata, derivedKey, metadataCipher)
 
 	go func() {
 		info, err := u.backend.UploadObject(
@@ -331,12 +332,25 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 	}, nil
 }
 
-func (u *Uploader) newEncryptedMetadata(metadata Metadata, derivedKey *storj.Key) streamupload.EncryptedMetadata {
+func (u *Uploader) getMetadataCipher(bucket string, path paths.Unencrypted) storj.CipherSuite {
+	if !path.Valid() {
+		return u.encStore.GetDefaultMetadataCipher()
+	}
+
+	_, _, base := u.encStore.LookupUnencrypted(bucket, path)
+	if base == nil {
+		return u.encStore.GetDefaultMetadataCipher()
+	}
+
+	return base.MetadataCipher
+}
+
+func (u *Uploader) newEncryptedMetadata(metadata Metadata, derivedKey *storj.Key, cipher storj.CipherSuite) streamupload.EncryptedMetadata {
 	return &encryptedMetadata{
 		metadata:    metadata,
 		segmentSize: u.segmentSize,
 		derivedKey:  derivedKey,
-		cipherSuite: u.encryptionParameters.CipherSuite,
+		cipherSuite: cipher,
 	}
 }
 
@@ -377,6 +391,10 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (data []byt
 	metadataBytes, err := e.metadata.Metadata()
 	if err != nil {
 		return nil, nil, nil, err
+	}
+
+	if e.cipherSuite == storj.EncNull {
+		return metadataBytes, nil, nil, nil
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{

@@ -15,7 +15,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/leak"
-	"storj.io/common/pb"
+	"storj.io/common/usermeta"
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
@@ -131,9 +131,7 @@ func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, k
 type dynamicMetadata struct{ *metaclient.Object }
 
 func (dyn dynamicMetadata) Metadata() ([]byte, error) {
-	return pb.Marshal(&pb.SerializableMeta{
-		UserDefined: CustomMetadata(dyn.Object.Metadata).Clone(),
-	})
+	return usermeta.Marshal(dyn.Object.Metadata)
 }
 
 type streamUpload interface {
