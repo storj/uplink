@@ -28,6 +28,7 @@ type RawObjectItem struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadata             []byte
+	ClearMetadata                 []byte
 
 	EncryptionParameters storj.EncryptionParameters
 	RedundancyScheme     storj.RedundancyScheme

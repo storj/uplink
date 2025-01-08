@@ -817,6 +817,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		EncryptedMetadata:             object.EncryptedMetadata,
 		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+		ClearMetadata:                 object.ClearMetadata,
 	}
 
 	if object.Retention != nil {
