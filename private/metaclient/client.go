@@ -1275,6 +1275,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 			EncryptedMetadata:             object.EncryptedMetadata,
+			ClearMetadata:                 object.ClearMetadata,
 
 			IsPrefix: isPrefix,
 		}
@@ -1361,6 +1362,7 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 			PlainSize:              object.PlainSize,
 			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
 			EncryptedMetadata:      object.EncryptedMetadata,
+			ClearMetadata:          object.ClearMetadata,
 
 			IsPrefix: false,
 		}

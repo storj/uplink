@@ -75,6 +75,7 @@ type RawObjectListItem struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadata             []byte
+	ClearMetadata                 []byte
 
 	IsPrefix bool
 }

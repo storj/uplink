@@ -899,6 +899,13 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		return Object{}, err
 	}
 
+	if listItem.ClearMetadata != nil {
+		object.Metadata, err = usermeta.Unmarshal(listItem.ClearMetadata)
+		if err != nil {
+			return Object{}, err
+		}
+	}
+
 	return object, nil
 }
 
