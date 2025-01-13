@@ -37,6 +37,7 @@ var (
 	expiration           = creationDate.Add(time.Hour)
 	uploadInfo           = streamupload.Info{CreationDate: creationDate, PlainSize: 123}
 	streamID             = storj.StreamID("STREAMID")
+	clearKey             = "CLEARKEY"
 	partNumber           = int32(1)
 	eTagCh               = make(chan []byte)
 )
@@ -141,8 +142,14 @@ func TestUpload(t *testing.T) {
 				expectCommitErr: "upload failed",
 			},
 			{
-				desc:           "upload success",
+				desc:           "upload success with encrypted metadata",
 				overrideConfig: func(c *config) {},
+			},
+			{
+				desc: "upload success with clear metadata",
+				overrideConfig: func(c *config) {
+					c.key = clearKey
+				},
 			},
 		} {
 			t.Run(tc.desc, func(t *testing.T) {
@@ -150,9 +157,14 @@ func TestUpload(t *testing.T) {
 					encStore = encryption.NewStore()
 					unenc    = paths.NewUnencrypted("KEY")
 					enc      = paths.NewEncrypted("ENCKEY")
+
+					clunenc = paths.NewUnencrypted(clearKey)
+					clenc   = paths.NewEncrypted(clearKey)
 				)
 
-				err := encStore.Add("BUCKET", unenc, enc, storjKey)
+				err := encStore.AddWithCipher("BUCKET", unenc, enc, storjKey, storj.EncAESGCM, storj.EncAESGCM)
+				require.NoError(t, err)
+				err = encStore.AddWithCipher("BUCKET", clunenc, clenc, storj.Key{}, storj.EncNull, storj.EncNull)
 				require.NoError(t, err)
 
 				c := config{
@@ -303,7 +315,12 @@ func (b fakeUploaderBackend) UploadObject(ctx context.Context, segmentSource str
 	if m.derivedKey == nil {
 		return streamupload.Info{}, errs.New("encrypted metadata segment derived key is nil")
 	}
-	if m.cipherSuite != cipherSuite {
+
+	if string(beginObject.EncryptedObjectKey) == clearKey {
+		if m.cipherSuite != storj.EncNull {
+			return streamupload.Info{}, errs.New("encrypted metadata cipher suite should be %d but got %d", storj.EncNull, m.cipherSuite)
+		}
+	} else if m.cipherSuite != cipherSuite {
 		return streamupload.Info{}, errs.New("encrypted metadata cipher suite should be %d but got %d", cipherSuite, m.cipherSuite)
 	}
 

@@ -615,6 +615,7 @@ type BeginObjectParams struct {
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadataNonce        storj.Nonce
+	ClearMetadata                 []byte
 
 	Retention Retention
 	LegalHold bool
@@ -643,6 +644,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		ClearMetadata:                 params.ClearMetadata,
 		LegalHold:                     params.LegalHold,
 	}
 
@@ -699,6 +701,7 @@ type CommitObjectParams struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
+	ClearMetadata                 []byte
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
@@ -708,6 +711,7 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		ClearMetadata:                 params.ClearMetadata,
 	}
 }
 
@@ -813,6 +817,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 		EncryptedMetadata:             object.EncryptedMetadata,
 		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+		ClearMetadata:                 object.ClearMetadata,
 	}
 
 	if object.Retention != nil {
@@ -1270,6 +1275,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 			EncryptedMetadata:             object.EncryptedMetadata,
+			ClearMetadata:                 object.ClearMetadata,
 
 			IsPrefix: isPrefix,
 		}
@@ -1356,6 +1362,7 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 			PlainSize:              object.PlainSize,
 			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
 			EncryptedMetadata:      object.EncryptedMetadata,
+			ClearMetadata:          object.ClearMetadata,
 
 			IsPrefix: false,
 		}

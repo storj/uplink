@@ -15,6 +15,7 @@ import (
 	"storj.io/common/paths"
 	"storj.io/common/pb"
 	"storj.io/common/storj"
+	"storj.io/common/usermeta"
 )
 
 var contentTypeKey = "content-type"
@@ -861,6 +862,14 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		return Object{}, err
 	}
 
+	if objectInfo.ClearMetadata != nil {
+		meta, err := usermeta.Unmarshal(objectInfo.ClearMetadata)
+		if err != nil {
+			return Object{}, err
+		}
+		object.Metadata = meta
+	}
+
 	return object, nil
 }
 
@@ -888,6 +897,13 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 	err := updateObjectWithStream(&object, stream, streamMeta)
 	if err != nil {
 		return Object{}, err
+	}
+
+	if listItem.ClearMetadata != nil {
+		object.Metadata, err = usermeta.Unmarshal(listItem.ClearMetadata)
+		if err != nil {
+			return Object{}, err
+		}
 	}
 
 	return object, nil

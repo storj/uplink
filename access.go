@@ -206,6 +206,9 @@ func config_requestAccessWithPassphraseAndConcurrency(config Config, ctx context
 	if config.disableObjectKeyEncryption {
 		encAccess.SetDefaultPathCipher(storj.EncNull)
 	}
+	if config.disableObjectMetadataEncryption {
+		encAccess.SetDefaultMetadataCipher(storj.EncNull)
+	}
 	encAccess.LimitTo(parsedAPIKey)
 
 	return &Access{

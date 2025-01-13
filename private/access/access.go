@@ -32,3 +32,15 @@ func APIKey(access *uplink.Access) *macaroon.APIKey {
 func DisableObjectKeyEncryption(config *uplink.Config) {
 	expose.ConfigDisableObjectKeyEncryption(config)
 }
+
+// DisableObjectMetadataEncryption disables the encryption of object metadata for newly
+// uploaded objects.
+//
+// Disabling the encryption of object metadata means that the object
+// metadata is stored in plain text in the satellite database. This allows
+// object search based on metadata values.
+//
+// Object content encryption is not affected by this flag.
+func DisableObjectMetadataEncryption(config *uplink.Config) {
+	expose.ConfigDisableObjectMetadataEncryption(config)
+}
