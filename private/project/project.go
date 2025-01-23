@@ -11,6 +11,7 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/pb"
 	"storj.io/common/signing"
 	"storj.io/common/uuid"
 	"storj.io/uplink"
@@ -31,29 +32,75 @@ var (
 	ErrLockNotEnabled = errors.New("object lock is not enabled")
 )
 
-// GetPublicID gets the public project ID for the given access grant.
-func GetPublicID(ctx context.Context, config uplink.Config, access *uplink.Access) (id uuid.UUID, err error) {
-	defer mon.Task()(&ctx)(&err)
+// EdgeURLOverrides contains the URL overrides for the edge service.
+type EdgeURLOverrides struct {
+	AuthService         string
+	PublicLinksharing   string
+	InternalLinksharing string
+}
 
+// Info contains the public ID, salt and edge url overrides of a project.
+type Info struct {
+	PublicId         uuid.UUID
+	Salt             []byte
+	EdgeUrlOverrides *EdgeURLOverrides
+}
+
+func getProjectInfo(ctx context.Context, config uplink.Config, access *uplink.Access) (_ *pb.ProjectInfoResponse, err error) {
 	dialer, err := expose.ConfigGetDialer(config, ctx)
 	if err != nil {
-		return id, packageError.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
 
 	client, err := metaclient.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
 	if err != nil {
-		return id, packageError.Wrap(err)
+		return nil, packageError.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, client.Close()) }()
 
 	info, err := client.GetProjectInfo(ctx)
+	return info, err
+}
+
+// GetPublicID gets the public project ID for the given access grant.
+func GetPublicID(ctx context.Context, config uplink.Config, access *uplink.Access) (id uuid.UUID, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	info, err := getProjectInfo(ctx, config, access)
 	if err != nil {
 		return id, convertKnownErrors(err, "", "")
 	}
 	copy(id[:], info.ProjectPublicId)
 
 	return id, nil
+}
+
+// GetProjectInfo gets the project info for the given access grant.
+func GetProjectInfo(ctx context.Context, config uplink.Config, access *uplink.Access) (_ Info, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	info, err := getProjectInfo(ctx, config, access)
+	if err != nil {
+		return Info{}, convertKnownErrors(err, "", "")
+	}
+	var id uuid.UUID
+	copy(id[:], info.ProjectPublicId)
+
+	projectInfo := Info{
+		PublicId: id,
+		Salt:     info.ProjectSalt,
+	}
+
+	if info.EdgeUrlOverrides != nil {
+		projectInfo.EdgeUrlOverrides = &EdgeURLOverrides{
+			AuthService:         string(info.EdgeUrlOverrides.AuthService),
+			PublicLinksharing:   string(info.EdgeUrlOverrides.PublicLinksharing),
+			InternalLinksharing: string(info.EdgeUrlOverrides.PrivateLinksharing),
+		}
+	}
+
+	return projectInfo, nil
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
