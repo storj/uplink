@@ -20,6 +20,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/storagenode/piecestore"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -76,6 +77,22 @@ func TestBeginUpload_Expires(t *testing.T) {
 			),
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+
+		// Disable the migration backend for this test to ensure that
+		// pieces with TTL are not moved to the hashstore.
+		// See: https://github.com/storj/storj/commit/10689139fb41013d03edec503f1148ba202ea2e3
+		for _, sn := range planet.StorageNodes {
+			for _, sat := range planet.Satellites {
+				sn.Storage2.MigratingBackend.UpdateState(ctx, sat.ID(), func(state *piecestore.MigrationState) {
+					state.PassiveMigrate = false
+					state.WriteToNew = false
+					state.ReadNewFirst = false
+					state.TTLToNew = false
+				})
+				sn.Storage2.MigrationChore.SetMigrate(sat.ID(), false, false)
+			}
+		}
+
 		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
@@ -114,14 +131,10 @@ func TestBeginUpload_Expires(t *testing.T) {
 		require.Nil(t, list.Item())
 
 		// check that storage nodes have pieces that will expire
-		for i, node := range planet.StorageNodes {
-			if i%2 != 0 {
-				// only every other node would have pieces that will expire
-				// because the others have hashstore enabled.
-				expired, err := node.StorageOld.Store.GetExpired(ctx, now.Add(time.Hour+10*time.Minute))
-				require.NoError(t, err)
-				require.NotEmpty(t, expired)
-			}
+		for _, node := range planet.StorageNodes {
+			expired, err := node.StorageOld.Store.GetExpired(ctx, now.Add(time.Hour+10*time.Minute))
+			require.NoError(t, err)
+			require.NotEmpty(t, expired)
 		}
 	})
 }

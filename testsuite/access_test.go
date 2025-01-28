@@ -22,6 +22,7 @@ import (
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
+	"storj.io/storj/storagenode/piecestore"
 	"storj.io/uplink"
 	privateAccess "storj.io/uplink/private/access"
 )
@@ -902,6 +903,22 @@ func TestAccessMaxObjectTTL(t *testing.T) {
 			Satellite: testplanet.ReconfigureRS(2, 3, 4, 4),
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+
+		// Disable the migration backend for this test to ensure that
+		// pieces with TTL are not moved to the hashstore.
+		// See: https://github.com/storj/storj/commit/10689139fb41013d03edec503f1148ba202ea2e3
+		for _, sn := range planet.StorageNodes {
+			for _, sat := range planet.Satellites {
+				sn.Storage2.MigratingBackend.UpdateState(ctx, sat.ID(), func(state *piecestore.MigrationState) {
+					state.PassiveMigrate = false
+					state.WriteToNew = false
+					state.ReadNewFirst = false
+					state.TTLToNew = false
+				})
+				sn.Storage2.MigrationChore.SetMigrate(sat.ID(), false, false)
+			}
+		}
+
 		access := planet.Uplinks[0].Access[planet.Satellites[0].ID()]
 
 		now := time.Now()
@@ -935,14 +952,10 @@ func TestAccessMaxObjectTTL(t *testing.T) {
 		require.False(t, objects.Next())
 		require.NoError(t, objects.Err())
 
-		for i, node := range planet.StorageNodes {
-			if i%2 != 0 {
-				// only every other node would have pieces that will expire
-				// because the others have hashstore enabled.
-				expired, err := node.StorageOld.Store.GetExpired(ctx, now.Add(time.Hour+10*time.Minute))
-				require.NoError(t, err)
-				require.NotEmpty(t, expired)
-			}
+		for _, node := range planet.StorageNodes {
+			expired, err := node.StorageOld.Store.GetExpired(ctx, now.Add(time.Hour+10*time.Minute))
+			require.NoError(t, err)
+			require.NotEmpty(t, expired)
 		}
 	})
 }
