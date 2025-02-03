@@ -15,7 +15,7 @@ pipeline {
                     label 'main'
                     image 'storjlabs/ci:latest'
                     alwaysPull true
-                    args '-u root:root --cap-add SYS_PTRACE -v "/tmp/gomod":/go/pkg/mod -v /tmp/golangci-lint:/root/.cache/golangci-lint -v /tmp/gocache:/root/.cache/go-build'
+                    args '-u root:root --cap-add SYS_PTRACE -v /tmp/gomod:/go/pkg/mod -v /tmp/golangci-lint:/root/.cache/golangci-lint -v /tmp/gocache/uplink:/root/.cache/go-build -v /tmp/gocache/uplink/integration:/root/.cache/go-build-integration'
                 }
             }
             stages {
@@ -100,7 +100,10 @@ pipeline {
                             environment {
                                 STORJ_TEST_COCKROACH = 'omit'
                                 STORJ_TEST_POSTGRES = 'omit'
-                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|spanner://127.0.0.1:9011?emulator|spanner://127.0.0.1:9012?emulator|spanner://127.0.0.1:9013?emulator'
+                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|'+
+                                                     'spanner://127.0.0.1:9011?emulator|'+
+                                                     'spanner://127.0.0.1:9012?emulator|'+
+                                                     'spanner://127.0.0.1:9013?emulator'
                                 STORJ_TEST_LOG_LEVEL = 'info'
                                 COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
                             }
@@ -141,15 +144,17 @@ pipeline {
                             environment {
                                 STORJ_TEST_POSTGRES = 'omit'
                                 STORJ_TEST_COCKROACH = 'omit'
-                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|spanner://127.0.0.1:9011?emulator|spanner://127.0.0.1:9012?emulator|spanner://127.0.0.1:9013?emulator|spanner://127.0.0.1:9014?emulator|spanner://127.0.0.1:9015?emulator'
+                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9014?emulator|'+
+                                                     'spanner://127.0.0.1:9015?emulator|'+
+                                                     'spanner://127.0.0.1:9016?emulator|'+
+                                                     'spanner://127.0.0.1:9017?emulator'
+                                GOCACHE = '/root/.cache/go-build-integration'                                                     
                             }
                             steps {
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9010 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9011 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9012 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9013 &'
                                 sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9014 &'
                                 sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9015 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9016 &'
+                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9017 &'
 
                                 dir('testsuite'){
                                     sh 'cp go.mod go-temp.mod'
