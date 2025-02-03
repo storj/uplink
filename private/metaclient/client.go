@@ -20,9 +20,11 @@ import (
 	"storj.io/common/pb"
 	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcstatus"
+	"storj.io/common/signing"
 	"storj.io/common/storj"
 	"storj.io/uplink/internal"
 	"storj.io/uplink/private/eestream"
+	"storj.io/uplink/private/metaclient/cursed"
 )
 
 var (
@@ -48,6 +50,8 @@ type Client struct {
 	conn      *rpc.Conn
 	client    pb.DRPCMetainfoClient
 	apiKeyRaw []byte
+
+	satellite signing.Signer
 
 	userAgent string
 }
@@ -2054,12 +2058,21 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 	for i, request := range requests {
 		batchItems[i] = request.BatchItem()
 	}
+
+	if err := client.preprocess(ctx, batchItems); err != nil {
+		return nil, Error.Wrap(err)
+	}
+
 	response, err := client.client.Batch(ctx, &pb.BatchRequest{
 		Header:   client.header(),
 		Requests: batchItems,
 	})
 	if err != nil {
-		return []BatchResponse{}, Error.Wrap(err)
+		return nil, Error.Wrap(err)
+	}
+
+	if err := client.postprocess(ctx, response.Responses); err != nil {
+		return nil, Error.Wrap(err)
 	}
 
 	resp = make([]BatchResponse, len(response.Responses))
@@ -2078,6 +2091,11 @@ func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem
 	for i, request := range requests {
 		batchItems[i] = request.BatchItem()
 	}
+
+	if err := client.preprocess(ctx, batchItems); err != nil {
+		return nil, Error.Wrap(err)
+	}
+
 	data, err := pb.Marshal(&pb.BatchRequest{
 		Header:   client.header(),
 		Requests: batchItems,
@@ -2087,7 +2105,7 @@ func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem
 		Data:      data,
 	})
 	if err != nil {
-		return []BatchResponse{}, Error.Wrap(err)
+		return nil, Error.Wrap(err)
 	}
 
 	var respData []byte
@@ -2100,19 +2118,84 @@ func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem
 		err = Error.New("unsupported compression type: %v", compResponse.Selected)
 	}
 	if err != nil {
-		return []BatchResponse{}, Error.Wrap(err)
+		return nil, Error.Wrap(err)
 	}
 
 	var response pb.BatchResponse
 	if err := pb.Unmarshal(respData, &response); err != nil {
-		return []BatchResponse{}, Error.Wrap(err)
+		return nil, Error.Wrap(err)
 	}
+
+	if err := client.postprocess(ctx, response.Responses); err != nil {
+		return nil, Error.Wrap(err)
+	}
+
 	resp := make([]BatchResponse, len(response.Responses))
 	for i, response := range response.Responses {
 		resp[i] = MakeBatchResponse(batchItems[i], response)
 	}
 
 	return resp, nil
+}
+
+func (client *Client) preprocess(ctx context.Context, reqs []*pb.BatchRequestItem) error {
+	if client.satellite == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
+		return nil
+	}
+
+	for _, req := range reqs {
+		switch r := req.Request.(type) {
+		default: // present to silence gocritic. i like the type switch better.
+
+		case *pb.BatchRequestItem_SegmentBegin:
+			r.SegmentBegin.LiteRequest = true
+		}
+	}
+
+	return nil
+}
+
+func (client *Client) postprocess(ctx context.Context, resps []*pb.BatchResponseItem) error {
+	if client.satellite == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
+		return nil
+	}
+
+	for _, resp := range resps {
+		switch r := resp.Response.(type) {
+		default: // present to silence gocritic. i like the type switch better.
+
+		case *pb.BatchResponseItem_SegmentBegin:
+			limits := r.SegmentBegin.AddressedLimits
+
+			if len(limits) > 0 && limits[0].Limit != nil && len(limits[0].Limit.SatelliteSignature) == 0 {
+				// we know we got a lite response so we have to add in the information to make it
+				// valid: the piece id and satellite signature. we then need to repack the segment
+				// id to contain the new original order limits and signature.
+
+				var segmentID cursed.SegmentID
+				if err := pb.Unmarshal(r.SegmentBegin.SegmentId, &segmentID); err != nil {
+					return err
+				}
+
+				var err error
+				for pieceNum, limit := range limits {
+					limit.Limit.PieceId = segmentID.RootPieceId.Derive(limit.Limit.StorageNodeId, int32(pieceNum))
+					limits[pieceNum].Limit, err = signing.SignOrderLimit(ctx, client.satellite, limit.Limit)
+					if err != nil {
+						return err
+					}
+				}
+
+				segmentID.OriginalOrderLimits = limits
+				r.SegmentBegin.SegmentId, err = cursed.PackSegmentID(ctx, client.satellite, &segmentID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // SetRawAPIKey sets the client's raw API key. Mainly used for testing.
