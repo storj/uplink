@@ -11,6 +11,7 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/signing"
 	"storj.io/common/uuid"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
@@ -57,3 +58,13 @@ func GetPublicID(ctx context.Context, config uplink.Config, access *uplink.Acces
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
+
+//go:linkname setSatelliteSigner storj.io/uplink.setSatelliteSigner
+func setSatelliteSigner(project *uplink.Project, signer signing.Signer)
+
+// SetSatelliteSigner will enable an uplink Project's configuration to
+// better coordinate with the Satellite by providing the Uplink the Satellite's
+// ability to sign messages.
+func SetSatelliteSigner(project *uplink.Project, signer signing.Signer) {
+	setSatelliteSigner(project, signer)
+}

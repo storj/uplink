@@ -51,13 +51,17 @@ type Client struct {
 	client    pb.DRPCMetainfoClient
 	apiKeyRaw []byte
 
-	satellite signing.Signer
-
-	userAgent string
+	opts DialNodeURLOpts
 }
 
-// DialNodeURL dials to metainfo endpoint with the specified api key.
-func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey *macaroon.APIKey, userAgent string) (*Client, error) {
+// DialNodeURLOpts contains options for DialNodeURLWithOpts.
+type DialNodeURLOpts struct {
+	UserAgent       string
+	SatelliteSigner signing.Signer
+}
+
+// DialNodeURLWithOpts is like DialNodeURL but takes options.
+func DialNodeURLWithOpts(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey *macaroon.APIKey, opts DialNodeURLOpts) (*Client, error) {
 	url, err := storj.ParseNodeURL(nodeURL)
 	if err != nil {
 		return nil, Error.Wrap(err)
@@ -77,8 +81,15 @@ func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey 
 		client:    pb.NewDRPCMetainfoClient(conn),
 		apiKeyRaw: apiKey.SerializeRaw(),
 
-		userAgent: userAgent,
+		opts: opts,
 	}, nil
+}
+
+// DialNodeURL dials to metainfo endpoint with the specified api key.
+func DialNodeURL(ctx context.Context, dialer rpc.Dialer, nodeURL string, apiKey *macaroon.APIKey, userAgent string) (*Client, error) {
+	return DialNodeURLWithOpts(ctx, dialer, nodeURL, apiKey, DialNodeURLOpts{
+		UserAgent: userAgent,
+	})
 }
 
 // Close closes the dialed connection.
@@ -98,7 +109,7 @@ func (client *Client) Close() error {
 func (client *Client) header() *pb.RequestHeader {
 	return &pb.RequestHeader{
 		ApiKey:    client.apiKeyRaw,
-		UserAgent: []byte(client.userAgent),
+		UserAgent: []byte(client.opts.UserAgent),
 	}
 }
 
@@ -2139,7 +2150,7 @@ func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem
 }
 
 func (client *Client) preprocess(ctx context.Context, reqs []*pb.BatchRequestItem) error {
-	if client.satellite == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
+	if client.opts.SatelliteSigner == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
 		return nil
 	}
 
@@ -2156,7 +2167,7 @@ func (client *Client) preprocess(ctx context.Context, reqs []*pb.BatchRequestIte
 }
 
 func (client *Client) postprocess(ctx context.Context, resps []*pb.BatchResponseItem) error {
-	if client.satellite == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
+	if client.opts.SatelliteSigner == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
 		return nil
 	}
 
@@ -2180,14 +2191,14 @@ func (client *Client) postprocess(ctx context.Context, resps []*pb.BatchResponse
 				var err error
 				for pieceNum, limit := range limits {
 					limit.Limit.PieceId = segmentID.RootPieceId.Derive(limit.Limit.StorageNodeId, int32(pieceNum))
-					limits[pieceNum].Limit, err = signing.SignOrderLimit(ctx, client.satellite, limit.Limit)
+					limits[pieceNum].Limit, err = signing.SignOrderLimit(ctx, client.opts.SatelliteSigner, limit.Limit)
 					if err != nil {
 						return err
 					}
 				}
 
 				segmentID.OriginalOrderLimits = limits
-				r.SegmentBegin.SegmentId, err = cursed.PackSegmentID(ctx, client.satellite, &segmentID)
+				r.SegmentBegin.SegmentId, err = cursed.PackSegmentID(ctx, client.opts.SatelliteSigner, &segmentID)
 				if err != nil {
 					return err
 				}
