@@ -61,9 +61,13 @@ func convertKnownErrors(err error, bucket, key string) error {
 	case metaclient.ErrUploadIDInvalid.Has(err):
 		return errwrapf("%w (%q)", ErrUploadIDInvalid, key)
 	case encryption.ErrMissingEncryptionBase.Has(err):
-		return errwrapf("%w (%q)", ErrPermissionDenied, key)
+		// Some of our test harnesses need to be able to distinguish between
+		// client rejection and Satellite rejection.
+		return &joinedErr{main: errwrapf("%w (%q)", ErrPermissionDenied, key), alt: err}
 	case encryption.ErrMissingDecryptionBase.Has(err):
-		return errwrapf("%w (%q)", ErrPermissionDenied, key)
+		// Some of our test harnesses need to be able to distinguish between
+		// client rejection and Satellite rejection.
+		return &joinedErr{main: errwrapf("%w (%q)", ErrPermissionDenied, key), alt: err}
 	case errs2.IsRPC(err, rpcstatus.ResourceExhausted):
 		// TODO is a better way to do this?
 		message := internal.RootError(err).Error()
