@@ -332,6 +332,89 @@ func (db *DB) DeleteObject(ctx context.Context, bucket, key string, version []by
 	return db.ObjectFromRawObjectItem(ctx, bucket, key, object)
 }
 
+// DeleteObjectsOptions contains additional options for deleting multiple objects from a bucket.
+type DeleteObjectsOptions struct {
+	BypassGovernanceRetention bool
+	Quiet                     bool
+}
+
+// DeleteObjectsItem describes the location of an object in a bucket to be deleted.
+type DeleteObjectsItem struct {
+	ObjectKey string
+	Version   []byte
+}
+
+// DeleteObjectsResultItem represents the result of an individual DeleteObjects deletion.
+type DeleteObjectsResultItem struct {
+	ObjectKey        string
+	RequestedVersion []byte
+
+	Removed *DeleteObjectsResultItemRemoved
+	Marker  *DeleteObjectsResultItemMarker
+
+	Status storj.DeleteObjectsStatus
+}
+
+// DeleteObjects deletes multiple objects from a bucket.
+func (db *DB) DeleteObjects(ctx context.Context, bucket string, items []DeleteObjectsItem, options DeleteObjectsOptions) (resultItems []DeleteObjectsResultItem, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucket == "" {
+		return nil, ErrNoBucket.New("")
+	}
+
+	if len(items) == 0 {
+		return nil, ErrDeleteObjectsNoItems.New("")
+	}
+
+	params := DeleteObjectsParams{
+		Bucket:                    []byte(bucket),
+		Items:                     make([]RawDeleteObjectsItem, 0, len(items)),
+		BypassGovernanceRetention: options.BypassGovernanceRetention,
+		Quiet:                     options.Quiet,
+	}
+
+	for _, item := range items {
+		if len(item.ObjectKey) == 0 {
+			return nil, ErrNoPath.New("")
+		}
+
+		encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(item.ObjectKey), db.encStore)
+		if err != nil {
+			return nil, err
+		}
+
+		params.Items = append(params.Items, RawDeleteObjectsItem{
+			EncryptedObjectKey: []byte(encPath.Raw()),
+			Version:            item.Version,
+		})
+	}
+
+	rawResultItems, err := db.metainfo.DeleteObjects(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	resultItems = make([]DeleteObjectsResultItem, 0, len(rawResultItems))
+
+	for _, rawItem := range rawResultItems {
+		unencPath, err := encryption.DecryptPathWithStoreCipher(bucket, paths.NewEncrypted(string(rawItem.EncryptedObjectKey)), db.encStore)
+		if err != nil {
+			return nil, err
+		}
+
+		resultItems = append(resultItems, DeleteObjectsResultItem{
+			ObjectKey:        unencPath.Raw(),
+			RequestedVersion: rawItem.RequestedVersion,
+			Removed:          rawItem.Removed,
+			Marker:           rawItem.Marker,
+			Status:           rawItem.Status,
+		})
+	}
+
+	return resultItems, nil
+}
+
 // ModifyPendingObject creates an interface for updating a partially uploaded object.
 func (db *DB) ModifyPendingObject(ctx context.Context, bucket, key string) (object *MutableObject, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -1012,8 +1095,24 @@ func getEncryptedKeyAndNonce(metadataKey []byte, metadataNonce storj.Nonce, m *p
 }
 
 func version(status int32, version []byte) []byte {
-	if status == int32(pb.Object_COMMITTED_VERSIONED) || status == int32(pb.Object_DELETE_MARKER_VERSIONED) {
-		return version
+	if !isStatusVersioned(pb.Object_Status(status)) {
+		return nil
 	}
-	return nil
+	return version
+}
+
+func isStatusVersioned(status pb.Object_Status) bool {
+	return status == pb.Object_COMMITTED_VERSIONED || status == pb.Object_DELETE_MARKER_VERSIONED
+}
+
+func isStatusCommitted(status pb.Object_Status) bool {
+	switch status {
+	case pb.Object_COMMITTED_UNVERSIONED,
+		pb.Object_COMMITTED_VERSIONED,
+		pb.Object_DELETE_MARKER_VERSIONED,
+		pb.Object_DELETE_MARKER_UNVERSIONED:
+		return true
+	default:
+		return false
+	}
 }

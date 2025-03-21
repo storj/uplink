@@ -11,7 +11,6 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
-	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/uplink"
@@ -30,6 +29,15 @@ var packageError = errs.Class("object")
 var (
 	// ErrMethodNotAllowed is returned when method is not allowed against specified entity (e.g. object).
 	ErrMethodNotAllowed = errors.New("method not allowed")
+
+	// ErrObjectKeyMissing is returned when an object key is expected but not provided.
+	ErrObjectKeyMissing = errors.New("object key is missing")
+
+	// ErrObjectVersionInvalid is returned when an object version is invalid.
+	ErrObjectVersionInvalid = errors.New("object version is invalid")
+
+	// ErrBucketNameMissing is returned when a bucket name is expected but not provided.
+	ErrBucketNameMissing = errors.New("bucket name is missing")
 
 	// ErrNoObjectLockConfiguration is returned when a locked object is copied to a bucket without object lock configuration.
 	ErrNoObjectLockConfiguration = errors.New("destination bucket has no object lock configuration")
@@ -50,10 +58,43 @@ var (
 	// ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention is returned when attempting to upload into a bucket
 	// with default retention settings using an API key that enforces an object expiration time.
 	ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention = errors.New("cannot upload into a bucket with default retention settings using an API key that enforces an object expiration time")
+
+	// ErrDeleteObjectsNoItems is returned when attempting to delete an empty list of objects from a bucket.
+	ErrDeleteObjectsNoItems = errors.New("at least one object must be specified for deletion")
+
+	// ErrDeleteObjectsTooManyItems is returned when a list of objects to delete from a bucket is too large.
+	ErrDeleteObjectsTooManyItems = errors.New("too many objects specified for deletion")
+
+	rpcCodeToError = map[rpcstatus.StatusCode]error{
+		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
+		rpcstatus.ObjectLockBucketRetentionConfigurationMissing:    ErrNoObjectLockConfiguration,
+		rpcstatus.ObjectLockInvalidBucketState:                     privateBucket.ErrBucketInvalidStateObjectLock,
+		rpcstatus.ObjectLockObjectProtected:                        ErrObjectProtected,
+		rpcstatus.ObjectLockInvalidObjectState:                     ErrObjectLockInvalidObjectState,
+		rpcstatus.ObjectLockUploadWithTTLAndDefaultRetention:       ErrObjectLockUploadWithTTLAndDefaultRetention,
+		rpcstatus.ObjectLockUploadWithTTLAPIKeyAndDefaultRetention: ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention,
+		rpcstatus.ObjectKeyMissing:                                 ErrObjectKeyMissing,
+		rpcstatus.ObjectKeyTooLong:                                 uplink.ErrObjectKeyInvalid,
+		rpcstatus.ObjectVersionInvalid:                             ErrObjectVersionInvalid,
+		rpcstatus.BucketNotFound:                                   uplink.ErrBucketNotFound,
+		rpcstatus.BucketNameMissing:                                ErrBucketNameMissing,
+		rpcstatus.BucketNameInvalid:                                uplink.ErrBucketNameInvalid,
+		rpcstatus.DeleteObjectsNoItems:                             ErrDeleteObjectsNoItems,
+		rpcstatus.DeleteObjectsTooManyItems:                        ErrDeleteObjectsTooManyItems,
+	}
 )
 
 // IPSummary contains information about the object IP-s.
 type IPSummary = metaclient.GetObjectIPsResponse
+
+// DeleteObjectsOptions contains additional options for deleting objects.
+type DeleteObjectsOptions = metaclient.DeleteObjectsOptions
+
+// DeleteObjectsItem describes the location of an object in a bucket to be deleted.
+type DeleteObjectsItem = metaclient.DeleteObjectsItem
+
+// DeleteObjectsResultItem represents the result of an individual DeleteObjects deletion.
+type DeleteObjectsResultItem = metaclient.DeleteObjectsResultItem
 
 // VersionedObject represents object with version.
 // TODO find better place of name for this and related things.
@@ -245,6 +286,38 @@ func DeleteObject(ctx context.Context, project *uplink.Project, bucket, key stri
 	}
 
 	return convertObject(&obj), nil
+}
+
+// DeleteObjects deletes multiple objects from a bucket.
+func DeleteObjects(ctx context.Context, project *uplink.Project, bucket string, items []DeleteObjectsItem, options *DeleteObjectsOptions) (_ []DeleteObjectsResultItem, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if options == nil {
+		options = &DeleteObjectsOptions{}
+	}
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, bucket, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	resultItems, err := db.DeleteObjects(ctx, bucket, items, *options)
+	if err != nil {
+		switch {
+		case metaclient.ErrNoBucket.Has(err):
+			err = ErrBucketNameMissing
+		case metaclient.ErrNoPath.Has(err):
+			err = ErrObjectKeyMissing
+		case metaclient.ErrDeleteObjectsNoItems.Has(err):
+			err = ErrDeleteObjectsNoItems
+		default:
+			err = packageConvertKnownErrors(err, bucket, "")
+		}
+		return nil, err
+	}
+
+	return resultItems, nil
 }
 
 // ListObjectVersions returns a list of objects and their versions.
@@ -473,24 +546,10 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 }
 
 func packageConvertKnownErrors(err error, bucket, key string) error {
-	switch {
-	case errs2.IsRPC(err, rpcstatus.MethodNotAllowed):
-		return ErrMethodNotAllowed
-	case errs2.IsRPC(err, rpcstatus.ObjectLockBucketRetentionConfigurationMissing):
-		return ErrNoObjectLockConfiguration
-	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState):
-		return privateBucket.ErrBucketInvalidStateObjectLock
-	case errs2.IsRPC(err, rpcstatus.ObjectLockObjectProtected):
-		return ErrObjectProtected
-	case errs2.IsRPC(err, rpcstatus.ObjectLockInvalidObjectState):
-		return ErrObjectLockInvalidObjectState
-	case errs2.IsRPC(err, rpcstatus.ObjectLockUploadWithTTLAndDefaultRetention):
-		return ErrObjectLockUploadWithTTLAndDefaultRetention
-	case errs2.IsRPC(err, rpcstatus.ObjectLockUploadWithTTLAPIKeyAndDefaultRetention):
-		return ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention
-	default:
-		return convertKnownErrors(err, bucket, key)
+	if convertedErr, ok := rpcCodeToError[rpcstatus.Code(err)]; ok {
+		return convertedErr
 	}
+	return convertKnownErrors(err, bucket, key)
 }
 
 func convertErrors(err error) error {

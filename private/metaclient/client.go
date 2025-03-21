@@ -1217,6 +1217,114 @@ func (client *Client) BeginDeleteObject(ctx context.Context, params BeginDeleteO
 	return newObjectInfo(response.Object), nil
 }
 
+// DeleteObjectsParams represents parameters for the DeleteObjects method.
+type DeleteObjectsParams struct {
+	Bucket                    []byte
+	Items                     []RawDeleteObjectsItem
+	BypassGovernanceRetention bool
+	Quiet                     bool
+}
+
+// RawDeleteObjectsItem describes the location of an object in a bucket to be deleted.
+type RawDeleteObjectsItem struct {
+	EncryptedObjectKey []byte
+	Version            []byte
+}
+
+func (params *DeleteObjectsParams) toRequest(header *pb.RequestHeader) *pb.DeleteObjectsRequest {
+	req := &pb.DeleteObjectsRequest{
+		Header:                    header,
+		Bucket:                    params.Bucket,
+		Items:                     make([]*pb.DeleteObjectsRequestItem, 0, len(params.Items)),
+		BypassGovernanceRetention: params.BypassGovernanceRetention,
+		Quiet:                     params.Quiet,
+	}
+	for _, item := range params.Items {
+		req.Items = append(req.Items, &pb.DeleteObjectsRequestItem{
+			EncryptedObjectKey: item.EncryptedObjectKey,
+			ObjectVersion:      item.Version,
+		})
+	}
+	return req
+}
+
+// BatchItem returns a single item for a batch request.
+func (params *DeleteObjectsParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_ObjectsDelete{
+			ObjectsDelete: params.toRequest(nil),
+		},
+	}
+}
+
+// RawDeleteObjectsResultItem represents the result of an individual DeleteObjects deletion.
+type RawDeleteObjectsResultItem struct {
+	EncryptedObjectKey []byte
+	RequestedVersion   []byte
+
+	Removed *DeleteObjectsResultItemRemoved
+	Marker  *DeleteObjectsResultItemMarker
+
+	Status storj.DeleteObjectsStatus
+}
+
+// DeleteObjectsResultItemRemoved contains information about an object that was removed
+// as a result of processing a DeleteObjects request item.
+type DeleteObjectsResultItemRemoved struct {
+	Version     []byte
+	IsCommitted bool
+	IsVersioned bool
+}
+
+// DeleteObjectsResultItemMarker contains information about a delete marker that was inserted
+// as a result of processing a DeleteObjects request item.
+type DeleteObjectsResultItemMarker struct {
+	Version     []byte
+	IsVersioned bool
+}
+
+func newDeleteObjectsResponse(pbResponse *pb.DeleteObjectsResponse) []RawDeleteObjectsResultItem {
+	resultItems := make([]RawDeleteObjectsResultItem, 0, len(pbResponse.Items))
+	for _, pbItem := range pbResponse.Items {
+		item := RawDeleteObjectsResultItem{
+			EncryptedObjectKey: pbItem.EncryptedObjectKey,
+			RequestedVersion:   pbItem.RequestedObjectVersion,
+			Status:             storj.DeleteObjectsStatus(pbItem.Status),
+		}
+		if pbItem.Removed != nil {
+			item.Removed = &DeleteObjectsResultItemRemoved{
+				Version:     pbItem.Removed.ObjectVersion,
+				IsCommitted: isStatusCommitted(pbItem.Removed.Status),
+				IsVersioned: isStatusVersioned(pbItem.Removed.Status),
+			}
+		}
+		if pbItem.Marker != nil {
+			item.Marker = &DeleteObjectsResultItemMarker{
+				Version:     pbItem.Marker.ObjectVersion,
+				IsVersioned: isStatusVersioned(pbItem.Marker.Status),
+			}
+		}
+		resultItems = append(resultItems, item)
+	}
+	return resultItems
+}
+
+// DeleteObjects deletes multiple objects from a bucket.
+func (client *Client) DeleteObjects(ctx context.Context, params DeleteObjectsParams) (_ []RawDeleteObjectsResultItem, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.DeleteObjectsResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.DeleteObjects(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	return newDeleteObjectsResponse(response), nil
+}
+
 // ListObjectsParams parameters for ListObjects method.
 type ListObjectsParams struct {
 	Bucket                []byte

@@ -19,6 +19,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
+	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
@@ -1875,5 +1876,184 @@ func TestListObjectVersionsIsLatest(t *testing.T) {
 		for _, obj := range objs {
 			require.True(t, obj.IsPrefix)
 		}
+	})
+}
+
+func TestDeleteObjects(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.DeleteObjectsEnabled = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+
+		bucketName := "test-bucket"
+		err := planet.Uplinks[0].CreateBucket(ctx, sat, bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+		type minimalObject struct {
+			key     string
+			version []byte
+		}
+
+		randVersion := func() []byte {
+			randVersionID := metabase.Version(testrand.Int63n(int64(metabase.MaxVersion-1)) + 1)
+			return metabase.NewStreamVersionID(randVersionID, testrand.UUID()).Bytes()
+		}
+
+		createObject := func(t *testing.T) minimalObject {
+			objectKey := testrand.Path()
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+			return minimalObject{
+				key:     objectKey,
+				version: upload.Info().Version,
+			}
+		}
+
+		getLastCommittedVersion := func(t *testing.T, bucketName string, objectKey string) *object.VersionedObject {
+			versions, _, err := object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+				Cursor:        objectKey,
+				VersionCursor: metabase.NewStreamVersionID(metabase.MaxVersion+1, uuid.UUID{}).Bytes(),
+				Recursive:     true,
+				Limit:         1,
+			})
+			require.NoError(t, err)
+			require.NotEmpty(t, versions)
+			require.Equal(t, versions[0].Key, objectKey)
+			return versions[0]
+		}
+
+		t.Run("Basic", func(t *testing.T) {
+			obj1 := createObject(t)
+			obj2 := createObject(t)
+
+			result, err := object.DeleteObjects(ctx, project, bucketName, []object.DeleteObjectsItem{
+				{
+					ObjectKey: obj1.key,
+					Version:   obj1.version,
+				},
+				{
+					ObjectKey: obj2.key,
+				},
+			}, nil)
+			require.NoError(t, err)
+
+			obj2Marker := getLastCommittedVersion(t, bucketName, obj2.key)
+			require.True(t, obj2Marker.IsDeleteMarker)
+
+			require.ElementsMatch(t, []object.DeleteObjectsResultItem{
+				{
+					ObjectKey:        obj1.key,
+					RequestedVersion: obj1.version,
+					Removed: &metaclient.DeleteObjectsResultItemRemoved{
+						Version:     obj1.version,
+						IsCommitted: true,
+						IsVersioned: true,
+					},
+					Status: storj.DeleteObjectsStatusOK,
+				},
+				{
+					ObjectKey: obj2.key,
+					Marker: &metaclient.DeleteObjectsResultItemMarker{
+						Version:     obj2Marker.Version,
+						IsVersioned: true,
+					},
+					Status: storj.DeleteObjectsStatusOK,
+				},
+			}, result)
+		})
+
+		t.Run("Quiet mode", func(t *testing.T) {
+			obj := createObject(t)
+
+			notFoundObj := minimalObject{
+				key:     testrand.Path(),
+				version: randVersion(),
+			}
+
+			result, err := object.DeleteObjects(ctx, project, bucketName, []object.DeleteObjectsItem{
+				{
+					ObjectKey: obj.key,
+					Version:   obj.version,
+				},
+				{
+					ObjectKey: notFoundObj.key,
+					Version:   notFoundObj.version,
+				},
+			}, &metaclient.DeleteObjectsOptions{
+				Quiet: true,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []object.DeleteObjectsResultItem{{
+				ObjectKey:        notFoundObj.key,
+				RequestedVersion: notFoundObj.version,
+				Status:           storj.DeleteObjectsStatusNotFound,
+			}}, result)
+		})
+
+		t.Run("Invalid options", func(t *testing.T) {
+			item := object.DeleteObjectsItem{
+				ObjectKey: testrand.Path(),
+				Version:   randVersion(),
+			}
+
+			test := func(t *testing.T, bucketName string, items []object.DeleteObjectsItem, expectedError error) {
+				result, err := object.DeleteObjects(ctx, project, bucketName, items, nil)
+				require.Empty(t, result)
+				require.ErrorIs(t, err, expectedError)
+			}
+
+			t.Run("Missing bucket name", func(t *testing.T) {
+				test(t, "", []object.DeleteObjectsItem{item}, object.ErrBucketNameMissing)
+			})
+
+			t.Run("Invalid bucket name", func(t *testing.T) {
+				test(t, string(testrand.RandAlphaNumeric(64)), []object.DeleteObjectsItem{item}, uplink.ErrBucketNameInvalid)
+			})
+
+			t.Run("No items", func(t *testing.T) {
+				test(t, bucketName, []object.DeleteObjectsItem{}, object.ErrDeleteObjectsNoItems)
+			})
+
+			t.Run("Too many items", func(t *testing.T) {
+				items := make([]object.DeleteObjectsItem, 0, metabase.DeleteObjectsMaxItems+1)
+				for i := 0; i < metabase.DeleteObjectsMaxItems+1; i++ {
+					items = append(items, item)
+				}
+				test(t, bucketName, items, object.ErrDeleteObjectsTooManyItems)
+			})
+
+			t.Run("Missing object key", func(t *testing.T) {
+				test(t, bucketName, []object.DeleteObjectsItem{{
+					Version: randVersion(),
+				}}, object.ErrObjectKeyMissing)
+			})
+
+			t.Run("Invalid object key", func(t *testing.T) {
+				objectKey := string(testrand.RandAlphaNumeric(sat.Config.Metainfo.MaxEncryptedObjectKeyLength + 1))
+				test(t, bucketName, []object.DeleteObjectsItem{{
+					ObjectKey: objectKey,
+				}}, uplink.ErrObjectKeyInvalid)
+			})
+
+			t.Run("Invalid object version", func(t *testing.T) {
+				test(t, bucketName, []object.DeleteObjectsItem{{
+					ObjectKey: testrand.Path(),
+					Version:   randVersion()[:8],
+				}}, object.ErrObjectVersionInvalid)
+			})
+		})
 	})
 }

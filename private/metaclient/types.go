@@ -225,6 +225,9 @@ var (
 	// ErrConflictingPlacement is an error class for conflicting placement
 	// between a project default and a new bucket.
 	ErrConflictingPlacement = errs.Class("conflicting placement")
+
+	// ErrDeleteObjectsNoItems is returned when attempting to delete an empty list of objects from a bucket.
+	ErrDeleteObjectsNoItems = errs.Class("no objects to delete")
 )
 
 // Bucket contains information about a specific bucket.
