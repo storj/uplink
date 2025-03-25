@@ -291,20 +291,20 @@ func (b fakeUploaderBackend) UploadObject(ctx context.Context, segmentSource str
 
 	m, ok := encMeta.(*encryptedMetadata)
 	if !ok {
-		return streamupload.Info{}, errs.New("encrypted metadata is of type %T but expected %T", encMeta, m)
+		return streamupload.Info{}, errs.New("encMeta is of type %T but expected %T", encMeta, m)
 	}
 
 	if um, ok := m.metadata.(fixedMetadata); !ok {
-		return streamupload.Info{}, errs.New("encrypted metadata metadata is of type %T but expected %T", m.metadata, um)
+		return streamupload.Info{}, errs.New("encryptedMetadata metadata is of type %T but expected %T", m.metadata, um)
 	}
 	if m.segmentSize != segmentSize {
-		return streamupload.Info{}, errs.New("encrypted metadata segment size should be %d but is %d", segmentSize, m.segmentSize)
+		return streamupload.Info{}, errs.New("encryptedMetadata segmentSize should be %d but is %d", segmentSize, m.segmentSize)
 	}
 	if m.derivedKey == nil {
-		return streamupload.Info{}, errs.New("encrypted metadata segment derived key is nil")
+		return streamupload.Info{}, errs.New("encryptedMetadata segment derived key is nil")
 	}
 	if m.cipherSuite != cipherSuite {
-		return streamupload.Info{}, errs.New("encrypted metadata cipher suite should be %d but got %d", cipherSuite, m.cipherSuite)
+		return streamupload.Info{}, errs.New("encryptedMetadata cipherSuite should be %d but got %d", cipherSuite, m.cipherSuite)
 	}
 
 	return b.upload()
@@ -332,20 +332,20 @@ func (fakeUploaderBackend) checkCommonParams(source streamupload.SegmentSource, 
 
 	u, ok := uploader.(segmentUploader)
 	if !ok {
-		return errs.New("segment uploader is of type %T but expected %T", uploader, u)
+		return errs.New("segmentUploader is of type %T but expected %T", uploader, u)
 	}
 
 	if um, ok := u.metainfo.(metainfoUpload); !ok {
-		return errs.New("segment uploader metainfo is of type %T but expected %T", u.metainfo, um)
+		return errs.New("segmentUploader metainfo is of type %T but expected %T", u.metainfo, um)
 	}
 	if up, ok := u.piecePutter.(piecePutter); !ok {
-		return errs.New("segment uploader piece putter is of type %T but expected %T", u.piecePutter, up)
+		return errs.New("segmentUploader piece putter is of type %T but expected %T", u.piecePutter, up)
 	}
 	if s, ok := u.sched.(noopScheduler); !ok {
-		return errs.New("segment uploader scheduler is of type %T but expected %T", u.sched, s)
+		return errs.New("segmentUploader scheduler is of type %T but expected %T", u.sched, s)
 	}
 	if u.longTailMargin != longTailMargin {
-		return errs.New("segment uploader long tail margin is %d but expected %d", u.longTailMargin, longTailMargin)
+		return errs.New("segmentUploader long tail margin is %d but expected %d", u.longTailMargin, longTailMargin)
 	}
 
 	if b, ok := batcher.(metainfoUpload); !ok {
