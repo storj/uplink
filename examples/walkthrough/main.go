@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -21,25 +22,29 @@ const defaultExpiration = 7 * 24 * time.Hour
 // UploadAndDownloadData uploads the specified data to the specified key in the
 // specified bucket, using the specified Satellite, API key, and passphrase.
 func UploadAndDownloadData(ctx context.Context,
-	accessGrant, bucketName, uploadKey string, dataToUpload []byte) error {
+	accessGrant, bucketName, uploadKey string, dataToUpload []byte) (err error) {
 
 	// Parse access grant, which contains necessary credentials and permissions.
 	access, err := uplink.ParseAccess(accessGrant)
 	if err != nil {
-		return fmt.Errorf("could not request access grant: %v", err)
+		return fmt.Errorf("could not request access grant: %w", err)
 	}
 
 	// Open up the Project we will be working with.
 	project, err := uplink.OpenProject(ctx, access)
 	if err != nil {
-		return fmt.Errorf("could not open project: %v", err)
+		return fmt.Errorf("could not open project: %w", err)
 	}
-	defer project.Close()
+	defer func() {
+		if closeErr := project.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	// Ensure the desired Bucket within the Project is created.
 	_, err = project.EnsureBucket(ctx, bucketName)
 	if err != nil {
-		return fmt.Errorf("could not ensure bucket: %v", err)
+		return fmt.Errorf("could not ensure bucket: %w", err)
 	}
 
 	// Intitiate the upload of our Object to the specified bucket and key.
@@ -48,7 +53,7 @@ func UploadAndDownloadData(ctx context.Context,
 		Expires: time.Now().Add(defaultExpiration),
 	})
 	if err != nil {
-		return fmt.Errorf("could not initiate upload: %v", err)
+		return fmt.Errorf("could not initiate upload: %w", err)
 	}
 
 	// Copy the data to the upload.
@@ -56,26 +61,30 @@ func UploadAndDownloadData(ctx context.Context,
 	_, err = io.Copy(upload, buf)
 	if err != nil {
 		_ = upload.Abort()
-		return fmt.Errorf("could not upload data: %v", err)
+		return fmt.Errorf("could not upload data: %w", err)
 	}
 
 	// Commit the uploaded object.
 	err = upload.Commit()
 	if err != nil {
-		return fmt.Errorf("could not commit uploaded object: %v", err)
+		return fmt.Errorf("could not commit uploaded object: %w", err)
 	}
 
 	// Initiate a download of the same object again
 	download, err := project.DownloadObject(ctx, bucketName, uploadKey, nil)
 	if err != nil {
-		return fmt.Errorf("could not open object: %v", err)
+		return fmt.Errorf("could not open object: %w", err)
 	}
-	defer download.Close()
+	defer func() {
+		if closeErr := download.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	// Read everything from the download stream
 	receivedContents, err := io.ReadAll(download)
 	if err != nil {
-		return fmt.Errorf("could not read data: %v", err)
+		return fmt.Errorf("could not read data: %w", err)
 	}
 
 	// Check that the downloaded data is the same as the uploaded data.
@@ -86,6 +95,7 @@ func UploadAndDownloadData(ctx context.Context,
 	return nil
 }
 
+// CreatePublicSharedLink demonstrates how to create a public shareable link.
 func CreatePublicSharedLink(ctx context.Context, accessGrant, bucketName, objectKey string) (string, error) {
 	// Define configuration for the storj sharing site.
 	config := edge.Config{
