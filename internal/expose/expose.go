@@ -50,6 +50,16 @@ func AccessGetAPIKey(*uplink.Access) *macaroon.APIKey
 //go:linkname AccessGetEncAccess storj.io/uplink.access_getEncAccess
 func AccessGetEncAccess(*uplink.Access) *grant.EncryptionAccess
 
+// AccessToInternal exposes uplink.access_toInternal.
+//
+//go:linkname AccessToInternal storj.io/uplink.access_toInternal
+func AccessToInternal(*uplink.Access) *grant.Access
+
+// AccessFromInternal exposes uplink.access_fromInternal.
+//
+//go:linkname AccessFromInternal storj.io/uplink.access_fromInternal
+func AccessFromInternal(*grant.Access) *uplink.Access
+
 // ConfigRequestAccessWithPassphraseAndConcurrency exposes Config.requestAccessWithPassphraseAndConcurrency.
 //
 //nolint:revive
