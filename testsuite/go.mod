@@ -14,7 +14,7 @@ require (
 	storj.io/common v0.0.0-20250318112615-b9952c61d22f
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250320232423-f726832a2a52
+	storj.io/storj v1.91.0-alpha.0.20250407191407-bcef33a169fd
 	storj.io/uplink v1.13.2-0.20250218103408-3179c8d1ccdb
 )
 
@@ -28,6 +28,7 @@ require (
 	cloud.google.com/go/iam v1.3.1 // indirect
 	cloud.google.com/go/longrunning v0.6.4 // indirect
 	cloud.google.com/go/monitoring v1.23.0 // indirect
+	cloud.google.com/go/profiler v0.4.0 // indirect
 	cloud.google.com/go/secretmanager v1.14.3 // indirect
 	cloud.google.com/go/spanner v1.75.0 // indirect
 	cloud.google.com/go/storage v1.50.0 // indirect
@@ -179,7 +180,7 @@ require (
 	gopkg.in/segmentio/analytics-go.v3 v3.1.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	storj.io/eventkit v0.0.0-20240415002644-1d9596fee086 // indirect
+	storj.io/eventkit v0.0.0-20250407101305-1fc91e6bea89 // indirect
 	storj.io/monkit-jaeger v0.0.0-20240221095020-52b0792fa6cd // indirect
 	storj.io/picobuf v0.0.3 // indirect
 )
