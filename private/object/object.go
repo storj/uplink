@@ -11,6 +11,7 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
+	"storj.io/common/errs2"
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/uplink"
@@ -64,6 +65,9 @@ var (
 
 	// ErrDeleteObjectsTooManyItems is returned when a list of objects to delete from a bucket is too large.
 	ErrDeleteObjectsTooManyItems = errors.New("too many objects specified for deletion")
+
+	// ErrDeleteObjectsUnimplemented is returned when the satellite does not have a DeleteObjects implementation.
+	ErrDeleteObjectsUnimplemented = errors.New("DeleteObjects is not implemented")
 
 	rpcCodeToError = map[rpcstatus.StatusCode]error{
 		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
@@ -305,6 +309,8 @@ func DeleteObjects(ctx context.Context, project *uplink.Project, bucket string, 
 	resultItems, err := db.DeleteObjects(ctx, bucket, items, *options)
 	if err != nil {
 		switch {
+		case errs2.IsRPC(err, rpcstatus.Unimplemented):
+			err = ErrDeleteObjectsUnimplemented
 		case metaclient.ErrNoBucket.Has(err):
 			err = ErrBucketNameMissing
 		case metaclient.ErrNoPath.Has(err):

@@ -1905,11 +1905,6 @@ func TestDeleteObjects(t *testing.T) {
 			version []byte
 		}
 
-		randVersion := func() []byte {
-			randVersionID := metabase.Version(testrand.Int63n(int64(metabase.MaxVersion-1)) + 1)
-			return metabase.NewStreamVersionID(randVersionID, testrand.UUID()).Bytes()
-		}
-
 		createObject := func(t *testing.T) minimalObject {
 			objectKey := testrand.Path()
 			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
@@ -2056,4 +2051,33 @@ func TestDeleteObjects(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestDeleteObjectsUnimplemented(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.DeleteObjectsEnabled = false
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = object.DeleteObjects(ctx, project, testrand.BucketName(), []object.DeleteObjectsItem{{
+			ObjectKey: testrand.Path(),
+			Version:   randVersion(),
+		}}, nil)
+
+		require.ErrorIs(t, err, object.ErrDeleteObjectsUnimplemented)
+	})
+}
+
+func randVersion() []byte {
+	randVersionID := metabase.Version(testrand.Int63n(int64(metabase.MaxVersion-1)) + 1)
+	return metabase.NewStreamVersionID(randVersionID, testrand.UUID()).Bytes()
 }
