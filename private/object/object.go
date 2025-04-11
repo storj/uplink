@@ -34,6 +34,9 @@ var (
 	// ErrObjectKeyMissing is returned when an object key is expected but not provided.
 	ErrObjectKeyMissing = errors.New("object key is missing")
 
+	// ErrObjectKeyTooLong is returned when an object key is too long.
+	ErrObjectKeyTooLong = errors.New("object key is too long")
+
 	// ErrObjectVersionInvalid is returned when an object version is invalid.
 	ErrObjectVersionInvalid = errors.New("object version is invalid")
 
@@ -78,7 +81,7 @@ var (
 		rpcstatus.ObjectLockUploadWithTTLAndDefaultRetention:       ErrObjectLockUploadWithTTLAndDefaultRetention,
 		rpcstatus.ObjectLockUploadWithTTLAPIKeyAndDefaultRetention: ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention,
 		rpcstatus.ObjectKeyMissing:                                 ErrObjectKeyMissing,
-		rpcstatus.ObjectKeyTooLong:                                 uplink.ErrObjectKeyInvalid,
+		rpcstatus.ObjectKeyTooLong:                                 ErrObjectKeyTooLong,
 		rpcstatus.ObjectVersionInvalid:                             ErrObjectVersionInvalid,
 		rpcstatus.BucketNotFound:                                   uplink.ErrBucketNotFound,
 		rpcstatus.BucketNameMissing:                                ErrBucketNameMissing,

@@ -2036,11 +2036,11 @@ func TestDeleteObjects(t *testing.T) {
 				}}, object.ErrObjectKeyMissing)
 			})
 
-			t.Run("Invalid object key", func(t *testing.T) {
+			t.Run("Object key too long", func(t *testing.T) {
 				objectKey := string(testrand.RandAlphaNumeric(sat.Config.Metainfo.MaxEncryptedObjectKeyLength + 1))
 				test(t, bucketName, []object.DeleteObjectsItem{{
 					ObjectKey: objectKey,
-				}}, uplink.ErrObjectKeyInvalid)
+				}}, object.ErrObjectKeyTooLong)
 			})
 
 			t.Run("Invalid object version", func(t *testing.T) {
