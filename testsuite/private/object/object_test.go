@@ -1905,8 +1905,8 @@ func TestDeleteObjects(t *testing.T) {
 			version []byte
 		}
 
-		createObject := func(t *testing.T) minimalObject {
-			objectKey := testrand.Path()
+		createPrefixedObject := func(t *testing.T, prefix string) minimalObject {
+			objectKey := prefix + testrand.Path()
 			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
 			require.NoError(t, err)
 			require.NoError(t, upload.Commit())
@@ -1914,6 +1914,10 @@ func TestDeleteObjects(t *testing.T) {
 				key:     objectKey,
 				version: upload.Info().Version,
 			}
+		}
+
+		createObject := func(t *testing.T) minimalObject {
+			return createPrefixedObject(t, "")
 		}
 
 		getLastCommittedVersion := func(t *testing.T, bucketName string, objectKey string) *object.VersionedObject {
@@ -1970,10 +1974,23 @@ func TestDeleteObjects(t *testing.T) {
 		})
 
 		t.Run("Quiet mode", func(t *testing.T) {
-			obj := createObject(t)
+			const prefix = "prefix/"
 
+			access := planet.Uplinks[0].Access[sat.ID()]
+			access, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
+				Bucket: bucketName,
+				Prefix: prefix,
+			})
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, access)
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			obj := createPrefixedObject(t, prefix)
+			unauthorizedObj := createObject(t)
 			notFoundObj := minimalObject{
-				key:     testrand.Path(),
+				key:     prefix + testrand.Path(),
 				version: randVersion(),
 			}
 
@@ -1981,6 +1998,10 @@ func TestDeleteObjects(t *testing.T) {
 				{
 					ObjectKey: obj.key,
 					Version:   obj.version,
+				},
+				{
+					ObjectKey: unauthorizedObj.key,
+					Version:   unauthorizedObj.version,
 				},
 				{
 					ObjectKey: notFoundObj.key,
@@ -1991,11 +2012,18 @@ func TestDeleteObjects(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, []object.DeleteObjectsResultItem{{
-				ObjectKey:        notFoundObj.key,
-				RequestedVersion: notFoundObj.version,
-				Status:           storj.DeleteObjectsStatusNotFound,
-			}}, result)
+			require.ElementsMatch(t, []object.DeleteObjectsResultItem{
+				{
+					ObjectKey:        unauthorizedObj.key,
+					RequestedVersion: unauthorizedObj.version,
+					Status:           storj.DeleteObjectsStatusUnauthorized,
+				},
+				{
+					ObjectKey:        notFoundObj.key,
+					RequestedVersion: notFoundObj.version,
+					Status:           storj.DeleteObjectsStatusNotFound,
+				},
+			}, result)
 		})
 
 		t.Run("Invalid options", func(t *testing.T) {

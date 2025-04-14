@@ -374,6 +374,8 @@ func (db *DB) DeleteObjects(ctx context.Context, bucket string, items []DeleteOb
 		Quiet:                     options.Quiet,
 	}
 
+	resultItems = make([]DeleteObjectsResultItem, 0, len(items))
+
 	for _, item := range items {
 		if len(item.ObjectKey) == 0 {
 			return nil, ErrNoPath.New("")
@@ -381,6 +383,14 @@ func (db *DB) DeleteObjects(ctx context.Context, bucket string, items []DeleteOb
 
 		encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(item.ObjectKey), db.encStore)
 		if err != nil {
+			if encryption.ErrMissingEncryptionBase.Has(err) {
+				resultItems = append(resultItems, DeleteObjectsResultItem{
+					ObjectKey:        item.ObjectKey,
+					RequestedVersion: item.Version,
+					Status:           storj.DeleteObjectsStatusUnauthorized,
+				})
+				continue
+			}
 			return nil, err
 		}
 
@@ -390,12 +400,14 @@ func (db *DB) DeleteObjects(ctx context.Context, bucket string, items []DeleteOb
 		})
 	}
 
+	if len(params.Items) == 0 {
+		return resultItems, nil
+	}
+
 	rawResultItems, err := db.metainfo.DeleteObjects(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-
-	resultItems = make([]DeleteObjectsResultItem, 0, len(rawResultItems))
 
 	for _, rawItem := range rawResultItems {
 		unencPath, err := encryption.DecryptPathWithStoreCipher(bucket, paths.NewEncrypted(string(rawItem.EncryptedObjectKey)), db.encStore)
