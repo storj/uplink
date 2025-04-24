@@ -127,7 +127,6 @@ func TestCreateBucketWithLocation(t *testing.T) {
 					PlacementRules: "buckets_test_placement.yaml",
 				}
 				config.Console.Placement.SelfServeEnabled = true
-				config.Console.Placement.SelfServeNames = []string{"Poland"}
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
