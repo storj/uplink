@@ -133,6 +133,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		beginObjectReq.ExpiresAt = opts.Expires
 		beginObjectReq.Retention = opts.Retention
 		beginObjectReq.LegalHold = opts.LegalHold
+		beginObjectReq.IfNoneMatch = opts.IfNoneMatch
 	}
 
 	var streamID storj.StreamID
@@ -358,6 +359,7 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	commitObject := metaclient.CommitObjectParams{
 		StreamID:          streamID,
 		EncryptedMetadata: objectMetadata,
+		IfNoneMatch:       beginObjectReq.IfNoneMatch,
 	}
 	if s.encryptionParameters.CipherSuite != storj.EncNull {
 		commitObject.EncryptedMetadataEncryptedKey = encryptedKey

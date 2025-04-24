@@ -180,6 +180,7 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 		if err != nil {
 			return Info{}, err
 		}
+		commitObject.IfNoneMatch = beginObject.IfNoneMatch
 		aggregator.Schedule(commitObject)
 	}
 

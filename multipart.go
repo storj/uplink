@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "unsafe" // for go:linkname
 
 	"github.com/zeebo/errs"
 
@@ -105,10 +106,19 @@ func (project *Project) BeginUpload(ctx context.Context, bucket, key string, opt
 func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID string, opts *CommitUploadOptions) (object *Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	// TODO add completedPart to options when we will have implementation for that
+	metaOpts := &metaclient.CommitUploadOptions{}
+	if opts != nil {
+		metaOpts.CustomMetadata = opts.CustomMetadata
+	}
+	return project.commitUpload(ctx, bucket, key, uploadID, metaOpts)
+}
 
+func (project *Project) commitUpload(ctx context.Context, bucket, key string, uploadID string, opts *metaclient.CommitUploadOptions) (object *Object, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	// TODO add completedPart to options when we will have implementation for that
 	if opts == nil {
-		opts = &CommitUploadOptions{}
+		opts = &metaclient.CommitUploadOptions{}
 	}
 
 	metainfoDB, err := project.dialMetainfoDB(ctx)
@@ -117,7 +127,7 @@ func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID 
 	}
 	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
 
-	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, project.encryptionParameters)
+	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, project.encryptionParameters, opts.IfNoneMatch)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -486,4 +496,16 @@ func (upload *PartUpload) emitEvent(aborted bool) {
 		// segment count
 		// ram available
 	)
+}
+
+// commitUpload exposes the private project.commitObject method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname commitUpload
+func commitUpload(ctx context.Context, project *Project, bucket, key string, uploadID string, opts *metaclient.CommitUploadOptions) (object *Object, err error) {
+	return project.commitUpload(ctx, bucket, key, uploadID, opts)
 }

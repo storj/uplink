@@ -63,4 +63,13 @@ type UploadOptions struct {
 
 	Retention Retention
 	LegalHold bool
+
+	IfNoneMatch []string
+}
+
+// CommitUploadOptions contains additional options for committing an upload.
+type CommitUploadOptions struct {
+	CustomMetadata map[string]string
+
+	IfNoneMatch []string
 }

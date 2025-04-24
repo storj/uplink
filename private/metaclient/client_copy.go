@@ -94,6 +94,7 @@ type FinishCopyObjectParams struct {
 	NewSegmentKeys               []EncryptedKeyAndNonce
 	Retention                    Retention
 	LegalHold                    bool
+	IfNoneMatch                  []string
 }
 
 func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectFinishCopyRequest {
@@ -117,6 +118,7 @@ func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 		NewEncryptedMetadataKey:      params.NewEncryptedMetadataKey,
 		NewSegmentKeys:               keys,
 		LegalHold:                    params.LegalHold,
+		IfNoneMatch:                  params.IfNoneMatch,
 	}
 	if params.Retention != (Retention{}) {
 		request.Retention = &pb.Retention{

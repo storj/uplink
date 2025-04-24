@@ -229,6 +229,7 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 		beginObject.ExpiresAt = opts.Expires
 		beginObject.Retention = opts.Retention
 		beginObject.LegalHold = opts.LegalHold
+		beginObject.IfNoneMatch = opts.IfNoneMatch
 	}
 
 	uploader := segmentUploader{metainfo: u.metainfo, piecePutter: u.piecePutter, sched: sched, longTailMargin: u.longTailMargin}

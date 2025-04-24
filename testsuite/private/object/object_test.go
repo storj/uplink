@@ -29,6 +29,7 @@ import (
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/object"
 	"storj.io/uplink/private/testuplink"
 )
@@ -2102,6 +2103,127 @@ func TestDeleteObjectsUnimplemented(t *testing.T) {
 		}}, nil)
 
 		require.ErrorIs(t, err, object.ErrDeleteObjectsUnimplemented)
+	})
+}
+
+func TestConditionalWrites(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 1,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.UseBucketLevelObjectVersioning = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		unversionedBucket, versionedBucket := testrand.BucketName(), testrand.BucketName()
+		testData := testrand.Bytes(5 * memory.KiB)
+		testDataInline := testrand.Bytes(memory.B)
+
+		require.NoError(t, upl.CreateBucket(ctx, sat, unversionedBucket))
+
+		require.NoError(t, upl.CreateBucket(ctx, sat, versionedBucket))
+		require.NoError(t, bucket.SetBucketVersioning(ctx, project, versionedBucket, true))
+
+		runTest := func(name string, fn func(t *testing.T, bucket, key string, data []byte)) {
+			for _, tc := range []struct {
+				name, bucket string
+				data         []byte
+			}{
+				{name: "unversioned bucket", bucket: unversionedBucket, data: testData},
+				{name: "inline unversioned bucket", bucket: unversionedBucket, data: testDataInline},
+				{name: "versioned bucket", bucket: versionedBucket, data: testData},
+				{name: "inline versioned bucket", bucket: versionedBucket, data: testDataInline},
+			} {
+				t.Run(fmt.Sprintf("%s %s", name, tc.name), func(t *testing.T) {
+					fn(t, tc.bucket, testrand.Path(), tc.data)
+				})
+			}
+		}
+
+		runTest("Unimplemented", func(t *testing.T, bucket, key string, data []byte) {
+			opts := metaclient.UploadOptions{IfNoneMatch: []string{"something"}}
+
+			_, err := upl.UploadWithOptions(ctx, sat, bucket, key, data, &opts)
+			require.ErrorIs(t, err, object.ErrUnimplemented)
+		})
+
+		runTest("Upload", func(t *testing.T, bucket, key string, data []byte) {
+			opts := metaclient.UploadOptions{IfNoneMatch: []string{"*"}}
+
+			_, err := upl.UploadWithOptions(ctx, sat, bucket, key, data, &opts)
+			require.NoError(t, err)
+
+			_, err = upl.UploadWithOptions(ctx, sat, bucket, key, data, &opts)
+			require.ErrorIs(t, err, object.ErrFailedPrecondition)
+
+			require.NoError(t, upl.DeleteObject(ctx, sat, bucket, key))
+
+			_, err = upl.UploadWithOptions(ctx, sat, bucket, key, data, &opts)
+			require.NoError(t, err)
+		})
+
+		runTest("CopyObject", func(t *testing.T, bucket, key string, data []byte) {
+			srcKey, dstKey := key, testrand.Path()
+			copyOpts := object.CopyObjectOptions{IfNoneMatch: []string{"*"}}
+
+			obj, err := upl.UploadWithOptions(ctx, sat, bucket, srcKey, testData, &metaclient.UploadOptions{
+				IfNoneMatch: []string{"*"},
+			})
+			require.NoError(t, err)
+
+			_, err = object.CopyObject(ctx, project, bucket, srcKey, obj.Version, bucket, dstKey, copyOpts)
+			require.NoError(t, err)
+
+			_, err = object.CopyObject(ctx, project, bucket, srcKey, obj.Version, bucket, dstKey, copyOpts)
+			require.ErrorIs(t, err, object.ErrFailedPrecondition)
+
+			require.NoError(t, upl.DeleteObject(ctx, sat, bucket, dstKey))
+
+			_, err = object.CopyObject(ctx, project, bucket, srcKey, obj.Version, bucket, dstKey, copyOpts)
+			require.NoError(t, err)
+		})
+
+		runTest("CommitUpload", func(t *testing.T, bucket, key string, data []byte) {
+			opts := metaclient.CommitUploadOptions{IfNoneMatch: []string{"*"}}
+
+			newUpload := func() uplink.UploadInfo {
+				upload, err := multipart.BeginUpload(ctx, project, bucket, key, nil)
+				require.NoError(t, err)
+
+				part, err := project.UploadPart(ctx, bucket, key, upload.UploadID, 1)
+				require.NoError(t, err)
+
+				_, err = part.Write(data)
+				require.NoError(t, err)
+				require.NoError(t, part.Commit())
+
+				return upload
+			}
+
+			upload := newUpload()
+
+			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
+			require.NoError(t, err)
+
+			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
+			require.ErrorIs(t, err, object.ErrFailedPrecondition)
+
+			require.NoError(t, upl.DeleteObject(ctx, sat, bucket, key))
+
+			upload = newUpload()
+
+			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
+			require.NoError(t, err)
+		})
 	})
 }
 

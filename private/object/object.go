@@ -6,6 +6,7 @@ package object
 import (
 	"context"
 	"errors"
+	"reflect"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -72,6 +73,12 @@ var (
 	// ErrDeleteObjectsUnimplemented is returned when the satellite does not have a DeleteObjects implementation.
 	ErrDeleteObjectsUnimplemented = errors.New("DeleteObjects is not implemented")
 
+	// ErrFailedPrecondition is returned when requests cannot be completed due to failed preconditions.
+	ErrFailedPrecondition = errs.New("failed precondition")
+
+	// ErrUnimplemented is returned for requests with unimplemented options.
+	ErrUnimplemented = errs.New("unimplemented")
+
 	rpcCodeToError = map[rpcstatus.StatusCode]error{
 		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
 		rpcstatus.ObjectLockBucketRetentionConfigurationMissing:    ErrNoObjectLockConfiguration,
@@ -88,6 +95,8 @@ var (
 		rpcstatus.BucketNameInvalid:                                uplink.ErrBucketNameInvalid,
 		rpcstatus.DeleteObjectsNoItems:                             ErrDeleteObjectsNoItems,
 		rpcstatus.DeleteObjectsTooManyItems:                        ErrDeleteObjectsTooManyItems,
+		rpcstatus.FailedPrecondition:                               ErrFailedPrecondition,
+		rpcstatus.Unimplemented:                                    ErrUnimplemented,
 	}
 )
 
@@ -149,6 +158,8 @@ type ListObjectVersionsOptions struct {
 type CopyObjectOptions struct {
 	Retention metaclient.Retention
 	LegalHold bool
+
+	IfNoneMatch []string
 }
 
 // Info returns the last information about the uploaded object.
@@ -398,12 +409,12 @@ func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key st
 // CommitUpload commits a multipart upload to bucket and key started with BeginUpload.
 //
 // uploadID is an upload identifier returned by BeginUpload.
-func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, opts *uplink.CommitUploadOptions) (info *VersionedObject, err error) {
+func CommitUpload(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, opts *metaclient.CommitUploadOptions) (info *VersionedObject, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	obj, err := project.CommitUpload(ctx, bucket, key, uploadID, opts)
+	obj, err := commitUpload(ctx, project, bucket, key, uploadID, opts)
 	if err != nil {
-		return nil, err
+		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
 
 	return convertUplinkObject(obj), nil
@@ -420,9 +431,10 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	metaOpts := metaclient.CopyObjectOptions{}
-	if options != (CopyObjectOptions{}) {
+	if !reflect.DeepEqual(options, (CopyObjectOptions{})) {
 		metaOpts.Retention = options.Retention
 		metaOpts.LegalHold = options.LegalHold
+		metaOpts.IfNoneMatch = options.IfNoneMatch
 	}
 	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey, metaOpts)
 	if err != nil {
@@ -608,6 +620,9 @@ func download_getMetaclientObject(dl *uplink.Download) *metaclient.Object
 
 //go:linkname uploadObjectWithRetention storj.io/uplink.uploadObjectWithRetention
 func uploadObjectWithRetention(ctx context.Context, project *uplink.Project, bucket, key string, options *metaclient.UploadOptions) (_ *uplink.Upload, err error)
+
+//go:linkname commitUpload storj.io/uplink.commitUpload
+func commitUpload(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, opts *metaclient.CommitUploadOptions) (_ *uplink.Object, err error)
 
 //go:linkname upload_getMetaclientObject storj.io/uplink.upload_getMetaclientObject
 func upload_getMetaclientObject(u *uplink.Upload) *metaclient.Object

@@ -789,7 +789,7 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string, version []byte)
 }
 
 // CommitObject commits an object.
-func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, customMetadata map[string]string, encryptionParameters storj.EncryptionParameters) (info Object, err error) {
+func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, customMetadata map[string]string, encryptionParameters storj.EncryptionParameters, ifNoneMatch []string) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	switch {
@@ -815,6 +815,7 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, cu
 	if err != nil {
 		return Object{}, err
 	}
+	commitObjParams.IfNoneMatch = ifNoneMatch
 
 	response, err := db.metainfo.CommitObjectWithResponse(ctx, commitObjParams)
 	if err != nil {

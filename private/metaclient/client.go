@@ -633,6 +633,8 @@ type BeginObjectParams struct {
 
 	Retention Retention
 	LegalHold bool
+
+	IfNoneMatch []string
 }
 
 func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginRequest {
@@ -714,6 +716,8 @@ type CommitObjectParams struct {
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
+
+	IfNoneMatch []string
 }
 
 func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectCommitRequest {
@@ -723,6 +727,7 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		IfNoneMatch:                   params.IfNoneMatch,
 	}
 }
 
