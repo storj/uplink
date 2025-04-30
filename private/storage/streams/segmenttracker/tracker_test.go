@@ -31,20 +31,20 @@ func TestTracker(t *testing.T) {
 		return &fakeSegment{index: index, err: errors.New("oh no")}
 	}
 
-	makeInlineSegmentWithEncryptedTag := func(index int32, encryptedTag string) metaclient.BatchItem {
-		return &metaclient.MakeInlineSegmentParams{PlainSize: int64(index), EncryptedTag: []byte(encryptedTag)}
+	makeInlineSegmentWithEncryptedETag := func(index int32, encryptedETag string) metaclient.BatchItem {
+		return &metaclient.MakeInlineSegmentParams{PlainSize: int64(index), EncryptedETag: []byte(encryptedETag)}
 	}
 
 	makeInlineSegment := func(index int32) metaclient.BatchItem {
-		return makeInlineSegmentWithEncryptedTag(index, "")
+		return makeInlineSegmentWithEncryptedETag(index, "")
 	}
 
-	commitSegmentWithEncryptedTag := func(index int32, encryptedTag string) metaclient.BatchItem {
-		return &metaclient.CommitSegmentParams{PlainSize: int64(index), EncryptedTag: []byte(encryptedTag)}
+	commitSegmentWithEncryptedETag := func(index int32, encryptedETag string) metaclient.BatchItem {
+		return &metaclient.CommitSegmentParams{PlainSize: int64(index), EncryptedETag: []byte(encryptedETag)}
 	}
 
 	commitSegment := func(index int32) metaclient.BatchItem {
-		return commitSegmentWithEncryptedTag(index, "")
+		return commitSegmentWithEncryptedETag(index, "")
 	}
 
 	t.Run("SegmentDone holds back highest seen segment", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestTracker(t *testing.T) {
 			scheduler.AssertScheduledAndReset(t)
 			err := tracker.Flush(context.Background())
 			require.NoError(t, err)
-			scheduler.AssertScheduledAndReset(t, makeInlineSegmentWithEncryptedTag(1, "etag-1"))
+			scheduler.AssertScheduledAndReset(t, makeInlineSegmentWithEncryptedETag(1, "etag-1"))
 		})
 		t.Run("CommitSegment", func(t *testing.T) {
 			tracker, scheduler := setup("etag")
@@ -96,7 +96,7 @@ func TestTracker(t *testing.T) {
 			scheduler.AssertScheduledAndReset(t)
 			err := tracker.Flush(context.Background())
 			require.NoError(t, err)
-			scheduler.AssertScheduledAndReset(t, commitSegmentWithEncryptedTag(1, "etag-1"))
+			scheduler.AssertScheduledAndReset(t, commitSegmentWithEncryptedETag(1, "etag-1"))
 		})
 	})
 

@@ -160,7 +160,7 @@ func TestBegin(t *testing.T) {
 				Encryption:        fakeSegmentInfo.Encryption,
 				SizeEncryptedData: fakeSegmentInfo.EncryptedSize,
 				PlainSize:         fakeSegmentInfo.PlainSize,
-				EncryptedTag:      nil,
+				EncryptedETag:     nil,
 				// The uploads with the first three limits/pieces always
 				// succeed due to the way the tests are constructed above. If
 				// that changes then this code needs to be updated to be more

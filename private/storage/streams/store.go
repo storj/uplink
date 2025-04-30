@@ -567,7 +567,7 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 	}
 
 	// store ETag only for last segment in a part
-	encryptedTag, err := encryptETag(eTag, s.encryptionParameters, &lastSegmentContentKey)
+	encryptedETag, err := encryptETag(eTag, s.encryptionParameters, &lastSegmentContentKey)
 	if err != nil {
 		return Part{}, errs.Wrap(err)
 	}
@@ -575,9 +575,9 @@ func (s *Store) PutPart(ctx context.Context, bucket, unencryptedKey string, stre
 		// take last segment in a part and set ETag
 		switch singleRequest := requestsToBatch[len(requestsToBatch)-1].(type) {
 		case *metaclient.MakeInlineSegmentParams:
-			singleRequest.EncryptedTag = encryptedTag
+			singleRequest.EncryptedETag = encryptedETag
 		case *metaclient.CommitSegmentParams:
-			singleRequest.EncryptedTag = encryptedTag
+			singleRequest.EncryptedETag = encryptedETag
 		default:
 			return Part{}, errs.New("unsupported request type")
 		}
