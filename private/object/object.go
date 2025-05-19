@@ -154,6 +154,16 @@ type ListObjectVersionsOptions struct {
 	Limit         int
 }
 
+// ListObjectsOptions defines listing options for objects.
+type ListObjectsOptions struct {
+	Prefix    string
+	Cursor    string
+	Recursive bool
+	System    bool
+	Custom    bool
+	Limit     int
+}
+
 // CopyObjectOptions options for CopyObject method.
 type CopyObjectOptions struct {
 	Retention metaclient.Retention
@@ -359,6 +369,42 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 		opts.Prefix = options.Prefix
 		opts.Cursor = options.Cursor
 		opts.VersionCursor = options.VersionCursor
+		opts.Recursive = options.Recursive
+		opts.IncludeCustomMetadata = options.Custom
+		opts.IncludeSystemMetadata = options.System
+		opts.Limit = options.Limit
+	}
+
+	obj, err := db.ListObjects(ctx, bucket, opts)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+
+	var versions []*VersionedObject
+	for _, o := range obj.Items {
+		versions = append(versions, convertObject(&o))
+	}
+
+	return versions, obj.More, nil
+}
+
+// ListObjects returns a list of objects.
+func ListObjects(ctx context.Context, project *uplink.Project, bucket string, options *ListObjectsOptions) (_ []*VersionedObject, more bool, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, false, convertKnownErrors(err, bucket, "")
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	opts := metaclient.ListOptions{
+		Direction: metaclient.After,
+	}
+
+	if options != nil {
+		opts.Prefix = options.Prefix
+		opts.Cursor = options.Cursor
 		opts.Recursive = options.Recursive
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System

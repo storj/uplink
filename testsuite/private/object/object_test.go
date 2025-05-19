@@ -6,7 +6,9 @@ package object_test
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -2224,6 +2226,97 @@ func TestConditionalWrites(t *testing.T) {
 			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
 			require.NoError(t, err)
 		})
+	})
+}
+
+func TestListObject(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.DefaultPathCipher = storj.EncNull
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+		uploadKeys := []string{
+			"foo/bar/A",
+			"foo/bar/B",
+			"foo/bar/C",
+			"foo/bar/test/D",
+			"foo/bar/test/E",
+			"foo/bar/test/F",
+		}
+
+		// shuffle the keys to ensure upload order doesn't affect the listing
+		rand.Shuffle(len(uploadKeys), func(i, j int) { uploadKeys[i], uploadKeys[j] = uploadKeys[j], uploadKeys[i] })
+
+		var sortedKeys []string
+		for _, key := range uploadKeys {
+			sortedKeys = append(sortedKeys, key)
+			require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, key, testrand.Bytes(128)))
+		}
+		sort.Strings(sortedKeys)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		type testCase struct {
+			Opts     object.ListObjectsOptions
+			Prefixes []string
+			Objects  []string
+			Limit    int
+		}
+
+		for _, tc := range []testCase{
+			{
+				Opts:     object.ListObjectsOptions{Prefix: ""},
+				Prefixes: []string{"foo/"},
+			},
+			{
+				Opts:     object.ListObjectsOptions{Prefix: "foo/"},
+				Prefixes: []string{"bar/"},
+			},
+			{
+				Opts:     object.ListObjectsOptions{Prefix: "foo/bar/"},
+				Prefixes: []string{"test/"},
+				Objects:  []string{"A", "B", "C"},
+			},
+			{
+				Opts:    object.ListObjectsOptions{Prefix: "foo/bar/test/"},
+				Objects: []string{"D", "E", "F"},
+			},
+			{
+				Opts:    object.ListObjectsOptions{Prefix: "foo/bar/test/", Limit: 2},
+				Objects: []string{"D", "E"},
+			},
+			{
+				Opts:    object.ListObjectsOptions{Prefix: "", Recursive: true, Limit: 4},
+				Objects: sortedKeys[:4],
+			},
+			{
+				Opts:    object.ListObjectsOptions{Cursor: "foo/bar/B", Recursive: true, Limit: 4},
+				Objects: sortedKeys[2:],
+			},
+		} {
+			result, _, err := object.ListObjects(ctx, project, bucketName, &tc.Opts)
+			require.NoError(t, err)
+
+			var objects, prefixes []string
+			for _, item := range result {
+				if item.IsPrefix {
+					prefixes = append(prefixes, item.Key)
+				} else {
+					objects = append(objects, item.Key)
+				}
+			}
+
+			require.ElementsMatch(t, tc.Prefixes, prefixes, "opts: %v", tc.Opts)
+			require.ElementsMatch(t, tc.Objects, objects, "opts: %v", tc.Opts)
+		}
 	})
 }
 
