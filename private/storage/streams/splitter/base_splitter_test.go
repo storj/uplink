@@ -113,7 +113,6 @@ func TestBaseSplitter(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			splitter, err := newBaseSplitter(split, minimum)
 			require.NoError(t, err)

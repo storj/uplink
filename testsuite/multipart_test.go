@@ -479,7 +479,7 @@ func TestDownloadObjectWithManySegments(t *testing.T) {
 
 		// Current max limit for segments listing is 1000, we need
 		// to check if more than that will be handlel correctly
-		for i := 0; i < 1010; i++ {
+		for i := range 1010 {
 			expectedData = append(expectedData, byte(i))
 
 			// TODO maybe put it in parallel
@@ -688,7 +688,7 @@ func TestListUploads_Paging(t *testing.T) {
 
 		numberOfObjects := 0
 		for _, prefix := range prefixes {
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				_, err := project.BeginUpload(ctx, "testbucket", prefix+"object"+strconv.Itoa(i), nil)
 				require.NoError(t, err)
 				numberOfObjects++
@@ -696,7 +696,7 @@ func TestListUploads_Paging(t *testing.T) {
 		}
 
 		// Upload 10 objects with exactly the same key.
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			// We use a key that precedes lexicographically the previous BeginUpload calls that use
 			// keys that start with the non-empty prefix or the "object" word, to not mix the results with
 			// the tests that set the cursor.
@@ -976,7 +976,7 @@ func TestListUploadParts_Ordering(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
 
-		for i := 0; i < partCount; i++ {
+		for i := range partCount {
 			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
 			require.NoError(t, err)
 
@@ -991,7 +991,7 @@ func TestListUploadParts_Ordering(t *testing.T) {
 		// list parts with a cursor starting after all parts
 		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
 
-		for i := 0; i < partCount; i++ {
+		for i := range partCount {
 			require.True(t, iterator.Next())
 			item := iterator.Item()
 			require.EqualValues(t, i, item.PartNumber)
@@ -1022,7 +1022,7 @@ func TestListUploadParts_Cursor(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
 
-		for i := 0; i < partCount; i++ {
+		for i := range partCount {
 			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
 			require.NoError(t, err)
 
@@ -1082,7 +1082,7 @@ func TestListUploadParts_CursorAndPaging(t *testing.T) {
 		require.NotNil(t, info.UploadID)
 		testData := testrand.Bytes(46 * memory.KiB)
 
-		for i := 0; i < partCount; i++ {
+		for i := range partCount {
 			upload, err := project.UploadPart(ctx, "testbucket", "multipart-object", info.UploadID, uint32(i))
 			require.NoError(t, err)
 
@@ -1097,7 +1097,7 @@ func TestListUploadParts_CursorAndPaging(t *testing.T) {
 		require.NoError(t, err)
 
 		iterator := project.ListUploadParts(ctx, "testbucket", "multipart-object", info.UploadID, nil)
-		for i := 0; i < partCount; i++ {
+		for i := range partCount {
 			require.True(t, iterator.Next(), "part %v", i)
 			item := iterator.Item()
 			require.EqualValues(t, i, item.PartNumber)
@@ -1241,7 +1241,7 @@ func TestListUploadsDuplicates(t *testing.T) {
 					// upload objects to the same location to have many pending objects
 					// with different versions
 					expectedKeys := make(map[string]struct{})
-					for i := 0; i < amount; i++ {
+					for range amount {
 						info, err := project.BeginUpload(ctx, bucket, prefix+"pending-object", nil)
 						require.NoError(t, err)
 						expectedKeys[info.Key+";"+info.UploadID] = struct{}{}
@@ -1256,7 +1256,7 @@ func TestListUploadsDuplicates(t *testing.T) {
 				UploadFunc: func(bucket string, prefix string) map[string]struct{} {
 					// upload to the same location many times to have internally different versions
 					expectedKeys := make(map[string]struct{})
-					for i := 0; i < amount; i++ {
+					for i := range amount {
 						version := 1
 						if i%2 == 0 {
 							version = 2

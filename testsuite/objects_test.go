@@ -150,7 +150,6 @@ func TestListObjects_TwoObjects(t *testing.T) {
 		}
 
 		for object := range expectedObjects {
-			object := object
 			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
 			defer func() {
 				_, err := project.DeleteObject(ctx, "testbucket", object)
@@ -269,7 +268,6 @@ func TestListObjects_Cursor(t *testing.T) {
 		}
 
 		for object := range expectedObjects {
-			object := object
 			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
 			defer func() {
 				_, err := project.DeleteObject(ctx, "testbucket", object)
@@ -322,7 +320,7 @@ func TestListObjects_Paging(t *testing.T) {
 
 		now := time.Now()
 
-		for i := 0; i < totalObjects; i++ {
+		for i := range totalObjects {
 			key := fmt.Sprintf("%d/%d.dat", i, i)
 			expectedObjects[key] = true
 			uploadObjectWithMetadata(t, ctx, project, "testbucket", key, expectedContentSize, expectedMetadata)

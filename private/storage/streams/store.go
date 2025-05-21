@@ -8,13 +8,13 @@ import (
 	"crypto/rand"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
-	"golang.org/x/exp/slices"
 
 	"storj.io/common/context2"
 	"storj.io/common/encryption"
@@ -662,11 +662,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 	var offset int64
 	switch {
 	case len(downloaded) > 0 && len(listed) > 0:
-		if listed[0].PlainOffset < downloaded[0].Info.PlainOffset {
-			offset = listed[0].PlainOffset
-		} else {
-			offset = downloaded[0].Info.PlainOffset
-		}
+		offset = min(listed[0].PlainOffset, downloaded[0].Info.PlainOffset)
 	case len(downloaded) > 0:
 		offset = downloaded[0].Info.PlainOffset
 	case len(listed) > 0:

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -55,9 +56,7 @@ type CustomMetadata map[string]string
 // Clone makes a deep clone.
 func (meta CustomMetadata) Clone() CustomMetadata {
 	r := CustomMetadata{}
-	for k, v := range meta {
-		r[k] = v
-	}
+	maps.Copy(r, meta)
 	return r
 }
 

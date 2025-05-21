@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
-	"golang.org/x/exp/slices"
 
 	"storj.io/common/rpc/rpctracing"
 	"storj.io/common/sync2"

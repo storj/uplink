@@ -49,7 +49,7 @@ func TestUploadStreamClosing(t *testing.T) {
 			},
 		}
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			tt := tts[i%len(tts)]
 			tt.pieceID = storj.PieceID{byte(i / 256), byte(i % 256), 1}
 			if i%2 == 1 {

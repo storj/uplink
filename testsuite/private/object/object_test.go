@@ -2055,7 +2055,7 @@ func TestDeleteObjects(t *testing.T) {
 
 			t.Run("Too many items", func(t *testing.T) {
 				items := make([]object.DeleteObjectsItem, 0, metabase.DeleteObjectsMaxItems+1)
-				for i := 0; i < metabase.DeleteObjectsMaxItems+1; i++ {
+				for range metabase.DeleteObjectsMaxItems + 1 {
 					items = append(items, item)
 				}
 				test(t, bucketName, items, object.ErrDeleteObjectsTooManyItems)

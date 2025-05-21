@@ -542,7 +542,7 @@ func mustNewStreamID() storj.StreamID {
 
 func segmentsPlainSize(numSegments int) int64 {
 	var plainSize int64
-	for i := 0; i < numSegments; i++ {
+	for i := range numSegments {
 		plainSize += segmentPlainSize(i)
 	}
 	return plainSize
@@ -553,9 +553,9 @@ func segmentPlainSize(index int) int64 {
 }
 
 func encryptETag(index int) []byte {
-	return []byte(fmt.Sprintf("%s-%d", string(eTag), index))
+	return fmt.Appendf(nil, "%s-%d", string(eTag), index)
 }
 
 func encryptMetadata(lastSegmentSize int64) []byte {
-	return []byte(fmt.Sprintf("ENCRYPTED-METADATA-%d", lastSegmentSize))
+	return fmt.Appendf(nil, "ENCRYPTED-METADATA-%d", lastSegmentSize)
 }

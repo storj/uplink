@@ -127,7 +127,6 @@ func TestSplitter(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			splitter, err := New(opts)
 			require.NoError(t, err)

@@ -1,6 +1,6 @@
 module storj.io/uplink
 
-go 1.20
+go 1.23.0
 
 require (
 	github.com/gogo/protobuf v1.3.2
@@ -9,7 +9,6 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/sudo v1.0.2
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/sync v0.7.0
 	storj.io/common v0.0.0-20250424225939-266f5ac37159
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661

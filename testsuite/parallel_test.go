@@ -42,8 +42,7 @@ func TestParallelUploadDownload(t *testing.T) {
 		}
 
 		group := errs2.Group{}
-		for p := 0; p < concurrency; p++ {
-			p := p
+		for p := range concurrency {
 			group.Go(func() error {
 				upload, err := project.UploadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
@@ -69,8 +68,7 @@ func TestParallelUploadDownload(t *testing.T) {
 
 		group = errs2.Group{}
 		downloadedData := make([][]byte, concurrency)
-		for p := 0; p < concurrency; p++ {
-			p := p
+		for p := range concurrency {
 			group.Go(func() error {
 				download, err := project.DownloadObject(ctx, "test", strconv.Itoa(p), nil)
 				if err != nil {
@@ -113,7 +111,7 @@ func TestUplinksParallel(t *testing.T) {
 		for i := range planet.Uplinks {
 			uplink := planet.Uplinks[i]
 
-			for p := 0; p < parallelCount; p++ {
+			for p := range parallelCount {
 				suffix := fmt.Sprintf("-%d-%d", i, p)
 				group.Go(func() error {
 					data := testrand.Bytes(memory.Size(100+testrand.Intn(500)) * memory.KiB)

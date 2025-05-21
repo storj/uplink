@@ -15,7 +15,7 @@ import (
 
 func TestUnique(t *testing.T) {
 	limits := make([]*pb.AddressedOrderLimit, 4)
-	for i := 0; i < len(limits); i++ {
+	for i := range limits {
 		limits[i] = &pb.AddressedOrderLimit{
 			Limit: &pb.OrderLimit{
 				StorageNodeId: testrand.NodeID(),

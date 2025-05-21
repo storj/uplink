@@ -89,7 +89,6 @@ func TestCopyObject(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.Bucket+"/"+tc.Key+" to "+tc.NewBucket+"/"+tc.NewKey+" "+tc.ObjectSize.Base2String(), func(t *testing.T) {
 				expectedData := testrand.Bytes(tc.ObjectSize)
 				err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], tc.Bucket, tc.Key, expectedData)
@@ -171,7 +170,6 @@ func TestDeleteCopiedObject(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run("delete "+tc.KeyToDelete+", download"+tc.KeyToDownload, func(t *testing.T) {
 				testData := testrand.Bytes(10 * memory.KiB)
 				err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], "ancestor-bucket", tc.Key, testData)

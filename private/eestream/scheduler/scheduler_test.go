@@ -31,7 +31,7 @@ func TestScheduler_Priority(t *testing.T) {
 	_, _ = h1.Get(ctx)
 
 	var counts [3]int
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		func() {
 			r, ok := h1.Get(ctx)
 			require.True(t, ok)
@@ -115,7 +115,7 @@ func TestScheduler_Limits(t *testing.T) {
 
 	var counts [maxConcurrent]int64
 	var wg sync.WaitGroup
-	for i := 0; i < numHandles; i++ {
+	for i := range numHandles {
 		i := i
 
 		wg.Add(1)
@@ -140,7 +140,7 @@ func TestScheduler_Limits(t *testing.T) {
 				}
 			}()
 
-			for j := 0; j < numResources; j++ {
+			for range numResources {
 				if t.Failed() {
 					break
 				}

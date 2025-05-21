@@ -109,8 +109,6 @@ func TestSharePermissions(t *testing.T) {
 		}
 
 		for i, item := range items {
-			i := i
-			item := item
 
 			name := func() string {
 				result := make([]string, 0, 4)
@@ -327,7 +325,6 @@ func TestSharePrefix_List(t *testing.T) {
 			{sharePrefix: "a/b/c", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
 			{sharePrefix: "a/b/c/", listPrefix: "a/b/c/", deniedListPrefixes: []string{"", "a/"}},
 		} {
-			tt := tt
 			t.Run("sharePrefix: "+tt.sharePrefix+", listPrefix: "+tt.listPrefix, func(t *testing.T) {
 				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
 					Bucket: "testbucket",
@@ -407,7 +404,6 @@ func TestSharePrefix_Download(t *testing.T) {
 			"a/b/c/",
 			"a/b/c/test.dat",
 		} {
-			prefix := prefix
 			t.Run("prefix: "+prefix, func(t *testing.T) {
 				sharedAccess, err := access.Share(uplink.FullPermission(), uplink.SharePrefix{
 					Bucket: "testbucket",
@@ -663,7 +659,7 @@ func TestListObjects_DisableObjectKeyEncryption(t *testing.T) {
 
 		// Upload 20 object with random object keys
 		objectCount := 20
-		for i := 0; i < objectCount; i++ {
+		for range objectCount {
 			upload, err := project.UploadObject(ctx, bucketName, testrand.Path(), nil)
 			require.NoError(t, err)
 

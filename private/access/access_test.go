@@ -5,6 +5,7 @@ package access_test
 
 import (
 	"context"
+	"maps"
 	"math/rand"
 	"testing"
 	"time"
@@ -179,9 +180,7 @@ func newAccessGrant() (access *uplink.Access, secret []byte, err error) {
 
 func cloneWithoutKeys[K comparable, V any](base map[K]V, keysToRemove []K) map[K]V {
 	result := make(map[K]V, len(base))
-	for k, v := range base {
-		result[k] = v
-	}
+	maps.Copy(result, base)
 	for _, k := range keysToRemove {
 		delete(result, k)
 	}

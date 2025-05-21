@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -341,7 +342,7 @@ func (r *CallRecorder) RecordCall(rpc string, message drpc.Message) {
 
 // History returns the list of rpc names which called on this connection.
 func (r *CallRecorder) History() []string {
-	return append([]string{}, r.calls...)
+	return slices.Clone(r.calls)
 }
 
 // Attach wraps a drpc.Conn connection and returns with one where the counters are hooked in.

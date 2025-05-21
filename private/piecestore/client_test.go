@@ -190,7 +190,7 @@ func (l LegacyPieceStoreDescription) NumMethods() int {
 }
 
 // Method implements drpc.Description.
-func (l LegacyPieceStoreDescription) Method(n int) (rpc string, encoding drpc.Encoding, receiver drpc.Receiver, method interface{}, ok bool) {
+func (l LegacyPieceStoreDescription) Method(n int) (rpc string, encoding drpc.Encoding, receiver drpc.Receiver, method any, ok bool) {
 	index := 0
 	for i := 0; i < l.Current.NumMethods(); i++ {
 		rpc, encoding, receiver, method, ok := l.Current.Method(i)

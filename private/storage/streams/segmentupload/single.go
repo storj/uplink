@@ -86,10 +86,7 @@ func Begin(ctx context.Context,
 	if longTailMargin >= 0 {
 		// The number of uploads is enough to satisfy the optimal threshold plus
 		// a small long tail margin, capped by the number of limits.
-		uploaderCount = optimalThreshold + longTailMargin
-		if uploaderCount > len(beginSegment.Limits) {
-			uploaderCount = len(beginSegment.Limits)
-		}
+		uploaderCount = min(optimalThreshold+longTailMargin, len(beginSegment.Limits))
 	}
 
 	mgr := pieceupload.NewManager(

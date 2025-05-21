@@ -108,8 +108,8 @@ func convertKnownErrors(err error, bucket, key string) error {
 	return packageError.Wrap(err)
 }
 
-func errwrapf(format string, err error, args ...interface{}) error {
-	var all []interface{}
+func errwrapf(format string, err error, args ...any) error {
+	var all []any
 	all = append(all, err)
 	all = append(all, args...)
 	return packageError.Wrap(fmt.Errorf(format, all...))
@@ -125,7 +125,7 @@ func (err *joinedErr) Is(target error) bool {
 	return errors.Is(err.main, target) || errors.Is(err.alt, target)
 }
 
-func (err *joinedErr) As(target interface{}) bool {
+func (err *joinedErr) As(target any) bool {
 	if errors.As(err.main, target) {
 		return true
 	}

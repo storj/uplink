@@ -132,11 +132,11 @@ func TestOldUplink(t *testing.T) {
 			}
 
 			// upload few object with multiple versions
-			for i := 0; i < numberOfObjects; i++ {
+			for i := range numberOfObjects {
 				objectKey := "object" + strconv.Itoa(i)
 				expectedObjectKeys[i] = objectKey
 				numberOfVersions := testrand.Intn(3) + 1
-				for j := 0; j < numberOfVersions; j++ {
+				for range numberOfVersions {
 					exptectedLatestContent[i] = testrand.Bytes(10 * memory.KiB)
 					err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, objectKey, exptectedLatestContent[i])
 					require.NoError(t, err)

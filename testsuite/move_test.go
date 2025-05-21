@@ -89,7 +89,6 @@ func TestMoveObject(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.Bucket+"/"+tc.Key+" to "+tc.NewBucket+"/"+tc.NewKey+" "+tc.ObjectSize.Base2String(), func(t *testing.T) {
 				expectedData := testrand.Bytes(tc.ObjectSize)
 				err := planet.Uplinks[0].Upload(newCtx, planet.Satellites[0], tc.Bucket, tc.Key, expectedData)
@@ -311,7 +310,7 @@ func TestMoveObject_Overwrite(t *testing.T) {
 
 		tc := testCase{"testbucket", "an/object/key", "testbucket", "an/object/key2", memory.KiB}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			uploadObject(t, ctx, project, tc.Bucket, tc.Key, tc.ObjectSize)
 			require.NoError(t, project.MoveObject(ctx, tc.Bucket, tc.Key, tc.NewBucket, tc.NewKey, nil))
 		}

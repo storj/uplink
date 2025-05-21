@@ -54,7 +54,6 @@ func TestObject(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.Name, func(t *testing.T) {
 				upload, err := project.UploadObject(ctx, "testbucket", tc.Name, nil)
 				require.NoError(t, err)
@@ -218,7 +217,7 @@ func TestUploadObjectWithOverMaxParts(t *testing.T) {
 
 		t.Run("parts in default order", func(t *testing.T) {
 			expectedData := testrand.Bytes(30 * memory.KiB)
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i))
 				require.NoError(t, err)
 				_, err = upload.Write(expectedData)
@@ -234,7 +233,7 @@ func TestUploadObjectWithOverMaxParts(t *testing.T) {
 
 		t.Run("parts in random order", func(t *testing.T) {
 			expectedData := testrand.Bytes(30 * memory.KiB)
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				upload, err := project.UploadPart(ctx, bucket, objectKey, info.UploadID, uint32(i+3))
 				require.NoError(t, err)
 				_, err = upload.Write(expectedData)

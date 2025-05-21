@@ -66,7 +66,7 @@ func testBufferSimpleConcurrent(t *testing.T, backend Backend, amount int64) {
 
 	go func() {
 		var tmp [1]byte
-		for i := int64(0); i < amount; i++ {
+		for range amount {
 			_, _ = buf.Write(tmp[:])
 		}
 		buf.DoneWriting(nil)
@@ -117,11 +117,11 @@ func testWriteBufferConcurrent(t *testing.T, backend Backend, amount int64) {
 
 	go func() { results <- wrap(io.Copy(io.Discard, iotest.OneByteReader(buf.Reader()))) }()
 	go func() { results <- wrap(io.Copy(io.Discard, iotest.HalfReader(buf.Reader()))) }()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() { results <- wrap(io.Copy(io.Discard, buf.Reader())) }()
 	}
 
-	for i := 0; i < 13; i++ {
+	for range 13 {
 		require.Equal(t, result{amount, nil}, <-results)
 	}
 }

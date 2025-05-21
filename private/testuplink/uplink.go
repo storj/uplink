@@ -177,7 +177,7 @@ var (
 )
 
 // Log writes to upload log file if exists.
-func Log(ctx context.Context, args ...interface{}) {
+func Log(ctx context.Context, args ...any) {
 	w := GetLogWriter(ctx)
 	if w == nil {
 		return

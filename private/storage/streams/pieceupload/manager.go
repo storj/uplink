@@ -6,6 +6,7 @@ package pieceupload
 import (
 	"context"
 	"io"
+	"slices"
 	"sort"
 	"sync"
 
@@ -57,7 +58,7 @@ type Manager struct {
 // NewManager returns a new piece upload manager.
 func NewManager(exchanger LimitsExchanger, pieceReader PieceReader, segmentID storj.SegmentID, limits []*pb.AddressedOrderLimit) *Manager {
 	next := make(chan int, len(limits))
-	for num := 0; num < len(limits); num++ {
+	for num := range limits {
 		next <- num
 	}
 	return &Manager{
@@ -161,7 +162,7 @@ func (mgr *Manager) NextPiece(ctx context.Context) (_ io.Reader, _ *pb.Addressed
 func (mgr *Manager) Results() (storj.SegmentID, []*pb.SegmentPieceUploadResult) {
 	mgr.mu.Lock()
 	segmentID := mgr.segmentID
-	results := append([]*pb.SegmentPieceUploadResult(nil), mgr.results...)
+	results := slices.Clone(mgr.results)
 	mgr.mu.Unlock()
 
 	// The satellite expects the results to be sorted by piece number...

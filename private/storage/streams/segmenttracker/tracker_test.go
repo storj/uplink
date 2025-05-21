@@ -195,5 +195,5 @@ func (s *fakeSegment) EncryptETag(eTag []byte) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return []byte(fmt.Sprintf("%s-%d", string(eTag), s.index)), nil
+	return fmt.Appendf(nil, "%s-%d", string(eTag), s.index), nil
 }

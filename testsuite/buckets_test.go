@@ -6,13 +6,13 @@ package testsuite_test
 import (
 	"context"
 	"fmt"
+	"maps"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"storj.io/common/testcontext"
 	"storj.io/storj/private/testplanet"
@@ -80,7 +80,7 @@ func TestListBuckets_TwoBuckets(t *testing.T) {
 		}
 		bucketsToDelete := maps.Keys(expectedBuckets)
 		defer func() {
-			for _, bucket := range bucketsToDelete {
+			for bucket := range bucketsToDelete {
 				_, err := project.DeleteBucket(ctx, bucket)
 				require.NoError(t, err)
 			}
@@ -122,7 +122,6 @@ func TestListBuckets_Cursor(t *testing.T) {
 		}
 
 		for bucket := range expectedBuckets {
-			bucket := bucket
 			createBucket(t, ctx, project, bucket)
 			defer func() {
 				_, err := project.DeleteBucket(ctx, bucket)
@@ -177,14 +176,14 @@ func TestListBuckets_AutoPaging(t *testing.T) {
 		totalBuckets := 5
 		expectedBuckets := map[string]bool{}
 
-		for i := 0; i < totalBuckets; i++ {
+		for i := range totalBuckets {
 			bucketName := fmt.Sprintf("bucket%d", i)
 			expectedBuckets[bucketName] = true
 			createBucket(t, ctx, project, bucketName)
 		}
 		bucketsToDelete := maps.Keys(expectedBuckets)
 		defer func() {
-			for _, bucketName := range bucketsToDelete {
+			for bucketName := range bucketsToDelete {
 				_, err := project.DeleteBucket(ctx, bucketName)
 				require.NoError(t, err)
 			}

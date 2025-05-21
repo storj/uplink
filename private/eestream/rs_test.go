@@ -524,7 +524,7 @@ func TestDecoderErrorWithStalledReaders(t *testing.T) {
 	}
 	readerMap := make(map[int]io.ReadCloser, len(readers))
 	// just a few readers will operate normally
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		readerMap[i] = io.NopCloser(bytes.NewReader(pieces[i]))
 	}
 	// some of the readers will be slow
@@ -606,7 +606,7 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 			err := erasureScheme.Encode(data[:dataSize], func(num int, data []byte) {
 				shares = append(shares, infectious.Share{
 					Number: num,
-					Data:   append([]byte{}, data...),
+					Data:   bytes.Clone(data),
 				})
 			})
 			if err != nil {
@@ -621,10 +621,7 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 					})
 
 					offset := i % (configuration.total / 4)
-					n := configuration.required + 1 + offset
-					if n > configuration.total {
-						n = configuration.total
-					}
+					n := min(configuration.required+1+offset, configuration.total)
 
 					_, err = erasureScheme.Decode(output[:dataSize], shares[:n])
 					if err != nil {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"maps"
 	"strings"
 	"time"
 
@@ -832,9 +833,7 @@ func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[s
 	}
 
 	clone := make(map[string]string, len(metadata))
-	for k, v := range metadata {
-		clone[k] = v
-	}
+	maps.Copy(clone, metadata)
 
 	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
 		UserDefined: clone,

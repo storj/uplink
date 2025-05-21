@@ -29,8 +29,8 @@ type BatchItem interface {
 
 // BatchResponse single response from batch call.
 type BatchResponse struct {
-	pbRequest  interface{}
-	pbResponse interface{}
+	pbRequest  any
+	pbResponse any
 }
 
 // MakeBatchResponse makes a batch response from the request and response

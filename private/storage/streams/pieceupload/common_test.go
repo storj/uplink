@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/zeebo/errs"
 
@@ -65,7 +66,7 @@ func (f fakeExchanger) ExchangeLimits(ctx context.Context, segmentID storj.Segme
 
 	rev := segmentID[0]
 
-	limits := append([]*pb.AddressedOrderLimit(nil), f.limits[rev]...)
+	limits := slices.Clone(f.limits[rev])
 	if len(limits) == 0 {
 		return nil, nil, errs.New("programmer error: no limits for segment ID revision %d", rev)
 	}
@@ -86,7 +87,7 @@ func (f fakeExchanger) ExchangeLimits(ctx context.Context, segmentID storj.Segme
 
 func makeLimits(n int) []*pb.AddressedOrderLimit {
 	var limits []*pb.AddressedOrderLimit
-	for num := 0; num < n; num++ {
+	for num := range n {
 		limits = append(limits, makeLimit(piecenum{num}, revision{0}))
 	}
 	return limits
