@@ -9,11 +9,11 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.11.0
-	storj.io/common v0.0.0-20250424225939-266f5ac37159
+	golang.org/x/sync v0.14.0
+	storj.io/common v0.0.0-20250521125603-ca59e6919866
 	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250430201035-4b188ad7085a
+	storj.io/storj v1.91.0-alpha.0.20250521125347-24e7a612beeb
 	storj.io/uplink v1.13.2-0.20250425174511-3655b8bf7053
 )
 
@@ -91,6 +91,7 @@ require (
 	github.com/jackc/pgtype v1.14.1 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jtolds/monkit-hw/v2 v2.0.0-20250117140252-1a544613ac79 // indirect
 	github.com/jtolds/tracetagger/v2 v2.0.0-rc5 // indirect
 	github.com/jtolio/crawlspace v0.0.0-20231116162947-3ec5cc6b36c5 // indirect
@@ -104,6 +105,8 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/oschwald/maxminddb-golang v1.12.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
@@ -112,8 +115,10 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pquerna/otp v1.3.0 // indirect
-	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
-	github.com/quic-go/quic-go v0.40.1 // indirect
+	github.com/prometheus/client_golang v1.20.5 // indirect
+	github.com/prometheus/client_model v0.6.1 // indirect
+	github.com/prometheus/common v0.55.0 // indirect
+	github.com/quic-go/quic-go v0.52.0 // indirect
 	github.com/redis/go-redis/v9 v9.5.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
@@ -158,15 +163,15 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
-	go.uber.org/mock v0.3.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
