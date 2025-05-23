@@ -166,22 +166,27 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, storj.DefaultPlacement)
 		require.NoError(t, err)
 
+		// We can't recreate a bucket if the deleted one had a custom placement set,
+		// i.e., it was attributed to a specific placement.
+		// This is a new caveat related to billing for the self-serve placement feature.
+		bucketName1 := "bucket1"
+
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
-			Name:      bucketName,
+			Name:      bucketName1,
 			Placement: "Poland",
 		})
 		require.NoError(t, err)
 
-		placement, err = planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName), projectID)
+		placement, err = planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName1), projectID)
 		require.NoError(t, err)
 		require.Equal(t, storj.PlacementConstraint(40), placement)
 
 		// delete the bucket
-		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName), projectID)
+		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName1), projectID)
 		require.NoError(t, err)
 
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
-			Name:      bucketName,
+			Name:      bucketName1,
 			Placement: "EU", // invalid placement
 		})
 		require.True(t, metaclient.ErrInvalidPlacement.Has(err))
@@ -189,18 +194,20 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		// disable self-serve placement
 		planet.Satellites[0].API.Metainfo.Endpoint.TestSelfServePlacementEnabled(false)
 
+		bucketName2 := "bucket2"
+
 		// passing invalid placement should not fail if self-serve placement is disabled.
 		// This is for backward compatibility with integration tests that'll pass placements
 		// regardless of self-serve placement being enabled or not.
 		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
-			Name:      bucketName,
+			Name:      bucketName2,
 			Placement: "EU", // invalid placement
 		})
 		require.NoError(t, err)
 
 		// placement should be set to default event though a placement was passed
 		// because self-serve placement is disabled.
-		placement, err = planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName), projectID)
+		placement, err = planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName2), projectID)
 		require.NoError(t, err)
 		require.Equal(t, storj.DefaultPlacement, placement)
 	})

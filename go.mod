@@ -10,11 +10,11 @@ require (
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.14.0
-	storj.io/common v0.0.0-20250521125603-ca59e6919866
-	storj.io/drpc v0.0.35-0.20240709171858-0075ac871661
-	storj.io/eventkit v0.0.0-20240415002644-1d9596fee086
+	storj.io/common v0.0.0-20250522165802-807832ddbca1
+	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
+	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2
-	storj.io/picobuf v0.0.3
+	storj.io/picobuf v0.0.4
 )
 
 require (
