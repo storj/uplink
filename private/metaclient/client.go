@@ -2262,7 +2262,7 @@ func (client *Client) compressedBatch(ctx context.Context, requests ...BatchItem
 	return resp, nil
 }
 
-func (client *Client) preprocess(ctx context.Context, reqs []*pb.BatchRequestItem) error {
+func (client *Client) preprocess(_ context.Context, reqs []*pb.BatchRequestItem) error {
 	if client.opts.SatelliteSigner == nil || os.Getenv("STORJ_LITE_DISABLED") != "" {
 		return nil
 	}
@@ -2273,6 +2273,8 @@ func (client *Client) preprocess(ctx context.Context, reqs []*pb.BatchRequestIte
 
 		case *pb.BatchRequestItem_SegmentBegin:
 			r.SegmentBegin.LiteRequest = true
+		case *pb.BatchRequestItem_ObjectDownload:
+			r.ObjectDownload.LiteRequest = true
 		}
 	}
 
@@ -2314,6 +2316,38 @@ func (client *Client) postprocess(ctx context.Context, resps []*pb.BatchResponse
 				r.SegmentBegin.SegmentId, err = cursed.PackSegmentID(ctx, client.opts.SatelliteSigner, &segmentID)
 				if err != nil {
 					return err
+				}
+			}
+		case *pb.BatchResponseItem_ObjectDownload:
+			// ObjectDownload only sends the first segment of the requested range segment unless the
+			// requested range is outside of objects bounds.
+			if len(r.ObjectDownload.SegmentDownload) > 0 {
+				segmentDownload := r.ObjectDownload.SegmentDownload[0]
+				var segmentID cursed.SegmentID
+				err := pb.Unmarshal(segmentDownload.SegmentId, &segmentID)
+				if err != nil {
+					return err
+				}
+
+				// segmentID is only set for the purpose of having the root piece ID. The normal object
+				// download requests (no lite ones) don't set the segmentID
+				segmentDownload.SegmentId = nil
+
+				// These addressed limits don't contain the piece ID, and they aren't signed. We have to set the
+				// piece ID and sign the orders.
+				for pieceNum, limit := range segmentDownload.AddressedLimits {
+					// Download always return a slice of orders limits with length equal to the number of pieces
+					// but to download we don't need all the pieces, so the order limits of the unneeded pieces
+					// are nil.
+					if limit.Limit == nil {
+						continue
+					}
+
+					limit.Limit.PieceId = segmentID.RootPieceId.Derive(limit.Limit.StorageNodeId, int32(pieceNum))
+					limit.Limit, err = signing.SignOrderLimit(ctx, client.opts.SatelliteSigner, limit.Limit)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
