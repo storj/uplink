@@ -357,9 +357,11 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	}
 
 	commitObject := metaclient.CommitObjectParams{
-		StreamID:          streamID,
-		EncryptedMetadata: objectMetadata,
-		IfNoneMatch:       beginObjectReq.IfNoneMatch,
+		StreamID: streamID,
+		EncryptedUserData: metaclient.EncryptedUserData{
+			EncryptedMetadata: objectMetadata,
+		},
+		IfNoneMatch: beginObjectReq.IfNoneMatch,
 	}
 	if s.encryptionParameters.CipherSuite != storj.EncNull {
 		commitObject.EncryptedMetadataEncryptedKey = encryptedKey

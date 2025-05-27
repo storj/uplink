@@ -79,9 +79,11 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 		ExpiresAt:            options.Expires,
 		EncryptionParameters: encryptionParameters(project),
 
-		EncryptedMetadata:             metadata.EncryptedContent,
-		EncryptedMetadataEncryptedKey: metadata.EncryptedKey,
-		EncryptedMetadataNonce:        metadata.EncryptedKeyNonce,
+		EncryptedUserData: metaclient.EncryptedUserData{
+			EncryptedMetadata:             metadata.EncryptedContent,
+			EncryptedMetadataEncryptedKey: metadata.EncryptedKey,
+			EncryptedMetadataNonce:        metadata.EncryptedKeyNonce,
+		},
 
 		Retention: options.Retention,
 		LegalHold: options.LegalHold,

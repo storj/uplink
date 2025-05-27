@@ -627,9 +627,7 @@ type BeginObjectParams struct {
 	EncryptionParameters storj.EncryptionParameters
 	ExpiresAt            time.Time
 
-	EncryptedMetadata             []byte
-	EncryptedMetadataEncryptedKey []byte
-	EncryptedMetadataNonce        storj.Nonce
+	EncryptedUserData
 
 	Retention Retention
 	LegalHold bool
@@ -713,9 +711,7 @@ func (client *Client) BeginObject(ctx context.Context, params BeginObjectParams)
 type CommitObjectParams struct {
 	StreamID storj.StreamID
 
-	EncryptedMetadataNonce        storj.Nonce
-	EncryptedMetadata             []byte
-	EncryptedMetadataEncryptedKey []byte
+	EncryptedUserData
 
 	IfNoneMatch []string
 }
@@ -827,12 +823,14 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 
 		StreamID: object.StreamId,
 
-		Created:                       object.CreatedAt,
-		PlainSize:                     object.PlainSize,
-		Expires:                       object.ExpiresAt,
-		EncryptedMetadata:             object.EncryptedMetadata,
-		EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
-		EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+		Created:   object.CreatedAt,
+		PlainSize: object.PlainSize,
+		Expires:   object.ExpiresAt,
+		EncryptedUserData: EncryptedUserData{
+			EncryptedMetadata:             object.EncryptedMetadata,
+			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+		},
 	}
 
 	if object.Retention != nil {
@@ -948,9 +946,7 @@ type UpdateObjectMetadataParams struct {
 	EncryptedObjectKey []byte
 	StreamID           storj.StreamID
 
-	EncryptedMetadataNonce        storj.Nonce
-	EncryptedMetadata             []byte
-	EncryptedMetadataEncryptedKey []byte
+	EncryptedUserData
 }
 
 func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.ObjectUpdateMetadataRequest {
@@ -1388,16 +1384,18 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 		}
 
 		objects[i] = RawObjectListItem{
-			EncryptedObjectKey:            object.EncryptedObjectKey,
-			Version:                       object.ObjectVersion,
-			Status:                        int32(object.Status),
-			IsLatest:                      object.IsLatest,
-			CreatedAt:                     object.CreatedAt,
-			ExpiresAt:                     object.ExpiresAt,
-			PlainSize:                     object.PlainSize,
-			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
-			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
-			EncryptedMetadata:             object.EncryptedMetadata,
+			EncryptedObjectKey: object.EncryptedObjectKey,
+			Version:            object.ObjectVersion,
+			Status:             int32(object.Status),
+			IsLatest:           object.IsLatest,
+			CreatedAt:          object.CreatedAt,
+			ExpiresAt:          object.ExpiresAt,
+			PlainSize:          object.PlainSize,
+			EncryptedUserData: EncryptedUserData{
+				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+				EncryptedMetadata:             object.EncryptedMetadata,
+			},
 
 			IsPrefix: isPrefix,
 		}
@@ -1475,15 +1473,17 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 	for i, object := range response.Items {
 
 		objects[i] = RawObjectListItem{
-			EncryptedObjectKey:     object.EncryptedObjectKey,
-			Version:                object.ObjectVersion,
-			Status:                 int32(object.Status),
-			IsLatest:               false,
-			CreatedAt:              object.CreatedAt,
-			ExpiresAt:              object.ExpiresAt,
-			PlainSize:              object.PlainSize,
-			EncryptedMetadataNonce: object.EncryptedMetadataNonce,
-			EncryptedMetadata:      object.EncryptedMetadata,
+			EncryptedObjectKey: object.EncryptedObjectKey,
+			Version:            object.ObjectVersion,
+			Status:             int32(object.Status),
+			IsLatest:           false,
+			CreatedAt:          object.CreatedAt,
+			ExpiresAt:          object.ExpiresAt,
+			PlainSize:          object.PlainSize,
+			EncryptedUserData: EncryptedUserData{
+				EncryptedMetadataNonce: object.EncryptedMetadataNonce,
+				EncryptedMetadata:      object.EncryptedMetadata,
+			},
 
 			IsPrefix: false,
 		}

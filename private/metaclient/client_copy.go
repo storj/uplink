@@ -86,15 +86,14 @@ func (client *Client) BeginCopyObject(ctx context.Context, params BeginCopyObjec
 
 // FinishCopyObjectParams parameters for FinishCopyObject method.
 type FinishCopyObjectParams struct {
-	StreamID                     storj.StreamID
-	NewBucket                    []byte
-	NewEncryptedObjectKey        []byte
-	NewEncryptedMetadataKeyNonce storj.Nonce
-	NewEncryptedMetadataKey      []byte
-	NewSegmentKeys               []EncryptedKeyAndNonce
-	Retention                    Retention
-	LegalHold                    bool
-	IfNoneMatch                  []string
+	StreamID              storj.StreamID
+	NewBucket             []byte
+	NewEncryptedObjectKey []byte
+	NewEncryptedUserData  EncryptedUserData
+	NewSegmentKeys        []EncryptedKeyAndNonce
+	Retention             Retention
+	LegalHold             bool
+	IfNoneMatch           []string
 }
 
 func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectFinishCopyRequest {
@@ -114,8 +113,9 @@ func (params *FinishCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.Ob
 		StreamId:                     params.StreamID,
 		NewBucket:                    params.NewBucket,
 		NewEncryptedObjectKey:        params.NewEncryptedObjectKey,
-		NewEncryptedMetadataKeyNonce: params.NewEncryptedMetadataKeyNonce,
-		NewEncryptedMetadataKey:      params.NewEncryptedMetadataKey,
+		NewEncryptedMetadata:         params.NewEncryptedUserData.EncryptedMetadata,
+		NewEncryptedMetadataKeyNonce: params.NewEncryptedUserData.EncryptedMetadataNonce,
+		NewEncryptedMetadataKey:      params.NewEncryptedUserData.EncryptedMetadataEncryptedKey,
 		NewSegmentKeys:               keys,
 		LegalHold:                    params.LegalHold,
 		IfNoneMatch:                  params.IfNoneMatch,

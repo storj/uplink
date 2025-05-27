@@ -82,12 +82,14 @@ func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, so
 	}
 
 	params := FinishCopyObjectParams{
-		StreamID:                     response.StreamID,
-		NewBucket:                    []byte(targetBucket),
-		NewEncryptedObjectKey:        []byte(targetEncKey.Raw()),
-		NewEncryptedMetadataKeyNonce: newMetadataKeyNonce,
-		NewEncryptedMetadataKey:      newMetadataEncryptedKey,
-		NewSegmentKeys:               newKeys,
+		StreamID:              response.StreamID,
+		NewBucket:             []byte(targetBucket),
+		NewEncryptedObjectKey: []byte(targetEncKey.Raw()),
+		NewEncryptedUserData: EncryptedUserData{
+			EncryptedMetadataNonce:        newMetadataKeyNonce,
+			EncryptedMetadataEncryptedKey: newMetadataEncryptedKey,
+		},
+		NewSegmentKeys: newKeys,
 	}
 	if !reflect.DeepEqual(opts, (CopyObjectOptions{})) {
 		params.Retention = opts.Retention

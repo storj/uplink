@@ -25,15 +25,20 @@ type RawObjectItem struct {
 
 	PlainSize int64
 
-	EncryptedMetadataNonce        storj.Nonce
-	EncryptedMetadataEncryptedKey []byte
-	EncryptedMetadata             []byte
+	EncryptedUserData
 
 	EncryptionParameters storj.EncryptionParameters
 	RedundancyScheme     storj.RedundancyScheme
 
 	LegalHold *bool
 	Retention *Retention
+}
+
+// EncryptedUserData contains all fields about encrypted user data.
+type EncryptedUserData struct {
+	EncryptedMetadata             []byte
+	EncryptedMetadataEncryptedKey []byte
+	EncryptedMetadataNonce        storj.Nonce
 }
 
 // Retention represents an object's Object Lock retention information.
@@ -71,9 +76,7 @@ type RawObjectListItem struct {
 
 	PlainSize int64
 
-	EncryptedMetadataNonce        storj.Nonce
-	EncryptedMetadataEncryptedKey []byte
-	EncryptedMetadata             []byte
+	EncryptedUserData
 
 	IsPrefix bool
 }

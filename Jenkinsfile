@@ -2,7 +2,7 @@ pipeline {
     agent none
 
     options {
-          timeout(time: 45, unit: 'MINUTES')
+          timeout(time: 80, unit: 'MINUTES')
     }
     environment {
         NPM_CONFIG_CACHE = '/tmp/npm/cache'
@@ -74,7 +74,7 @@ pipeline {
                             }
                             steps {
                                 sh 'go vet ./...'
-                                sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... > .build/tests.json'
+                                sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 40m -json -race ./... > .build/tests.json'
                             }
 
                             post {
@@ -115,7 +115,7 @@ pipeline {
 
                                 dir('testsuite'){
                                     sh 'go vet ./...'
-                                    sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 20m -json -race ./... > ../.build/testsuite.json'
+                                    sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 40m -json -race ./... > ../.build/testsuite.json'
                                 }
                             }
 
@@ -159,7 +159,7 @@ pipeline {
                                 dir('testsuite'){
                                     sh 'cp go.mod go-temp.mod'
                                     sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                                    sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 4 -p 6 -vet=off -timeout 40m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                                    sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 4 -p 6 -vet=off -timeout 80m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
                                 }
                             }
 

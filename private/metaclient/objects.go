@@ -185,12 +185,14 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 	}
 
 	return db.metainfo.UpdateObjectMetadata(ctx, UpdateObjectMetadataParams{
-		Bucket:                        []byte(bucket),
-		EncryptedObjectKey:            []byte(encPath.Raw()),
-		StreamID:                      object.Stream.ID,
-		EncryptedMetadata:             streamMetaBytes,
-		EncryptedMetadataEncryptedKey: encryptedKey,
-		EncryptedMetadataNonce:        encryptedKeyNonce,
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		StreamID:           object.Stream.ID,
+		EncryptedUserData: EncryptedUserData{
+			EncryptedMetadata:             streamMetaBytes,
+			EncryptedMetadataEncryptedKey: encryptedKey,
+			EncryptedMetadataNonce:        encryptedKeyNonce,
+		},
 	})
 }
 

@@ -200,10 +200,12 @@ func createCommitObjectParams(lastSegment splitter.Segment, encMeta EncryptedMet
 	}
 
 	return &metaclient.CommitObjectParams{
-		StreamID:                      nil, // set by the stream batcher
-		EncryptedMetadataNonce:        *encryptedMetadataKeyNonce,
-		EncryptedMetadataEncryptedKey: *encryptedMetadataKey,
-		EncryptedMetadata:             encryptedMetadata,
+		StreamID: nil, // set by the stream batcher
+		EncryptedUserData: metaclient.EncryptedUserData{
+			EncryptedMetadataNonce:        *encryptedMetadataKeyNonce,
+			EncryptedMetadataEncryptedKey: *encryptedMetadataKey,
+			EncryptedMetadata:             encryptedMetadata,
+		},
 	}, nil
 }
 
