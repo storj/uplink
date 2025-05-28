@@ -10,7 +10,7 @@ require (
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.14.0
-	storj.io/common v0.0.0-20250522165802-807832ddbca1
+	storj.io/common v0.0.0-20250529081337-15d9add689d4
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2

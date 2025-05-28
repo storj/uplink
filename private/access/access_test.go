@@ -64,7 +64,7 @@ func TestShare(t *testing.T) {
 		apiKey := expose.AccessGetAPIKey(access)
 
 		t.Run("Prefix", func(t *testing.T) {
-			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, macaroon.Action{
+			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, macaroon.Action{
 				Op:            permissionActionTypes[permissions[0]],
 				Bucket:        []byte(testrand.BucketName()),
 				EncryptedPath: []byte(testrand.Path()),
@@ -86,13 +86,13 @@ func TestShare(t *testing.T) {
 			action := allowedAction
 			for perm, actionType := range disallowedActionTypes {
 				action.Op = actionType
-				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, action, nil)
+				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, action, nil)
 				assert.ErrorIs(t, err, macaroon.ErrUnauthorized.Instance(), "expected permission %q to not be granted", perm)
 			}
 
 			for _, perm := range permissions {
 				action.Op = permissionActionTypes[perm]
-				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, action, nil)
+				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, action, nil)
 				assert.NoError(t, err, "expected permission %q to be granted", perm)
 			}
 		})
@@ -112,7 +112,7 @@ func TestShare(t *testing.T) {
 			action := allowedAction
 			for perm, actionType := range permissionActionTypes {
 				action.Op = actionType
-				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, action, nil)
+				err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, action, nil)
 				assert.NoError(t, err, "expected permission %q to be granted", perm)
 			}
 		})
@@ -120,14 +120,14 @@ func TestShare(t *testing.T) {
 		t.Run("NotAfter", func(t *testing.T) {
 			action := allowedAction
 			action.Time = notAfter.Add(time.Second)
-			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, action, nil)
+			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, action, nil)
 			require.ErrorIs(t, err, macaroon.ErrUnauthorized.Instance())
 		})
 
 		t.Run("NotBefore", func(t *testing.T) {
 			action := allowedAction
 			action.Time = notBefore.Add(-time.Second)
-			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionLatest, action, nil)
+			err := apiKey.Check(ctx, secret, macaroon.APIKeyVersionObjectLock, action, nil)
 			require.ErrorIs(t, err, macaroon.ErrUnauthorized.Instance())
 		})
 
