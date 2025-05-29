@@ -1686,6 +1686,15 @@ type RetryBeginSegmentPiecesParams struct {
 	RetryPieceNumbers []int
 }
 
+// BatchItem returns single item for batch request.
+func (params *RetryBeginSegmentPiecesParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_SegmentBeginRetryPieces{
+			SegmentBeginRetryPieces: params.toRequest(nil),
+		},
+	}
+}
+
 func (params *RetryBeginSegmentPiecesParams) toRequest(header *pb.RequestHeader) *pb.RetryBeginSegmentPiecesRequest {
 	retryPieceNumbers := make([]int32, len(params.RetryPieceNumbers))
 	for i, pieceNumber := range params.RetryPieceNumbers {
@@ -1715,6 +1724,10 @@ func newRetryBeginSegmentPiecesResponse(response *pb.RetryBeginSegmentPiecesResp
 func (client *Client) RetryBeginSegmentPieces(ctx context.Context, params RetryBeginSegmentPiecesParams) (_ RetryBeginSegmentPiecesResponse, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if os.Getenv("STORJ_COMPRESSED_BATCH") != "false" {
+		return client.batchRetryBeginSegmentPieces(ctx, params)
+	}
+
 	var response *pb.RetryBeginSegmentPiecesResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		response, err = client.client.RetryBeginSegmentPieces(ctx, params.toRequest(client.header()))
@@ -1725,6 +1738,29 @@ func (client *Client) RetryBeginSegmentPieces(ctx context.Context, params RetryB
 	}
 
 	return newRetryBeginSegmentPiecesResponse(response)
+}
+
+// batchRetryBeginSegmentPieces is RetryBeginSegmentPieces but goes through the batch rpc.
+func (client *Client) batchRetryBeginSegmentPieces(ctx context.Context, params RetryBeginSegmentPiecesParams) (_ RetryBeginSegmentPiecesResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var items []BatchResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		items, err = client.Batch(ctx, &params)
+		return err
+	})
+	if err != nil {
+		return RetryBeginSegmentPiecesResponse{}, Error.Wrap(err)
+	}
+	if len(items) != 1 {
+		return RetryBeginSegmentPiecesResponse{}, Error.New("unexpected number of responses: %d", len(items))
+	}
+	response, ok := items[0].pbResponse.(*pb.BatchResponseItem_SegmentBeginRetryPieces)
+	if !ok {
+		return RetryBeginSegmentPiecesResponse{}, Error.New("unexpected response type: %T", items[0].pbResponse)
+	}
+
+	return newRetryBeginSegmentPiecesResponse(response.SegmentBeginRetryPieces)
 }
 
 // CommitSegmentParams parameters for CommitSegment method.
