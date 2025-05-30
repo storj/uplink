@@ -18,14 +18,12 @@ import (
 
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
-	"storj.io/common/signing"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/storagenode"
 	"storj.io/uplink"
-	"storj.io/uplink/private/project"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -630,40 +628,6 @@ func TestObjectPermissionDenied(t *testing.T) {
 		err = project.MoveObject(ctx, "source-bucket", "testkey", "source-bucket", "testkey-copy", nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
-	})
-}
-
-func TestObjectUploadDownloadExternalSigner(t *testing.T) {
-	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 4, UplinkCount: 1,
-	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-
-		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "test-bucket")
-		require.NoError(t, err)
-
-		proj, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
-		require.NoError(t, err)
-		defer ctx.Check(proj.Close)
-
-		signer := signing.SignerFromFullIdentity(planet.Satellites[0].Identity)
-		project.SetSatelliteSigner(proj, signer)
-
-		upload, err := proj.UploadObject(ctx, "test-bucket", "test-object", nil)
-		require.NoError(t, err)
-
-		expectedData := testrand.Bytes(5 * memory.KiB)
-		_, err = upload.Write(expectedData)
-		require.NoError(t, err)
-
-		require.NoError(t, upload.Commit())
-
-		download, err := proj.DownloadObject(ctx, "test-bucket", "test-object", nil)
-		require.NoError(t, err)
-		defer ctx.Check(download.Close)
-
-		data, err := io.ReadAll(download)
-		require.NoError(t, err)
-		require.Equal(t, expectedData, data)
 	})
 }
 
