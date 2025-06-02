@@ -280,7 +280,7 @@ func newMetainfoParts(planet *testplanet.Planet, encStore *encryption.Store) (_ 
 		CipherSuite: storj.EncAESGCM,
 	}
 	inlineThreshold := 8 * memory.KiB.Int()
-	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, encryptionParameters, inlineThreshold, 0)
+	streams, err := streams.NewStreamStore(metainfoClient, ec, 64*memory.MiB.Int64(), encStore, encryptionParameters, inlineThreshold, 0, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}

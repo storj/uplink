@@ -19,6 +19,7 @@ import (
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
 )
@@ -30,6 +31,9 @@ var ErrUploadDone = errors.New("upload done")
 type UploadOptions struct {
 	// When Expires is zero, there is no expiration.
 	Expires time.Time
+	// StallConfig controls how slow uploads are detected and canceled.
+	// If nil, default configuration is used.
+	StallDetectionConfig *stalldetection.Config
 }
 
 // UploadObject starts an upload to the specific key.
@@ -39,6 +43,7 @@ func (project *Project) UploadObject(ctx context.Context, bucket, key string, op
 	metaOpts := &metaclient.UploadOptions{}
 	if options != nil {
 		metaOpts.Expires = options.Expires
+		metaOpts.StallDetectionConfig = options.StallDetectionConfig
 	}
 	return project.uploadObjectWithRetention(ctx, bucket, key, metaOpts)
 }
@@ -107,7 +112,7 @@ func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, k
 		upload.stats.encPath = encPath
 	}
 
-	streams, err := project.getStreamsStore(ctx)
+	streams, err := project.getStreamsStoreWithStallConfig(ctx, options.StallDetectionConfig)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

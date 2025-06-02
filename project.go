@@ -15,6 +15,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/metaclient"
+	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/testuplink"
 	"storj.io/uplink/private/version"
@@ -147,6 +148,10 @@ func (project *Project) Close() (err error) {
 }
 
 func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, err error) {
+	return project.getStreamsStoreWithStallConfig(ctx, nil)
+}
+
+func (project *Project) getStreamsStoreWithStallConfig(ctx context.Context, stallDetectionConfig *stalldetection.Config) (_ *streams.Store, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	metainfoClient, err := project.dialMetainfoClient(ctx)
@@ -171,7 +176,8 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		project.access.encAccess.Store,
 		project.encryptionParameters,
 		maxInlineSize,
-		longTailMargin)
+		longTailMargin,
+		stallDetectionConfig)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

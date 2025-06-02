@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,8 @@ func TestUploadOne(t *testing.T) {
 		expectUploaded bool
 		expectNum      int
 		expectErr      string
+		stallManager   *StallManager
+		stallTimeout   time.Duration
 	}{
 		{
 			desc:           "first piece successful",
@@ -57,6 +60,18 @@ func TestUploadOne(t *testing.T) {
 			failPuts:  2,
 			expectErr: "piece limit exchange failed: oh no",
 		},
+		{
+			desc:           "successful upload with stall manager",
+			stallManager:   NewStallManager(),
+			expectUploaded: true,
+			expectNum:      0,
+		},
+		{
+			desc:           "stall timeout triggers context cancellation",
+			stallManager:   NewStallManager(),
+			stallTimeout:   10 * time.Millisecond,
+			expectUploaded: false,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			uploadCtx, uploadCancel := context.WithCancel(context.Background())
@@ -72,8 +87,20 @@ func TestUploadOne(t *testing.T) {
 			}
 
 			manager := newManagerWithExchanger(2, failExchange{})
-			putter := &fakePutter{t: t, failPuts: tc.failPuts}
-			uploaded, err := UploadOne(longTailCtx, uploadCtx, manager, putter, fakePrivateKey)
+
+			var putter PiecePutter
+			if tc.stallTimeout > 0 {
+				// Use slowPutter for stall timeout test
+				putter = &slowPutter{
+					t:     t,
+					delay: 50 * time.Millisecond, // Longer than stall timeout
+				}
+				tc.stallManager.SetMaxDuration(tc.stallTimeout)
+			} else {
+				putter = &fakePutter{t: t, failPuts: tc.failPuts}
+			}
+
+			uploaded, err := UploadOne(longTailCtx, uploadCtx, manager, putter, fakePrivateKey, tc.stallManager)
 			if tc.expectErr != "" {
 				require.EqualError(t, err, tc.expectErr)
 				return
@@ -84,6 +111,29 @@ func TestUploadOne(t *testing.T) {
 				assertResults(t, manager, revision{0}, makeResult(piecenum{tc.expectNum}, revision{0}))
 			}
 		})
+	}
+}
+
+// slowPutter simulates a slow upload for stall timeout testing
+type slowPutter struct {
+	t     *testing.T
+	delay time.Duration
+}
+
+func (p *slowPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
+
+	// Simulate slow upload
+	time.Sleep(p.delay)
+
+	select {
+	case <-uploadCtx.Done():
+		return nil, nil, uploadCtx.Err()
+	case <-longTailCtx.Done():
+		return nil, nil, longTailCtx.Err()
+	default:
+		num := pieceReaderNum(data)
+		return hash(num), nil, nil
 	}
 }
 
