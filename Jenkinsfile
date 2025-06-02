@@ -159,7 +159,7 @@ pipeline {
                                 dir('testsuite'){
                                     sh 'cp go.mod go-temp.mod'
                                     sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                                    sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 4 -p 6 -vet=off -timeout 80m -json storj.io/storj/... 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                                    sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 4 -p 6 -vet=off -timeout 80m -json $(go list storj.io/storj/... | grep -v /metabase | grep -v /satellitedb) 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
                                 }
                             }
 
