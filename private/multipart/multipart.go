@@ -68,7 +68,7 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 	}
 	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
 
-	metadata, err := encryptMetadata(project, bucket, key, options.CustomMetadata)
+	encryptedUserData, err := encryptUserData(project, bucket, key, options.CustomMetadata)
 	if err != nil {
 		return uplink.UploadInfo{}, convertKnownErrors(err, bucket, key)
 	}
@@ -79,11 +79,7 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 		ExpiresAt:            options.Expires,
 		EncryptionParameters: encryptionParameters(project),
 
-		EncryptedUserData: metaclient.EncryptedUserData{
-			EncryptedMetadata:             metadata.EncryptedContent,
-			EncryptedMetadataEncryptedKey: metadata.EncryptedKey,
-			EncryptedMetadataNonce:        metadata.EncryptedKeyNonce,
-		},
+		EncryptedUserData: encryptedUserData,
 
 		Retention: options.Retention,
 		LegalHold: options.LegalHold,
@@ -103,60 +99,54 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 	}, nil
 }
 
-type encryptedMetadata struct {
-	EncryptedContent  []byte
-	EncryptedKey      []byte
-	EncryptedKeyNonce storj.Nonce
-}
-
-func encryptMetadata(project *uplink.Project, bucket, key string, metadata uplink.CustomMetadata) (encryptedMetadata, error) {
+func encryptUserData(project *uplink.Project, bucket, key string, metadata uplink.CustomMetadata) (metaclient.EncryptedUserData, error) {
 	if len(metadata) == 0 {
-		return encryptedMetadata{}, nil
+		return metaclient.EncryptedUserData{}, nil
 	}
 
 	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
 		UserDefined: metadata.Clone(),
 	})
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
 		Metadata: metadataBytes,
 	})
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	derivedKey, err := deriveContentKey(project, bucket, key)
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	var metadataKey storj.Key
 	// generate random key for encrypting the segment's content
 	_, err = rand.Read(metadataKey[:])
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	var encryptedKeyNonce storj.Nonce
 	// generate random nonce for encrypting the metadata key
 	_, err = rand.Read(encryptedKeyNonce[:])
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	encryptionParameters := encryptionParameters(project)
 	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
 	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
 	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
@@ -164,13 +154,13 @@ func encryptMetadata(project *uplink.Project, bucket, key string, metadata uplin
 		EncryptedStreamInfo: encryptedStreamInfo,
 	})
 	if err != nil {
-		return encryptedMetadata{}, errs.Wrap(err)
+		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
-	return encryptedMetadata{
-		EncryptedContent:  streamMetaBytes,
-		EncryptedKey:      encryptedKey,
-		EncryptedKeyNonce: encryptedKeyNonce,
+	return metaclient.EncryptedUserData{
+		EncryptedMetadata:             streamMetaBytes,
+		EncryptedMetadataEncryptedKey: encryptedKey,
+		EncryptedMetadataNonce:        encryptedKeyNonce,
 	}, nil
 }
 
