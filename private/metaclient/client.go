@@ -166,6 +166,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
+		EncryptedEtag:                 params.EncryptedETag,
 		LegalHold:                     params.LegalHold,
 	}
 
@@ -231,6 +232,7 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		EncryptedEtag:                 params.EncryptedETag,
 		IfNoneMatch:                   params.IfNoneMatch,
 	}
 }
@@ -338,6 +340,7 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 			EncryptedMetadata:             object.EncryptedMetadata,
 			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+			EncryptedETag:                 object.EncryptedEtag,
 		},
 	}
 
@@ -455,6 +458,7 @@ type UpdateObjectMetadataParams struct {
 	StreamID           storj.StreamID
 
 	EncryptedUserData
+	SetEncryptedETag bool
 }
 
 func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.ObjectUpdateMetadataRequest {
@@ -466,6 +470,8 @@ func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *p
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
+		EncryptedEtag:                 params.EncryptedETag,
+		SetEncryptedEtag:              params.SetEncryptedETag,
 	}
 }
 
@@ -921,6 +927,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 				EncryptedMetadata:             object.EncryptedMetadata,
+				EncryptedETag:                 object.EncryptedEtag,
 			},
 
 			IsPrefix: isPrefix,
@@ -1007,8 +1014,10 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 			ExpiresAt:          object.ExpiresAt,
 			PlainSize:          object.PlainSize,
 			EncryptedUserData: EncryptedUserData{
-				EncryptedMetadataNonce: object.EncryptedMetadataNonce,
-				EncryptedMetadata:      object.EncryptedMetadata,
+				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+				EncryptedMetadata:             object.EncryptedMetadata,
+				EncryptedETag:                 object.EncryptedEtag,
 			},
 
 			IsPrefix: false,

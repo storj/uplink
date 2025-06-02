@@ -33,6 +33,7 @@ type Object struct {
 	System SystemMetadata
 	Custom CustomMetadata
 
+	etag        []byte
 	version     []byte
 	isVersioned bool
 	isLatest    bool
@@ -135,7 +136,7 @@ func (project *Project) UpdateObjectMetadata(ctx context.Context, bucket, key st
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone())
+	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone(), nil, false)
 	if err != nil {
 		return convertKnownErrors(err, bucket, key)
 	}
@@ -159,6 +160,7 @@ func convertObject(obj *metaclient.Object) *Object {
 		},
 		Custom: obj.Metadata,
 
+		etag:        obj.ETag,
 		version:     obj.Version,
 		isVersioned: obj.IsVersioned,
 		isLatest:    obj.IsLatest,
@@ -169,6 +171,18 @@ func convertObject(obj *metaclient.Object) *Object {
 	}
 
 	return object
+}
+
+// objectETag is exposing object etag field.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname objectETag
+func objectETag(object *Object) []byte {
+	return object.etag
 }
 
 // objectVersion is exposing object version field.

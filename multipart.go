@@ -127,7 +127,7 @@ func (project *Project) commitUpload(ctx context.Context, bucket, key string, up
 	}
 	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
 
-	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, project.encryptionParameters, opts.IfNoneMatch)
+	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.CustomMetadata, opts.ETag, project.encryptionParameters, opts.IfNoneMatch)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}

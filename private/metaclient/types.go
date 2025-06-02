@@ -39,6 +39,7 @@ type EncryptedUserData struct {
 	EncryptedMetadata             []byte
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadataNonce        storj.Nonce
+	EncryptedETag                 []byte
 }
 
 // Retention represents an object's Object Lock retention information.
@@ -167,6 +168,7 @@ type Object struct {
 	IsLatest       bool
 
 	Metadata map[string]string
+	ETag     []byte
 
 	ContentType string
 	Created     time.Time

@@ -59,6 +59,7 @@ type Part struct {
 // Metadata interface returns the latest metadata for an object.
 type Metadata interface {
 	Metadata() ([]byte, error)
+	ETag() ([]byte, error)
 }
 
 // Store is a store for streams. It implements typedStore as part of an ongoing migration
@@ -352,7 +353,18 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 		EncryptedStreamInfo: encryptedStreamInfo,
 	}
 
-	objectMetadata, err := pb.Marshal(&streamMeta)
+	encryptedMetadata, err := pb.Marshal(&streamMeta)
+	if err != nil {
+		return Meta{}, errs.Wrap(err)
+	}
+
+	// encrypt etag with the content encryption key and 1 nonce.
+	etagBytes, err := metadata.ETag()
+	if err != nil {
+		return Meta{}, errs.Wrap(err)
+	}
+
+	encryptedETag, err := encryption.Encrypt(etagBytes, s.encryptionParameters.CipherSuite, &contentKey, &storj.Nonce{1})
 	if err != nil {
 		return Meta{}, errs.Wrap(err)
 	}
@@ -360,7 +372,8 @@ func (s *Store) Put(ctx context.Context, bucket, unencryptedKey string, data io.
 	commitObject := metaclient.CommitObjectParams{
 		StreamID: streamID,
 		EncryptedUserData: metaclient.EncryptedUserData{
-			EncryptedMetadata: objectMetadata,
+			EncryptedMetadata: encryptedMetadata,
+			EncryptedETag:     encryptedETag,
 		},
 		IfNoneMatch: beginObjectReq.IfNoneMatch,
 	}

@@ -117,6 +117,7 @@ type DeleteObjectsResultItem = metaclient.DeleteObjectsResultItem
 type VersionedObject struct {
 	uplink.Object
 	Version []byte
+	ETag    []byte
 	// IsVersioned reports whether VersionedObject is a truly versioned
 	// object, such as an object uploaded to a bucket with versioning
 	// active. VersionedObject not being versioned can happen when it's
@@ -208,6 +209,12 @@ func (upload *VersionedUpload) Commit() error {
 // If it is nil, it won't be modified.
 func (upload *VersionedUpload) SetCustomMetadata(ctx context.Context, custom uplink.CustomMetadata) error {
 	return upload.upload.SetCustomMetadata(ctx, custom)
+}
+
+// SetETag updates etag metadata to be included with the object.
+// If it is nil, it won't be modified.
+func (upload *VersionedUpload) SetETag(ctx context.Context, etag []byte) error {
+	return upload_setETag(ctx, upload.upload, etag)
 }
 
 // Abort aborts the upload.
@@ -606,6 +613,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 			},
 			Custom: obj.Metadata,
 		},
+		ETag:           obj.ETag,
 		Version:        obj.Version,
 		IsVersioned:    obj.IsVersioned,
 		IsDeleteMarker: obj.IsDeleteMarker,
@@ -629,6 +637,7 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 
 	return &VersionedObject{
 		Object:      *obj,
+		ETag:        objectETag(obj),
 		Version:     objectVersion(obj),
 		IsVersioned: objectIsVersioned(obj),
 		IsLatest:    objectIsLatest(obj),
@@ -672,6 +681,9 @@ func dialMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metaclient
 //go:linkname encryptionParameters storj.io/uplink.encryptionParameters
 func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
 
+//go:linkname objectETag storj.io/uplink.objectETag
+func objectETag(object *uplink.Object) []byte
+
 //go:linkname objectVersion storj.io/uplink.objectVersion
 func objectVersion(object *uplink.Object) []byte
 
@@ -698,3 +710,6 @@ func upload_getMetaclientObject(u *uplink.Upload) *metaclient.Object
 
 //go:linkname upload_getStreamMeta storj.io/uplink.upload_getStreamMeta
 func upload_getStreamMeta(u *uplink.Upload) *streams.Meta
+
+//go:linkname upload_setETag storj.io/uplink.upload_setETag
+func upload_setETag(ctx context.Context, u *uplink.Upload, etag []byte) error

@@ -526,8 +526,12 @@ func (segmentUploader) Begin(ctx context.Context, resp *metaclient.BeginSegmentR
 
 type encryptedMetadata struct{}
 
-func (encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (data []byte, encKey *storj.EncryptedPrivateKey, nonce *storj.Nonce, err error) {
-	return encryptMetadata(lastSegmentSize), &encMetadataKey, &encMetadataKeyNonce, nil
+func (encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metaclient.EncryptedUserData, err error) {
+	return &metaclient.EncryptedUserData{
+		EncryptedMetadata:             encryptMetadata(lastSegmentSize),
+		EncryptedMetadataEncryptedKey: encMetadataKey,
+		EncryptedMetadataNonce:        encMetadataKeyNonce,
+	}, nil
 }
 
 func mustNewStreamID() storj.StreamID {

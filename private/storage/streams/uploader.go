@@ -378,10 +378,10 @@ type encryptedMetadata struct {
 	cipherSuite storj.CipherSuite
 }
 
-func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (data []byte, encKey *storj.EncryptedPrivateKey, nonce *storj.Nonce, err error) {
+func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metaclient.EncryptedUserData, err error) {
 	metadataBytes, err := e.metadata.Metadata()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
@@ -390,39 +390,54 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (data []byt
 		Metadata:        metadataBytes,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	var metadataKey storj.Key
 	if _, err := rand.Read(metadataKey[:]); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	var encryptedMetadataKeyNonce storj.Nonce
 	if _, err := rand.Read(encryptedMetadataKeyNonce[:]); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	// encrypt the metadata key with the derived key and the random encrypted key nonce
 	encryptedMetadataKey, err := encryption.EncryptKey(&metadataKey, e.cipherSuite, e.derivedKey, &encryptedMetadataKeyNonce)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	// encrypt the stream info with the metadata key and the zero nonce
 	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, e.cipherSuite, &metadataKey, &storj.Nonce{})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	streamMeta, err := pb.Marshal(&pb.StreamMeta{
 		EncryptedStreamInfo: encryptedStreamInfo,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	return streamMeta, &encryptedMetadataKey, &encryptedMetadataKeyNonce, nil
+	etagBytes, err := e.metadata.ETag()
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedETag, err := encryption.Encrypt(etagBytes, e.cipherSuite, &metadataKey, &storj.Nonce{1})
+	if err != nil {
+		return nil, err
+	}
+
+	return &metaclient.EncryptedUserData{
+		EncryptedMetadata:             streamMeta,
+		EncryptedMetadataEncryptedKey: encryptedMetadataKey[:],
+		EncryptedMetadataNonce:        encryptedMetadataKeyNonce,
+		EncryptedETag:                 encryptedETag,
+	}, nil
 }
 
 type uploaderBackend interface {

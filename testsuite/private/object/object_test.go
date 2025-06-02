@@ -2492,6 +2492,69 @@ func TestListObjectWithArbitraryPrefixMetadata(t *testing.T) {
 	})
 }
 
+func TestETag(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		require.NoError(t, upload.SetETag(ctx, []byte("etag")))
+
+		require.NoError(t, upload.Commit())
+
+		require.Error(t, upload.SetETag(ctx, []byte("duplicate set")))
+
+		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+
+		require.EqualValues(t, []byte("etag"), statObj.ETag)
+
+		objectKey2 := "test-object2"
+		objectKey3 := "test-object3"
+
+		{
+			err = project.MoveObject(ctx, bucketName, objectKey, bucketName, objectKey2, nil)
+			require.NoError(t, err)
+
+			stat, err := object.StatObject(ctx, project, bucketName, objectKey2, upload.Info().Version)
+			require.NoError(t, err)
+
+			require.EqualValues(t, []byte("etag"), stat.ETag)
+		}
+
+		{
+			_, err = project.CopyObject(ctx, bucketName, objectKey2, bucketName, objectKey3, nil)
+			require.NoError(t, err)
+
+			stat, err := object.StatObject(ctx, project, bucketName, objectKey3, upload.Info().Version)
+			require.NoError(t, err)
+
+			require.EqualValues(t, []byte("etag"), stat.ETag)
+		}
+
+		entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System: true, Custom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.EqualValues(t, []byte("etag"), entry.ETag)
+		}
+	})
+}
+
 func randVersion() []byte {
 	randVersionID := metabase.Version(testrand.Int63n(int64(metabase.MaxVersion-1)) + 1)
 	return metabase.NewStreamVersionID(randVersionID, testrand.UUID()).Bytes()

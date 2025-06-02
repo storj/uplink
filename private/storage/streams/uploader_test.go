@@ -222,18 +222,20 @@ func TestEncryptedMetadata(t *testing.T) {
 		derivedKey:  &storjKey,
 		cipherSuite: cipherSuite,
 	}
-	streamMetaBytes, encMetaKey, encMetaKeyNonce, err := e.EncryptedMetadata(segmentSize - 1)
+
+	encData, err := e.EncryptedMetadata(segmentSize - 1)
 	require.NoError(t, err)
-	require.NotNil(t, streamMetaBytes)
-	require.NotNil(t, encMetaKey)
-	require.NotNil(t, encMetaKeyNonce)
+	require.NotNil(t, encData.EncryptedMetadata)
+	require.NotNil(t, encData.EncryptedMetadataEncryptedKey)
+	require.NotNil(t, encData.EncryptedMetadataNonce)
+	require.NotNil(t, encData.EncryptedETag)
 
 	streamMeta := new(pb.StreamMeta)
-	err = pb.Unmarshal(streamMetaBytes, streamMeta)
+	err = pb.Unmarshal(encData.EncryptedMetadata, streamMeta)
 	require.NoError(t, err)
 
 	// Decrypt and assert contents
-	metadataKey, err := encryption.DecryptKey(*encMetaKey, e.cipherSuite, e.derivedKey, encMetaKeyNonce)
+	metadataKey, err := encryption.DecryptKey(encData.EncryptedMetadataEncryptedKey, e.cipherSuite, e.derivedKey, &encData.EncryptedMetadataNonce)
 	require.NoError(t, err)
 	streamInfoBytes, err := encryption.Decrypt(streamMeta.EncryptedStreamInfo, e.cipherSuite, metadataKey, &storj.Nonce{})
 	require.NoError(t, err)
@@ -247,6 +249,12 @@ func TestEncryptedMetadata(t *testing.T) {
 		LastSegmentSize: segmentSize - 1,
 		Metadata:        []byte("METADATA"),
 	}, streamInfo)
+
+	// Decrypt etag and asset contents
+	etagBytes, err := encryption.Decrypt(encData.EncryptedETag, e.cipherSuite, metadataKey, &storj.Nonce{1})
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("ETAG"), etagBytes)
 }
 
 func TestLimitsExchanger(t *testing.T) {
@@ -386,6 +394,10 @@ type fixedMetadata struct{}
 
 func (fixedMetadata) Metadata() ([]byte, error) {
 	return []byte("METADATA"), nil
+}
+
+func (fixedMetadata) ETag() ([]byte, error) {
+	return []byte("ETAG"), nil
 }
 
 type noopScheduler struct{}

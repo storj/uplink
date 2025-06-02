@@ -70,6 +70,7 @@ func (db *DB) CreateObject(ctx context.Context, bucket, key string, createInfo *
 
 	if createInfo != nil {
 		info.Metadata = createInfo.Metadata
+		info.ETag = createInfo.ETag
 		info.ContentType = createInfo.ContentType
 		info.Expires = createInfo.Expires
 		info.RedundancyScheme = createInfo.RedundancyScheme
@@ -92,7 +93,7 @@ func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *Mut
 
 // UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
 // Any existing custom metadata will be deleted.
-func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata map[string]string) (err error) {
+func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata map[string]string, etag []byte, setETag bool) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -184,6 +185,11 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		return err
 	}
 
+	encryptedETag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
+	if err != nil {
+		return err
+	}
+
 	return db.metainfo.UpdateObjectMetadata(ctx, UpdateObjectMetadataParams{
 		Bucket:             []byte(bucket),
 		EncryptedObjectKey: []byte(encPath.Raw()),
@@ -192,7 +198,9 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 			EncryptedMetadata:             streamMetaBytes,
 			EncryptedMetadataEncryptedKey: encryptedKey,
 			EncryptedMetadataNonce:        encryptedKeyNonce,
+			EncryptedETag:                 encryptedETag,
 		},
+		SetEncryptedETag: setETag,
 	})
 }
 
@@ -501,11 +509,7 @@ func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawOb
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
-		stream, streamMeta, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc,
-			item.EncryptedMetadata,
-			item.EncryptedMetadataEncryptedKey,
-			item.EncryptedMetadataNonce,
-		)
+		stream, streamMeta, etag, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, pi.PathUnenc, item.EncryptedUserData)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -514,7 +518,7 @@ func (db *DB) pendingObjectsFromRawObjectList(ctx context.Context, items []RawOb
 			return nil, errClass.Wrap(err)
 		}
 
-		object, err := db.objectFromRawObjectListItem(pi.Bucket, pi.PathUnenc.Raw(), item, stream, streamMeta)
+		object, err := db.objectFromRawObjectListItem(pi.Bucket, pi.PathUnenc.Raw(), item, stream, streamMeta, etag)
 		if err != nil {
 			return nil, errClass.Wrap(err)
 		}
@@ -653,11 +657,7 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			unencKey = paths.NewUnencrypted(unencItem)
 		}
 
-		stream, streamMeta, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, unencKey,
-			item.EncryptedMetadata,
-			item.EncryptedMetadataEncryptedKey,
-			item.EncryptedMetadataNonce,
-		)
+		stream, streamMeta, etag, err := db.typedDecryptStreamInfo(ctx, pi.Bucket, unencKey, item.EncryptedUserData)
 		if err != nil {
 			// skip items that cannot be decrypted
 			if encryption.ErrDecryptFailed.Has(err) {
@@ -666,7 +666,7 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 			return nil, errClass.Wrap(err)
 		}
 
-		object, err := db.objectFromRawObjectListItem(pi.Bucket, unencItem, item, stream, streamMeta)
+		object, err := db.objectFromRawObjectListItem(pi.Bucket, unencItem, item, stream, streamMeta, etag)
 		if err != nil {
 			return nil, errClass.Wrap(err)
 		}
@@ -803,7 +803,7 @@ func (db *DB) GetObject(ctx context.Context, bucket, key string, version []byte)
 }
 
 // CommitObject commits an object.
-func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, customMetadata map[string]string, encryptionParameters storj.EncryptionParameters, ifNoneMatch []string) (info Object, err error) {
+func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, customMetadata map[string]string, etag []byte, encryptionParameters storj.EncryptionParameters, ifNoneMatch []string) (info Object, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	switch {
@@ -825,7 +825,7 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, cu
 		return Object{}, err
 	}
 
-	commitObjParams, err := db.fillMetadata(bucket, key, id, customMetadata, encryptionParameters)
+	commitObjParams, err := db.fillMetadata(bucket, key, id, customMetadata, etag, encryptionParameters)
 	if err != nil {
 		return Object{}, err
 	}
@@ -839,7 +839,7 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, cu
 	return db.ObjectFromRawObjectItem(ctx, bucket, key, response.Object)
 }
 
-func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[string]string, encryptionParameters storj.EncryptionParameters) (CommitObjectParams, error) {
+func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[string]string, etag []byte, encryptionParameters storj.EncryptionParameters) (CommitObjectParams, error) {
 	commitObjParams := CommitObjectParams{StreamID: id}
 	if len(metadata) == 0 {
 		return commitObjParams, nil
@@ -900,9 +900,15 @@ func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[s
 		return CommitObjectParams{}, err
 	}
 
+	encryptedETag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
+	if err != nil {
+		return CommitObjectParams{}, err
+	}
+
 	commitObjParams.EncryptedMetadataEncryptedKey = encryptedKey
 	commitObjParams.EncryptedMetadataNonce = encryptedKeyNonce
 	commitObjParams.EncryptedMetadata = streamMetaBytes
+	commitObjParams.EncryptedETag = encryptedETag
 
 	return commitObjParams, nil
 }
@@ -913,6 +919,11 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		return Object{}, nil
 	}
 
+	streamInfo, streamMeta, etag, err := db.typedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key), objectInfo.EncryptedUserData)
+	if err != nil {
+		return Object{}, err
+	}
+
 	object := Object{
 		Version:        version(objectInfo.Status, objectInfo.Version),
 		Bucket:         Bucket{Name: bucket},
@@ -921,6 +932,8 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 		IsVersioned:    objectInfo.IsVersioned(),
 		IsDeleteMarker: objectInfo.IsDeleteMarker(),
 		IsLatest:       false,
+
+		ETag: etag,
 
 		Created:  objectInfo.Created, // TODO: use correct field
 		Modified: objectInfo.Created, // TODO: use correct field
@@ -937,15 +950,6 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 			RedundancyScheme:     objectInfo.RedundancyScheme,
 			EncryptionParameters: objectInfo.EncryptionParameters,
 		},
-	}
-
-	streamInfo, streamMeta, err := db.typedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key),
-		objectInfo.EncryptedMetadata,
-		objectInfo.EncryptedMetadataEncryptedKey,
-		objectInfo.EncryptedMetadataNonce,
-	)
-	if err != nil {
-		return Object{}, err
 	}
 
 	if object.Stream.EncryptionParameters.CipherSuite == storj.EncUnspecified {
@@ -972,7 +976,7 @@ func (db *DB) ObjectFromRawObjectItem(ctx context.Context, bucket, key string, o
 	return object, nil
 }
 
-func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta) (Object, error) {
+func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listItem RawObjectListItem, stream *pb.StreamInfo, streamMeta pb.StreamMeta, etag []byte) (Object, error) {
 	object := Object{
 		Version:        listItem.Version,
 		Bucket:         Bucket{Name: bucket},
@@ -981,6 +985,8 @@ func (db *DB) objectFromRawObjectListItem(bucket string, path storj.Path, listIt
 		IsVersioned:    listItem.IsVersioned(),
 		IsDeleteMarker: listItem.IsDeleteMarker(),
 		IsLatest:       listItem.IsLatest,
+
+		ETag: etag,
 
 		Created:  listItem.CreatedAt, // TODO: use correct field
 		Modified: listItem.CreatedAt, // TODO: use correct field
@@ -1063,44 +1069,50 @@ func (object *MutableObject) CreateDynamicStream(ctx context.Context, metadata S
 }
 
 // typedDecryptStreamInfo decrypts stream info.
-func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted,
-	streamMetaBytes, metadataKey []byte, metadataNonce storj.Nonce) (_ *pb.StreamInfo, _ pb.StreamMeta, err error) {
+func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencryptedKey paths.Unencrypted, encryptedUserData EncryptedUserData) (_ *pb.StreamInfo, _ pb.StreamMeta, etag []byte, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	streamMeta := pb.StreamMeta{}
-	err = pb.Unmarshal(streamMetaBytes, &streamMeta)
+	err = pb.Unmarshal(encryptedUserData.EncryptedMetadata, &streamMeta)
 	if err != nil {
-		return nil, pb.StreamMeta{}, err
+		return nil, pb.StreamMeta{}, nil, err
 	}
 
 	if db.encStore.EncryptionBypass {
-		return nil, streamMeta, nil
+		return nil, streamMeta, encryptedUserData.EncryptedETag, nil
 	}
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, unencryptedKey, db.encStore)
 	if err != nil {
-		return nil, pb.StreamMeta{}, err
+		return nil, pb.StreamMeta{}, nil, err
 	}
 
 	cipher := storj.CipherSuite(streamMeta.EncryptionType)
-	encryptedKey, keyNonce := getEncryptedKeyAndNonce(metadataKey, metadataNonce, streamMeta.LastSegmentMeta)
+	encryptedKey, keyNonce := getEncryptedKeyAndNonce(encryptedUserData.EncryptedMetadataEncryptedKey, encryptedUserData.EncryptedMetadataNonce, streamMeta.LastSegmentMeta)
 	contentKey, err := encryption.DecryptKey(encryptedKey, cipher, derivedKey, keyNonce)
 	if err != nil {
-		return nil, pb.StreamMeta{}, err
+		return nil, pb.StreamMeta{}, nil, err
 	}
 
 	// decrypt metadata with the content encryption key and zero nonce
 	streamInfo, err := encryption.Decrypt(streamMeta.EncryptedStreamInfo, cipher, contentKey, &storj.Nonce{})
 	if err != nil {
-		return nil, pb.StreamMeta{}, err
+		return nil, pb.StreamMeta{}, nil, err
 	}
 
 	var stream pb.StreamInfo
 	if err := pb.Unmarshal(streamInfo, &stream); err != nil {
-		return nil, pb.StreamMeta{}, err
+		return nil, pb.StreamMeta{}, nil, err
 	}
 
-	return &stream, streamMeta, nil
+	if len(encryptedUserData.EncryptedETag) > 0 {
+		etag, err = encryption.Decrypt(encryptedUserData.EncryptedETag, cipher, contentKey, &storj.Nonce{1})
+		if err != nil {
+			return nil, pb.StreamMeta{}, nil, err
+		}
+	}
+
+	return &stream, streamMeta, etag, nil
 }
 
 // getEncryptedKeyAndNonce returns key and nonce directly if exists, otherwise try to get them from SegmentMeta.
