@@ -140,7 +140,7 @@ func TestListObjects_TwoObjects(t *testing.T) {
 
 		createBucket(t, ctx, project, "testbucket")
 		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
+			_, err := project.DeleteBucketWithObjects(ctx, "testbucket")
 			require.NoError(t, err)
 		}()
 
@@ -151,10 +151,6 @@ func TestListObjects_TwoObjects(t *testing.T) {
 
 		for object := range expectedObjects {
 			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
-			defer func() {
-				_, err := project.DeleteObject(ctx, "testbucket", object)
-				require.NoError(t, err)
-			}()
 		}
 
 		list := listObjects(ctx, t, project, "testbucket", nil)
@@ -188,16 +184,7 @@ func TestListObjects_PrefixRecursive(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
-
 		uploadObject(t, ctx, project, "testbucket", "a/b/c/test.dat", 1*memory.KiB)
-		defer func() {
-			_, err := project.DeleteObject(ctx, "testbucket", "a/b/c/test.dat")
-			require.NoError(t, err)
-		}()
 
 		list := listObjects(ctx, t, project, "testbucket", &uplink.ListObjectsOptions{
 			Prefix:    "a/b/",
@@ -257,10 +244,6 @@ func TestListObjects_Cursor(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		createBucket(t, ctx, project, "testbucket")
-		defer func() {
-			_, err := project.DeleteBucket(ctx, "testbucket")
-			require.NoError(t, err)
-		}()
 
 		expectedObjects := map[string]bool{
 			"test1.dat": true,
@@ -269,10 +252,6 @@ func TestListObjects_Cursor(t *testing.T) {
 
 		for object := range expectedObjects {
 			uploadObject(t, ctx, project, "testbucket", object, 1*memory.KiB)
-			defer func() {
-				_, err := project.DeleteObject(ctx, "testbucket", object)
-				require.NoError(t, err)
-			}()
 		}
 
 		list := listObjects(ctx, t, project, "testbucket", nil)
@@ -435,30 +414,33 @@ func TestListObjects_TwoObjectsWithDiffPassphrase(t *testing.T) {
 
 		// upload two objects with different encryption passphrases
 		for i, item := range items {
-			accesses[i], err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, item)
-			require.NoError(t, err)
+			func() {
+				accesses[i], err = uplink.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, item)
+				require.NoError(t, err)
 
-			project, err := uplink.OpenProject(ctx, accesses[i])
-			require.NoError(t, err)
-			defer ctx.Check(project.Close)
+				project, err := uplink.OpenProject(ctx, accesses[i])
+				require.NoError(t, err)
+				defer ctx.Check(project.Close)
 
-			createBucket(t, ctx, project, bucket)
-
-			uploadObject(t, ctx, project, bucket, item, 1)
+				createBucket(t, ctx, project, bucket)
+				uploadObject(t, ctx, project, bucket, item, 1)
+			}()
 		}
 
 		// listing should return one object per access
 		for i, access := range accesses {
-			project, err := uplink.OpenProject(ctx, access)
-			require.NoError(t, err)
-			defer ctx.Check(project.Close)
+			func() {
+				project, err := uplink.OpenProject(ctx, access)
+				require.NoError(t, err)
+				defer ctx.Check(project.Close)
 
-			objects := project.ListObjects(ctx, bucket, nil)
+				objects := project.ListObjects(ctx, bucket, nil)
 
-			require.True(t, objects.Next())
-			require.NoError(t, objects.Err())
-			require.Equal(t, items[i], objects.Item().Key)
-			require.False(t, objects.Next())
+				require.True(t, objects.Next())
+				require.NoError(t, objects.Err())
+				require.Equal(t, items[i], objects.Item().Key)
+				require.False(t, objects.Next())
+			}()
 		}
 	})
 }

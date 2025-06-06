@@ -123,10 +123,6 @@ func TestListBuckets_Cursor(t *testing.T) {
 
 		for bucket := range expectedBuckets {
 			createBucket(t, ctx, project, bucket)
-			defer func() {
-				_, err := project.DeleteBucket(ctx, bucket)
-				require.NoError(t, err)
-			}()
 		}
 
 		list := listBuckets(ctx, t, project, nil)
@@ -181,13 +177,6 @@ func TestListBuckets_AutoPaging(t *testing.T) {
 			expectedBuckets[bucketName] = true
 			createBucket(t, ctx, project, bucketName)
 		}
-		bucketsToDelete := maps.Keys(expectedBuckets)
-		defer func() {
-			for bucketName := range bucketsToDelete {
-				_, err := project.DeleteBucket(ctx, bucketName)
-				require.NoError(t, err)
-			}
-		}()
 
 		list := listBuckets(ctx, t, project, nil)
 
