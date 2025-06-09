@@ -13,8 +13,8 @@ require (
 	storj.io/common v0.0.0-20250613183730-e7569d08d735
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250530165551-47532894c729
-	storj.io/uplink v1.13.2-0.20250530143115-d1f99977e40c
+	storj.io/storj v1.91.0-alpha.0.20250617165618-a10c97be5ec4
+	storj.io/uplink v1.13.2-0.20250616101609-fc62b14be693
 )
 
 require (

@@ -119,6 +119,13 @@ func TestGetBucketLocation(t *testing.T) {
 }
 
 func TestCreateBucketWithLocation(t *testing.T) {
+	var (
+		placement       = storj.PlacementConstraint(40)
+		placementDetail = console.PlacementDetail{
+			ID:     40,
+			IdName: "Poland",
+		}
+	)
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
@@ -126,6 +133,10 @@ func TestCreateBucketWithLocation(t *testing.T) {
 				config.Placement = nodeselection.ConfigurablePlacementRule{
 					PlacementRules: "buckets_test_placement.yaml",
 				}
+				config.Console.Placement.SelfServeDetails.SetMap(map[storj.PlacementConstraint]console.PlacementDetail{
+					0:         {ID: 0},
+					placement: placementDetail,
+				})
 				config.Console.Placement.SelfServeEnabled = true
 			},
 		},
