@@ -260,6 +260,40 @@ func SetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 	return convertKnownErrors(err, bucketName, "")
 }
 
+// DeleteBucketWithObjectsBypassGovernanceRetention deletes all objects in the bucket and bypasses any object lock settings.
+func DeleteBucketWithObjectsBypassGovernanceRetention(ctx context.Context, project *uplink.Project, bucketName string) (_ *uplink.Bucket, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return nil, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	existing, err := metainfoClient.DeleteBucket(ctx, metaclient.DeleteBucketParams{
+		Name: []byte(bucketName),
+
+		DeleteAll:                 true,
+		BypassGovernanceRetention: true,
+	})
+	if err != nil {
+		return nil, convertKnownErrors(err, bucketName, "")
+	}
+
+	if len(existing.Name) == 0 {
+		return &uplink.Bucket{Name: bucketName}, nil
+	}
+
+	return &uplink.Bucket{
+		Name:    existing.Name,
+		Created: existing.Created,
+	}, nil
+}
+
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
 

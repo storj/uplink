@@ -491,15 +491,18 @@ func (client *Client) SetBucketObjectLockConfiguration(ctx context.Context, para
 
 // DeleteBucketParams parameters for DeleteBucket method.
 type DeleteBucketParams struct {
-	Name      []byte
-	DeleteAll bool
+	Name                      []byte
+	DeleteAll                 bool
+	BypassGovernanceRetention bool
 }
 
 func (params *DeleteBucketParams) toRequest(header *pb.RequestHeader) *pb.BucketDeleteRequest {
 	return &pb.BucketDeleteRequest{
-		Header:    header,
-		Name:      params.Name,
-		DeleteAll: params.DeleteAll,
+		Header: header,
+		Name:   params.Name,
+
+		DeleteAll:                 params.DeleteAll,
+		BypassGovernanceRetention: params.BypassGovernanceRetention,
 	}
 }
 
