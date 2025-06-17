@@ -2277,8 +2277,16 @@ func TestListObject(t *testing.T) {
 				Prefixes: []string{"foo/"},
 			},
 			{
+				Opts:     object.ListObjectsOptions{Prefix: "foo"},
+				Prefixes: []string{"/"},
+			},
+			{
 				Opts:     object.ListObjectsOptions{Prefix: "foo/"},
 				Prefixes: []string{"bar/"},
+			},
+			{
+				Opts:     object.ListObjectsOptions{Prefix: "foo/b"},
+				Prefixes: []string{"ar/"},
 			},
 			{
 				Opts:     object.ListObjectsOptions{Prefix: "foo/bar/"},
@@ -2301,6 +2309,10 @@ func TestListObject(t *testing.T) {
 				Opts:    object.ListObjectsOptions{Cursor: "foo/bar/B", Recursive: true, Limit: 4},
 				Objects: sortedKeys[2:],
 			},
+			{
+				Opts:    object.ListObjectsOptions{Prefix: "foo/bar/tes", Recursive: true},
+				Objects: []string{"t/D", "t/E", "t/F"},
+			},
 		} {
 			result, _, err := object.ListObjects(ctx, project, bucketName, &tc.Opts)
 			require.NoError(t, err)
@@ -2317,6 +2329,25 @@ func TestListObject(t *testing.T) {
 			require.ElementsMatch(t, tc.Prefixes, prefixes, "opts: %v", tc.Opts)
 			require.ElementsMatch(t, tc.Objects, objects, "opts: %v", tc.Opts)
 		}
+	})
+}
+
+func TestListObjectWithPrefixError(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+		require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], bucketName, "foo/bar/A", testrand.Bytes(128)))
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+		_, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{Prefix: "foo"})
+		require.Errorf(t, err, "prefix should end with slash")
+		_, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{Prefix: "foo/"})
+		require.NoError(t, err)
 	})
 }
 

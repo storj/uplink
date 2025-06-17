@@ -1341,6 +1341,7 @@ type ListObjectsParams struct {
 	Recursive             bool
 	Status                int32
 	IncludeAllVersions    bool
+	ArbitraryPrefix       bool
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -1359,6 +1360,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 		Status:             pb.Object_Status(params.Status),
 		IncludeAllVersions: params.IncludeAllVersions,
 		VersionCursor:      params.VersionCursor,
+		ArbitraryPrefix:    params.ArbitraryPrefix,
 	}
 }
 

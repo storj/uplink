@@ -533,10 +533,6 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		return ObjectList{}, ErrNoBucket.New("")
 	}
 
-	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") {
-		return ObjectList{}, errClass.New("prefix should end with slash")
-	}
-
 	var startAfter string
 	switch options.Direction {
 	// TODO for now we are supporting only After
@@ -568,6 +564,15 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
+	encPrefix := []byte(pi.ParentEnc.Raw())
+	if pi.Cipher == storj.EncNull {
+		encPrefix = []byte(options.Prefix)
+	}
+
+	if options.Prefix != "" && !strings.HasSuffix(options.Prefix, "/") && pi.Cipher != storj.EncNull {
+		return ObjectList{}, errClass.New("prefix should end with slash")
+	}
+
 	startAfter, err = encryption.EncryptPathRaw(startAfter, pi.Cipher, &pi.ParentKey)
 	if err != nil {
 		return ObjectList{}, errClass.Wrap(err)
@@ -585,7 +590,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	for {
 		items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
 			Bucket:                []byte(bucket),
-			EncryptedPrefix:       []byte(pi.ParentEnc.Raw()),
+			EncryptedPrefix:       encPrefix,
 			EncryptedCursor:       startAfterEnc,
 			Limit:                 int32(options.Limit),
 			IncludeCustomMetadata: options.IncludeCustomMetadata,
@@ -594,6 +599,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 			Status:                options.Status,
 			IncludeAllVersions:    options.IncludeAllVersions,
 			VersionCursor:         versionCursor,
+			ArbitraryPrefix:       pi.Cipher == storj.EncNull,
 		})
 		if err != nil {
 			return ObjectList{}, errClass.Wrap(err)
