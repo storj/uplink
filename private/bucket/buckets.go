@@ -30,10 +30,16 @@ var (
 	// ErrBucketInvalidStateObjectLock is returned when attempting to set object lock without versioning enabled.
 	// This error is also returned when attempting to suspend versioning when object lock is enabled on the bucket.
 	ErrBucketInvalidStateObjectLock = errors.New("object lock requires bucket versioning to be enabled")
+
+	// ErrTagsNotFound is returned when no tags were found on a bucket.
+	ErrTagsNotFound = errors.New("tags not found")
 )
 
 // Bucket contains information about the bucket.
 type Bucket metaclient.Bucket
+
+// Tag represents a bucket tag.
+type Tag = metaclient.BucketTag
 
 // ListBucketsOptions defines bucket listing options.
 type ListBucketsOptions struct {
@@ -110,6 +116,26 @@ func GetBucketLocation(ctx context.Context, project *uplink.Project, bucketName 
 	return string(response.Location), convertKnownErrors(err, bucketName, "")
 }
 
+// GetBucketTagging returns the set of tags placed on a bucket.
+func GetBucketTagging(ctx context.Context, project *uplink.Project, bucketName string) (_ []Tag, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return nil, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	response, err := metainfoClient.GetBucketTagging(ctx, metaclient.GetBucketTaggingParams{
+		Name: []byte(bucketName),
+	})
+	return response.Tags, packageConvertKnownErrors(err, bucketName, "")
+}
+
 // GetBucketVersioning returns bucket versioning state.
 func GetBucketVersioning(ctx context.Context, project *uplink.Project, bucketName string) (_ int32, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -149,11 +175,8 @@ func SetBucketVersioning(ctx context.Context, project *uplink.Project, bucketNam
 		Name:       []byte(bucketName),
 		Versioning: versioning,
 	})
-	if errs2.IsRPC(err, rpcstatus.ObjectLockInvalidBucketState) {
-		err = ErrBucketInvalidStateObjectLock
-	}
 
-	return convertKnownErrors(err, bucketName, "")
+	return packageConvertKnownErrors(err, bucketName, "")
 }
 
 // CreateBucketWithObjectLockParams contains parameters for CreateBucketWithObjectLock method.
@@ -208,18 +231,11 @@ func GetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 	response, err := metainfoClient.GetBucketObjectLockConfiguration(ctx, metaclient.GetBucketObjectLockConfigurationParams{
 		Name: []byte(bucketName),
 	})
-	// TODO: remove when we expose those in convertKnownErrors
-	switch {
-	case metaclient.ErrProjectNoLock.Has(err):
-		err = privateProject.ErrProjectNoLock
-	case metaclient.ErrBucketNoLock.Has(err):
-		err = ErrBucketNoLock
-	}
 
 	return &metaclient.BucketObjectLockConfiguration{
 		Enabled:          response.Enabled,
 		DefaultRetention: response.DefaultRetention,
-	}, convertKnownErrors(err, bucketName, "")
+	}, packageConvertKnownErrors(err, bucketName, "")
 }
 
 // SetBucketObjectLockConfiguration updates bucket object lock configuration.
@@ -250,14 +266,7 @@ func SetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 		DefaultRetention: config.DefaultRetention,
 	})
 
-	switch {
-	case metaclient.ErrBucketInvalidObjectLockConfig.Has(err):
-		err = ErrBucketInvalidObjectLockConfig
-	case metaclient.ErrBucketInvalidStateObjectLock.Has(err):
-		err = ErrBucketInvalidStateObjectLock
-	}
-
-	return convertKnownErrors(err, bucketName, "")
+	return packageConvertKnownErrors(err, bucketName, "")
 }
 
 // DeleteBucketWithObjectsBypassGovernanceRetention deletes all objects in the bucket and bypasses any object lock settings.
@@ -292,6 +301,23 @@ func DeleteBucketWithObjectsBypassGovernanceRetention(ctx context.Context, proje
 		Name:    existing.Name,
 		Created: existing.Created,
 	}, nil
+}
+
+func packageConvertKnownErrors(err error, bucket, key string) error {
+	switch {
+	case metaclient.ErrProjectNoLock.Has(err):
+		return privateProject.ErrProjectNoLock
+	case metaclient.ErrBucketNoLock.Has(err):
+		return ErrBucketNoLock
+	case metaclient.ErrBucketInvalidObjectLockConfig.Has(err):
+		return ErrBucketInvalidObjectLockConfig
+	case metaclient.ErrBucketInvalidStateObjectLock.Has(err):
+		return ErrBucketInvalidStateObjectLock
+	case metaclient.ErrBucketTagsNotFound.Has(err):
+		return ErrTagsNotFound
+	}
+
+	return convertKnownErrors(err, bucket, key)
 }
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors

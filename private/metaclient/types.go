@@ -214,6 +214,9 @@ var (
 	// ErrBucketNotFound is an error class for non-existing bucket.
 	ErrBucketNotFound = errs.Class("bucket not found")
 
+	// ErrBucketTagsNotFound is returned when no tags were found on a bucket.
+	ErrBucketTagsNotFound = errs.Class("tags not found on bucket")
+
 	// ErrBucketNoLock is an error class for cases when object lock is not enabled for a bucket.
 	ErrBucketNoLock = errs.Class("no bucket object lock")
 
@@ -238,6 +241,12 @@ type Bucket struct {
 	Name        string
 	Created     time.Time
 	Attribution string
+}
+
+// BucketTag represents a bucket tag.
+type BucketTag struct {
+	Key   string
+	Value string
 }
 
 // DefaultRetention contains information about a bucket's default retention.

@@ -634,6 +634,10 @@ func (client *Client) GetObjectRetention(ctx context.Context, params GetObjectRe
 }
 
 func convertErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+
 	message := internal.RootError(err).Error()
 	switch {
 	case strings.HasPrefix(message, "bucket not found"):
@@ -662,6 +666,8 @@ func convertErrors(err error) error {
 		return ErrInvalidPlacement.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.PlacementConflictingValues):
 		return ErrConflictingPlacement.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.TagsNotFound):
+		return ErrBucketTagsNotFound.Wrap(err)
 	default:
 		return err
 	}

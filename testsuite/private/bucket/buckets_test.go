@@ -19,7 +19,7 @@ import (
 	"storj.io/storj/satellite/console"
 	"storj.io/storj/satellite/nodeselection"
 	"storj.io/uplink"
-	"storj.io/uplink/private/bucket"
+	privateBucket "storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -58,7 +58,7 @@ func TestListBucketsWithAttribution(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		iterator := bucket.ListBucketsWithAttribution(ctx, project, nil)
+		iterator := privateBucket.ListBucketsWithAttribution(ctx, project, nil)
 		for iterator.Next() {
 			item := iterator.Item()
 			userAgent, ok := testCases[item.Name]
@@ -89,18 +89,18 @@ func TestGetBucketLocation(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		// no bucket name
-		_, err = bucket.GetBucketLocation(ctx, project, "")
+		_, err = privateBucket.GetBucketLocation(ctx, project, "")
 		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
 
 		// bucket not exists
-		_, err = bucket.GetBucketLocation(ctx, project, "test-bucket")
+		_, err = privateBucket.GetBucketLocation(ctx, project, "test-bucket")
 		require.ErrorIs(t, err, uplink.ErrBucketNotFound)
 
 		err = planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "test-bucket")
 		require.NoError(t, err)
 
 		// bucket without location
-		location, err := bucket.GetBucketLocation(ctx, project, "test-bucket")
+		location, err := privateBucket.GetBucketLocation(ctx, project, "test-bucket")
 		require.NoError(t, err)
 		require.Empty(t, location)
 
@@ -112,7 +112,7 @@ func TestGetBucketLocation(t *testing.T) {
 		require.NoError(t, err)
 
 		// bucket with location
-		location, err = bucket.GetBucketLocation(ctx, project, "test-bucket")
+		location, err = privateBucket.GetBucketLocation(ctx, project, "test-bucket")
 		require.NoError(t, err)
 		require.Equal(t, "Poland", location)
 	})
@@ -152,14 +152,14 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, storj.EU)
 		require.NoError(t, err)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:      bucketName,
 			Placement: "Poland",
 		})
 		// cannot create bucket with custom placement if there is project default.
 		require.True(t, metaclient.ErrConflictingPlacement.Has(err))
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name: bucketName,
 		})
 		require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		// This is a new caveat related to billing for the self-serve placement feature.
 		bucketName1 := "bucket1"
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:      bucketName1,
 			Placement: "Poland",
 		})
@@ -196,7 +196,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName1), projectID)
 		require.NoError(t, err)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:      bucketName1,
 			Placement: "EU", // invalid placement
 		})
@@ -210,7 +210,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		// passing invalid placement should not fail if self-serve placement is disabled.
 		// This is for backward compatibility with integration tests that'll pass placements
 		// regardless of self-serve placement being enabled or not.
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:      bucketName2,
 			Placement: "EU", // invalid placement
 		})
@@ -266,7 +266,7 @@ func TestSetBucketVersioning(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.NotNil(t, testBucket)
-				err = bucket.SetBucketVersioning(ctx, project, testBucket.Name, tt.versioning)
+				err = privateBucket.SetBucketVersioning(ctx, project, testBucket.Name, tt.versioning)
 				// only 3 error state transitions
 				if tt.initialVersioningState == buckets.VersioningUnsupported ||
 					(tt.initialVersioningState == buckets.Unversioned && tt.versioning == suspend) {
@@ -274,7 +274,7 @@ func TestSetBucketVersioning(t *testing.T) {
 				} else {
 					require.NoError(t, err)
 				}
-				versioningState, err := bucket.GetBucketVersioning(ctx, project, testBucket.Name)
+				versioningState, err := privateBucket.GetBucketVersioning(ctx, project, testBucket.Name)
 				require.NoError(t, err)
 				require.Equal(t, tt.resultantVersioningState, buckets.Versioning(versioningState))
 			})
@@ -313,11 +313,11 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		// permission denied for older API key version
-		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		_, err = privateBucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
 		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
 
 		// permission denied for older API key version
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              "some-bucket",
 			ObjectLockEnabled: true,
 		})
@@ -342,26 +342,26 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		defer ctx.Check(project.Close)
 
 		// bucket not exists
-		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		_, err = privateBucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
 		require.ErrorIs(t, err, uplink.ErrBucketNotFound)
 
 		// no bucket name
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              "",
 			ObjectLockEnabled: false,
 		})
 		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              "test-bucket",
 			ObjectLockEnabled: false,
 		})
 		require.NoError(t, err)
 
-		_, err = bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
-		require.ErrorIs(t, err, bucket.ErrBucketNoLock)
+		_, err = privateBucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket")
+		require.ErrorIs(t, err, privateBucket.ErrBucketNoLock)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              "test-bucket",
 			ObjectLockEnabled: true,
 		})
@@ -371,13 +371,13 @@ func TestCreateBucketWithObjectLock(t *testing.T) {
 		_, err = project.DeleteBucketWithObjects(ctx, "test-bucket")
 		require.NoError(t, err)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              "test-bucket2",
 			ObjectLockEnabled: true,
 		})
 		require.NoError(t, err)
 
-		configuration, err := bucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
+		configuration, err := privateBucket.GetBucketObjectLockConfiguration(ctx, project, "test-bucket2")
 		require.NoError(t, err)
 		require.True(t, configuration.Enabled)
 		require.Nil(t, configuration.DefaultRetention)
@@ -421,7 +421,7 @@ func TestSetBucketObjectLockConfig(t *testing.T) {
 		bucketName := "test-bucket"
 
 		// permission denied for older API key version
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, &metaclient.BucketObjectLockConfiguration{})
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, &metaclient.BucketObjectLockConfiguration{})
 		require.ErrorIs(t, err, uplink.ErrPermissionDenied)
 
 		err = project.Close()
@@ -445,23 +445,23 @@ func TestSetBucketObjectLockConfig(t *testing.T) {
 		config := &metaclient.BucketObjectLockConfiguration{Enabled: true}
 
 		// no bucket name
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, "", config)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, "", config)
 		require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
 
 		// bucket not exists
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
 		require.ErrorIs(t, err, uplink.ErrBucketNotFound)
 
-		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{
+		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name:              bucketName,
 			ObjectLockEnabled: false,
 		})
 		require.NoError(t, err)
 
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
 		require.NoError(t, err)
 
-		configResp, err := bucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
+		configResp, err := privateBucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
 		require.NoError(t, err)
 		require.True(t, configResp.Enabled)
 
@@ -472,21 +472,21 @@ func TestSetBucketObjectLockConfig(t *testing.T) {
 			Days:  duration,
 		}
 
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
-		require.ErrorIs(t, err, bucket.ErrBucketInvalidObjectLockConfig)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.ErrorIs(t, err, privateBucket.ErrBucketInvalidObjectLockConfig)
 
 		config.DefaultRetention.Years = 0
 		config.DefaultRetention.Mode = storj.NoRetention
 
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
-		require.ErrorIs(t, err, bucket.ErrBucketInvalidObjectLockConfig)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		require.ErrorIs(t, err, privateBucket.ErrBucketInvalidObjectLockConfig)
 
 		config.DefaultRetention.Mode = storj.GovernanceMode
 
-		err = bucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
+		err = privateBucket.SetBucketObjectLockConfiguration(ctx, project, bucketName, config)
 		require.NoError(t, err)
 
-		configResp, err = bucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
+		configResp, err = privateBucket.GetBucketObjectLockConfiguration(ctx, project, bucketName)
 		require.NoError(t, err)
 		require.True(t, configResp.Enabled)
 		require.NotNil(t, configResp.DefaultRetention)
@@ -527,6 +527,78 @@ func TestSuspendVersioningObjectLock(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.ErrorIs(t, bucket.SetBucketVersioning(ctx, project, "test-bucket", false), bucket.ErrBucketInvalidStateObjectLock)
+		require.ErrorIs(t, privateBucket.SetBucketVersioning(ctx, project, "test-bucket", false), privateBucket.ErrBucketInvalidStateObjectLock)
+	})
+}
+
+func TestGetBucketTagging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.BucketTaggingEnabled = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		const bucketName = "test-bucket"
+		_, err = sat.API.DB.Buckets().CreateBucket(ctx, buckets.Bucket{
+			ProjectID: projectID,
+			Name:      bucketName,
+		})
+		require.NoError(t, err)
+
+		t.Run("Nonexistent bucket", func(t *testing.T) {
+			_, err := privateBucket.GetBucketTagging(ctx, project, "nonexistent-bucket")
+			require.ErrorIs(t, err, uplink.ErrBucketNotFound)
+		})
+
+		t.Run("No tags", func(t *testing.T) {
+			_, err := privateBucket.GetBucketTagging(ctx, project, bucketName)
+			require.ErrorIs(t, err, privateBucket.ErrTagsNotFound)
+		})
+
+		t.Run("Basic", func(t *testing.T) {
+			expectedTags := []privateBucket.Tag{
+				{
+					Key:   "abcdeABCDE01234+-./:=@_",
+					Value: "_@=:/.-+fghijFGHIJ56789",
+				},
+				{
+					Key:   string([]rune{'Ա', 'א', 'ء', 'ऄ', 'ঀ', '٠', '०', '০'}),
+					Value: string([]rune{'ֆ', 'ת', 'ي', 'ह', 'হ', '٩', '९', '৯'}),
+				},
+				{
+					Key:   "\t\n\v\f\r \xc2\x85\xc2\xa0\u1680\u2002",
+					Value: "\u3000\u2003\xc2\xa0\xc2\x85 \r\f\v\n\t",
+				},
+				{
+					Key:   "key",
+					Value: "",
+				},
+			}
+
+			var dbTags []buckets.Tag
+			for _, tag := range expectedTags {
+				dbTags = append(dbTags, buckets.Tag(tag))
+			}
+			require.NoError(t, sat.DB.Buckets().SetBucketTagging(ctx, []byte(bucketName), projectID, dbTags))
+
+			tags, err := privateBucket.GetBucketTagging(ctx, project, bucketName)
+			require.NoError(t, err)
+			require.Equal(t, expectedTags, tags)
+		})
+
+		t.Run("Missing bucket name", func(t *testing.T) {
+			_, err := privateBucket.GetBucketTagging(ctx, project, "")
+			require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
+		})
 	})
 }

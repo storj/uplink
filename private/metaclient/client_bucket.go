@@ -183,6 +183,58 @@ func (client *Client) GetBucketLocation(ctx context.Context, params GetBucketLoc
 	}, nil
 }
 
+// GetBucketTaggingParams represents parameters for the GetBucketTagging method.
+type GetBucketTaggingParams struct {
+	Name []byte
+}
+
+func (params *GetBucketTaggingParams) toRequest(header *pb.RequestHeader) *pb.GetBucketTaggingRequest {
+	return &pb.GetBucketTaggingRequest{
+		Header: header,
+		Name:   params.Name,
+	}
+}
+
+// BatchItem returns single item for a batch request.
+func (params *GetBucketTaggingParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketGetTagging{
+			BucketGetTagging: params.toRequest(nil),
+		},
+	}
+}
+
+// GetBucketTaggingResponse represents the response to a GetBucketTagging request.
+type GetBucketTaggingResponse struct {
+	Tags []BucketTag
+}
+
+// GetBucketTagging returns the set of tags placed on a bucket.
+func (client *Client) GetBucketTagging(ctx context.Context, params GetBucketTaggingParams) (_ GetBucketTaggingResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetBucketTaggingResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetBucketTagging(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return GetBucketTaggingResponse{}, Error.Wrap(convertErrors(err))
+	}
+
+	tags := make([]BucketTag, 0, len(response.Tags))
+	for _, protoTag := range response.Tags {
+		tags = append(tags, BucketTag{
+			Key:   string(protoTag.Key),
+			Value: string(protoTag.Value),
+		})
+	}
+
+	return GetBucketTaggingResponse{
+		Tags: tags,
+	}, nil
+}
+
 // GetBucketVersioningParams parameters for GetBucketVersioning method.
 type GetBucketVersioningParams struct {
 	Name []byte
@@ -258,7 +310,7 @@ func (client *Client) SetBucketVersioning(ctx context.Context, params SetBucketV
 		_, err = client.client.SetBucketVersioning(ctx, params.toRequest(client.header()))
 		return err
 	})
-	return Error.Wrap(err)
+	return Error.Wrap(convertErrors(err))
 }
 
 // GetBucketObjectLockConfigurationParams parameters for GetBucketObjectLockConfiguration method.
