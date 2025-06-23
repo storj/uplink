@@ -235,6 +235,47 @@ func (client *Client) GetBucketTagging(ctx context.Context, params GetBucketTagg
 	}, nil
 }
 
+// SetBucketTaggingParams represents parameters for the SetBucketTagging method.
+type SetBucketTaggingParams struct {
+	Name []byte
+	Tags []BucketTag
+}
+
+func (params *SetBucketTaggingParams) toRequest(header *pb.RequestHeader) *pb.SetBucketTaggingRequest {
+	pbTags := make([]*pb.BucketTag, 0, len(params.Tags))
+	for _, tag := range params.Tags {
+		pbTags = append(pbTags, &pb.BucketTag{
+			Key:   []byte(tag.Key),
+			Value: []byte(tag.Value),
+		})
+	}
+	return &pb.SetBucketTaggingRequest{
+		Header: header,
+		Name:   params.Name,
+		Tags:   pbTags,
+	}
+}
+
+// BatchItem returns single item for a batch request.
+func (params *SetBucketTaggingParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketSetTagging{
+			BucketSetTagging: params.toRequest(nil),
+		},
+	}
+}
+
+// SetBucketTagging places a set of tags on a bucket.
+func (client *Client) SetBucketTagging(ctx context.Context, params SetBucketTaggingParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetBucketTagging(ctx, params.toRequest(client.header()))
+		return err
+	})
+	return Error.Wrap(convertErrors(err))
+}
+
 // GetBucketVersioningParams parameters for GetBucketVersioning method.
 type GetBucketVersioningParams struct {
 	Name []byte
@@ -271,7 +312,7 @@ func (client *Client) GetBucketVersioning(ctx context.Context, params GetBucketV
 		return err
 	})
 	if err != nil {
-		return GetBucketVersioningResponse{}, Error.Wrap(err)
+		return GetBucketVersioningResponse{}, Error.Wrap(convertErrors(err))
 	}
 
 	return GetBucketVersioningResponse{

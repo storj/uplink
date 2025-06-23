@@ -33,6 +33,18 @@ var (
 
 	// ErrTagsNotFound is returned when no tags were found on a bucket.
 	ErrTagsNotFound = errors.New("tags not found")
+
+	// ErrTooManyTags is returned when a set of tags is too long.
+	ErrTooManyTags = errors.New("too many tags")
+
+	// ErrTagKeyInvalid is returned when the key of a tag is invalid.
+	ErrTagKeyInvalid = errors.New("tag key invalid")
+
+	// ErrTagKeyDuplicate is returned when a set of tags contains multiple tags with the same key.
+	ErrTagKeyDuplicate = errors.New("tag key is duplicated")
+
+	// ErrTagValueInvalid is returned when the value of a tag is invalid.
+	ErrTagValueInvalid = errors.New("tag value invalid")
 )
 
 // Bucket contains information about the bucket.
@@ -134,6 +146,28 @@ func GetBucketTagging(ctx context.Context, project *uplink.Project, bucketName s
 		Name: []byte(bucketName),
 	})
 	return response.Tags, packageConvertKnownErrors(err, bucketName, "")
+}
+
+// SetBucketTagging places a set of tags on a bucket.
+func SetBucketTagging(ctx context.Context, project *uplink.Project, bucketName string, tags []Tag) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	err = metainfoClient.SetBucketTagging(ctx, metaclient.SetBucketTaggingParams{
+		Name: []byte(bucketName),
+		Tags: tags,
+	})
+
+	return packageConvertKnownErrors(err, bucketName, "")
 }
 
 // GetBucketVersioning returns bucket versioning state.
@@ -315,6 +349,14 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 		return ErrBucketInvalidStateObjectLock
 	case metaclient.ErrBucketTagsNotFound.Has(err):
 		return ErrTagsNotFound
+	case metaclient.ErrTooManyBucketTags.Has(err):
+		return ErrTooManyTags
+	case metaclient.ErrBucketTagKeyInvalid.Has(err):
+		return ErrTagKeyInvalid
+	case metaclient.ErrBucketTagKeyDuplicate.Has(err):
+		return ErrTagKeyDuplicate
+	case metaclient.ErrBucketTagValueInvalid.Has(err):
+		return ErrTagValueInvalid
 	}
 
 	return convertKnownErrors(err, bucket, key)

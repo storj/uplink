@@ -217,6 +217,18 @@ var (
 	// ErrBucketTagsNotFound is returned when no tags were found on a bucket.
 	ErrBucketTagsNotFound = errs.Class("tags not found on bucket")
 
+	// ErrTooManyBucketTags is returned when a set of bucket tags is too long.
+	ErrTooManyBucketTags = errs.Class("too many bucket tags")
+
+	// ErrBucketTagKeyInvalid is returned when the key of a bucket tag is invalid.
+	ErrBucketTagKeyInvalid = errs.Class("bucket tag key invalid")
+
+	// ErrBucketTagKeyDuplicate is returned when a set of bucket tags contains multiple tags with the same key.
+	ErrBucketTagKeyDuplicate = errs.Class("bucket tag key is duplicated")
+
+	// ErrBucketTagValueInvalid is returned when the value of a bucket tag is invalid.
+	ErrBucketTagValueInvalid = errs.Class("bucket tag value invalid")
+
 	// ErrBucketNoLock is an error class for cases when object lock is not enabled for a bucket.
 	ErrBucketNoLock = errs.Class("no bucket object lock")
 

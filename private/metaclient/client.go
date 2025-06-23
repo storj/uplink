@@ -668,6 +668,14 @@ func convertErrors(err error) error {
 		return ErrConflictingPlacement.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.TagsNotFound):
 		return ErrBucketTagsNotFound.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.TooManyTags):
+		return ErrTooManyBucketTags.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.TagKeyInvalid):
+		return ErrBucketTagKeyInvalid.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.TagKeyDuplicate):
+		return ErrBucketTagKeyDuplicate.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.TagValueInvalid):
+		return ErrBucketTagValueInvalid.Wrap(err)
 	default:
 		return err
 	}

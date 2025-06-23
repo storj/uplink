@@ -13,6 +13,7 @@ import (
 	"storj.io/common/macaroon"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
+	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
@@ -600,5 +601,145 @@ func TestGetBucketTagging(t *testing.T) {
 			_, err := privateBucket.GetBucketTagging(ctx, project, "")
 			require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
 		})
+	})
+}
+
+func TestSetBucketTagging(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.BucketTaggingEnabled = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		bucketsDB := sat.DB.Buckets()
+		projectID := upl.Projects[0].ID
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		const bucketName = "test-bucket"
+		_, err = bucketsDB.CreateBucket(ctx, buckets.Bucket{
+			ProjectID: projectID,
+			Name:      bucketName,
+		})
+		require.NoError(t, err)
+
+		requireTags := func(t *testing.T, bucketName string, expectedTags []privateBucket.Tag) {
+			dbTags, err := bucketsDB.GetBucketTagging(ctx, []byte(bucketName), projectID)
+			require.NoError(t, err)
+
+			if len(expectedTags) == 0 {
+				require.Empty(t, dbTags)
+				return
+			}
+
+			var tags []privateBucket.Tag
+			for _, tag := range dbTags {
+				tags = append(tags, privateBucket.Tag(tag))
+			}
+			require.Equal(t, expectedTags, tags)
+		}
+
+		t.Run("Nonexistent bucket", func(t *testing.T) {
+			err := privateBucket.SetBucketTagging(ctx, project, "nonexistent-bucket", []privateBucket.Tag{})
+			require.ErrorIs(t, err, uplink.ErrBucketNotFound)
+		})
+
+		t.Run("No tags", func(t *testing.T) {
+			err := bucketsDB.SetBucketTagging(ctx, []byte(bucketName), projectID, []buckets.Tag{{
+				Key:   "key",
+				Value: "value",
+			}})
+			require.NoError(t, err)
+
+			require.NoError(t, privateBucket.SetBucketTagging(ctx, project, bucketName, nil))
+			requireTags(t, bucketName, nil)
+		})
+
+		t.Run("Basic", func(t *testing.T) {
+			expectedTags := []privateBucket.Tag{
+				{
+					Key:   "abcdeABCDE01234+-./:=@_",
+					Value: "_@=:/.-+fghijFGHIJ56789",
+				},
+				{
+					Key:   string([]rune{'Ա', 'א', 'ء', 'ऄ', 'ঀ', '٠', '०', '০'}),
+					Value: string([]rune{'ֆ', 'ת', 'ي', 'ह', 'হ', '٩', '९', '৯'}),
+				},
+				{
+					Key:   "\t\n\v\f\r \xc2\x85\xc2\xa0\u1680\u2002",
+					Value: "\u3000\u2003\xc2\xa0\xc2\x85 \r\f\v\n\t",
+				},
+				{
+					Key:   "key",
+					Value: "",
+				},
+			}
+			require.NoError(t, privateBucket.SetBucketTagging(ctx, project, bucketName, expectedTags))
+
+			requireTags(t, bucketName, expectedTags)
+		})
+
+		t.Run("Missing bucket name", func(t *testing.T) {
+			err := privateBucket.SetBucketTagging(ctx, project, "", nil)
+			require.ErrorIs(t, err, uplink.ErrBucketNameInvalid)
+		})
+
+		var tooManyTags []privateBucket.Tag
+		for range 51 {
+			tooManyTags = append(tooManyTags, privateBucket.Tag{
+				Key:   string(testrand.RandAlphaNumeric(32)),
+				Value: string(testrand.RandAlphaNumeric(32)),
+			})
+		}
+
+		for _, tt := range []struct {
+			name          string
+			tags          []privateBucket.Tag
+			expectedError error
+		}{
+			{
+				name: "Tag key too long",
+				tags: []privateBucket.Tag{{
+					Key: string(testrand.RandAlphaNumeric(129)),
+				}},
+				expectedError: privateBucket.ErrTagKeyInvalid,
+			},
+			{
+				name: "Tag value too long",
+				tags: []privateBucket.Tag{{
+					Key:   "key",
+					Value: string(testrand.RandAlphaNumeric(257)),
+				}},
+				expectedError: privateBucket.ErrTagValueInvalid,
+			},
+			{
+				name: "Duplicate tag key",
+				tags: []privateBucket.Tag{
+					{Key: "key", Value: "foo"},
+					{Key: "key", Value: "bar"},
+				},
+				expectedError: privateBucket.ErrTagKeyDuplicate,
+			},
+			{
+				name:          "Too many tags",
+				tags:          tooManyTags,
+				expectedError: privateBucket.ErrTooManyTags,
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				err := privateBucket.SetBucketTagging(ctx, project, bucketName, tt.tags)
+				if tt.expectedError == nil {
+					require.NoError(t, err)
+					return
+				}
+				require.ErrorIs(t, err, tt.expectedError)
+			})
+		}
 	})
 }
