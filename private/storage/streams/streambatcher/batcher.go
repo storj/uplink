@@ -29,7 +29,7 @@ type Info struct {
 	// Version is object version retrieved from CommitObject batch item.
 	Version []byte
 
-	// IsVersion is retrieved from CommitObject batch item.
+	// IsVersioned is retrieved from CommitObject batch item.
 	IsVersioned bool
 }
 
