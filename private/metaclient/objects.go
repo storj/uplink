@@ -645,7 +645,9 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 		}
 
 		var unencKey paths.Unencrypted
-		if pi.ParentEnc.Valid() {
+		if pi.Cipher == storj.EncNull && pi.PathEnc.Valid() {
+			unencKey = paths.NewUnencrypted(pi.PathEnc.Raw() + unencItem)
+		} else if pi.ParentEnc.Valid() {
 			unencKey = paths.NewUnencrypted(pi.ParentUnenc.Raw() + "/" + unencItem)
 		} else {
 			unencKey = paths.NewUnencrypted(unencItem)

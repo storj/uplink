@@ -2430,6 +2430,68 @@ func TestDownloadObject_DownloadSegment_ServerSideCopy(t *testing.T) {
 	})
 }
 
+func TestListObjectWithArbitraryPrefixMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.DefaultPathCipher = storj.EncNull
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		objectKeys := []string{
+			"prefix1filea.txt",
+			"prefix1fileb.txt",
+			"prefix2filec.txt",
+			"prefix2filed.txt",
+			"otherfile.txt",
+		}
+
+		metadata := uplink.CustomMetadata{
+			"test-key": "test-value",
+		}
+
+		// Upload objects with custom metadata
+		for _, key := range objectKeys {
+			upload, err := project.UploadObject(ctx, bucketName, key, nil)
+			require.NoError(t, err)
+
+			err = upload.SetCustomMetadata(ctx, metadata)
+			require.NoError(t, err)
+
+			_, err = upload.Write(testrand.Bytes(100))
+			require.NoError(t, err)
+
+			err = upload.Commit()
+			require.NoError(t, err)
+		}
+
+		// Test listing with arbitrary prefix - this should work correctly with EncNull
+		// and test the metadata decryption
+		result, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			Prefix:    "prefix1",
+			Recursive: true,
+			Custom:    true,
+		})
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+
+		// Verify that objects can be listed and metadata decryption works
+		for _, item := range result {
+			require.Contains(t, []string{"filea.txt", "fileb.txt"}, item.Key)
+			require.Equal(t, metadata, item.Custom)
+			require.False(t, item.IsPrefix)
+		}
+	})
+}
+
 func randVersion() []byte {
 	randVersionID := metabase.Version(testrand.Int63n(int64(metabase.MaxVersion-1)) + 1)
 	return metabase.NewStreamVersionID(randVersionID, testrand.UUID()).Bytes()
