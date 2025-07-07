@@ -439,11 +439,34 @@ func UploadObject(ctx context.Context, project *uplink.Project, bucket, key stri
 	}, nil
 }
 
+// DownloadObjectOptions contains options for downloading an object.
+type DownloadObjectOptions struct {
+	// When Offset is negative it will read the suffix of the blob.
+	// Combining negative offset and positive length is not supported.
+	Offset int64
+	// When Length is negative it will read until the end of the blob.
+	Length int64
+
+	ServerSideCopy bool
+}
+
 // DownloadObject starts a download from the specific key and version. If version is empty latest object will be downloaded.
-func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *VersionedDownload, err error) {
+func DownloadObject(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *DownloadObjectOptions) (_ *VersionedDownload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	download, err := downloadObjectWithVersion(ctx, project, bucket, key, version, options)
+	var opts *metaclient.DownloadOptions
+	if options != nil {
+		sr, err := metaclient.NewStreamRange(options.Offset, options.Length)
+		if err != nil {
+			return nil, packageError.Wrap(err)
+		}
+		opts = &metaclient.DownloadOptions{
+			Range:          sr,
+			ServerSideCopy: options.ServerSideCopy,
+		}
+	}
+
+	download, err := downloadObjectWithVersion(ctx, project, bucket, key, version, opts)
 	if err != nil {
 		return nil, packageConvertKnownErrors(err, bucket, key)
 	}
@@ -659,7 +682,7 @@ func objectIsVersioned(object *uplink.Object) bool
 func objectIsLatest(object *uplink.Object) bool
 
 //go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
-func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.DownloadOptions) (_ *uplink.Download, err error)
+func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *metaclient.DownloadOptions) (_ *uplink.Download, err error)
 
 //go:linkname download_getMetaclientObject storj.io/uplink.download_getMetaclientObject
 func download_getMetaclientObject(dl *uplink.Download) *metaclient.Object

@@ -1387,87 +1387,8 @@ type DownloadObjectParams struct {
 	Version            []byte
 
 	Range StreamRange
-}
 
-// StreamRange contains range specification.
-type StreamRange struct {
-	Mode   StreamRangeMode
-	Start  int64
-	Limit  int64
-	Suffix int64
-}
-
-// StreamRangeMode contains different modes for range.
-type StreamRangeMode byte
-
-const (
-	// StreamRangeAll selects all.
-	StreamRangeAll StreamRangeMode = iota
-	// StreamRangeStart selects starting from range.Start.
-	StreamRangeStart
-	// StreamRangeStartLimit selects starting from range.Start to range.End (inclusive).
-	StreamRangeStartLimit
-	// StreamRangeSuffix selects last range.Suffix bytes.
-	StreamRangeSuffix
-)
-
-func (streamRange StreamRange) toProto() *pb.Range {
-	switch streamRange.Mode {
-	case StreamRangeAll:
-	case StreamRangeStart:
-		return &pb.Range{
-			Range: &pb.Range_Start{
-				Start: &pb.RangeStart{
-					PlainStart: streamRange.Start,
-				},
-			},
-		}
-	case StreamRangeStartLimit:
-		return &pb.Range{
-			Range: &pb.Range_StartLimit{
-				StartLimit: &pb.RangeStartLimit{
-					PlainStart: streamRange.Start,
-					PlainLimit: streamRange.Limit,
-				},
-			},
-		}
-	case StreamRangeSuffix:
-		return &pb.Range{
-			Range: &pb.Range_Suffix{
-				Suffix: &pb.RangeSuffix{
-					PlainSuffix: streamRange.Suffix,
-				},
-			},
-		}
-	}
-	return nil
-}
-
-// Normalize converts the range to a StreamRangeStartLimit or StreamRangeAll.
-func (streamRange StreamRange) Normalize(plainSize int64) StreamRange {
-	switch streamRange.Mode {
-	case StreamRangeAll:
-		streamRange.Start = 0
-		streamRange.Limit = plainSize
-	case StreamRangeStart:
-		streamRange.Mode = StreamRangeStartLimit
-		streamRange.Limit = plainSize
-	case StreamRangeStartLimit:
-	case StreamRangeSuffix:
-		streamRange.Mode = StreamRangeStartLimit
-		streamRange.Start = plainSize - streamRange.Suffix
-		streamRange.Limit = plainSize
-	}
-
-	if streamRange.Start < 0 {
-		streamRange.Start = 0
-	}
-	if streamRange.Limit > plainSize {
-		streamRange.Limit = plainSize
-	}
-	streamRange.Suffix = 0
-
-	return streamRange
+	ServerSideCopy bool
 }
 
 func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectDownloadRequest {
@@ -1477,6 +1398,7 @@ func (params *DownloadObjectParams) toRequest(header *pb.RequestHeader) *pb.Obje
 		EncryptedObjectKey: params.EncryptedObjectKey,
 		ObjectVersion:      params.Version,
 		Range:              params.Range.toProto(),
+		ServerSideCopy:     params.ServerSideCopy,
 	}
 }
 
@@ -1560,6 +1482,8 @@ func (client *Client) batchDownloadObject(ctx context.Context, params DownloadOb
 type DownloadSegmentParams struct {
 	StreamID storj.StreamID
 	Position SegmentPosition
+
+	ServerSideCopy bool
 }
 
 func (params *DownloadSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentDownloadRequest {
@@ -1570,6 +1494,7 @@ func (params *DownloadSegmentParams) toRequest(header *pb.RequestHeader) *pb.Seg
 			PartNumber: params.Position.PartNumber,
 			Index:      params.Position.Index,
 		},
+		ServerSideCopy: params.ServerSideCopy,
 	}
 }
 

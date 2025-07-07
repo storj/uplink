@@ -360,3 +360,111 @@ func (opts BucketListOptions) NextPage(list BucketList) BucketListOptions {
 		Limit:     opts.Limit,
 	}
 }
+
+// StreamRange contains range specification.
+type StreamRange struct {
+	Mode   StreamRangeMode
+	Start  int64
+	Limit  int64
+	Suffix int64
+}
+
+// StreamRangeMode contains different modes for range.
+type StreamRangeMode byte
+
+const (
+	// StreamRangeAll selects all.
+	StreamRangeAll StreamRangeMode = iota
+	// StreamRangeStart selects starting from range.Start.
+	StreamRangeStart
+	// StreamRangeStartLimit selects starting from range.Start to range.End (inclusive).
+	StreamRangeStartLimit
+	// StreamRangeSuffix selects last range.Suffix bytes.
+	StreamRangeSuffix
+)
+
+func (streamRange StreamRange) toProto() *pb.Range {
+	switch streamRange.Mode {
+	case StreamRangeAll:
+	case StreamRangeStart:
+		return &pb.Range{
+			Range: &pb.Range_Start{
+				Start: &pb.RangeStart{
+					PlainStart: streamRange.Start,
+				},
+			},
+		}
+	case StreamRangeStartLimit:
+		return &pb.Range{
+			Range: &pb.Range_StartLimit{
+				StartLimit: &pb.RangeStartLimit{
+					PlainStart: streamRange.Start,
+					PlainLimit: streamRange.Limit,
+				},
+			},
+		}
+	case StreamRangeSuffix:
+		return &pb.Range{
+			Range: &pb.Range_Suffix{
+				Suffix: &pb.RangeSuffix{
+					PlainSuffix: streamRange.Suffix,
+				},
+			},
+		}
+	}
+	return nil
+}
+
+// Normalize converts the range to a StreamRangeStartLimit or StreamRangeAll.
+func (streamRange StreamRange) Normalize(plainSize int64) StreamRange {
+	switch streamRange.Mode {
+	case StreamRangeAll:
+		streamRange.Start = 0
+		streamRange.Limit = plainSize
+	case StreamRangeStart:
+		streamRange.Mode = StreamRangeStartLimit
+		streamRange.Limit = plainSize
+	case StreamRangeStartLimit:
+	case StreamRangeSuffix:
+		streamRange.Mode = StreamRangeStartLimit
+		streamRange.Start = plainSize - streamRange.Suffix
+		streamRange.Limit = plainSize
+	}
+
+	if streamRange.Start < 0 {
+		streamRange.Start = 0
+	}
+	if streamRange.Limit > plainSize {
+		streamRange.Limit = plainSize
+	}
+	streamRange.Suffix = 0
+
+	return streamRange
+}
+
+// NewStreamRange creates a new StreamRange based on the offset and length.
+func NewStreamRange(offset, length int64) (streamRange StreamRange, err error) {
+	switch {
+	case offset < 0:
+		if length >= 0 {
+			return StreamRange{}, errs.New("suffix requires length to be negative, got %v", length)
+		}
+		streamRange = StreamRange{
+			Mode:   StreamRangeSuffix,
+			Suffix: -offset,
+		}
+	case length < 0:
+		streamRange = StreamRange{
+			Mode:  StreamRangeStart,
+			Start: offset,
+		}
+
+	default:
+		streamRange = StreamRange{
+			Mode:  StreamRangeStartLimit,
+			Start: offset,
+			Limit: offset + length,
+		}
+	}
+	return streamRange, nil
+}

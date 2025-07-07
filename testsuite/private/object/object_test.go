@@ -4,6 +4,7 @@
 package object_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"math/rand"
@@ -18,6 +19,7 @@ import (
 
 	"storj.io/common/macaroon"
 	"storj.io/common/memory"
+	"storj.io/common/pkcrypto"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -2348,6 +2350,83 @@ func TestListObjectWithPrefixError(t *testing.T) {
 		require.Errorf(t, err, "prefix should end with slash")
 		_, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{Prefix: "foo/"})
 		require.NoError(t, err)
+	})
+}
+
+func TestDownloadObject_DownloadSegment_ServerSideCopy(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.DefaultPathCipher = storj.EncNull
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		endpoint := planet.Satellites[0].API.Metainfo.Endpoint
+
+		now := time.Now()
+
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "test"))
+		err := planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test", "remote", testrand.Bytes(5*memory.KiB))
+		require.NoError(t, err)
+		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test", "inline", testrand.Bytes(500))
+		require.NoError(t, err)
+
+		// we need stable identity to add it to trusted uplinks
+		ident := planet.Uplinks[0].Identity
+
+		chainPEM := bytes.NewBuffer([]byte{})
+		require.NoError(t, pkcrypto.WriteCertPEM(chainPEM, ident.Chain()...))
+
+		keyPEM := bytes.NewBuffer([]byte{})
+		require.NoError(t, pkcrypto.WritePrivateKeyPEM(keyPEM, ident.Key))
+
+		config := uplink.Config{
+			ChainPEM: chainPEM.Bytes(),
+			KeyPEM:   keyPEM.Bytes(),
+		}
+
+		project, err := config.OpenProject(ctx, planet.Uplinks[0].Access[planet.Satellites[0].ID()])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		t.Run("untrusted uplink", func(t *testing.T) {
+			for _, objectKey := range []string{"remote", "inline"} {
+				_, err = object.DownloadObject(ctx, project, "test", objectKey, nil, &object.DownloadObjectOptions{
+					ServerSideCopy: true,
+				})
+				require.Error(t, err)
+			}
+		})
+		t.Run("trusted uplink", func(t *testing.T) {
+			endpoint.TestingAddTrustedUplink(ident.ID)
+
+			for _, objectKey := range []string{"remote", "inline"} {
+				func() {
+					download, err := object.DownloadObject(ctx, project, "test", objectKey, nil, &object.DownloadObjectOptions{
+						Offset:         0,
+						Length:         400,
+						ServerSideCopy: true,
+					})
+					require.NoError(t, err)
+					defer ctx.Check(download.Close)
+
+					data, err := io.ReadAll(download)
+					require.NoError(t, err)
+					require.Len(t, data, 400)
+				}()
+			}
+
+		})
+
+		for _, sn := range planet.StorageNodes {
+			sn.Storage2.Orders.SendOrders(ctx, now.Add(24*time.Hour))
+		}
+		planet.Satellites[0].Orders.Chore.Loop.TriggerWait()
+
+		usage, err := planet.Satellites[0].DB.ProjectAccounting().GetProjectTotal(ctx, planet.Uplinks[0].Projects[0].ID, now.Add(-time.Hour), now.Add(time.Hour))
+		require.NoError(t, err)
+		require.Zero(t, usage.Egress)
 	})
 }
 

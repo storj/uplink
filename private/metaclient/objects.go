@@ -678,6 +678,8 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 // DownloadOptions contains additional options for downloading.
 type DownloadOptions struct {
 	Range StreamRange
+
+	ServerSideCopy bool
 }
 
 // DownloadInfo contains response for DownloadObject.
@@ -710,6 +712,7 @@ func (db *DB) DownloadObject(ctx context.Context, bucket, key string, version []
 		EncryptedObjectKey: []byte(encPath.Raw()),
 		Version:            version,
 		Range:              options.Range,
+		ServerSideCopy:     options.ServerSideCopy,
 	})
 	if err != nil {
 		return DownloadInfo{}, err
