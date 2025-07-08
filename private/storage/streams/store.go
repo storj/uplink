@@ -77,14 +77,15 @@ type Store struct {
 }
 
 // NewStreamStore constructs a stream store.
-func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold, longTailMargin int, stallDetectionConfig *stalldetection.Config) (*Store, error) {
+func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold, longTailMargin int) (*Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
 	if encryptionParameters.BlockSize <= 0 {
 		return nil, errs.New("encryption block size must be larger than 0")
 	}
-
+	// Load stall detection env variables
+	stallDetectionConfig := stalldetection.ConfigFromEnv()
 	// TODO: this is a hack for now. Once the new upload codepath is enabled
 	// by default, we can clean this up and stop embedding the uploader in
 	// the streams store.

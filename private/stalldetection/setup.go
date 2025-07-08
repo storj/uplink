@@ -4,6 +4,9 @@
 package stalldetection
 
 import (
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"storj.io/eventkit"
@@ -12,8 +15,6 @@ import (
 var evs = eventkit.Package()
 
 // Config contains configuration for stall detection and handling.
-// Empty struct implies default values.
-// Nil implies stall manager is disabled.
 type Config struct {
 	// BaseUploads is the number of successful uploads that need to
 	// occur before we start considering whether remaining uploads have stalled.
@@ -34,35 +35,75 @@ type Config struct {
 	DynamicBaseUploads bool
 }
 
-// DefaultConfig provides default values for stall detection.
-var DefaultConfig = Config{
+// defaultConfig provides default values for stall detection.
+var defaultConfig = Config{
 	BaseUploads:      3,
 	Factor:           2,
 	MinStallDuration: 10 * time.Second,
 }
 
-// Setup updates the stall detection config values to their finals.
-// Uses defaults when out of range or unassigned.
-func (c *Config) Setup(totalNodes int) {
-	if c.Factor < 1 {
-		c.Factor = DefaultConfig.Factor
+// ConfigFromEnv creates a config from the environment variables.
+func ConfigFromEnv() (config *Config) {
+	if !isEnabled() {
+		return nil
 	}
-	if c.BaseUploads < 1 {
-		c.BaseUploads = DefaultConfig.BaseUploads
+	return &Config{
+		BaseUploads:        getEnvInt("STORJ_STALL_DETECTION_BASE_UPLOADS", defaultConfig.BaseUploads),
+		Factor:             getEnvInt("STORJ_STALL_DETECTION_FACTOR", defaultConfig.Factor),
+		MinStallDuration:   getEnvDuration("STORJ_STALL_DETECTION_MIN_DURATION", defaultConfig.MinStallDuration),
+		DynamicBaseUploads: strings.ToLower(os.Getenv("STORJ_STALL_DETECTION_DYNAMIC_BASE")) == "true",
 	}
-	if c.DynamicBaseUploads && totalNodes > 0 {
-		c.BaseUploads = totalNodes / 2
-	}
+}
 
-	if c.MinStallDuration <= 0 {
-		c.MinStallDuration = DefaultConfig.MinStallDuration
+// SetDefaults sets config to defaults if includes invalid parameters.
+// Sets BaseUploads from RS scheme if DyanmicBaseUploads is true.
+func (c *Config) SetDefaults(totalNodes int) (config *Config) {
+	configCopy := *c
+	config = &configCopy
+
+	if config.DynamicBaseUploads && totalNodes > 1 {
+		config.BaseUploads = totalNodes / 2
+	}
+	if config.Factor < 1 {
+		config.Factor = defaultConfig.Factor
+	}
+	if config.BaseUploads < 1 {
+		config.BaseUploads = defaultConfig.BaseUploads
+	}
+	if config.MinStallDuration <= 0 {
+		config.MinStallDuration = defaultConfig.MinStallDuration
 	}
 
 	evs.Event("stall-detection-config-setup",
-		eventkit.Int64("base_uploads", int64(c.BaseUploads)),
-		eventkit.Int64("factor", int64(c.Factor)),
-		eventkit.Duration("min_stall_duration", c.MinStallDuration),
-		eventkit.Bool("dynamic_base_uploads", c.DynamicBaseUploads),
+		eventkit.Int64("base_uploads", int64(config.BaseUploads)),
+		eventkit.Int64("factor", int64(config.Factor)),
+		eventkit.Duration("min_stall_duration", config.MinStallDuration),
+		eventkit.Bool("dynamic_base_uploads", config.DynamicBaseUploads),
 		eventkit.Int64("total_nodes", int64(totalNodes)),
 	)
+	return config
+}
+
+// isEnabledFromEnv checks if stall detection is enabled via environment variables
+func isEnabled() bool {
+	return strings.ToLower(os.Getenv("STORJ_STALL_DETECTION_ENABLED")) == "true"
+}
+
+// Helper functions for environment variable parsing
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultVal
+}
+
+func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultVal
 }

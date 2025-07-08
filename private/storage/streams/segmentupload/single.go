@@ -117,10 +117,10 @@ func Begin(ctx context.Context,
 	// Set up StallManager.
 	var stallManager *pieceupload.StallManager
 	if stallDetectionConfig != nil {
-		total := beginSegment.RedundancyStrategy.TotalCount()
-		stallDetectionConfig.Setup(total)
+		stallDetectionConfig.SetDefaults(beginSegment.RedundancyStrategy.TotalCount())
 		stallManager = pieceupload.NewStallManager()
 	}
+
 	uploadStart := time.Now()
 
 	results := make(chan segmentResult, uploaderCount)

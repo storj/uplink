@@ -145,11 +145,12 @@ type Uploader struct {
 	encryptionParameters storj.EncryptionParameters
 	inlineThreshold      int
 	longTailMargin       int
-	stallDetectionConfig *stalldetection.Config
 
 	// The backend is fixed to the real backend in production but is overridden
 	// for testing.
 	backend uploaderBackend
+
+	stallDetectionConfig *stalldetection.Config
 }
 
 // NewUploader constructs a new stream putter.
@@ -170,8 +171,8 @@ func NewUploader(metainfo MetainfoUpload, piecePutter pieceupload.PiecePutter, s
 		encryptionParameters: encryptionParameters,
 		inlineThreshold:      inlineThreshold,
 		longTailMargin:       longTailMargin,
-		stallDetectionConfig: stallDetectionConfig,
 		backend:              realUploaderBackend{},
+		stallDetectionConfig: stallDetectionConfig,
 	}, nil
 }
 

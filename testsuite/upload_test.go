@@ -42,7 +42,7 @@ func TestSetMetadata(t *testing.T) {
 		assertObjectEmptyCreated(t, upload.Info(), key)
 
 		expectedCustomMetadata := uplink.CustomMetadata{}
-		for i := range 10 {
+		for i := 0; i < 10; i++ {
 			// TODO figure out why its failing with
 			// expectedCustomMetadata[string(testrand.BytesInt(10))] = string(testrand.BytesInt(100))
 			expectedCustomMetadata["key"+strconv.Itoa(i)] = "value" + strconv.Itoa(i)
@@ -355,7 +355,7 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 			Satellite: testplanet.ReconfigureRS(1, 2, 3, 4),
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		for i := range 40 {
+		for i := 0; i < 40; i++ {
 			require.NoError(t, planet.StopPeer(planet.StorageNodes[i]))
 		}
 
@@ -386,7 +386,7 @@ func TestConcurrentUploadToSamePath(t *testing.T) {
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		satellite := planet.Satellites[0]
-		uplink := planet.Uplinks[0]
+		u := planet.Uplinks[0]
 
 		project := openProject(t, ctx, planet)
 		defer ctx.Check(project.Close)
@@ -422,21 +422,21 @@ func TestConcurrentUploadToSamePath(t *testing.T) {
 		err = upload1.Commit()
 		require.NoError(t, err)
 
-		downloaded, err := uplink.Download(ctx, satellite, "testbucket", "test.dat")
+		downloaded, err := u.Download(ctx, satellite, "testbucket", "test.dat")
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
 
 		err = upload2.Abort()
 		require.NoError(t, err)
 
-		downloaded, err = uplink.Download(ctx, satellite, "testbucket", "test.dat")
+		downloaded, err = u.Download(ctx, satellite, "testbucket", "test.dat")
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
 
 		err = upload3.Commit()
 		require.NoError(t, err)
 
-		downloaded, err = uplink.Download(ctx, satellite, "testbucket", "test.dat")
+		downloaded, err = u.Download(ctx, satellite, "testbucket", "test.dat")
 		require.NoError(t, err)
 		require.Equal(t, expectedData, downloaded)
 	})
