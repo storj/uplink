@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
+	"math"
 	"os"
 	"slices"
 	"sort"
@@ -819,17 +820,25 @@ func (lr *lazySegmentRanger) Size() int64 {
 	return lr.plainSize
 }
 
+var all = int32(math.MaxInt32)
+
 // Range implements Ranger.Range to be lazily connected.
 func (lr *lazySegmentRanger) Range(ctx context.Context, offset, length int64) (_ io.ReadCloser, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if lr.ranger == nil {
+		var desiredNodes int32
+		if lr.errorDetection {
+			desiredNodes = all
+		}
+
 		downloadResponse, err := lr.metainfo.DownloadSegmentWithRS(ctx, metaclient.DownloadSegmentParams{
 			StreamID: lr.streamID,
 			Position: metaclient.SegmentPosition{
 				PartNumber: lr.position.PartNumber,
 				Index:      lr.position.Index,
 			},
+			DesiredNodes: desiredNodes,
 		})
 		if err != nil {
 			return nil, err

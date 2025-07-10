@@ -1491,8 +1491,9 @@ func (client *Client) batchDownloadObject(ctx context.Context, params DownloadOb
 
 // DownloadSegmentParams parameters for DownloadSegment method.
 type DownloadSegmentParams struct {
-	StreamID storj.StreamID
-	Position SegmentPosition
+	StreamID     storj.StreamID
+	Position     SegmentPosition
+	DesiredNodes int32
 
 	ServerSideCopy bool
 }
@@ -1505,6 +1506,7 @@ func (params *DownloadSegmentParams) toRequest(header *pb.RequestHeader) *pb.Seg
 			PartNumber: params.Position.PartNumber,
 			Index:      params.Position.Index,
 		},
+		DesiredNodes:   params.DesiredNodes,
 		ServerSideCopy: params.ServerSideCopy,
 	}
 }

@@ -18,11 +18,13 @@ import (
 
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
+	"storj.io/common/pb"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/storagenode"
+	"storj.io/storj/storagenode/piecestore"
 	"storj.io/uplink"
 	"storj.io/uplink/private/testuplink"
 )
@@ -666,4 +668,47 @@ func uploadObjectWithMetadata(t *testing.T, ctx *testcontext.Context, project *u
 	assertObject(t, upload.Info(), key)
 
 	return upload.Info()
+}
+
+func TestDownloadRetries(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 6, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: testplanet.ReconfigureRS(2, 2, 6, 6),
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		for _, peer := range planet.StorageNodes {
+			peer.Storage2.MigratingBackend.UpdateState(ctx, planet.Satellites[0].ID(), func(state *piecestore.MigrationState) {
+				state.TTLToNew = false
+				state.WriteToNew = false
+				state.ReadNewFirst = false
+				state.PassiveMigrate = false
+			})
+		}
+
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "test"))
+		require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test", "remote", testrand.Bytes(5*memory.KiB)))
+
+		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
+		require.NoError(t, err)
+		require.Len(t, segments, 1)
+
+		for _, piece := range segments[0].Pieces[:2] {
+			pieceID := segments[0].RootPieceID.Derive(piece.StorageNode, int32(piece.Number))
+			badNode := planet.FindNode(piece.StorageNode)
+			writer, err := badNode.Storage2.OldPieceBackend.Writer(ctx, planet.Satellites[0].ID(), pieceID, pb.PieceHashAlgorithm_BLAKE3, time.Time{})
+			require.NoError(t, err)
+
+			_, err = writer.Write(testrand.Bytes(memory.Size(segments[0].PieceSize())))
+			require.NoError(t, err)
+			err = writer.Commit(ctx, &pb.PieceHeader{})
+			require.NoError(t, err)
+		}
+
+		// TODO maybe there is a way to make this test more reliable but have no idea how atm
+		for range 5 {
+			_, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "test", "remote")
+			require.NoError(t, err)
+		}
+	})
 }
