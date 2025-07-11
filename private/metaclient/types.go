@@ -151,6 +151,9 @@ var (
 
 	// ErrObjectLockInvalidObjectState is an error class for cases where an object is in an invalid state for Object Lock operations.
 	ErrObjectLockInvalidObjectState = errs.Class("invalid object state for object lock")
+
+	// ErrUnimplemented is an error class for unimplemented methods.
+	ErrUnimplemented = errs.Class("unimplemented")
 )
 
 // Object contains information about a specific object.

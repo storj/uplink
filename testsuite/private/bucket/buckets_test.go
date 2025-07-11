@@ -532,6 +532,34 @@ func TestSuspendVersioningObjectLock(t *testing.T) {
 	})
 }
 
+func TestBucketTaggingUnimplemented(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1,
+		UplinkCount:    1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		upl := planet.Uplinks[0]
+		projectID := upl.Projects[0].ID
+
+		project, err := upl.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		const bucketName = "test-bucket"
+		_, err = sat.API.DB.Buckets().CreateBucket(ctx, buckets.Bucket{
+			ProjectID: projectID,
+			Name:      bucketName,
+		})
+		require.NoError(t, err)
+
+		err = privateBucket.SetBucketTagging(ctx, project, bucketName, []privateBucket.Tag{})
+		require.ErrorIs(t, err, privateBucket.ErrUnimplemented)
+
+		_, err = privateBucket.GetBucketTagging(ctx, project, bucketName)
+		require.ErrorIs(t, err, privateBucket.ErrUnimplemented)
+	})
+}
+
 func TestGetBucketTagging(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, UplinkCount: 1,

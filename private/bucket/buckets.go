@@ -45,6 +45,9 @@ var (
 
 	// ErrTagValueInvalid is returned when the value of a tag is invalid.
 	ErrTagValueInvalid = errors.New("tag value invalid")
+
+	// ErrUnimplemented is returned when a method is not implemented.
+	ErrUnimplemented = errors.New("unimplemented")
 )
 
 // Bucket contains information about the bucket.
@@ -357,6 +360,8 @@ func packageConvertKnownErrors(err error, bucket, key string) error {
 		return ErrTagKeyDuplicate
 	case metaclient.ErrBucketTagValueInvalid.Has(err):
 		return ErrTagValueInvalid
+	case metaclient.ErrUnimplemented.Has(err):
+		err = ErrUnimplemented
 	}
 
 	return convertKnownErrors(err, bucket, key)

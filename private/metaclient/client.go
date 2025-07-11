@@ -676,6 +676,8 @@ func convertErrors(err error) error {
 		return ErrBucketTagKeyDuplicate.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.TagValueInvalid):
 		return ErrBucketTagValueInvalid.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.Unimplemented):
+		return ErrUnimplemented.Wrap(err)
 	default:
 		return err
 	}
