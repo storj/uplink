@@ -568,6 +568,14 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		return ObjectList{}, errClass.Wrap(err)
 	}
 
+	delimiter := "/"
+	if options.Delimiter != "" {
+		if options.Delimiter != "/" && pi.Cipher != storj.EncNull {
+			return ObjectList{}, ErrUnsupportedDelimiter.New("%q", options.Delimiter)
+		}
+		delimiter = options.Delimiter
+	}
+
 	encPrefix := []byte(pi.ParentEnc.Raw())
 	if pi.Cipher == storj.EncNull {
 		encPrefix = []byte(options.Prefix)
@@ -594,6 +602,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	for {
 		items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
 			Bucket:                []byte(bucket),
+			Delimiter:             []byte(delimiter),
 			EncryptedPrefix:       encPrefix,
 			EncryptedCursor:       startAfterEnc,
 			Limit:                 int32(options.Limit),
@@ -610,7 +619,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 		}
 		m = more
 
-		objectsList, err = db.objectsFromRawObjectList(ctx, items, pi)
+		objectsList, err = db.objectsFromRawObjectList(ctx, items, pi, []byte(delimiter))
 		if err != nil {
 			return ObjectList{}, errClass.Wrap(err)
 		}
@@ -635,7 +644,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	}, nil
 }
 
-func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo) (objectList []Object, err error) {
+func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectListItem, pi *encryption.PrefixInfo, delimiter []byte) (objectList []Object, err error) {
 	objectList = make([]Object, 0, len(items))
 
 	for _, item := range items {
@@ -652,7 +661,7 @@ func (db *DB) objectsFromRawObjectList(ctx context.Context, items []RawObjectLis
 		if pi.Cipher == storj.EncNull && pi.PathEnc.Valid() {
 			unencKey = paths.NewUnencrypted(pi.PathEnc.Raw() + unencItem)
 		} else if pi.ParentEnc.Valid() {
-			unencKey = paths.NewUnencrypted(pi.ParentUnenc.Raw() + "/" + unencItem)
+			unencKey = paths.NewUnencrypted(pi.ParentUnenc.Raw() + string(delimiter) + unencItem)
 		} else {
 			unencKey = paths.NewUnencrypted(unencItem)
 		}

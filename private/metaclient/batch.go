@@ -136,7 +136,12 @@ func (resp *BatchResponse) ListObjects() (ListObjectsResponse, error) {
 		return ListObjectsResponse{}, ErrInvalidType
 	}
 
-	return newListObjectsResponse(item.ObjectList, requestItem.ObjectList.EncryptedPrefix, requestItem.ObjectList.Recursive), nil
+	return newListObjectsResponse(
+		item.ObjectList,
+		requestItem.ObjectList.EncryptedPrefix,
+		requestItem.ObjectList.Delimiter,
+		requestItem.ObjectList.Recursive,
+	), nil
 }
 
 // BeginSegment returns response for BeginSegment request.

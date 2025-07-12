@@ -859,6 +859,7 @@ func (client *Client) DeleteObjects(ctx context.Context, params DeleteObjectsPar
 // ListObjectsParams parameters for ListObjects method.
 type ListObjectsParams struct {
 	Bucket                []byte
+	Delimiter             []byte
 	EncryptedPrefix       []byte
 	EncryptedCursor       []byte
 	VersionCursor         []byte
@@ -875,6 +876,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 	return &pb.ObjectListRequest{
 		Header:          header,
 		Bucket:          params.Bucket,
+		Delimiter:       params.Delimiter,
 		EncryptedPrefix: params.EncryptedPrefix,
 		EncryptedCursor: params.EncryptedCursor,
 		Limit:           params.Limit,
@@ -906,12 +908,12 @@ type ListObjectsResponse struct {
 	More  bool
 }
 
-func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []byte, recursive bool) ListObjectsResponse {
+func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []byte, delimiter []byte, recursive bool) ListObjectsResponse {
 	objects := make([]RawObjectListItem, len(response.Items))
 	for i, object := range response.Items {
 		encryptedObjectKey := object.EncryptedObjectKey
 		isPrefix := false
-		if !recursive && len(encryptedObjectKey) != 0 && encryptedObjectKey[len(encryptedObjectKey)-1] == '/' && !bytes.Equal(encryptedObjectKey, encryptedPrefix) {
+		if !recursive && bytes.HasSuffix(encryptedObjectKey, delimiter) && !bytes.Equal(encryptedObjectKey, encryptedPrefix) {
 			isPrefix = true
 		}
 
@@ -948,6 +950,10 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams) (_ []RawObjectListItem, more bool, err error) {
 	defer mon.Task()(&ctx)(&err)
 
+	if params.Recursive {
+		params.Delimiter = nil
+	}
+
 	var items []BatchResponse
 	err = WithRetry(ctx, func(ctx context.Context) error {
 		items, err = client.Batch(ctx, &params)
@@ -964,7 +970,7 @@ func (client *Client) ListObjects(ctx context.Context, params ListObjectsParams)
 		return []RawObjectListItem{}, false, Error.New("unexpected response type: %T", items[0].pbResponse)
 	}
 
-	listResponse := newListObjectsResponse(response.ObjectList, params.EncryptedPrefix, params.Recursive)
+	listResponse := newListObjectsResponse(response.ObjectList, params.EncryptedPrefix, params.Delimiter, params.Recursive)
 	return listResponse.Items, listResponse.More, Error.Wrap(err)
 }
 

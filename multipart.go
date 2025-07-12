@@ -303,6 +303,7 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 	opts := metaclient.ListOptions{
 		Direction: metaclient.After,
 		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
+		Delimiter: "/",
 	}
 
 	if options != nil {

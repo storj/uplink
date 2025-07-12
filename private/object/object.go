@@ -73,6 +73,9 @@ var (
 	// ErrDeleteObjectsUnimplemented is returned when the satellite does not have a DeleteObjects implementation.
 	ErrDeleteObjectsUnimplemented = errors.New("DeleteObjects is not implemented")
 
+	// ErrUnsupportedDelimiter is returned when an unsupported delimiter is provided in a listing request.
+	ErrUnsupportedDelimiter = errors.New("unsupported delimiter")
+
 	// ErrFailedPrecondition is returned when requests cannot be completed due to failed preconditions.
 	ErrFailedPrecondition = errs.New("failed precondition")
 
@@ -147,6 +150,7 @@ type SetObjectRetentionOptions = metaclient.SetObjectRetentionOptions
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
+	Delimiter     string
 	Cursor        string
 	VersionCursor []byte
 	Recursive     bool
@@ -158,6 +162,7 @@ type ListObjectVersionsOptions struct {
 // ListObjectsOptions defines listing options for objects.
 type ListObjectsOptions struct {
 	Prefix    string
+	Delimiter string
 	Cursor    string
 	Recursive bool
 	System    bool
@@ -370,6 +375,7 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 	opts := metaclient.ListOptions{
 		Direction:          metaclient.After,
 		IncludeAllVersions: true,
+		Delimiter:          "/",
 	}
 
 	if options != nil {
@@ -380,11 +386,15 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
 		opts.Limit = options.Limit
+
+		if options.Delimiter != "" {
+			opts.Delimiter = options.Delimiter
+		}
 	}
 
 	obj, err := db.ListObjects(ctx, bucket, opts)
 	if err != nil {
-		return nil, false, convertKnownErrors(err, bucket, "")
+		return nil, false, convertKnownErrors(convertErrors(err), bucket, "")
 	}
 
 	var versions []*VersionedObject
@@ -407,6 +417,7 @@ func ListObjects(ctx context.Context, project *uplink.Project, bucket string, op
 
 	opts := metaclient.ListOptions{
 		Direction: metaclient.After,
+		Delimiter: "/",
 	}
 
 	if options != nil {
@@ -416,11 +427,15 @@ func ListObjects(ctx context.Context, project *uplink.Project, bucket string, op
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
 		opts.Limit = options.Limit
+
+		if options.Delimiter != "" {
+			opts.Delimiter = options.Delimiter
+		}
 	}
 
 	obj, err := db.ListObjects(ctx, bucket, opts)
 	if err != nil {
-		return nil, false, convertKnownErrors(err, bucket, "")
+		return nil, false, convertKnownErrors(convertErrors(err), bucket, "")
 	}
 
 	var versions []*VersionedObject
@@ -667,6 +682,8 @@ func convertErrors(err error) error {
 		err = ErrObjectProtected
 	case metaclient.ErrObjectLockInvalidObjectState.Has(err):
 		err = ErrObjectLockInvalidObjectState
+	case metaclient.ErrUnsupportedDelimiter.Has(err):
+		err = ErrUnsupportedDelimiter
 	}
 
 	return err

@@ -37,6 +37,7 @@ func (project *Project) ListObjects(ctx context.Context, bucket string, options 
 	b := metaclient.Bucket{Name: bucket}
 	opts := metaclient.ListOptions{
 		Direction: metaclient.After,
+		Delimiter: "/",
 	}
 
 	if options != nil {

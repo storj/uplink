@@ -15,7 +15,7 @@ func TestListOptions(t *testing.T) {
 	opts := metaclient.ListOptions{
 		Prefix:                "alpha/",
 		Cursor:                "a",
-		Delimiter:             '/',
+		Delimiter:             "/",
 		Recursive:             true,
 		Direction:             metaclient.After,
 		Limit:                 30,
@@ -39,7 +39,7 @@ func TestListOptions(t *testing.T) {
 		Prefix:                "alpha/",
 		Cursor:                "",
 		CursorEnc:             []byte("encrypted_path"),
-		Delimiter:             '/',
+		Delimiter:             "/",
 		Recursive:             true,
 		Direction:             metaclient.After,
 		Limit:                 30,

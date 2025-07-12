@@ -153,6 +153,9 @@ var (
 	// ErrObjectLockInvalidObjectState is an error class for cases where an object is in an invalid state for Object Lock operations.
 	ErrObjectLockInvalidObjectState = errs.Class("invalid object state for object lock")
 
+	// ErrUnsupportedDelimiter is an error class for when an unsupported delimiter is provided in a listing request.
+	ErrUnsupportedDelimiter = errs.Class("unsupported delimiter")
+
 	// ErrUnimplemented is an error class for unimplemented methods.
 	ErrUnimplemented = errs.Class("unimplemented")
 )
@@ -296,7 +299,7 @@ type ListOptions struct {
 	Cursor                storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
 	CursorEnc             []byte
 	VersionCursor         []byte
-	Delimiter             rune
+	Delimiter             string
 	Recursive             bool
 	Direction             ListDirection
 	Limit                 int

@@ -258,8 +258,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		// Enable encryption bypass
 		encStore.EncryptionBypass = true
 
-		opts := options("", "", 0)
-		opts.Recursive = true
+		opts := optionsRecursive("", "", 0)
 		encodedList, err := db.ListObjects(ctx, bucket.Name, opts)
 		require.NoError(t, err)
 		require.Equal(t, len(objectKeys), len(encodedList.Items))
@@ -540,6 +539,7 @@ func options(prefix, cursor string, limit int) metaclient.ListOptions {
 		Cursor:    cursor,
 		Direction: metaclient.After,
 		Limit:     limit,
+		Delimiter: "/",
 	}
 }
 

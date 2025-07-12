@@ -5,6 +5,7 @@ package object_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"storj.io/common/grant"
 	"storj.io/common/macaroon"
 	"storj.io/common/memory"
 	"storj.io/common/pkcrypto"
@@ -2552,6 +2554,235 @@ func TestETag(t *testing.T) {
 		for _, entry := range entries {
 			require.EqualValues(t, []byte("etag"), entry.ETag)
 		}
+	})
+}
+
+func TestListObjectsDelimiter(t *testing.T) {
+	testListObjectsDelimiter(t, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
+		objects, _, err := object.ListObjects(ctx, project, params.bucketName, &object.ListObjectsOptions{
+			Prefix:    params.prefix,
+			Delimiter: params.delimiter,
+			Recursive: params.recursive,
+		})
+		return objects, err
+	})
+}
+
+func TestListObjectVersionsDelimiter(t *testing.T) {
+	testListObjectsDelimiter(t, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
+		objects, _, err := object.ListObjectVersions(ctx, project, params.bucketName, &object.ListObjectVersionsOptions{
+			Prefix:    params.prefix,
+			Delimiter: params.delimiter,
+			Recursive: params.recursive,
+		})
+		return objects, err
+	})
+}
+
+type testListObjectsDelimiterParams struct {
+	bucketName string
+	prefix     string
+	delimiter  string
+	recursive  bool
+}
+
+func testListObjectsDelimiter(t *testing.T, fn func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error)) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.DefaultPathCipher = storj.EncNull
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		const (
+			delimiter        = "###"
+			defaultDelimiter = "/"
+		)
+
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+		bucketName := testrand.BucketName()
+
+		require.NoError(t, up.CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		objects := make(map[string]*object.VersionedObject)
+
+		for _, objectKey := range []string{
+			"abc" + delimiter,
+			"abc" + delimiter + "def",
+			"abc" + delimiter + "def" + delimiter + "ghi",
+			"abc" + defaultDelimiter + "def",
+			"xyz" + delimiter + "uvw",
+		} {
+			obj := metabasetest.CreateObject(ctx, t, sat.Metabase.DB, metabase.ObjectStream{
+				ProjectID:  up.Projects[0].ID,
+				BucketName: metabase.BucketName(bucketName),
+				ObjectKey:  metabase.ObjectKey(objectKey),
+				Version:    1,
+				StreamID:   testrand.UUID(),
+			}, 0)
+
+			objects[objectKey] = &object.VersionedObject{
+				Object: uplink.Object{
+					Key:    string(obj.ObjectKey),
+					System: uplink.SystemMetadata{},
+					Custom: uplink.CustomMetadata{},
+				},
+				Version:  obj.StreamVersionID().Bytes(),
+				IsLatest: true,
+			}
+		}
+
+		prefixEntry := func(objectKey string) *object.VersionedObject {
+			return &object.VersionedObject{
+				Object: uplink.Object{
+					Key:      objectKey,
+					System:   uplink.SystemMetadata{},
+					Custom:   uplink.CustomMetadata{},
+					IsPrefix: true,
+				},
+				Version: make([]byte, 16),
+			}
+		}
+
+		withoutPrefix := func(prefix string, obj *object.VersionedObject) *object.VersionedObject {
+			newObj := *obj
+			newObj.Object.Key = newObj.Object.Key[len(prefix):]
+			return &newObj
+		}
+
+		t.Run("Default delimiter", func(t *testing.T) {
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "",
+				delimiter:  "",
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				objects["abc"+delimiter],
+				objects["abc"+delimiter+"def"],
+				objects["abc"+delimiter+"def"+delimiter+"ghi"],
+				prefixEntry("abc" + defaultDelimiter),
+				objects["xyz"+delimiter+"uvw"],
+			}, objectList)
+		})
+
+		t.Run("Root", func(t *testing.T) {
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "",
+				delimiter:  delimiter,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				prefixEntry("abc" + delimiter),
+				objects["abc"+defaultDelimiter+"def"],
+				prefixEntry("xyz" + delimiter),
+			}, objectList)
+		})
+
+		t.Run("1 level deep", func(t *testing.T) {
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "abc" + delimiter,
+				delimiter:  delimiter,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				withoutPrefix("abc"+delimiter, objects["abc"+delimiter]),
+				withoutPrefix("abc"+delimiter, objects["abc"+delimiter+"def"]),
+				prefixEntry("def" + delimiter),
+			}, objectList)
+		})
+
+		t.Run("2 levels deep", func(t *testing.T) {
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "abc" + delimiter + "def" + delimiter,
+				delimiter:  delimiter,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				withoutPrefix(
+					"abc"+delimiter+"def"+delimiter,
+					objects["abc"+delimiter+"def"+delimiter+"ghi"],
+				),
+			}, objectList)
+		})
+
+		t.Run("Prefix suffixed with partial delimiter", func(t *testing.T) {
+			partialDelimiter := delimiter[:len(delimiter)-1]
+			remainingDelimiter := delimiter[len(delimiter)-1:]
+
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "abc" + partialDelimiter,
+				delimiter:  delimiter,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				withoutPrefix("abc"+partialDelimiter, objects["abc"+delimiter]),
+				withoutPrefix("abc"+partialDelimiter, objects["abc"+delimiter+"def"]),
+				prefixEntry(remainingDelimiter + "def" + delimiter),
+			}, objectList)
+		})
+
+		t.Run("Recursive with delimiter", func(t *testing.T) {
+			// Ensure that the delimiter has no effect if recursive listing was requested.
+			objectList, err := fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "",
+				delimiter:  delimiter,
+				recursive:  true,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, []*object.VersionedObject{
+				objects["abc"+delimiter],
+				objects["abc"+delimiter+"def"],
+				objects["abc"+delimiter+"def"+delimiter+"ghi"],
+				objects["abc"+defaultDelimiter+"def"],
+				objects["xyz"+delimiter+"uvw"],
+			}, objectList)
+		})
+
+		t.Run("Unsupported cipher", func(t *testing.T) {
+			encAccess := grant.NewEncryptionAccessWithDefaultKey(&storj.Key{})
+			encAccess.SetDefaultPathCipher(storj.EncAESGCM)
+
+			grantAccess := grant.Access{
+				SatelliteAddress: sat.URL(),
+				APIKey:           up.APIKey[sat.ID()],
+				EncAccess:        encAccess,
+			}
+
+			serializedAccess, err := grantAccess.Serialize()
+			require.NoError(t, err)
+
+			access, err := uplink.ParseAccess(serializedAccess)
+			require.NoError(t, err)
+
+			project, err := uplink.OpenProject(ctx, access)
+			require.NoError(t, err)
+			defer ctx.Check(project.Close)
+
+			_, err = fn(ctx, project, testListObjectsDelimiterParams{
+				bucketName: bucketName,
+				prefix:     "",
+				delimiter:  delimiter,
+			})
+			require.ErrorIs(t, err, object.ErrUnsupportedDelimiter)
+		})
 	})
 }
 
