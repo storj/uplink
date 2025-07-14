@@ -635,10 +635,24 @@ func deriveETagKey(key *storj.Key) (*storj.Key, error) {
 	return encryption.DeriveKey(key, "storj-etag-v1")
 }
 
+// ErrorDetection is a struct that contains information about whether error detection is enabled
+type ErrorDetection struct {
+	Enabled bool
+	Offset  int64
+}
+
+// IsEnabled checks if error detection is enabled for the given offset and length.
+func (ed ErrorDetection) IsEnabled(offset, length int64) bool {
+	if !ed.Enabled {
+		return false
+	}
+	return ed.Offset >= offset && ed.Offset < offset+length
+}
+
 // Get returns a ranger that knows what the overall size is (from l/<key>)
 // and then returns the appropriate data from segments s0/<key>, s1/<key>,
 // ..., l/<key>.
-func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo, nextSegmentErrorDetection bool) (rr ranger.Ranger, err error) {
+func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info metaclient.DownloadInfo, errorDetection ErrorDetection) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	object := info.Object
@@ -706,11 +720,11 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				listed = listed[1:]
 			}
 
-			encryptedRanger, err := s.Ranger(ctx, segment, nextSegmentErrorDetection)
+			errorDetection := errorDetection.IsEnabled(segment.Info.PlainOffset, segment.Info.PlainSize)
+			encryptedRanger, err := s.Ranger(ctx, segment, errorDetection)
 			if err != nil {
 				return nil, errs.Wrap(err)
 			}
-			nextSegmentErrorDetection = false
 
 			contentNonce, err := deriveContentNonce(*segment.Info.Position)
 			if err != nil {
@@ -735,6 +749,7 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				return nil, errs.Wrap(err)
 			}
 
+			errorDetection := errorDetection.IsEnabled(segment.PlainOffset, segment.PlainSize)
 			rangers = append(rangers, &lazySegmentRanger{
 				metainfo:             s.metainfo,
 				streams:              s,
@@ -744,10 +759,9 @@ func (s *Store) Get(ctx context.Context, bucket, unencryptedKey string, info met
 				derivedKey:           derivedKey,
 				startingNonce:        &contentNonce,
 				encryptionParameters: object.EncryptionParameters,
-				errorDetection:       nextSegmentErrorDetection,
+				errorDetection:       errorDetection,
 			})
 			offset += segment.PlainSize
-			nextSegmentErrorDetection = false
 
 		default:
 			return nil, errs.New("missing segment for offset %d", offset)

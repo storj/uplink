@@ -162,7 +162,10 @@ func (download *Download) resetReader(nextSegmentErrorDetection bool) error {
 
 	obj := download.info.Object
 
-	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, download.info, nextSegmentErrorDetection)
+	rr, err := download.streams.Get(download.ctx, obj.Bucket.Name, obj.Path, download.info, streams.ErrorDetection{
+		Enabled: nextSegmentErrorDetection,
+		Offset:  download.offset,
+	})
 	if err != nil {
 		return err
 	}
