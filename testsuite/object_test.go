@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
+	"storj.io/storj/satellite/metabase"
 	"storj.io/storj/storagenode"
 	"storj.io/storj/storagenode/piecestore"
 	"storj.io/uplink"
@@ -687,28 +689,63 @@ func TestDownloadRetries(t *testing.T) {
 		}
 
 		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], "test"))
-		require.NoError(t, planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test", "remote", testrand.Bytes(5*memory.KiB)))
+
+		badSegments := [][]int{
+			{0},
+			{1},
+			{2},
+			{0, 2},
+			{0, 1, 2},
+		}
+
+		for index := range badSegments {
+			// each object with 3 segments
+			uploadCtx := testuplink.WithMaxSegmentSize(ctx, 7*memory.KiB)
+			require.NoError(t, planet.Uplinks[0].Upload(uploadCtx, planet.Satellites[0], "test", "remote"+strconv.Itoa(index), testrand.Bytes(20*memory.KiB)))
+		}
 
 		segments, err := planet.Satellites[0].Metabase.DB.TestingAllSegments(ctx)
 		require.NoError(t, err)
-		require.Len(t, segments, 1)
+		require.Len(t, segments, 3*len(badSegments))
 
-		for _, piece := range segments[0].Pieces[:2] {
-			pieceID := segments[0].RootPieceID.Derive(piece.StorageNode, int32(piece.Number))
-			badNode := planet.FindNode(piece.StorageNode)
-			writer, err := badNode.Storage2.OldPieceBackend.Writer(ctx, planet.Satellites[0].ID(), pieceID, pb.PieceHashAlgorithm_BLAKE3, time.Time{})
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, len(badSegments))
+
+		for index, object := range objects {
+			result, err := planet.Satellites[0].Metabase.DB.ListSegments(ctx, metabase.ListSegments{
+				ProjectID: planet.Uplinks[0].Projects[0].ID,
+				StreamID:  object.StreamID,
+			})
 			require.NoError(t, err)
 
-			_, err = writer.Write(testrand.Bytes(memory.Size(segments[0].PieceSize())))
-			require.NoError(t, err)
-			err = writer.Commit(ctx, &pb.PieceHeader{})
-			require.NoError(t, err)
-		}
+			for _, badSegmentIndex := range badSegments[index] {
+				badSegment := result.Segments[badSegmentIndex]
+				for _, piece := range badSegment.Pieces[:2] {
+					pieceID := badSegment.RootPieceID.Derive(piece.StorageNode, int32(piece.Number))
+					badNode := planet.FindNode(piece.StorageNode)
+					writer, err := badNode.Storage2.OldPieceBackend.Writer(ctx, planet.Satellites[0].ID(), pieceID, pb.PieceHashAlgorithm_BLAKE3, time.Time{})
+					require.NoError(t, err)
 
-		// TODO maybe there is a way to make this test more reliable but have no idea how atm
-		for range 5 {
-			_, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "test", "remote")
-			require.NoError(t, err)
+					_, err = writer.Write(testrand.Bytes(memory.Size(badSegment.PieceSize())))
+					require.NoError(t, err)
+					err = writer.Commit(ctx, &pb.PieceHeader{})
+					require.NoError(t, err)
+				}
+			}
+
+			// TODO this test is not perfect, because it doesn't guarantee that the bad pieces are actually used
+			// random selection during download may skip them but it is good enough for now
+			failures := 0
+			for range 4 {
+				_, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "test", "remote"+strconv.Itoa(index))
+				require.NoError(t, err)
+				if err != nil {
+					failures++
+					t.Logf("download failed: %v", err)
+				}
+			}
+			require.Zero(t, failures, "expected no failures during download, but got %d", failures)
 		}
 	})
 }
