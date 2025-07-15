@@ -737,13 +737,27 @@ func TestDownloadRetries(t *testing.T) {
 			// TODO this test is not perfect, because it doesn't guarantee that the bad pieces are actually used
 			// random selection during download may skip them but it is good enough for now
 			failures := 0
-			for range 4 {
+			for range 5 {
 				_, err = planet.Uplinks[0].Download(ctx, planet.Satellites[0], "test", "remote"+strconv.Itoa(index))
 				require.NoError(t, err)
 				if err != nil {
 					failures++
 					t.Logf("download failed: %v", err)
 				}
+				func() {
+					download, cleanup, err := planet.Uplinks[0].DownloadStreamRange(ctx, planet.Satellites[0], "test", "remote"+strconv.Itoa(index), 1, 19*memory.KiB.Int64())
+					require.NoError(t, err)
+					defer ctx.Check(cleanup)
+					defer ctx.Check(download.Close)
+
+					_, err = io.ReadAll(download)
+					require.NoError(t, err)
+					if err != nil {
+						failures++
+						t.Logf("ranged download failed: %v", err)
+					}
+				}()
+
 			}
 			require.Zero(t, failures, "expected no failures during download, but got %d", failures)
 		}

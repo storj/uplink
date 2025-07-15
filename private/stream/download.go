@@ -76,9 +76,8 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	}
 
 	if download.reader == nil {
-		err = download.resetReader(false)
-		if err != nil {
-			return 0, err
+		if err := download.resetReader(false); err != nil {
+			return 0, download.problemDetection(err)
 		}
 	}
 
@@ -95,7 +94,15 @@ func (download *Download) Read(data []byte) (n int, err error) {
 	if err == nil && n > 0 {
 		download.decryptionRetries = 0
 
-	} else if encryption.ErrDecryptFailed.Has(err) {
+	} else {
+		err = download.problemDetection(err)
+	}
+
+	return n, err
+}
+
+func (download *Download) problemDetection(err error) error {
+	if encryption.ErrDecryptFailed.Has(err) {
 		evs.Event("decryption-failure",
 			eventkit.Int64("decryption-retries", int64(download.decryptionRetries)),
 			eventkit.Int64("quiescence-retries", int64(download.quiescenceRetries)),
@@ -133,8 +140,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 			err = download.resetReader(false)
 		}
 	}
-
-	return n, err
+	return err
 }
 
 // Close closes the stream and releases the underlying resources.
