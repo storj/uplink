@@ -93,7 +93,7 @@ func (download *Download) Read(data []byte) (n int, err error) {
 
 	if err == nil && n > 0 {
 		download.decryptionRetries = 0
-
+		download.quiescenceRetries = 0
 	} else {
 		err = download.problemDetection(err)
 	}
