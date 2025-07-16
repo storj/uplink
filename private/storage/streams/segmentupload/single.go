@@ -5,6 +5,7 @@ package segmentupload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
+	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
@@ -25,9 +27,17 @@ import (
 )
 
 var (
-	mon        = monkit.Package()
-	uploadTask = mon.TaskNamed("segment-upload")
+	mon             = monkit.Package()
+	uploadTask      = mon.TaskNamed("segment-upload")
+	evs             = eventkit.Package()
+	uploadIDCounter atomic.Int64
 )
+
+// generateUploadID creates a unique identifier for tracking upload performance.
+func generateUploadID() string {
+	id := uploadIDCounter.Add(1)
+	return fmt.Sprintf("upload-%d", id)
+}
 
 // Scheduler is used to coordinate and constrain resources between
 // concurrent segment uploads.
@@ -116,15 +126,16 @@ func Begin(ctx context.Context,
 
 	// Set up StallManager.
 	var stallManager *pieceupload.StallManager
+	var updatedDetectionConfig *stalldetection.Config
 	if stallDetectionConfig != nil {
-		stallDetectionConfig.SetDefaults(beginSegment.RedundancyStrategy.TotalCount())
+		updatedDetectionConfig = stallDetectionConfig.ValidateAndUpdate(beginSegment.RedundancyStrategy.TotalCount())
 		stallManager = pieceupload.NewStallManager()
 	}
 
-	uploadStart := time.Now()
-
 	results := make(chan segmentResult, uploaderCount)
 	var successful int32
+	uploadStart := time.Now()
+	uploadID := generateUploadID()
 	for i := 0; i < uploaderCount; i++ {
 		res, ok := handle.Get(ctx)
 		if !ok {
@@ -133,26 +144,41 @@ func Begin(ctx context.Context,
 
 		wg.Add(1)
 		go func() {
+			pieceStart := time.Now()
 			defer wg.Done()
-
 			// Whether the upload is ultimately successful or not, when this
 			// function returns, the scheduler resource MUST be released to
 			// allow other piece uploads to take place.
 			defer res.Done()
 			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
-			results <- segmentResult{uploaded: uploaded, err: err}
+			var stallDetected bool
+			if err != nil {
+				var stallError pieceupload.StallDetectedError
+				if errors.As(err, &stallError) {
+					stallDetected = true
+					evs.Event("piece_stall_detected", eventkit.String("upload_id", uploadID), eventkit.Duration("duration", time.Since(pieceStart)))
+					// Convert stall errors to nil for backward compatibility
+					err = nil
+				} else {
+					var optimalError pieceupload.OptimalThresholdError
+					if errors.As(err, &optimalError) {
+						// Convert optimal threshold errors to nil for backward compatibility
+						err = nil
+					}
+					// Keep other errors as-is
+				}
+			}
+
+			results <- segmentResult{uploaded: uploaded, err: err, stallDetected: stallDetected}
 			if uploaded {
-				// Piece upload was successful. If we have met the optimal threshold, we
-				// can cancel the rest.
+				// Piece upload was successful.
 				successfulSoFar := int(atomic.AddInt32(&successful, 1))
 				// After BaseUploads successful uploads, calculate the stall threshold.
-				if stallDetectionConfig != nil && successfulSoFar == stallDetectionConfig.BaseUploads {
-					duration := time.Since(uploadStart) * time.Duration(stallDetectionConfig.Factor)
-					if duration < stallDetectionConfig.MinStallDuration {
-						duration = stallDetectionConfig.MinStallDuration
-					}
+				if updatedDetectionConfig != nil && successfulSoFar == updatedDetectionConfig.BaseUploads {
+					duration := max(time.Since(uploadStart)*time.Duration(updatedDetectionConfig.Factor), updatedDetectionConfig.MinStallDuration)
 					stallManager.SetMaxDuration(duration)
 				}
+				// If we have met the optimal threshold, we can cancel the rest.
 				if successfulSoFar == optimalThreshold {
 					testuplink.Log(ctx, "Segment reached optimal threshold of", optimalThreshold, "pieces.")
 					cancel()
@@ -162,15 +188,18 @@ func Begin(ctx context.Context,
 	}
 
 	return &Upload{
-		ctx:              ctx,
-		taskDone:         taskDone,
-		optimalThreshold: beginSegment.RedundancyStrategy.OptimalThreshold(),
-		handle:           handle,
-		results:          results,
-		cancel:           cancel,
-		wg:               wg,
-		mgr:              mgr,
-		segment:          segment,
+		ctx:                  ctx,
+		taskDone:             taskDone,
+		optimalThreshold:     beginSegment.RedundancyStrategy.OptimalThreshold(),
+		handle:               handle,
+		results:              results,
+		cancel:               cancel,
+		wg:                   wg,
+		mgr:                  mgr,
+		segment:              segment,
+		uploadStart:          uploadStart,
+		uploadID:             uploadID,
+		stallDetectionConfig: stallDetectionConfig,
 	}, nil
 }
 
@@ -187,8 +216,9 @@ func (r *pieceReader) PieceReader(num int) io.Reader {
 }
 
 type segmentResult struct {
-	uploaded bool
-	err      error
+	uploaded      bool
+	err           error
+	stallDetected bool
 }
 
 // Upload is a segment upload that has been started and returned by the Begin
@@ -203,6 +233,14 @@ type Upload struct {
 	wg               *sync.WaitGroup
 	mgr              *pieceupload.Manager
 	segment          splitter.Segment
+
+	// Performance tracking fields
+	uploadStart          time.Time
+	uploadID             string
+	stallDetectionConfig *stalldetection.Config
+
+	// Test-only fields for verification
+	stallsDetected int
 }
 
 // Wait blocks until the segment upload completes. It will be successful as
@@ -214,13 +252,20 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 
 	var eg errs.Group
 	var successful int
+	var stallsDetected int
 	for i := 0; i < cap(upload.results); i++ {
 		result := <-upload.results
 		if result.uploaded {
 			successful++
 		}
+		if result.stallDetected {
+			stallsDetected++
+		}
 		eg.Add(result.err)
 	}
+
+	// Store stall count for test verification
+	upload.stallsDetected = stallsDetected
 
 	// The goroutines should all be on their way to exiting since the loop
 	// above guarantees they have written their results to the channel. Wait
@@ -233,6 +278,17 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 	}
 	upload.segment.DoneReading(err)
 
+	// Emit comprehensive upload summary metrics
+	totalDuration := time.Since(upload.uploadStart)
+	uploaderCount := cap(upload.results)
+	stallsDetectedCount := int64(stallsDetected)
+
+	stallRate := float64(0)
+	if uploaderCount > 0 {
+		stallRate = float64(stallsDetectedCount) / float64(uploaderCount)
+	}
+	emitUploadSummary(upload.uploadID, totalDuration, successful, upload.optimalThreshold, uploaderCount, stallsDetectedCount, stallRate, err == nil, upload.stallDetectionConfig)
+
 	testuplink.Log(upload.ctx, "Done waiting for segment.",
 		"successful:", successful,
 		"optimal:", upload.optimalThreshold,
@@ -244,7 +300,7 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 	}
 
 	info := upload.segment.Finalize()
-	segmentID, results := upload.mgr.Results()
+	segmentID, uploadResults := upload.mgr.Results()
 
 	return &metaclient.CommitSegmentParams{
 		SegmentID:         segmentID,
@@ -252,6 +308,42 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 		SizeEncryptedData: info.EncryptedSize,
 		PlainSize:         info.PlainSize,
 		EncryptedETag:     nil, // encrypted eTag is injected by a different layer
-		UploadResult:      results,
+		UploadResult:      uploadResults,
 	}, nil
+}
+
+// emitUploadSummary emits a comprehensive upload summary event
+func emitUploadSummary(uploadID string, totalDuration time.Duration, successful, optimalThreshold, uploaderCount int, stallsDetected int64, stallRate float64, success bool, stallConfig *stalldetection.Config) {
+	var stall_enabled, dynamic_base_uploads bool
+	var base_uploads, factor int64
+	var min_stall_duration time.Duration
+
+	if stallConfig == nil {
+		stall_enabled = false
+		base_uploads = 0
+		factor = 0
+		min_stall_duration = 0
+		dynamic_base_uploads = false
+	} else {
+		stall_enabled = true
+		base_uploads = int64(stallConfig.BaseUploads)
+		factor = int64(stallConfig.Factor)
+		min_stall_duration = stallConfig.MinStallDuration
+		dynamic_base_uploads = stallConfig.DynamicBaseUploads
+	}
+	evs.Event("segment_upload_summary",
+		eventkit.String("upload_id", uploadID),
+		eventkit.Duration("total_duration", totalDuration),
+		eventkit.Int64("successful_pieces", int64(successful)),
+		eventkit.Int64("optimal_threshold", int64(optimalThreshold)),
+		eventkit.Int64("uploader_count", int64(uploaderCount)),
+		eventkit.Bool("success", success),
+		eventkit.Bool("stall_enabled", stall_enabled),
+		eventkit.Int64("stalls_detected", stallsDetected),
+		eventkit.Float64("stall_rate", stallRate),
+		eventkit.Int64("stall_base_uploads", base_uploads),
+		eventkit.Int64("stall_factor", factor),
+		eventkit.Duration("stall_min_duration", min_stall_duration),
+		eventkit.Bool("stall_dynamic_base_uploads", dynamic_base_uploads),
+	)
 }

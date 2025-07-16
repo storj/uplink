@@ -30,10 +30,23 @@ var (
 	errTryAgain = errors.New("try upload again")
 )
 
+// StallDetectedError indicates a piece was taking too long so the stall manager cancelled it.
+type StallDetectedError struct{}
+
+func (e StallDetectedError) Error() string { return "piece stall detected, context cancelled" }
+
+// OptimalThresholdError indicates a redundant piece cancellation because the segment reached its optimal threshold
+// (the long tail of piece upload options was cancelled).
+type OptimalThresholdError struct{}
+
+func (e OptimalThresholdError) Error() string {
+	return "cancelled due to optimal threshold (long-tail cancellation)"
+}
+
 // UploadOne uploads one piece from the manager using the given private key. If
 // it fails, it will attempt to upload another until either the upload context,
 // or the long tail context is cancelled.
-// The stalls parameter is optional. If nil, no stall detection will be used.
+// The stallManager parameter is optional. If nil, no stall detection will be used.
 func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey, stallManager *StallManager) (_ bool, err error) {
 	defer mon.Task()(&longTailCtx)(&err)
 	// If the long tail context is cancelled, then return a nil error.
@@ -97,11 +110,20 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 			}
 
 			if ctx.Err() != nil {
-				// If this context is done but the uploadCtx context isn't, then the
-				// download was cancelled for long tail optimization purposes. This
-				// is expected. Return that there was no error but that the upload
-				// did not complete.
-				return false, nil
+				// If we have a stall manager, we need to distinguish between
+				// stall detection timeout vs optimal threshold (long-tail) cancellation.
+				if stallManager != nil && longTailCtx.Err() == nil {
+					// Stall manager cancellation: this piece was taking longer than the
+					// stall detection threshold, so this piece upload has been cancelled
+					// so that the segment upload can try a different piece more quickly if necessary.
+					testuplink.Log(logCtx, "Stall Detected")
+					return false, StallDetectedError{}
+				} else {
+					// Long-tail Cancellation: the outer segment upload reached the optimal threshold,
+					// and so this piece has been canceled as it is now redundant.
+					testuplink.Log(logCtx, "Long tail cancellation due to optimal threshold")
+					return false, OptimalThresholdError{}
+				}
 			}
 
 			return false, errTryAgain

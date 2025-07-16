@@ -71,7 +71,7 @@ func TestConfigFromEnv(t *testing.T) {
 	})
 }
 
-func TestSetDefaults(t *testing.T) {
+func TestValidateAndUpdate(t *testing.T) {
 	t.Run("all valid values", func(t *testing.T) {
 		original := &Config{
 			BaseUploads:        5,
@@ -80,7 +80,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: false,
 		}
 
-		result := original.SetDefaults(15)
+		result := original.ValidateAndUpdate(15)
 
 		assert.Equal(t, 5, result.BaseUploads)
 		assert.Equal(t, 3, result.Factor)
@@ -99,7 +99,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: true,
 		}
 
-		result := original.SetDefaults(15)
+		result := original.ValidateAndUpdate(15)
 
 		assert.Equal(t, 7, result.BaseUploads) // int(totalNodes/2) = int(15/2) = 7
 		assert.Equal(t, 3, result.Factor)
@@ -115,7 +115,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: true,
 		}
 
-		result := original.SetDefaults(1)
+		result := original.ValidateAndUpdate(1)
 
 		assert.Equal(t, 5, result.BaseUploads) // Should not change since totalNodes <= 1
 		assert.Equal(t, 3, result.Factor)
@@ -131,7 +131,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: false,
 		}
 
-		result := original.SetDefaults(15)
+		result := original.ValidateAndUpdate(15)
 
 		assert.Equal(t, 5, result.BaseUploads)
 		assert.Equal(t, defaultConfig.Factor, result.Factor)
@@ -147,7 +147,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: false,
 		}
 
-		result := original.SetDefaults(15)
+		result := original.ValidateAndUpdate(15)
 
 		assert.Equal(t, defaultConfig.BaseUploads, result.BaseUploads)
 		assert.Equal(t, 3, result.Factor)
@@ -163,7 +163,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: false,
 		}
 
-		result := original.SetDefaults(15)
+		result := original.ValidateAndUpdate(15)
 
 		assert.Equal(t, 5, result.BaseUploads)
 		assert.Equal(t, 3, result.Factor)
@@ -179,7 +179,7 @@ func TestSetDefaults(t *testing.T) {
 			DynamicBaseUploads: true,
 		}
 
-		result := original.SetDefaults(20)
+		result := original.ValidateAndUpdate(20)
 
 		assert.Equal(t, 10, result.BaseUploads) // totalNodes/2 = 20/2 = 10
 		assert.Equal(t, defaultConfig.Factor, result.Factor)

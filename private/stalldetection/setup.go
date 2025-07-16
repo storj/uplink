@@ -55,9 +55,9 @@ func ConfigFromEnv() (config *Config) {
 	}
 }
 
-// SetDefaults sets config to defaults if includes invalid parameters.
+// ValidateAndUpdate sets config to defaults if includes invalid parameters.
 // Sets BaseUploads from RS scheme if DyanmicBaseUploads is true.
-func (c *Config) SetDefaults(totalNodes int) (config *Config) {
+func (c *Config) ValidateAndUpdate(totalNodes int) (config *Config) {
 	configCopy := *c
 	config = &configCopy
 
@@ -74,7 +74,7 @@ func (c *Config) SetDefaults(totalNodes int) (config *Config) {
 		config.MinStallDuration = defaultConfig.MinStallDuration
 	}
 
-	evs.Event("stall-detection-config-setup",
+	evs.Event("stall-detection-config-validate-update",
 		eventkit.Int64("base_uploads", int64(config.BaseUploads)),
 		eventkit.Int64("factor", int64(config.Factor)),
 		eventkit.Duration("min_stall_duration", config.MinStallDuration),
