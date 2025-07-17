@@ -156,6 +156,7 @@ type ListObjectVersionsOptions struct {
 	Recursive     bool
 	System        bool
 	Custom        bool
+	ETag          bool
 	Limit         int
 }
 
@@ -167,6 +168,7 @@ type ListObjectsOptions struct {
 	Recursive bool
 	System    bool
 	Custom    bool
+	ETag      bool
 	Limit     int
 }
 
@@ -385,6 +387,7 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 		opts.Recursive = options.Recursive
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
+		opts.IncludeETag = options.ETag
 		opts.Limit = options.Limit
 
 		if options.Delimiter != "" {
@@ -426,6 +429,7 @@ func ListObjects(ctx context.Context, project *uplink.Project, bucket string, op
 		opts.Recursive = options.Recursive
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
+		opts.IncludeETag = options.ETag
 		opts.Limit = options.Limit
 
 		if options.Delimiter != "" {

@@ -866,6 +866,7 @@ type ListObjectsParams struct {
 	Limit                 int32
 	IncludeCustomMetadata bool
 	IncludeSystemMetadata bool
+	IncludeETag           bool
 	Recursive             bool
 	Status                int32
 	IncludeAllVersions    bool
@@ -883,6 +884,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 		ObjectIncludes: &pb.ObjectListItemIncludes{
 			Metadata:              params.IncludeCustomMetadata,
 			ExcludeSystemMetadata: !params.IncludeSystemMetadata,
+			IncludeEtag:           params.IncludeETag,
 		},
 		UseObjectIncludes:  true,
 		Recursive:          params.Recursive,

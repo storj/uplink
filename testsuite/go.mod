@@ -1,6 +1,6 @@
 module storj.io/uplink/testsuite
 
-go 1.23.5
+go 1.24.0
 
 replace storj.io/uplink => ../
 
@@ -10,10 +10,10 @@ require (
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.15.0
-	storj.io/common v0.0.0-20250708184027-161236ba0b21
+	storj.io/common v0.0.0-20250714141838-91770d7c2a51
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250711121032-74a772892b4f
+	storj.io/storj v1.91.0-alpha.0.20250721095130-2ca2aa5c8d27
 	storj.io/uplink v1.13.2-0.20250616101609-fc62b14be693
 )
 
@@ -72,7 +72,7 @@ require (
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
+	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/linkedin/goavro/v2 v2.13.1 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/mattn/go-sqlite3 v1.14.19 // indirect
+	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

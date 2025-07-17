@@ -2548,7 +2548,9 @@ func TestETag(t *testing.T) {
 		}
 
 		entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System: true, Custom: true,
+			System: true,
+			Custom: true,
+			ETag:   true,
 		})
 		require.NoError(t, err)
 		for _, entry := range entries {

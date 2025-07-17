@@ -608,6 +608,7 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 			Limit:                 int32(options.Limit),
 			IncludeCustomMetadata: options.IncludeCustomMetadata,
 			IncludeSystemMetadata: options.IncludeSystemMetadata,
+			IncludeETag:           options.IncludeETag,
 			Recursive:             options.Recursive,
 			Status:                options.Status,
 			IncludeAllVersions:    options.IncludeAllVersions,

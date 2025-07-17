@@ -72,9 +72,9 @@ func TestBeginUploadWithMetadata(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedMetadata := map[string]uplink.CustomMetadata{
-			"nil":   nil,
-			"empty": {},
-			"not-empty": {
+			"1/nil":   nil,
+			"2/empty": {},
+			"3/not-empty": {
 				"key": "value",
 			},
 		}
@@ -88,7 +88,7 @@ func TestBeginUploadWithMetadata(t *testing.T) {
 				require.NotNil(t, info.UploadID)
 
 				list := project.ListUploads(ctx, "testbucket", &uplink.ListUploadsOptions{
-					Prefix: name,
+					Prefix: name[:2],
 					Custom: true,
 				})
 				require.True(t, list.Next())

@@ -305,6 +305,7 @@ type ListOptions struct {
 	Limit                 int
 	IncludeCustomMetadata bool
 	IncludeSystemMetadata bool
+	IncludeETag           bool
 	Status                int32
 	IncludeAllVersions    bool
 }
@@ -324,6 +325,7 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 		IncludeAllVersions:    opts.IncludeAllVersions,
 		IncludeSystemMetadata: opts.IncludeSystemMetadata,
 		IncludeCustomMetadata: opts.IncludeCustomMetadata,
+		IncludeETag:           opts.IncludeETag,
 		Direction:             After,
 		Limit:                 opts.Limit,
 		Status:                opts.Status,

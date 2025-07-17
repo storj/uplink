@@ -21,6 +21,7 @@ func TestListOptions(t *testing.T) {
 		Limit:                 30,
 		IncludeCustomMetadata: true,
 		IncludeSystemMetadata: true,
+		IncludeETag:           true,
 		Status:                2,
 	}
 
@@ -45,6 +46,7 @@ func TestListOptions(t *testing.T) {
 		Limit:                 30,
 		IncludeCustomMetadata: true,
 		IncludeSystemMetadata: true,
+		IncludeETag:           true,
 		Status:                2,
 	}, newopts)
 }

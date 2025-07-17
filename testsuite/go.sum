@@ -912,8 +912,8 @@ github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5/go.mod h1:kpwsk12EmLe
 github.com/google/pprof v0.0.0-20210601050228-01bbb1931b22/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
 github.com/google/pprof v0.0.0-20210609004039-a478d1d731e9/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
 github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
-github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 h1:hR7/MlvK23p6+lIw9SN1TigNLn9ZnF3W4SYRKq2gAHs=
-github.com/google/pprof v0.0.0-20230602150820-91b7bce49751/go.mod h1:Jh3hGz2jkYak8qXPD19ryItVnUgpgeqzdkY/D0EaeuA=
+github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db h1:097atOisP2aRj7vFgYQBbFN4U4JNXUNYpxael3UzMyo=
+github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db/go.mod h1:vavhavw2zAxS5dIdcRluK6cSGGPlZynqzFM8NdvU144=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/s2a-go v0.1.9 h1:LGD7gtMgezd8a/Xak7mEWL0PjoTQFvpRudN895yqKW0=
 github.com/google/s2a-go v0.1.9/go.mod h1:YA0Ei2ZQL3acow2O62kdp9UlnvMmU7kA6Eutn0dXayM=
@@ -1093,8 +1093,8 @@ github.com/mattn/go-isatty v0.0.7/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hd
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
 github.com/mattn/go-sqlite3 v1.14.14/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
-github.com/mattn/go-sqlite3 v1.14.19 h1:fhGleo2h1p8tVChob4I9HpmVFIAkKGpiukdrgQbWfGI=
-github.com/mattn/go-sqlite3 v1.14.19/go.mod h1:2eHXhiwb8IkHr+BDWZGa96P6+rkvnG63S2DGjv9HUNg=
+github.com/mattn/go-sqlite3 v1.14.28 h1:ThEiQrnbtumT+QMknw63Befp/ce/nUPgBPMlRFEum7A=
+github.com/mattn/go-sqlite3 v1.14.28/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
 github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8/go.mod h1:mC1jAcsrzbxHt8iiaC+zU4b1ylILSosueou12R++wfY=
 github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3/go.mod h1:RagcQ7I8IeTMnF8JTXieKnO4Z6JCsikNEzj0DwauVzE=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
@@ -2128,8 +2128,8 @@ rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
-storj.io/common v0.0.0-20250708184027-161236ba0b21 h1:FsgjPn6sIOv2runx8zo+NjSjouEhxRfTR2EKVG0gYmw=
-storj.io/common v0.0.0-20250708184027-161236ba0b21/go.mod h1:YNr7/ty6CmtpG5C9lEPtPXK3hOymZpueCb9QCNuPMUY=
+storj.io/common v0.0.0-20250714141838-91770d7c2a51 h1:8sFg5ZixspBoYHFOAtbW8MMjTMYxKmns2dsqmLm+5iU=
+storj.io/common v0.0.0-20250714141838-91770d7c2a51/go.mod h1:YNr7/ty6CmtpG5C9lEPtPXK3hOymZpueCb9QCNuPMUY=
 storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55 h1:8OE12DvUnB9lfZcHe7IDGsuhjrY9GBAr964PVHmhsro=
 storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55/go.mod h1:Y9LZaa8esL1PW2IDMqJE7CFSNq7d5bQ3RI7mGPtmKMg=
 storj.io/eventkit v0.0.0-20250410172343-61f26d3de156 h1:5MZ0CyMbG6Pi0rRzUWVG6dvpXjbBYEX2oyXuj+tT+sk=
@@ -2142,5 +2142,5 @@ storj.io/monkit-jaeger v0.0.0-20250523220404-454c1b072fad h1:HkjZ/RDf2MiY7ENNhDW
 storj.io/monkit-jaeger v0.0.0-20250523220404-454c1b072fad/go.mod h1:ZS8oCmCdx8/cSCbQBeT3BSAgxqoHPclTerizqn5i+Os=
 storj.io/picobuf v0.0.4 h1:qswHDla+YZ2TovGtMnU4astjvrADSIz84FXRn0qgP6o=
 storj.io/picobuf v0.0.4/go.mod h1:hSMxmZc58MS/2qSLy1I0idovlO7+6K47wIGUyRZa6mg=
-storj.io/storj v1.91.0-alpha.0.20250711121032-74a772892b4f h1:txUwM9Pun9qbeWd/ejKJzPstplYIu4juf/3uu/SAzCI=
-storj.io/storj v1.91.0-alpha.0.20250711121032-74a772892b4f/go.mod h1:RV9pGUnViGSqJiDC5Md2u3XY2hqYK1/4lwU2WAKaf0U=
+storj.io/storj v1.91.0-alpha.0.20250721095130-2ca2aa5c8d27 h1:7HgFQN56hLH9VtNhkHz918mKkp/hOtXn/1m/+dBozlE=
+storj.io/storj v1.91.0-alpha.0.20250721095130-2ca2aa5c8d27/go.mod h1:KS9PiZYju9iHV6TtPOCE2lkgrRceYPJihFM4SCXDP1k=

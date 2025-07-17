@@ -312,6 +312,7 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		opts.Recursive = options.Recursive
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeCustomMetadata = options.Custom
+		opts.IncludeETag = false // TODO: ETag not in the public API
 	}
 
 	opts.Limit = testuplink.GetListLimit(ctx)
