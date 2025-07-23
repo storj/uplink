@@ -158,7 +158,19 @@ func TestUploadPart(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
-		info, err := project.BeginUpload(newCtx, "testbucket", "multipart-object", nil)
+		// test an aborted upload maps the right invalid upload error
+		info, err := project.BeginUpload(newCtx, "testbucket", "testobject", nil)
+		require.NoError(t, err)
+		require.NoError(t, project.AbortUpload(newCtx, "testbucket", "testobject", info.UploadID))
+
+		u, err := project.UploadPart(newCtx, "testbucket", "testobject", info.UploadID, 1)
+		require.NoError(t, err)
+
+		_, err = u.Write(testrand.Bytes(5 * memory.KiB))
+		require.NoError(t, err)
+		require.ErrorIs(t, u.Commit(), uplink.ErrUploadIDInvalid)
+
+		info, err = project.BeginUpload(newCtx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
 

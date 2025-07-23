@@ -16,8 +16,10 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
+	"storj.io/common/errs2"
 	"storj.io/common/leak"
 	"storj.io/common/pb"
+	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
@@ -433,6 +435,10 @@ func (upload *PartUpload) Commit() error {
 	upload.stats.flagFailure(err)
 	track()
 	upload.emitEvent(false)
+
+	if errs2.IsRPC(err, rpcstatus.NotFound) {
+		return packageError.Wrap(ErrUploadIDInvalid)
+	}
 
 	return convertKnownErrors(err, upload.bucket, upload.key)
 }
