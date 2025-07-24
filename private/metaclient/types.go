@@ -295,19 +295,22 @@ const (
 
 // ListOptions lists objects.
 type ListOptions struct {
-	Prefix                storj.Path
-	Cursor                storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
-	CursorEnc             []byte
-	VersionCursor         []byte
-	Delimiter             string
-	Recursive             bool
-	Direction             ListDirection
-	Limit                 int
-	IncludeCustomMetadata bool
-	IncludeSystemMetadata bool
-	IncludeETag           bool
-	Status                int32
-	IncludeAllVersions    bool
+	Prefix        storj.Path
+	Cursor        storj.Path // Cursor is relative to Prefix, full path is Prefix + Cursor
+	CursorEnc     []byte
+	VersionCursor []byte
+	Delimiter     string
+	Recursive     bool
+	Direction     ListDirection
+	Limit         int
+
+	IncludeCustomMetadata       bool
+	IncludeSystemMetadata       bool
+	IncludeETag                 bool
+	IncludeETagOrCustomMetadata bool
+
+	Status             int32
+	IncludeAllVersions bool
 }
 
 // NextPage returns options for listing the next page.
@@ -317,18 +320,21 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 	}
 
 	return ListOptions{
-		Prefix:                opts.Prefix,
-		CursorEnc:             list.Cursor,
-		VersionCursor:         list.VersionCursor,
-		Delimiter:             opts.Delimiter,
-		Recursive:             opts.Recursive,
-		IncludeAllVersions:    opts.IncludeAllVersions,
-		IncludeSystemMetadata: opts.IncludeSystemMetadata,
-		IncludeCustomMetadata: opts.IncludeCustomMetadata,
-		IncludeETag:           opts.IncludeETag,
-		Direction:             After,
-		Limit:                 opts.Limit,
-		Status:                opts.Status,
+		Prefix:             opts.Prefix,
+		CursorEnc:          list.Cursor,
+		VersionCursor:      list.VersionCursor,
+		Delimiter:          opts.Delimiter,
+		Recursive:          opts.Recursive,
+		IncludeAllVersions: opts.IncludeAllVersions,
+
+		IncludeSystemMetadata:       opts.IncludeSystemMetadata,
+		IncludeCustomMetadata:       opts.IncludeCustomMetadata,
+		IncludeETag:                 opts.IncludeETag,
+		IncludeETagOrCustomMetadata: opts.IncludeETagOrCustomMetadata,
+
+		Direction: After,
+		Limit:     opts.Limit,
+		Status:    opts.Status,
 	}
 }
 

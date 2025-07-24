@@ -154,10 +154,14 @@ type ListObjectVersionsOptions struct {
 	Cursor        string
 	VersionCursor []byte
 	Recursive     bool
-	System        bool
-	Custom        bool
-	ETag          bool
-	Limit         int
+
+	System bool
+	Custom bool
+	ETag   bool
+	// ETagOrCustom fetches ETag and when it doesn't exist then Custom.
+	ETagOrCustom bool
+
+	Limit int
 }
 
 // ListObjectsOptions defines listing options for objects.
@@ -166,10 +170,14 @@ type ListObjectsOptions struct {
 	Delimiter string
 	Cursor    string
 	Recursive bool
-	System    bool
-	Custom    bool
-	ETag      bool
-	Limit     int
+
+	System bool
+	Custom bool
+	ETag   bool
+	// ETagOrCustom fetches ETag and when it doesn't exist then Custom.
+	ETagOrCustom bool
+
+	Limit int
 }
 
 // CopyObjectOptions options for CopyObject method.
@@ -385,9 +393,12 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 		opts.Cursor = options.Cursor
 		opts.VersionCursor = options.VersionCursor
 		opts.Recursive = options.Recursive
+
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeETag = options.ETag
+		opts.IncludeETagOrCustomMetadata = options.ETagOrCustom
+
 		opts.Limit = options.Limit
 
 		if options.Delimiter != "" {
@@ -427,9 +438,12 @@ func ListObjects(ctx context.Context, project *uplink.Project, bucket string, op
 		opts.Prefix = options.Prefix
 		opts.Cursor = options.Cursor
 		opts.Recursive = options.Recursive
+
 		opts.IncludeCustomMetadata = options.Custom
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeETag = options.ETag
+		opts.IncludeETagOrCustomMetadata = options.ETagOrCustom
+
 		opts.Limit = options.Limit
 
 		if options.Delimiter != "" {

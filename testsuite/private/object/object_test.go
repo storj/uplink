@@ -2556,6 +2556,63 @@ func TestETag(t *testing.T) {
 		for _, entry := range entries {
 			require.EqualValues(t, []byte("etag"), entry.ETag)
 		}
+
+		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       true,
+			Custom:       true,
+			ETagOrCustom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.EqualValues(t, []byte("etag"), entry.ETag)
+		}
+	})
+}
+
+func TestListObjects_ETagOrCustom(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
+		require.NoError(t, err)
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+		require.NoError(t, err)
+
+		_, err = upload.Write([]byte("test1"))
+		require.NoError(t, err)
+
+		custom := uplink.CustomMetadata{
+			"etag": "etag",
+			"123":  "123",
+		}
+
+		err = upload.SetCustomMetadata(ctx, custom)
+		require.NoError(t, err)
+
+		require.NoError(t, upload.Commit())
+
+		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, upload.Info().Version)
+		require.NoError(t, err)
+
+		require.EqualValues(t, custom, statObj.Custom)
+
+		entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       true,
+			Custom:       false,
+			ETagOrCustom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.Nil(t, entry.ETag)
+			require.EqualValues(t, custom, entry.Custom)
+		}
 	})
 }
 

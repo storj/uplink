@@ -601,19 +601,22 @@ func (db *DB) ListObjects(ctx context.Context, bucket string, options ListOption
 	// Keep looking until we find an object we can decrypt or we run out of objects
 	for {
 		items, more, err := db.metainfo.ListObjects(ctx, ListObjectsParams{
-			Bucket:                []byte(bucket),
-			Delimiter:             []byte(delimiter),
-			EncryptedPrefix:       encPrefix,
-			EncryptedCursor:       startAfterEnc,
-			Limit:                 int32(options.Limit),
-			IncludeCustomMetadata: options.IncludeCustomMetadata,
-			IncludeSystemMetadata: options.IncludeSystemMetadata,
-			IncludeETag:           options.IncludeETag,
-			Recursive:             options.Recursive,
-			Status:                options.Status,
-			IncludeAllVersions:    options.IncludeAllVersions,
-			VersionCursor:         versionCursor,
-			ArbitraryPrefix:       pi.Cipher == storj.EncNull,
+			Bucket:          []byte(bucket),
+			Delimiter:       []byte(delimiter),
+			EncryptedPrefix: encPrefix,
+			EncryptedCursor: startAfterEnc,
+			Limit:           int32(options.Limit),
+
+			IncludeCustomMetadata:       options.IncludeCustomMetadata,
+			IncludeSystemMetadata:       options.IncludeSystemMetadata,
+			IncludeETag:                 options.IncludeETag,
+			IncludeETagOrCustomMetadata: options.IncludeETagOrCustomMetadata,
+
+			Recursive:          options.Recursive,
+			Status:             options.Status,
+			IncludeAllVersions: options.IncludeAllVersions,
+			VersionCursor:      versionCursor,
+			ArbitraryPrefix:    pi.Cipher == storj.EncNull,
 		})
 		if err != nil {
 			return ObjectList{}, errClass.Wrap(err)

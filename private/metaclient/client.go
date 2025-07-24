@@ -858,19 +858,22 @@ func (client *Client) DeleteObjects(ctx context.Context, params DeleteObjectsPar
 
 // ListObjectsParams parameters for ListObjects method.
 type ListObjectsParams struct {
-	Bucket                []byte
-	Delimiter             []byte
-	EncryptedPrefix       []byte
-	EncryptedCursor       []byte
-	VersionCursor         []byte
-	Limit                 int32
-	IncludeCustomMetadata bool
-	IncludeSystemMetadata bool
-	IncludeETag           bool
-	Recursive             bool
-	Status                int32
-	IncludeAllVersions    bool
-	ArbitraryPrefix       bool
+	Bucket          []byte
+	Delimiter       []byte
+	EncryptedPrefix []byte
+	EncryptedCursor []byte
+	VersionCursor   []byte
+	Limit           int32
+
+	IncludeCustomMetadata       bool
+	IncludeSystemMetadata       bool
+	IncludeETag                 bool
+	IncludeETagOrCustomMetadata bool
+
+	Recursive          bool
+	Status             int32
+	IncludeAllVersions bool
+	ArbitraryPrefix    bool
 }
 
 func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectListRequest {
@@ -882,9 +885,10 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 		EncryptedCursor: params.EncryptedCursor,
 		Limit:           params.Limit,
 		ObjectIncludes: &pb.ObjectListItemIncludes{
-			Metadata:              params.IncludeCustomMetadata,
-			ExcludeSystemMetadata: !params.IncludeSystemMetadata,
-			IncludeEtag:           params.IncludeETag,
+			Metadata:                    params.IncludeCustomMetadata,
+			ExcludeSystemMetadata:       !params.IncludeSystemMetadata,
+			IncludeEtag:                 params.IncludeETag,
+			IncludeEtagOrCustomMetadata: params.IncludeETagOrCustomMetadata,
 		},
 		UseObjectIncludes:  true,
 		Recursive:          params.Recursive,
