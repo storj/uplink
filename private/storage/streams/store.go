@@ -26,7 +26,6 @@ import (
 	"storj.io/uplink/private/ecclient"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/metaclient"
-	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -77,7 +76,7 @@ type Store struct {
 }
 
 // NewStreamStore constructs a stream store.
-func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold, longTailMargin int, stallDetectionConfig *stalldetection.Config) (*Store, error) {
+func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold, longTailMargin int) (*Store, error) {
 	if segmentSize <= 0 {
 		return nil, errs.New("segment size must be larger than 0")
 	}
@@ -88,7 +87,7 @@ func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize
 	// TODO: this is a hack for now. Once the new upload codepath is enabled
 	// by default, we can clean this up and stop embedding the uploader in
 	// the streams store.
-	uploader, err := NewUploader(metainfo, ec, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin, stallDetectionConfig)
+	uploader, err := NewUploader(metainfo, ec, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin)
 	if err != nil {
 		return nil, err
 	}

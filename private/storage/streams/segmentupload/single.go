@@ -9,7 +9,6 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
@@ -18,7 +17,6 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
-	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/storage/streams/pieceupload"
 	"storj.io/uplink/private/storage/streams/splitter"
 	"storj.io/uplink/private/testuplink"
@@ -47,7 +45,6 @@ func Begin(ctx context.Context,
 	piecePutter pieceupload.PiecePutter,
 	scheduler Scheduler,
 	longTailMargin int,
-	stallDetectionConfig *stalldetection.Config,
 ) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
 
@@ -114,15 +111,6 @@ func Begin(ctx context.Context,
 		}
 	}()
 
-	// Set up StallManager.
-	var stallManager *pieceupload.StallManager
-	if stallDetectionConfig != nil {
-		total := beginSegment.RedundancyStrategy.TotalCount()
-		stallDetectionConfig.Setup(total)
-		stallManager = pieceupload.NewStallManager()
-	}
-	uploadStart := time.Now()
-
 	results := make(chan segmentResult, uploaderCount)
 	var successful int32
 	for i := 0; i < uploaderCount; i++ {
@@ -139,21 +127,12 @@ func Begin(ctx context.Context,
 			// function returns, the scheduler resource MUST be released to
 			// allow other piece uploads to take place.
 			defer res.Done()
-			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
+			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey)
 			results <- segmentResult{uploaded: uploaded, err: err}
 			if uploaded {
 				// Piece upload was successful. If we have met the optimal threshold, we
 				// can cancel the rest.
-				successfulSoFar := int(atomic.AddInt32(&successful, 1))
-				// After BaseUploads successful uploads, calculate the stall threshold.
-				if stallDetectionConfig != nil && successfulSoFar == stallDetectionConfig.BaseUploads {
-					duration := time.Since(uploadStart) * time.Duration(stallDetectionConfig.Factor)
-					if duration < stallDetectionConfig.MinStallDuration {
-						duration = stallDetectionConfig.MinStallDuration
-					}
-					stallManager.SetMaxDuration(duration)
-				}
-				if successfulSoFar == optimalThreshold {
+				if int(atomic.AddInt32(&successful, 1)) == optimalThreshold {
 					testuplink.Log(ctx, "Segment reached optimal threshold of", optimalThreshold, "pieces.")
 					cancel()
 				}

@@ -90,7 +90,7 @@ func TestNewUploader(t *testing.T) {
 			}
 			tc.overrideConfig(&c)
 
-			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, c.longTailMargin, nil)
+			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, c.longTailMargin)
 			if uploader != nil {
 				defer func() { assert.NoError(t, uploader.Close()) }()
 			}
@@ -163,7 +163,7 @@ func TestUpload(t *testing.T) {
 				}
 				tc.overrideConfig(&c)
 
-				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin, nil)
+				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin)
 				require.NoError(t, err)
 				defer func() { assert.NoError(t, uploader.Close()) }()
 

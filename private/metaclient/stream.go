@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"storj.io/common/pb"
-	"storj.io/uplink/private/stalldetection"
 )
 
 // MutableStream is for manipulating stream information.
@@ -75,8 +74,6 @@ type UploadOptions struct {
 	LegalHold bool
 
 	IfNoneMatch []string
-
-	StallDetectionConfig *stalldetection.Config
 }
 
 // CommitUploadOptions contains additional options for committing an upload.

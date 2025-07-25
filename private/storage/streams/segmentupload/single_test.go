@@ -11,7 +11,6 @@ import (
 	"io"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/errs"
@@ -21,7 +20,6 @@ import (
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
-	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/storage/streams/splitter"
 )
 
@@ -55,7 +53,6 @@ func TestBegin(t *testing.T) {
 		beginSegment           *metaclient.BeginSegmentResponse
 		overrideContext        func(*testing.T, context.Context) context.Context
 		overrideLongTailMargin func() int
-		stallConfig            *stalldetection.Config
 		expectBeginErr         string
 		expectWaitErr          string
 		expectUploaderCount    int // expected number of many concurrent piece uploads
@@ -122,16 +119,6 @@ func TestBegin(t *testing.T) {
 			beginSegment:  makeBeginSegment(badKind, fastKind, fastKind),
 			expectWaitErr: "failed to upload enough pieces (needed at least 3 but got 2); piece limit exchange failed: exchanges disallowed for test",
 		},
-		{
-			desc:         "stall manager enabled",
-			beginSegment: makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			stallConfig: &stalldetection.Config{
-				BaseUploads:      2,
-				Factor:           2,
-				MinStallDuration: 10 * time.Millisecond,
-			},
-			expectUploaderCount: optimalShares + longTailMargin,
-		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			var (
@@ -148,7 +135,7 @@ func TestBegin(t *testing.T) {
 			if tc.overrideLongTailMargin != nil {
 				longTailMargin = tc.overrideLongTailMargin()
 			}
-			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, longTailMargin, tc.stallConfig)
+			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, longTailMargin)
 			if tc.expectBeginErr != "" {
 				require.EqualError(t, err, tc.expectBeginErr)
 				require.NoError(t, sched.check(0))
