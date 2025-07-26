@@ -64,7 +64,7 @@ func DecodeReaders2(ctx context.Context, cancel func(), rs map[int]io.ReadCloser
 	dr.stripeReader = NewStripeReader(rs, es, int(expectedStripes), forceErrorDetection)
 
 	dr.ctx, dr.cancel = ctx, cancel
-	// Kick off a goroutine to watch for context cancelation.
+	// Kick off a goroutine to watch for context cancellation.
 	go func() {
 		<-dr.ctx.Done()
 		_ = dr.Close()
