@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"storj.io/common/encryption"
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
 	"storj.io/common/pb"
@@ -28,6 +29,7 @@ import (
 	"storj.io/storj/storagenode"
 	"storj.io/storj/storagenode/piecestore"
 	"storj.io/uplink"
+	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -188,6 +190,58 @@ func TestInmemoryUpload(t *testing.T) {
 		require.NoError(t, down.Close())
 
 		require.Equal(t, expected, downloaded)
+	})
+}
+
+func TestDownloadObjectWithBadMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		createBucket(t, ctx, project, "testbucket")
+
+		expected := testrand.Bytes(1 * memory.KiB)
+		upload, err := project.UploadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(expected)
+		require.NoError(t, err)
+		err = upload.SetCustomMetadata(ctx, map[string]string{
+			"foo": "bar",
+		})
+		require.NoError(t, err)
+		require.NoError(t, upload.Commit())
+
+		objects, err := planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, objects, 1)
+
+		object := objects[0]
+		streamMeta := &pb.StreamMeta{}
+		err = pb.Unmarshal(object.EncryptedMetadata, streamMeta)
+		require.NoError(t, err)
+
+		streamMeta.EncryptedStreamInfo = testrand.Bytes(100)
+
+		brokenMetadata, err := pb.Marshal(streamMeta)
+		require.NoError(t, err)
+
+		err = planet.Satellites[0].Metabase.DB.UpdateObjectLastCommittedMetadata(ctx, metabase.UpdateObjectLastCommittedMetadata{
+			ObjectLocation: object.Location(),
+			StreamID:       object.StreamID,
+			EncryptedUserData: metabase.EncryptedUserData{
+				EncryptedMetadata:             brokenMetadata,
+				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
+				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
+			},
+		})
+		require.NoError(t, err)
+
+		_, err = project.DownloadObject(ctx, "testbucket", "obj", nil)
+		require.Error(t, err)
+		require.True(t, metaclient.ErrObjectMetadata.Has(err))
+		require.True(t, encryption.ErrDecryptFailed.Has(err))
 	})
 }
 

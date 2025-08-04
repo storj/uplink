@@ -158,6 +158,9 @@ var (
 
 	// ErrUnimplemented is an error class for unimplemented methods.
 	ErrUnimplemented = errs.Class("unimplemented")
+
+	// ErrObjectMetadata is an error class for object metadata-related issues.
+	ErrObjectMetadata = errs.Class("object metadata")
 )
 
 // Object contains information about a specific object.

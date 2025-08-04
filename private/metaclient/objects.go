@@ -1088,7 +1088,7 @@ func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencry
 	streamMeta := pb.StreamMeta{}
 	err = pb.Unmarshal(encryptedUserData.EncryptedMetadata, &streamMeta)
 	if err != nil {
-		return nil, pb.StreamMeta{}, nil, err
+		return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 	}
 
 	if db.encStore.EncryptionBypass {
@@ -1097,31 +1097,31 @@ func (db *DB) typedDecryptStreamInfo(ctx context.Context, bucket string, unencry
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, unencryptedKey, db.encStore)
 	if err != nil {
-		return nil, pb.StreamMeta{}, nil, err
+		return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 	}
 
 	cipher := storj.CipherSuite(streamMeta.EncryptionType)
 	encryptedKey, keyNonce := getEncryptedKeyAndNonce(encryptedUserData.EncryptedMetadataEncryptedKey, encryptedUserData.EncryptedMetadataNonce, streamMeta.LastSegmentMeta)
 	contentKey, err := encryption.DecryptKey(encryptedKey, cipher, derivedKey, keyNonce)
 	if err != nil {
-		return nil, pb.StreamMeta{}, nil, err
+		return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 	}
 
 	// decrypt metadata with the content encryption key and zero nonce
 	streamInfo, err := encryption.Decrypt(streamMeta.EncryptedStreamInfo, cipher, contentKey, &storj.Nonce{})
 	if err != nil {
-		return nil, pb.StreamMeta{}, nil, err
+		return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 	}
 
 	var stream pb.StreamInfo
 	if err := pb.Unmarshal(streamInfo, &stream); err != nil {
-		return nil, pb.StreamMeta{}, nil, err
+		return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 	}
 
 	if len(encryptedUserData.EncryptedETag) > 0 {
 		etag, err = encryption.Decrypt(encryptedUserData.EncryptedETag, cipher, contentKey, &storj.Nonce{1})
 		if err != nil {
-			return nil, pb.StreamMeta{}, nil, err
+			return nil, pb.StreamMeta{}, nil, ErrObjectMetadata.Wrap(err)
 		}
 	}
 
