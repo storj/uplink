@@ -2548,9 +2548,10 @@ func TestETag(t *testing.T) {
 		}
 
 		entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System: true,
-			Custom: true,
-			ETag:   true,
+			System:       true,
+			Custom:       true,
+			ETag:         true,
+			ETagOrCustom: false,
 		})
 		require.NoError(t, err)
 		for _, entry := range entries {
@@ -2558,8 +2559,20 @@ func TestETag(t *testing.T) {
 		}
 
 		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System:       true,
-			Custom:       true,
+			System:       false,
+			Custom:       false,
+			ETag:         true,
+			ETagOrCustom: false,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.EqualValues(t, []byte("etag"), entry.ETag)
+		}
+
+		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       false,
+			Custom:       false,
+			ETag:         false,
 			ETagOrCustom: true,
 		})
 		require.NoError(t, err)
@@ -2613,6 +2626,40 @@ func TestListObjects_ETagOrCustom(t *testing.T) {
 			require.Nil(t, entry.ETag)
 			require.EqualValues(t, custom, entry.Custom)
 		}
+
+		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       true,
+			Custom:       true,
+			ETagOrCustom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.Nil(t, entry.ETag)
+			require.EqualValues(t, custom, entry.Custom)
+		}
+
+		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       false,
+			Custom:       true,
+			ETagOrCustom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.Nil(t, entry.ETag)
+			require.EqualValues(t, custom, entry.Custom)
+		}
+
+		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+			System:       false,
+			Custom:       false,
+			ETagOrCustom: true,
+		})
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.Nil(t, entry.ETag)
+			require.EqualValues(t, custom, entry.Custom)
+		}
+
 	})
 }
 
