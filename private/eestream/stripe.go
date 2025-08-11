@@ -9,13 +9,12 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"github.com/zeebo/errs"
 
 	"storj.io/common/rpc/rpctracing"
 	"storj.io/common/sync2"
@@ -259,15 +258,14 @@ func (s *StripeReader) CloseAndWait() error {
 }
 
 func (s *StripeReader) combineErrs() error {
-	var errstrings []string
+	var errsGroup errs.Group
 	for idx := range s.pieces {
 		if err := s.pieces[idx].buffer.Err(); err != nil && !errors.Is(err, io.EOF) {
-			errstrings = append(errstrings, fmt.Sprintf("\nerror retrieving piece %02d: %v", s.pieces[idx].shareNum, err))
+			errsGroup.Add(fmt.Errorf("error retrieving piece %02d: %w", s.pieces[idx].shareNum, err))
 		}
 	}
-	if len(errstrings) > 0 {
-		sort.Strings(errstrings)
-		return Error.New("failed to download segment: %s", strings.Join(errstrings, ""))
+	if len(errsGroup) > 0 {
+		return Error.Wrap(errsGroup.Err())
 	}
 	return Error.New("programmer error: no errors to combine")
 }
