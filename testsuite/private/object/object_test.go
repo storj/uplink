@@ -2252,6 +2252,7 @@ func TestListObject(t *testing.T) {
 			"foo/bar/test/D",
 			"foo/bar/test/E",
 			"foo/bar/test/F",
+			"foo/foo/G",
 		}
 
 		// shuffle the keys to ensure upload order doesn't affect the listing
@@ -2286,7 +2287,7 @@ func TestListObject(t *testing.T) {
 			},
 			{
 				Opts:     object.ListObjectsOptions{Prefix: "foo/"},
-				Prefixes: []string{"bar/"},
+				Prefixes: []string{"bar/", "foo/"},
 			},
 			{
 				Opts:     object.ListObjectsOptions{Prefix: "foo/b"},
@@ -2311,7 +2312,7 @@ func TestListObject(t *testing.T) {
 			},
 			{
 				Opts:    object.ListObjectsOptions{Cursor: "foo/bar/B", Recursive: true, Limit: 4},
-				Objects: sortedKeys[2:],
+				Objects: sortedKeys[2:6],
 			},
 			{
 				Opts:    object.ListObjectsOptions{Prefix: "foo/bar/tes", Recursive: true},

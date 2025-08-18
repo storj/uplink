@@ -4,7 +4,6 @@
 package metaclient
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"strings"
@@ -917,12 +916,6 @@ type ListObjectsResponse struct {
 func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []byte, delimiter []byte, recursive bool) ListObjectsResponse {
 	objects := make([]RawObjectListItem, len(response.Items))
 	for i, object := range response.Items {
-		encryptedObjectKey := object.EncryptedObjectKey
-		isPrefix := false
-		if !recursive && bytes.HasSuffix(encryptedObjectKey, delimiter) && !bytes.Equal(encryptedObjectKey, encryptedPrefix) {
-			isPrefix = true
-		}
-
 		objects[i] = RawObjectListItem{
 			EncryptedObjectKey: object.EncryptedObjectKey,
 			Version:            object.ObjectVersion,
@@ -937,8 +930,7 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 				EncryptedMetadata:             object.EncryptedMetadata,
 				EncryptedETag:                 object.EncryptedEtag,
 			},
-
-			IsPrefix: isPrefix,
+			IsPrefix: object.Status == pb.Object_PREFIX,
 		}
 
 		if object.StreamId != nil {
