@@ -1184,6 +1184,7 @@ type BeginSegmentResponse struct {
 	Limits             []*pb.AddressedOrderLimit
 	PiecePrivateKey    storj.PiecePrivateKey
 	RedundancyStrategy eestream.RedundancyStrategy
+	CohortRequirements *pb.CohortRequirements
 }
 
 func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentResponse, error) {
@@ -1200,6 +1201,7 @@ func newBeginSegmentResponse(response *pb.SegmentBeginResponse) (BeginSegmentRes
 		Limits:             response.AddressedLimits,
 		PiecePrivateKey:    response.PrivateKey,
 		RedundancyStrategy: rs,
+		CohortRequirements: response.CohortRequirements,
 	}, nil
 }
 

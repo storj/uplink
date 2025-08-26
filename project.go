@@ -159,11 +159,6 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		}
 	}()
 
-	var longTailMargin int
-	if project.concurrentSegmentUploadConfig != nil {
-		longTailMargin = project.concurrentSegmentUploadConfig.LongTailMargin
-	}
-
 	streamStore, err := streams.NewStreamStore(
 		metainfoClient,
 		project.ec,
@@ -171,7 +166,7 @@ func (project *Project) getStreamsStore(ctx context.Context) (_ *streams.Store, 
 		project.access.encAccess.Store,
 		project.encryptionParameters,
 		maxInlineSize,
-		longTailMargin)
+	)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

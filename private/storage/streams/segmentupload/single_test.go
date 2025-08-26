@@ -35,7 +35,7 @@ var (
 	slowKind = nodeKind{0: 2}
 	badKind  = nodeKind{0: 3}
 
-	rs             = mustNewRedundancyStrategy()
+	rs             = mustNewRedundancyStrategy(optimalShares, totalShares)
 	fakeSegmentID  = storj.SegmentID{0xFF}
 	fakePrivateKey = mustNewPiecePrivateKey()
 	minimumLimits  = makeLimits(fastKind, fastKind, fastKind)
@@ -48,18 +48,14 @@ var (
 )
 
 func TestBegin(t *testing.T) {
-	const longTailMargin = 1
-
 	for _, tc := range []struct {
-		desc                   string
-		beginSegment           *metaclient.BeginSegmentResponse
-		overrideContext        func(*testing.T, context.Context) context.Context
-		overrideLongTailMargin func() int
-		stallConfig            *stalldetection.Config
-		expectBeginErr         string
-		expectWaitErr          string
-		expectUploaderCount    int // expected number of many concurrent piece uploads
-		expectedStalls         int // expected number of stalled uploads
+		desc                string
+		beginSegment        *metaclient.BeginSegmentResponse
+		overrideContext     func(*testing.T, context.Context) context.Context
+		expectBeginErr      string
+		expectWaitErr       string
+		expectUploaderCount int // expected number of many concurrent piece uploads
+		expectedStalls      int // expected number of stalled uploads
 	}{
 		{
 			desc:           "begin segment response missing private key",
@@ -86,36 +82,14 @@ func TestBegin(t *testing.T) {
 			expectedStalls: 0,
 		},
 		{
-			desc:                   "negative long tail margin",
-			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			overrideLongTailMargin: func() int { return -1 },
-			expectUploaderCount:    totalShares,
-			expectedStalls:         0,
+			desc:           "upload count is capped to limits",
+			beginSegment:   makeBeginSegment(fastKind, fastKind, fastKind),
+			expectedStalls: 0,
 		},
 		{
-			desc:                   "zero long tail margin",
-			beginSegment:           makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			overrideLongTailMargin: func() int { return 0 },
-			expectUploaderCount:    optimalShares,
-			expectedStalls:         0,
-		},
-		{
-			desc:                "upload count is capped to limits",
-			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind),
-			expectUploaderCount: optimalShares,
-			expectedStalls:      0,
-		},
-		{
-			desc:                "upload count does not exceed optimal threshold + long tail margin",
-			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind, fastKind),
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectedStalls:      0,
-		},
-		{
-			desc:                "slow piece uploads are cancelled after optimal threshold hit",
-			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectedStalls:      0,
+			desc:           "slow piece uploads are cancelled after optimal threshold hit",
+			beginSegment:   makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
+			expectedStalls: 0,
 		},
 		{
 			desc:         "aborts immediately when context already cancelled",
@@ -135,10 +109,11 @@ func TestBegin(t *testing.T) {
 			expectedStalls: 0,
 		},
 		{
-			desc:                "successful long tail cancellation after optimal threshold reached",
-			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind, slowKind),
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectedStalls:      0,
+			desc: "cohort requirements with withhold satisfied",
+			beginSegment: makeBeginSegmentWithRequirements(
+				makeWithhold("node", 2, makeLit(1)),
+				fastKind, fastKind, fastKind, slowKind,
+			),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -147,16 +122,12 @@ func TestBegin(t *testing.T) {
 				limitsExchanger = new(fakeLimitsExchanger)
 				piecePutter     = new(fakePiecePutter)
 				sched           = newWrappedScheduler()
-				longTailMargin  = longTailMargin
 			)
 			ctx := context.Background()
 			if tc.overrideContext != nil {
 				ctx = tc.overrideContext(t, ctx)
 			}
-			if tc.overrideLongTailMargin != nil {
-				longTailMargin = tc.overrideLongTailMargin()
-			}
-			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, longTailMargin, tc.stallConfig)
+			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, nil)
 			if tc.expectBeginErr != "" {
 				require.EqualError(t, err, tc.expectBeginErr)
 				require.NoError(t, sched.check(0))
@@ -194,24 +165,20 @@ func TestBegin(t *testing.T) {
 				},
 			}, commitSegment)
 			require.Equal(t, tc.expectedStalls, upload.stallsDetected)
-			require.NoError(t, sched.check(tc.expectUploaderCount))
+			require.NoError(t, sched.check(len(tc.beginSegment.Limits)))
 		})
 	}
 }
 
 func TestBeginWithStalls(t *testing.T) {
-	const longTailMargin = 1
-
 	for _, tc := range []struct {
-		desc                   string
-		beginSegment           *metaclient.BeginSegmentResponse
-		overrideContext        func(*testing.T, context.Context) context.Context
-		overrideLongTailMargin func() int
-		stallConfig            *stalldetection.Config
-		expectBeginErr         string
-		expectWaitErr          string
-		expectUploaderCount    int // expected number of many concurrent piece uploads
-		expectedStalls         int // expected number of stalled uploads
+		desc            string
+		beginSegment    *metaclient.BeginSegmentResponse
+		overrideContext func(*testing.T, context.Context) context.Context
+		stallConfig     *stalldetection.Config
+		expectBeginErr  string
+		expectWaitErr   string
+		expectedStalls  int // expected number of stalled uploads
 	}{
 		{
 			// Stall detection: basic functionality test, no long tail
@@ -226,10 +193,8 @@ func TestBeginWithStalls(t *testing.T) {
 				Factor:           1,
 				MinStallDuration: 5 * time.Millisecond,
 			},
-			overrideLongTailMargin: func() int { return 0 },
-			expectUploaderCount:    optimalShares,
-			expectWaitErr:          "failed to upload enough pieces (needed at least 3 but got 1)",
-			expectedStalls:         2,
+			expectWaitErr:  "failed to upload enough pieces (needed at least 3 but got 1)",
+			expectedStalls: 2,
 		},
 		{
 			// Stall detection: basic functionality test, with longtail
@@ -244,9 +209,8 @@ func TestBeginWithStalls(t *testing.T) {
 				Factor:           1,
 				MinStallDuration: 5 * time.Millisecond,
 			},
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectWaitErr:       "failed to upload enough pieces (needed at least 3 but got 1)",
-			expectedStalls:      3,
+			expectWaitErr:  "failed to upload enough pieces (needed at least 3 but got 1)",
+			expectedStalls: 3,
 		},
 		{
 			// Stall detection: disabled test
@@ -254,11 +218,10 @@ func TestBeginWithStalls(t *testing.T) {
 			// No stall manager created, uploads rely only on long tail cancellation
 			// 3 fast pieces succeed, slow piece waits for long tail cancellation
 			// Expected: successful upload without any stall detection
-			desc:                "stall detection disabled",
-			beginSegment:        makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
-			stallConfig:         nil,
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectedStalls:      0,
+			desc:           "stall detection disabled",
+			beginSegment:   makeBeginSegment(fastKind, fastKind, fastKind, slowKind),
+			stallConfig:    nil,
+			expectedStalls: 0,
 		},
 		{
 			// Long tail vs stall detection: optimal threshold wins race
@@ -273,8 +236,7 @@ func TestBeginWithStalls(t *testing.T) {
 				Factor:           3,
 				MinStallDuration: 5 * time.Millisecond,
 			},
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectedStalls:      0,
+			expectedStalls: 0,
 		},
 		{
 			// Node failure: all bad nodes fail regardless of stall detection
@@ -289,9 +251,8 @@ func TestBeginWithStalls(t *testing.T) {
 				Factor:           1,
 				MinStallDuration: 1 * time.Millisecond,
 			},
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectWaitErr:       "failed to upload enough pieces (needed at least 3 but got 0); piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test",
-			expectedStalls:      0, // Upload should fail when all nodes fail, regardless of stall detection
+			expectWaitErr:  "failed to upload enough pieces (needed at least 3 but got 0); piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test; piece limit exchange failed: exchanges disallowed for test",
+			expectedStalls: 0, // Upload should fail when all nodes fail, regardless of stall detection
 		},
 		{
 			// Mixed node types: bad and slow nodes with stall detection
@@ -307,9 +268,8 @@ func TestBeginWithStalls(t *testing.T) {
 				Factor:           1,
 				MinStallDuration: 5 * time.Millisecond,
 			},
-			expectUploaderCount: optimalShares + longTailMargin,
-			expectWaitErr:       "failed to upload enough pieces (needed at least 3 but got 1); piece limit exchange failed: exchanges disallowed for test",
-			expectedStalls:      2, // Should fail when not enough good nodes available
+			expectWaitErr:  "failed to upload enough pieces (needed at least 3 but got 1); piece limit exchange failed: exchanges disallowed for test",
+			expectedStalls: 2, // Should fail when not enough good nodes available
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -318,16 +278,12 @@ func TestBeginWithStalls(t *testing.T) {
 				limitsExchanger = new(fakeLimitsExchanger)
 				piecePutter     = new(fakePiecePutter)
 				sched           = newWrappedScheduler()
-				longTailMargin  = longTailMargin
 			)
 			ctx := context.Background()
 			if tc.overrideContext != nil {
 				ctx = tc.overrideContext(t, ctx)
 			}
-			if tc.overrideLongTailMargin != nil {
-				longTailMargin = tc.overrideLongTailMargin()
-			}
-			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, longTailMargin, tc.stallConfig)
+			upload, err := Begin(ctx, tc.beginSegment, segment, limitsExchanger, piecePutter, sched, tc.stallConfig)
 			if tc.expectBeginErr != "" {
 				require.EqualError(t, err, tc.expectBeginErr)
 				require.NoError(t, sched.check(0))
@@ -365,7 +321,7 @@ func TestBeginWithStalls(t *testing.T) {
 				},
 			}, commitSegment)
 			require.Equal(t, tc.expectedStalls, upload.stallsDetected)
-			require.NoError(t, sched.check(tc.expectUploaderCount))
+			require.NoError(t, sched.check(len(tc.beginSegment.Limits)))
 		})
 	}
 }
@@ -377,11 +333,16 @@ func isNodeKind(nodeID storj.NodeID, kind nodeKind) bool {
 }
 
 func makeBeginSegment(kinds ...nodeKind) *metaclient.BeginSegmentResponse {
+	return makeBeginSegmentWithRequirements(nil, kinds...)
+}
+
+func makeBeginSegmentWithRequirements(requirements *pb.CohortRequirements, kinds ...nodeKind) *metaclient.BeginSegmentResponse {
 	return &metaclient.BeginSegmentResponse{
 		SegmentID:          fakeSegmentID,
 		Limits:             makeLimits(kinds...),
 		RedundancyStrategy: rs,
 		PiecePrivateKey:    fakePrivateKey,
+		CohortRequirements: requirements,
 	}
 }
 
@@ -410,6 +371,10 @@ func makeLimits(kinds ...nodeKind) []*pb.AddressedOrderLimit {
 			Limit: &pb.OrderLimit{
 				StorageNodeId: nodeID,
 				PieceId:       pieceID(i),
+			},
+			Tags: map[string][]byte{
+				"kind": kinds[i][:1],
+				"node": {byte(i)},
 			},
 		})
 	}
@@ -584,14 +549,14 @@ func mustNewPiecePrivateKey() storj.PiecePrivateKey {
 	return pk
 }
 
-func mustNewRedundancyStrategy() eestream.RedundancyStrategy {
+func mustNewRedundancyStrategy(optimalShares, totalShares int16) eestream.RedundancyStrategy {
 	rs, err := eestream.NewRedundancyStrategyFromStorj(storj.RedundancyScheme{
 		Algorithm:      storj.ReedSolomon,
 		ShareSize:      64,
 		RequiredShares: 1,
 		RepairShares:   2,
-		OptimalShares:  int16(optimalShares),
-		TotalShares:    int16(totalShares),
+		OptimalShares:  optimalShares,
+		TotalShares:    totalShares,
 	})
 	if err != nil {
 		panic(err)
@@ -629,4 +594,25 @@ func TestGenerateUploadID(t *testing.T) {
 		require.NoError(t, err2)
 		require.Greater(t, num2, num1)
 	})
+}
+func makeLit(n int) *pb.CohortRequirements {
+	return &pb.CohortRequirements{
+		Requirement: &pb.CohortRequirements_Literal_{
+			Literal: &pb.CohortRequirements_Literal{
+				Value: int32(n),
+			},
+		},
+	}
+}
+
+func makeWithhold(key string, n int, child *pb.CohortRequirements) *pb.CohortRequirements {
+	return &pb.CohortRequirements{
+		Requirement: &pb.CohortRequirements_Withhold_{
+			Withhold: &pb.CohortRequirements_Withhold{
+				TagKey: key,
+				Amount: int32(n),
+				Child:  child,
+			},
+		},
+	}
 }

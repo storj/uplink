@@ -14,7 +14,7 @@ import (
 )
 
 func TestEncodedReader(t *testing.T) {
-	rs := mustNewRedundancyStrategy()
+	rs := mustNewRedundancyStrategy(optimalShares, totalShares)
 
 	t.Run("produces valid pieces", func(t *testing.T) {
 		expected := bytes.Repeat([]byte{1}, rs.StripeSize())

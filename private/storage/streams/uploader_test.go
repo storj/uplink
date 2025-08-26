@@ -32,7 +32,6 @@ var (
 	cipherSuite          = storj.EncAESGCM
 	encryptionParameters = storj.EncryptionParameters{CipherSuite: cipherSuite, BlockSize: 32}
 	inlineThreshold      = 1024
-	longTailMargin       = 1
 	storjKey             = storj.Key{0: 1}
 	expiration           = creationDate.Add(time.Hour)
 	uploadInfo           = streamupload.Info{CreationDate: creationDate, PlainSize: 123}
@@ -46,7 +45,6 @@ func TestNewUploader(t *testing.T) {
 		segmentSize          int64
 		encryptionParameters storj.EncryptionParameters
 		inlineThreshold      int
-		longTailMargin       int
 	}
 
 	for _, tc := range []struct {
@@ -90,7 +88,7 @@ func TestNewUploader(t *testing.T) {
 			}
 			tc.overrideConfig(&c)
 
-			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, c.longTailMargin, nil)
+			uploader, err := NewUploader(metainfo, piecePutter{}, c.segmentSize, encStore, c.encryptionParameters, c.inlineThreshold, nil)
 			if uploader != nil {
 				defer func() { assert.NoError(t, uploader.Close()) }()
 			}
@@ -163,7 +161,7 @@ func TestUpload(t *testing.T) {
 				}
 				tc.overrideConfig(&c)
 
-				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, longTailMargin, nil)
+				uploader, err := NewUploader(metainfoUpload{}, piecePutter{}, segmentSize, encStore, encryptionParameters, inlineThreshold, nil)
 				require.NoError(t, err)
 				defer func() { assert.NoError(t, uploader.Close()) }()
 
@@ -351,9 +349,6 @@ func (fakeUploaderBackend) checkCommonParams(source streamupload.SegmentSource, 
 	}
 	if s, ok := u.sched.(noopScheduler); !ok {
 		return errs.New("segmentUploader scheduler is of type %T but expected %T", u.sched, s)
-	}
-	if u.longTailMargin != longTailMargin {
-		return errs.New("segmentUploader long tail margin is %d but expected %d", u.longTailMargin, longTailMargin)
 	}
 
 	if b, ok := batcher.(metainfoUpload); !ok {

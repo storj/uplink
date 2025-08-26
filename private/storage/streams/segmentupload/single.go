@@ -16,12 +16,14 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
+	"storj.io/common/pb"
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/stalldetection"
 	"storj.io/uplink/private/storage/streams/pieceupload"
+	"storj.io/uplink/private/storage/streams/segmentupload/cohorts"
 	"storj.io/uplink/private/storage/streams/splitter"
 	"storj.io/uplink/private/testuplink"
 )
@@ -56,7 +58,6 @@ func Begin(ctx context.Context,
 	limitsExchanger pieceupload.LimitsExchanger,
 	piecePutter pieceupload.PiecePutter,
 	scheduler Scheduler,
-	longTailMargin int,
 	stallDetectionConfig *stalldetection.Config,
 ) (_ *Upload, err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -96,11 +97,6 @@ func Begin(ctx context.Context,
 	}
 
 	uploaderCount := len(beginSegment.Limits)
-	if longTailMargin >= 0 {
-		// The number of uploads is enough to satisfy the optimal threshold plus
-		// a small long tail margin, capped by the number of limits.
-		uploaderCount = min(optimalThreshold+longTailMargin, len(beginSegment.Limits))
-	}
 
 	mgr := pieceupload.NewManager(
 		limitsExchanger,
@@ -132,6 +128,20 @@ func Begin(ctx context.Context,
 		stallManager = pieceupload.NewStallManager()
 	}
 
+	// Set up a cohort matcher to track when we've satisfied the cohort requirements.
+	var matcher *cohorts.Matcher
+	if beginSegment.CohortRequirements == nil {
+		matcher = cohorts.NewMatcher(&pb.CohortRequirements{
+			Requirement: &pb.CohortRequirements_Literal_{
+				Literal: &pb.CohortRequirements_Literal{
+					Value: int32(optimalThreshold),
+				},
+			},
+		}, len(beginSegment.Limits))
+	} else {
+		matcher = cohorts.NewMatcher(beginSegment.CohortRequirements, len(beginSegment.Limits))
+	}
+
 	results := make(chan segmentResult, uploaderCount)
 	var successful int32
 	uploadStart := time.Now()
@@ -150,7 +160,7 @@ func Begin(ctx context.Context,
 			// function returns, the scheduler resource MUST be released to
 			// allow other piece uploads to take place.
 			defer res.Done()
-			uploaded, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
+			uploaded, tags, node, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
 			var stallDetected bool
 			if err != nil {
 				var stallError pieceupload.StallDetectedError
@@ -186,9 +196,11 @@ func Begin(ctx context.Context,
 						eventkit.Duration("minStallDuration", minStallDuration),
 						eventkit.Duration("maxDuration", maxDuration))
 				}
-				// If we have met the optimal threshold, we can cancel the rest.
-				if successfulSoFar == optimalThreshold {
-					testuplink.Log(ctx, "Segment reached optimal threshold of", optimalThreshold, "pieces.")
+
+				// if the matcher says we've satisfied the cohort requirements, then cancel the
+				// remaining uploads.
+				if matcher.Increment(tags, node) {
+					testuplink.Log(ctx, "Satisfied cohort requirements after", successfulSoFar, "pieces")
 					cancel()
 				}
 			}

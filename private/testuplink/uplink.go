@@ -76,12 +76,6 @@ type ConcurrentSegmentUploadsConfig struct {
 	// on the amount of concurrent piece limits per-upload, across all
 	// segments.
 	SchedulerOptions scheduler.Options
-
-	// LongTailMargin represents the maximum number of piece uploads beyond the
-	// optimal threshold that will be uploaded for a given segment. Once an
-	// upload has reached the optimal threshold, the remaining piece uploads
-	// are cancelled.
-	LongTailMargin int
 }
 
 // DefaultConcurrentSegmentUploadsConfig returns the default ConcurrentSegmentUploadsConfig.
@@ -91,7 +85,6 @@ func DefaultConcurrentSegmentUploadsConfig() ConcurrentSegmentUploadsConfig {
 			MaximumConcurrent:        300,
 			MaximumConcurrentHandles: 10,
 		},
-		LongTailMargin: 50,
 	}
 }
 

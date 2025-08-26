@@ -65,7 +65,7 @@ func TestManager(t *testing.T) {
 		manager := newManagerWithExchanger(1, failExchange{})
 		requireNextPieceAndFinish(t, manager, piecenum{0}, revision{0}, false)
 
-		_, _, _, err := manager.NextPiece(context.Background())
+		_, _, _, _, _, err := manager.NextPiece(context.Background())
 		require.EqualError(t, err, "piece limit exchange failed: oh no")
 	})
 }
@@ -82,7 +82,10 @@ func assertResults(t *testing.T, manager *Manager, expectedRev revision, expecte
 }
 
 func requireNextPiece(t *testing.T, manager *Manager, expectedNum piecenum, expectedRev revision) func(bool) {
-	reader, limit, done, err := manager.NextPiece(context.Background())
+	reader, limit, tags, node, done, err := manager.NextPiece(context.Background())
+
+	_, _ = tags, node // TODO: tags, node
+
 	require.NoError(t, err, "expected next piece")
 	require.Equal(t, expectedNum, pieceReaderNum(reader), "unexpected next piece number")
 	require.Equal(t, makeLimit(expectedNum, expectedRev), limit, "unexpected next piece number limit")
@@ -96,7 +99,12 @@ func requireNextPiece(t *testing.T, manager *Manager, expectedNum piecenum, expe
 }
 
 func requireDone(t *testing.T, manager *Manager) {
-	reader, _, _, err := manager.NextPiece(context.Background())
+	reader, limit, tags, node, done, err := manager.NextPiece(context.Background())
+
+	// avoiding "dogsled" linting failure
+	_, _ = limit, tags
+	_, _ = node, done
+
 	if err == nil {
 		require.FailNowf(t, "expected done", "next piece %d", pieceReaderNum(reader))
 		return

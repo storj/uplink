@@ -7,10 +7,12 @@ require (
 	github.com/klauspost/compress v1.17.7
 	github.com/spacemonkeygo/monkit/v3 v3.0.23
 	github.com/stretchr/testify v1.9.0
+	github.com/zeebo/assert v1.3.1
 	github.com/zeebo/errs v1.4.0
+	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.14.0
-	storj.io/common v0.0.0-20250905132913-dad2ec895b75
+	storj.io/common v0.0.0-20250915164221-625600c545b3
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2

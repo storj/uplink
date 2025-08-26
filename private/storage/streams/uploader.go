@@ -144,7 +144,6 @@ type Uploader struct {
 	encStore             *encryption.Store
 	encryptionParameters storj.EncryptionParameters
 	inlineThreshold      int
-	longTailMargin       int
 
 	// The backend is fixed to the real backend in production but is overridden
 	// for testing.
@@ -154,7 +153,7 @@ type Uploader struct {
 }
 
 // NewUploader constructs a new stream putter.
-func NewUploader(metainfo MetainfoUpload, piecePutter pieceupload.PiecePutter, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold, longTailMargin int, stallDetectionConfig *stalldetection.Config) (*Uploader, error) {
+func NewUploader(metainfo MetainfoUpload, piecePutter pieceupload.PiecePutter, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int, stallDetectionConfig *stalldetection.Config) (*Uploader, error) {
 	switch {
 	case segmentSize <= 0:
 		return nil, errs.New("segment size must be larger than 0")
@@ -170,7 +169,6 @@ func NewUploader(metainfo MetainfoUpload, piecePutter pieceupload.PiecePutter, s
 		encStore:             encStore,
 		encryptionParameters: encryptionParameters,
 		inlineThreshold:      inlineThreshold,
-		longTailMargin:       longTailMargin,
 		backend:              realUploaderBackend{},
 		stallDetectionConfig: stallDetectionConfig,
 	}, nil
@@ -236,7 +234,12 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 		beginObject.IfNoneMatch = opts.IfNoneMatch
 	}
 
-	uploader := segmentUploader{metainfo: u.metainfo, piecePutter: u.piecePutter, sched: sched, longTailMargin: u.longTailMargin, stallDetectionConfig: u.stallDetectionConfig}
+	uploader := segmentUploader{
+		metainfo:             u.metainfo,
+		piecePutter:          u.piecePutter,
+		sched:                sched,
+		stallDetectionConfig: u.stallDetectionConfig,
+	}
 
 	encMeta := u.newEncryptedMetadata(metadata, derivedKey)
 
@@ -308,7 +311,12 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 		split.Finish(ctx.Err())
 	}()
 
-	uploader := segmentUploader{metainfo: u.metainfo, piecePutter: u.piecePutter, sched: sched, longTailMargin: u.longTailMargin, stallDetectionConfig: u.stallDetectionConfig}
+	uploader := segmentUploader{
+		metainfo:             u.metainfo,
+		piecePutter:          u.piecePutter,
+		sched:                sched,
+		stallDetectionConfig: u.stallDetectionConfig,
+	}
 
 	go func() {
 		info, err := u.backend.UploadPart(
@@ -349,12 +357,11 @@ type segmentUploader struct {
 	metainfo             MetainfoUpload
 	piecePutter          pieceupload.PiecePutter
 	sched                segmentupload.Scheduler
-	longTailMargin       int
 	stallDetectionConfig *stalldetection.Config
 }
 
 func (u segmentUploader) Begin(ctx context.Context, beginSegment *metaclient.BeginSegmentResponse, segment splitter.Segment) (streamupload.SegmentUpload, error) {
-	return segmentupload.Begin(ctx, beginSegment, segment, limitsExchanger{u.metainfo}, u.piecePutter, u.sched, u.longTailMargin, u.stallDetectionConfig)
+	return segmentupload.Begin(ctx, beginSegment, segment, limitsExchanger{u.metainfo}, u.piecePutter, u.sched, u.stallDetectionConfig)
 }
 
 type limitsExchanger struct {

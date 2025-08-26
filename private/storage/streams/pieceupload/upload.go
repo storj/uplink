@@ -47,7 +47,14 @@ func (e OptimalThresholdError) Error() string {
 // it fails, it will attempt to upload another until either the upload context,
 // or the long tail context is cancelled.
 // The stallManager parameter is optional. If nil, no stall detection will be used.
-func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter PiecePutter, privateKey storj.PiecePrivateKey, stallManager *StallManager) (_ bool, err error) {
+func UploadOne(
+	longTailCtx context.Context,
+	uploadCtx context.Context,
+	manager *Manager,
+	putter PiecePutter,
+	privateKey storj.PiecePrivateKey,
+	stallManager *StallManager,
+) (success bool, tags map[string]string, node byte, err error) {
 	defer mon.Task()(&longTailCtx)(&err)
 	// If the long tail context is cancelled, then return a nil error.
 	defer func() {
@@ -57,9 +64,9 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 	}()
 
 	for {
-		piece, limit, done, err := manager.NextPiece(longTailCtx)
+		piece, limit, tags, node, done, err := manager.NextPiece(longTailCtx)
 		if err != nil {
-			return false, err
+			return false, nil, 0, err
 		}
 
 		var pieceID string
@@ -132,7 +139,6 @@ func UploadOne(longTailCtx, uploadCtx context.Context, manager *Manager, putter 
 		if errors.Is(err, errTryAgain) {
 			continue
 		}
-		return success, err
+		return success, tags, node, err
 	}
-
 }
