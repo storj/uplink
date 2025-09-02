@@ -175,8 +175,16 @@ func Begin(ctx context.Context,
 				successfulSoFar := int(atomic.AddInt32(&successful, 1))
 				// After BaseUploads successful uploads, calculate the stall threshold.
 				if updatedDetectionConfig != nil && successfulSoFar == updatedDetectionConfig.BaseUploads {
-					duration := max(time.Since(uploadStart)*time.Duration(updatedDetectionConfig.Factor), updatedDetectionConfig.MinStallDuration)
-					stallManager.SetMaxDuration(duration)
+					baseUploadsDuration := time.Since(uploadStart)
+					detectionFactor := updatedDetectionConfig.Factor
+					minStallDuration := updatedDetectionConfig.MinStallDuration
+					maxDuration := max(baseUploadsDuration*time.Duration(detectionFactor), minStallDuration)
+					stallManager.SetMaxDuration(maxDuration)
+
+					evs.Event("stall_threshold_calculation", eventkit.Duration("baseUploadsDuration", baseUploadsDuration),
+						eventkit.Int64("detectionFactor", int64(detectionFactor)),
+						eventkit.Duration("minStallDuration", minStallDuration),
+						eventkit.Duration("maxDuration", maxDuration))
 				}
 				// If we have met the optimal threshold, we can cancel the rest.
 				if successfulSoFar == optimalThreshold {
