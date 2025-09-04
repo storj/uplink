@@ -2494,6 +2494,80 @@ func TestListObjectWithArbitraryPrefixMetadata(t *testing.T) {
 		}
 	})
 }
+func TestUpdateMetadata(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		_, err = project.EnsureBucket(ctx, "testbucket")
+		require.NoError(t, err)
+
+		expected := testrand.Bytes(1 * memory.KiB)
+
+		// upload object with no custom metadata
+		upload, err := object.UploadObject(ctx, project, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		_, err = upload.Write(expected)
+		require.NoError(t, err)
+		require.NoError(t, upload.SetETag(ctx, []byte("etag")))
+		require.NoError(t, upload.Commit())
+
+		// check that there is no custom metadata after the upload
+		obj, err := object.StatObject(ctx, project, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		require.Empty(t, obj.Custom)
+
+		newMetadata := uplink.CustomMetadata{
+			"key1": "value1",
+			"key2": "value2",
+		}
+
+		// update the object's metadata
+		err = object.UpdateObjectMetadata(ctx, project, "testbucket", "obj", newMetadata, &object.UpdateObjectMetadataOptions{
+			ETag: obj.ETag,
+		})
+		require.NoError(t, err)
+
+		// check that the metadata has been updated as expected
+		statObj, err := object.StatObject(ctx, project, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		require.EqualValues(t, []byte("etag"), statObj.ETag)
+		require.Equal(t, newMetadata, statObj.Custom)
+
+		// confirm that the object is still downloadable
+		download, err := project.DownloadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		downloaded, err := io.ReadAll(download)
+		require.NoError(t, err)
+		require.NoError(t, download.Close())
+		require.Equal(t, expected, downloaded)
+
+		// remove the object's metadata
+		err = object.UpdateObjectMetadata(ctx, project, "testbucket", "obj", nil, &object.UpdateObjectMetadataOptions{
+			ETag: obj.ETag,
+		})
+		require.NoError(t, err)
+
+		// check that the metadata has been removed
+		statObj, err = object.StatObject(ctx, project, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		require.EqualValues(t, []byte("etag"), statObj.ETag)
+		require.Empty(t, statObj.Custom)
+
+		// confirm that the object is still downloadable
+		download, err = project.DownloadObject(ctx, "testbucket", "obj", nil)
+		require.NoError(t, err)
+		downloaded, err = io.ReadAll(download)
+		require.NoError(t, err)
+		require.NoError(t, download.Close())
+		require.Equal(t, expected, downloaded)
+	})
+}
 
 func TestETag(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{

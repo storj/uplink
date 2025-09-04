@@ -147,6 +147,11 @@ type DeleteObjectOptions = metaclient.DeleteObjectOptions
 // SetObjectRetentionOptions contains additional options for setting an object's retention.
 type SetObjectRetentionOptions = metaclient.SetObjectRetentionOptions
 
+// UpdateObjectMetadataOptions contains additional options for updating object's metadata.
+type UpdateObjectMetadataOptions struct {
+	ETag []byte
+}
+
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
@@ -627,6 +632,29 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 	}
 
 	return retention, convertKnownErrors(err, bucket, key)
+}
+
+// UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
+// Any existing custom metadata will be deleted. This version allows setting ETag parameters.
+func UpdateObjectMetadata(ctx context.Context, project *uplink.Project, bucket, key string, newMetadata uplink.CustomMetadata, options *UpdateObjectMetadataOptions) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if options == nil {
+		options = &UpdateObjectMetadataOptions{}
+	}
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone(), options.ETag, options.ETag != nil)
+	if err != nil {
+		return convertKnownErrors(err, bucket, key)
+	}
+
+	return nil
 }
 
 // convertObject converts metainfo.Object to Version.
