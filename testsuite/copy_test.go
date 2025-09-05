@@ -23,6 +23,7 @@ func TestCopyObject(t *testing.T) {
 		SatelliteCount:   1,
 		StorageNodeCount: 4,
 		UplinkCount:      1,
+		Timeout:          -1,
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		newCtx := testuplink.WithMaxSegmentSize(ctx, 10*memory.KiB)
 		project := openProject(t, ctx, planet)

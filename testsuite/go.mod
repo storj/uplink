@@ -10,11 +10,11 @@ require (
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.15.0
-	storj.io/common v0.0.0-20250903140833-2619c78a2dc9
+	storj.io/common v0.0.0-20250905132913-dad2ec895b75
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250903231417-ebe7ab3141b2
-	storj.io/uplink v1.13.2-0.20250902205150-55c7452878c1
+	storj.io/storj v1.91.0-alpha.0.20250904124202-1d21130d73fc
+	storj.io/uplink v1.13.2-0.20250904071434-66ec02d86ad3
 )
 
 require (
