@@ -84,7 +84,7 @@ func (c *Config) ValidateAndUpdate(totalNodes int) (config *Config) {
 	return config
 }
 
-// isEnabledFromEnv checks if stall detection is enabled via environment variables
+// isEnabled checks if stall detection is enabled via environment variables
 func isEnabled() bool {
 	return strings.ToLower(os.Getenv("STORJ_STALL_DETECTION_ENABLED")) == "true"
 }
