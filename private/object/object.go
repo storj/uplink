@@ -662,7 +662,7 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 	return object
 }
 
-// convertObject converts metainfo.Object to Version.
+// convertUplinkObject converts an uplink.Object to a VersionedObject.
 func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 	if obj == nil {
 		return nil
