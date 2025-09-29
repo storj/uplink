@@ -6,6 +6,7 @@ package project
 import (
 	"context"
 	"errors"
+	"time"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -39,9 +40,10 @@ type EdgeURLOverrides struct {
 	InternalLinksharing string
 }
 
-// Info contains the public ID, salt and edge url overrides of a project.
+// Info contains information of a project.
 type Info struct {
 	PublicId         uuid.UUID
+	CreatedAt        time.Time
 	Salt             []byte
 	EdgeUrlOverrides *EdgeURLOverrides
 }
@@ -88,8 +90,9 @@ func GetProjectInfo(ctx context.Context, config uplink.Config, access *uplink.Ac
 	copy(id[:], info.ProjectPublicId)
 
 	projectInfo := Info{
-		PublicId: id,
-		Salt:     info.ProjectSalt,
+		PublicId:  id,
+		CreatedAt: info.ProjectCreatedAt,
+		Salt:      info.ProjectSalt,
 	}
 
 	if info.EdgeUrlOverrides != nil {

@@ -6,6 +6,7 @@ package project_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -114,6 +115,7 @@ func TestGetProjectInfo(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, info.Salt)
 		require.Equal(t, project.PublicID, info.PublicId)
+		require.WithinDuration(t, project.CreatedAt, info.CreatedAt, time.Nanosecond)
 		require.Nil(t, info.EdgeUrlOverrides)
 
 		err = sat.API.DB.Console().Projects().UpdateDefaultPlacement(ctx, project.ID, storj.PlacementConstraint(1))
