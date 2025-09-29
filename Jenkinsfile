@@ -74,12 +74,11 @@ pipeline {
                             }
                             steps {
                                 sh 'go vet ./...'
-                                sh 'go test -parallel 4 -p 6 -vet=off $COVERFLAGS -timeout 40m -json -race ./... > .build/tests.json'
+                                sh 'go test -parallel 6 -p 12 -vet=off $COVERFLAGS -timeout 40m -json -race ./... 2>&1 | tee .build/tests.json | xunit -out .build/tests.xml'
                             }
 
                             post {
                                 always {
-                                    sh script: 'cat .build/tests.json | xunit -out .build/tests.xml', returnStatus: true
                                     sh script: 'cat .build/tests.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/tests.json'
                                     junit '.build/tests.xml'
@@ -115,15 +114,12 @@ pipeline {
 
                                 dir('testsuite'){
                                     sh 'go vet ./...'
-                                    sh 'go test -parallel 2 -p 1 -vet=off $COVERFLAGS -timeout 40m -json -race ./... > ../.build/testsuite.json'
+                                    sh 'go test -parallel 6 -p 12 -vet=off $COVERFLAGS -timeout 40m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                                 }
                             }
 
                             post {
                                 always {
-                                    dir('testsuite'){
-                                        sh script: 'cat ../.build/testsuite.json | xunit -out ../.build/testsuite.xml', returnStatus: true
-                                    }
                                     sh script: 'cat .build/testsuite.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/testsuite.json'
                                     junit '.build/testsuite.xml'
@@ -140,41 +136,43 @@ pipeline {
                             }
                         }
 
-                        stage('Integration using Spanner [storj/storj]') {
-                            environment {
-                                STORJ_TEST_POSTGRES = 'omit'
-                                STORJ_TEST_COCKROACH = 'omit'
-                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9014?emulator|'+
-                                                     'spanner://127.0.0.1:9015?emulator|'+
-                                                     'spanner://127.0.0.1:9016?emulator|'+
-                                                     'spanner://127.0.0.1:9017?emulator'
-                                GOCACHE = '/root/.cache/go-build-integration'                                                     
-                            }
-                            steps {
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9014 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9015 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9016 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9017 &'
-
-                                dir('testsuite'){
-                                    sh 'cp go.mod go-temp.mod'
-                                    sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                                    sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 2 -p 1 -vet=off -timeout 80m -json $(go list storj.io/storj/... | grep -v /metabase | grep -v /satellitedb) 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
-                                }
-                            }
-
-                            post {
-                                always {
-                                    sh script: 'cat .build/testsuite-storj.json | tparse -all -slow 100', returnStatus: true
-                                    archiveArtifacts artifacts: '.build/testsuite-storj.json'
-                                    junit '.build/testsuite-storj.xml'
-                                }
-                            }
-                        }
                         stage('Go Compatibility') {
                             steps {
                                 sh 'check-cross-compile -compiler "go,go.min" storj.io/uplink/...'
                             }
+                        }
+                    }
+                }
+
+                stage('Integration storj/storj using Spanner') {
+                    environment {
+                        STORJ_TEST_POSTGRES = 'omit'
+                        STORJ_TEST_COCKROACH = 'omit'
+                        STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9014?emulator|'+
+                                             'spanner://127.0.0.1:9015?emulator|'+
+                                             'spanner://127.0.0.1:9016?emulator|'+
+                                             'spanner://127.0.0.1:9017?emulator'
+                        GOCACHE = '/root/.cache/go-build-integration'
+                    }
+                    steps {
+                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9014 &'
+                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9015 &'
+                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9016 &'
+                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9017 &'
+
+                        dir('testsuite'){
+                            sh 'cp go.mod go-temp.mod'
+
+                            sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
+                            sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 6 -p 12 -vet=off -timeout 80m -json $(go list storj.io/storj/... | grep -v /metabase | grep -v /satellitedb) 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                        }
+                    }
+
+                    post {
+                        always {
+                            sh script: 'cat .build/testsuite-storj.json | tparse -all -slow 100', returnStatus: true
+                            archiveArtifacts artifacts: '.build/testsuite-storj.json'
+                            junit '.build/testsuite-storj.xml'
                         }
                     }
                 }
