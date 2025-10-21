@@ -2220,7 +2220,11 @@ func TestConditionalWrites(t *testing.T) {
 			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
 			require.NoError(t, err)
 
-			_, err = object.CommitUpload(ctx, project, bucket, key, upload.UploadID, &opts)
+			upload2, err := object.UploadObject(ctx, project, bucket, key, &object.UploadOptions{
+				IfNoneMatch: []string{"*"},
+			})
+			require.NoError(t, err)
+			err = upload2.Commit()
 			require.ErrorIs(t, err, object.ErrFailedPrecondition)
 
 			require.NoError(t, upl.DeleteObject(ctx, sat, bucket, key))

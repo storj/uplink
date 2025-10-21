@@ -5,15 +5,15 @@ go 1.24.7
 replace storj.io/uplink => ../
 
 require (
-	github.com/klauspost/compress v1.17.11
+	github.com/klauspost/compress v1.18.1
 	github.com/stretchr/testify v1.10.0
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.17.0
-	storj.io/common v0.0.0-20250918032746-784a656bec7e
+	storj.io/common v0.0.0-20251020105611-b5c3802e98a0
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.91.0-alpha.0.20250929130437-677264c8bf84
+	storj.io/storj v1.91.0-alpha.0.20251023074012-ce06998012f8
 	storj.io/uplink v1.13.2-0.20250904071434-66ec02d86ad3
 )
 
