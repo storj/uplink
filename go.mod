@@ -5,14 +5,14 @@ go 1.24.0
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/klauspost/compress v1.17.7
-	github.com/spacemonkeygo/monkit/v3 v3.0.23
+	github.com/spacemonkeygo/monkit/v3 v3.0.25-0.20251022131615-eb24eb109368
 	github.com/stretchr/testify v1.9.0
 	github.com/zeebo/assert v1.3.1
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.16.0
-	storj.io/common v0.0.0-20251020105611-b5c3802e98a0
+	storj.io/common v0.0.0-20251107171817-6221ae45072c
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2
