@@ -160,26 +160,26 @@ func Begin(ctx context.Context,
 			// function returns, the scheduler resource MUST be released to
 			// allow other piece uploads to take place.
 			defer res.Done()
-			uploaded, tags, node, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
-			var stallDetected bool
-			if err != nil {
-				var stallError pieceupload.StallDetectedError
-				if errors.As(err, &stallError) {
-					stallDetected = true
-					evs.Event("piece_stall_detected", eventkit.String("upload_id", uploadID), eventkit.Duration("duration", time.Since(pieceStart)))
-					// Convert stall errors to nil for backward compatibility
-					err = nil
-				} else {
-					var optimalError pieceupload.OptimalThresholdError
-					if errors.As(err, &optimalError) {
-						// Convert optimal threshold errors to nil for backward compatibility
-						err = nil
-					}
-					// Keep other errors as-is
-				}
+			uploaded, tags, node, stallCount, err := pieceupload.UploadOne(longTailCtx, ctx, mgr, piecePutter, beginSegment.PiecePrivateKey, stallManager)
+
+			// Emit individual stall events
+			if stallCount > 0 {
+				evs.Event("piece_stalls_during_upload",
+					eventkit.String("upload_id", uploadID),
+					eventkit.Int64("stall_count", int64(stallCount)),
+					eventkit.Duration("duration", time.Since(pieceStart)))
 			}
 
-			results <- segmentResult{uploaded: uploaded, err: err, stallDetected: stallDetected}
+			if err != nil {
+				var optimalError pieceupload.OptimalThresholdError
+				if errors.As(err, &optimalError) {
+					// Convert optimal threshold errors to nil for backward compatibility
+					err = nil
+				}
+				// Keep other errors as-is
+			}
+
+			results <- segmentResult{uploaded: uploaded, err: err, stallCount: stallCount}
 			if uploaded {
 				// Piece upload was successful.
 				successfulSoFar := int(atomic.AddInt32(&successful, 1))
@@ -191,7 +191,9 @@ func Begin(ctx context.Context,
 					maxDuration := max(baseUploadsDuration*time.Duration(detectionFactor), minStallDuration)
 					stallManager.SetMaxDuration(maxDuration)
 
-					evs.Event("stall_threshold_calculation", eventkit.Duration("baseUploadsDuration", baseUploadsDuration),
+					evs.Event("stall_threshold_calculation",
+						eventkit.String("uploadID", uploadID),
+						eventkit.Duration("baseUploadsDuration", baseUploadsDuration),
 						eventkit.Int64("detectionFactor", int64(detectionFactor)),
 						eventkit.Duration("minStallDuration", minStallDuration),
 						eventkit.Duration("maxDuration", maxDuration))
@@ -236,9 +238,9 @@ func (r *pieceReader) PieceReader(num int) io.Reader {
 }
 
 type segmentResult struct {
-	uploaded      bool
-	err           error
-	stallDetected bool
+	uploaded   bool
+	err        error
+	stallCount int
 }
 
 // Upload is a segment upload that has been started and returned by the Begin
@@ -272,20 +274,18 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 
 	var eg errs.Group
 	var successful int
-	var stallsDetected int
+	var totalStalls int
 	for i := 0; i < cap(upload.results); i++ {
 		result := <-upload.results
 		if result.uploaded {
 			successful++
 		}
-		if result.stallDetected {
-			stallsDetected++
-		}
+		totalStalls += result.stallCount
 		eg.Add(result.err)
 	}
 
 	// Store stall count for test verification
-	upload.stallsDetected = stallsDetected
+	upload.stallsDetected = totalStalls
 
 	// The goroutines should all be on their way to exiting since the loop
 	// above guarantees they have written their results to the channel. Wait
@@ -301,7 +301,7 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 	// Emit comprehensive upload summary metrics
 	totalDuration := time.Since(upload.uploadStart)
 	uploaderCount := cap(upload.results)
-	stallsDetectedCount := int64(stallsDetected)
+	stallsDetectedCount := int64(totalStalls)
 
 	stallRate := float64(0)
 	if uploaderCount > 0 {

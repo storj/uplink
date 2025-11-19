@@ -47,6 +47,8 @@ func (e OptimalThresholdError) Error() string {
 // it fails, it will attempt to upload another until either the upload context,
 // or the long tail context is cancelled.
 // The stallManager parameter is optional. If nil, no stall detection will be used.
+// Returns: success (bool), tags (map), node (byte), stallCount (int), err (error)
+// stallCount indicates how many pieces were cancelled due to stall detection during this upload attempt.
 func UploadOne(
 	longTailCtx context.Context,
 	uploadCtx context.Context,
@@ -54,7 +56,7 @@ func UploadOne(
 	putter PiecePutter,
 	privateKey storj.PiecePrivateKey,
 	stallManager *StallManager,
-) (success bool, tags map[string]string, node byte, err error) {
+) (success bool, tags map[string]string, node byte, stallCount int, err error) {
 	defer mon.Task()(&longTailCtx)(&err)
 	// If the long tail context is cancelled, then return a nil error.
 	defer func() {
@@ -63,10 +65,11 @@ func UploadOne(
 		}
 	}()
 
+	var stalls int
 	for {
 		piece, limit, tags, node, done, err := manager.NextPiece(longTailCtx)
 		if err != nil {
-			return false, nil, 0, err
+			return false, nil, 0, stalls, err
 		}
 
 		var pieceID string
@@ -123,7 +126,7 @@ func UploadOne(
 					// Stall manager cancellation: this piece was taking longer than the
 					// stall detection threshold, so this piece upload has been cancelled
 					// so that the segment upload can try a different piece more quickly if necessary.
-					testuplink.Log(logCtx, "Stall Detected")
+					testuplink.Log(logCtx, "Stall Detected - retrying with different node")
 					return false, StallDetectedError{}
 				} else {
 					// Long-tail Cancellation: the outer segment upload reached the optimal threshold,
@@ -136,9 +139,16 @@ func UploadOne(
 			return false, errTryAgain
 		}()
 
+		// Retry logic: continue the loop for transient errors and stall detection
 		if errors.Is(err, errTryAgain) {
 			continue
 		}
-		return success, tags, node, err
+		var stallError StallDetectedError
+		if errors.As(err, &stallError) {
+			// Stall detected - increment counter and retry with a different node
+			stalls++
+			continue
+		}
+		return success, tags, node, stalls, err
 	}
 }

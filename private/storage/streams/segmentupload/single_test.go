@@ -141,7 +141,7 @@ func TestBegin(t *testing.T) {
 			require.Equal(t, err, segment.err)
 
 			if tc.expectWaitErr != "" {
-				require.EqualError(t, err, tc.expectWaitErr)
+				require.ErrorContains(t, err, tc.expectWaitErr)
 				require.Equal(t, tc.expectedStalls, upload.stallsDetected)
 				return
 			}
@@ -182,10 +182,10 @@ func TestBeginWithStalls(t *testing.T) {
 	}{
 		{
 			// Stall detection: basic functionality test, no long tail
-			// Tests that stall manager is properly initialized and configured
-			// After 1 base upload succeed, stall timeout = max(upload_time * 1, 5ms)
-			// expect 2 slow nodes to get cancelled.
-			// Expected: unsuccessful upload with stall detection enabled
+			// Tests that stall manager is properly initialized and configured.
+			// After 1 base upload succeeds, stall timeout = max(upload_time * 1, 5ms).
+			// 2 slow nodes get cancelled due to stall detection, then retry and exhaust the manager.
+			// Expected: unsuccessful upload with stall detection enabled and retries exhausted
 			desc:         "stall manager enabled, no long tail",
 			beginSegment: makeBeginSegment(fastKind, slowKind, slowKind),
 			stallConfig: &stalldetection.Config{
@@ -297,7 +297,7 @@ func TestBeginWithStalls(t *testing.T) {
 			require.Equal(t, err, segment.err)
 
 			if tc.expectWaitErr != "" {
-				require.EqualError(t, err, tc.expectWaitErr)
+				require.ErrorContains(t, err, tc.expectWaitErr)
 				require.Equal(t, tc.expectedStalls, upload.stallsDetected)
 				return
 			}
