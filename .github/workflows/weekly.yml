@@ -1,0 +1,31 @@
+name: Weekly Tasks
+
+on:
+  schedule:
+    # Runs every Wednesday at 9:00 AM UTC (cron format: minute hour day-of-month month day-of-week)
+    # Day of week: 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, etc.
+    - cron: '0 9 * * 3'
+  workflow_dispatch: # Allows manual trigger for testing
+
+jobs:
+  weekly-task:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Bump dependencies
+        run: make bump-dependencies
+
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "go.mod: bump dependencies"
+          branch: update-dependencies
+          reviewers: mniewrzal
