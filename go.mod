@@ -12,7 +12,7 @@ require (
 	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
 	golang.org/x/sync v0.16.0
-	storj.io/common v0.0.0-20251107171817-6221ae45072c
+	storj.io/common v0.0.0-20251120170554-032ced125058
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2
