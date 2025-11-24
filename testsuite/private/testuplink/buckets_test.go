@@ -138,7 +138,7 @@ func TestBucketDeleteAll(t *testing.T) {
 		}
 
 		// Upload an object to the bucket
-		upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
+		upload(ctx, t, streams, bucket.Name, "small-file", []byte("test"))
 
 		// Force delete the bucket
 		bucket, err = db.DeleteBucket(ctx, TestBucket, true)

@@ -21,7 +21,6 @@ import (
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
-	"storj.io/uplink/private/stream"
 )
 
 // ErrUploadDone is returned when either Abort or Commit has already been called.
@@ -114,16 +113,12 @@ func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, k
 	}
 	upload.streams = streams
 
-	if project.concurrentSegmentUploadConfig == nil {
-		upload.upload = stream.NewUpload(ctx, mutableStream, streams, options)
-	} else {
-		sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
-		u, err := streams.UploadObject(ctx, mutableStream.BucketName(), mutableStream.Path(), mutableStream, sched, options)
-		if err != nil {
-			return nil, convertKnownErrors(err, bucket, key)
-		}
-		upload.upload = u
+	sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
+	u, err := streams.UploadObject(ctx, mutableStream.BucketName(), mutableStream.Path(), mutableStream, sched, options)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
 	}
+	upload.upload = u
 
 	upload.tracker = project.tracker.Child("upload", 1)
 	return upload, nil

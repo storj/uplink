@@ -37,7 +37,6 @@ import (
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/object"
-	"storj.io/uplink/private/testuplink"
 )
 
 // TODO(ver) add tests for versioned/unversioned/suspended objects as well as delete markers
@@ -865,45 +864,6 @@ func TestGetObjectRetention(t *testing.T) {
 			_, err = object.GetObjectRetention(ctx, project, bucketName, objectKey, nil)
 			require.ErrorIs(t, err, object.ErrObjectLockInvalidObjectState)
 		})
-	})
-}
-
-func TestUploadObject_OldCodePath(t *testing.T) {
-	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
-		Reconfigure: testplanet.Reconfigure{
-			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Metainfo.UseBucketLevelObjectVersioning = true
-			},
-		},
-	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		bucketName := "test-bucket"
-		objectKey := "test-object"
-		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
-		require.NoError(t, err)
-
-		uploadCtx := testuplink.DisableConcurrentSegmentUploads(ctx)
-
-		project, err := planet.Uplinks[0].OpenProject(uploadCtx, planet.Satellites[0])
-		require.NoError(t, err)
-		defer ctx.Check(project.Close)
-
-		require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
-
-		upload, err := object.UploadObject(uploadCtx, project, bucketName, objectKey, nil)
-		require.NoError(t, err)
-
-		_, err = upload.Write([]byte("test"))
-		require.NoError(t, err)
-
-		require.NoError(t, upload.Commit())
-		require.NotEmpty(t, upload.Info().Version)
-
-		statObj, err := object.StatObject(uploadCtx, project, bucketName, objectKey, upload.Info().Version)
-		require.NoError(t, err)
-
-		uploadObject := upload.Info()
-		require.EqualExportedValues(t, *uploadObject, *statObj)
 	})
 }
 

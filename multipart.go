@@ -24,8 +24,6 @@ import (
 	"storj.io/eventkit"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
-	"storj.io/uplink/private/storage/streams"
-	"storj.io/uplink/private/stream"
 	"storj.io/uplink/private/testuplink"
 )
 
@@ -187,18 +185,13 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
-	upload.streams = streams
 
-	if project.concurrentSegmentUploadConfig == nil {
-		upload.upload = stream.NewUploadPart(ctx, bucket, key, decodedStreamID, partNumber, upload.eTagCh, streams)
-	} else {
-		sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
-		u, err := streams.UploadPart(ctx, bucket, key, decodedStreamID, int32(partNumber), upload.eTagCh, sched)
-		if err != nil {
-			return nil, convertKnownErrors(err, bucket, key)
-		}
-		upload.upload = u
+	sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
+	u, err := streams.UploadPart(ctx, bucket, key, decodedStreamID, int32(partNumber), upload.eTagCh, sched)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucket, key)
 	}
+	upload.upload = u
 
 	upload.tracker = project.tracker.Child("upload-part", 1)
 	return upload, nil
@@ -358,7 +351,6 @@ type PartUpload struct {
 	bucket  string
 	key     string
 	part    *Part
-	streams *streams.Store
 	eTagCh  chan []byte
 
 	stats operationStats
@@ -429,7 +421,6 @@ func (upload *PartUpload) Commit() error {
 
 	err := errs.Combine(
 		upload.upload.Commit(),
-		upload.streams.Close(),
 		upload.tracker.Close(),
 	)
 	upload.stats.flagFailure(err)
@@ -464,7 +455,6 @@ func (upload *PartUpload) Abort() error {
 
 	err := errs.Combine(
 		upload.upload.Abort(),
-		upload.streams.Close(),
 		upload.tracker.Close(),
 	)
 	upload.stats.flagFailure(err)

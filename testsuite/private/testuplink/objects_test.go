@@ -25,9 +25,11 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/uplink/private/bucket"
+	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/storage/streams"
 	"storj.io/uplink/private/stream"
+	"storj.io/uplink/private/testuplink"
 )
 
 const TestFile = "test-file"
@@ -65,7 +67,7 @@ func TestGetObject(t *testing.T) {
 	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
-		upload(ctx, t, db, streams, bucket.Name, TestFile, nil)
+		upload(ctx, t, streams, bucket.Name, TestFile, nil)
 
 		_, err = db.GetObject(ctx, "", "", nil)
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
@@ -94,9 +96,9 @@ func TestDownloadObject(t *testing.T) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
 		require.NoError(t, err)
 
-		upload(ctx, t, db, streams, bucket.Name, "empty-file", nil)
-		upload(ctx, t, db, streams, bucket.Name, "small-file", []byte("test"))
-		upload(ctx, t, db, streams, bucket.Name, "large-file", data)
+		upload(ctx, t, streams, bucket.Name, "empty-file", nil)
+		upload(ctx, t, streams, bucket.Name, "small-file", []byte("test"))
+		upload(ctx, t, streams, bucket.Name, "large-file", data)
 
 		_, err = db.GetObject(ctx, "", "", nil)
 		assert.True(t, metaclient.ErrNoBucket.Has(err))
@@ -123,14 +125,10 @@ func TestDownloadObject(t *testing.T) {
 	})
 }
 
-func upload(ctx context.Context, t *testing.T, db *metaclient.DB, streams *streams.Store, bucket, key string, data []byte) {
-	obj, err := db.CreateObject(ctx, bucket, key, nil)
+func upload(ctx context.Context, t *testing.T, streams *streams.Store, bucket, key string, data []byte) {
+	sched := scheduler.New(testuplink.GetConcurrentSegmentUploadsConfig(ctx).SchedulerOptions)
+	upload, err := streams.UploadObject(ctx, bucket, key, &metaclient.MutableStream{}, sched, nil)
 	require.NoError(t, err)
-
-	str, err := obj.CreateStream(ctx)
-	require.NoError(t, err)
-
-	upload := stream.NewUpload(ctx, str, streams, nil)
 
 	_, err = upload.Write(data)
 	require.NoError(t, err)
@@ -178,7 +176,7 @@ func TestDeleteObject(t *testing.T) {
 		require.NoError(t, err)
 
 		for i, key := range []string{unencryptedObjectKey.String(), encryptedObjectKey.String()} {
-			upload(ctx, t, db, streams, bucket.Name, key, nil)
+			upload(ctx, t, streams, bucket.Name, key, nil)
 
 			if i < 0 {
 				// Enable encryption bypass
@@ -251,7 +249,7 @@ func TestListObjects_EncryptionBypass(t *testing.T) {
 		}
 
 		for _, key := range objectKeys {
-			upload(ctx, t, db, streams, bucket.Name, key, nil)
+			upload(ctx, t, streams, bucket.Name, key, nil)
 		}
 		sort.Strings(objectKeys)
 
@@ -308,13 +306,13 @@ func TestListObjects(t *testing.T) {
 		}
 
 		for _, key := range objectKeys {
-			upload(ctx, t, db, streams, bucket.Name, key, nil)
+			upload(ctx, t, streams, bucket.Name, key, nil)
 		}
 
 		otherBucket, err := db.CreateBucket(ctx, "otherbucket")
 		require.NoError(t, err)
 
-		upload(ctx, t, db, streams, otherBucket.Name, "file-in-other-bucket", nil)
+		upload(ctx, t, streams, otherBucket.Name, "file-in-other-bucket", nil)
 
 		for i, tt := range []struct {
 			options metaclient.ListOptions
@@ -443,7 +441,7 @@ func TestListObjects_PagingWithDiffPassphrase(t *testing.T) {
 		}
 
 		for _, key := range objectKeys {
-			upload(ctx, t, dbA, streams, bucket.Name, key, nil)
+			upload(ctx, t, streams, bucket.Name, key, nil)
 		}
 
 		// Upload one object with different passphrase
@@ -456,7 +454,7 @@ func TestListObjects_PagingWithDiffPassphrase(t *testing.T) {
 			err := cleanup()
 			assert.NoError(t, err)
 		}()
-		upload(ctx, t, dbB, streams, bucket.Name, "object_with_different_passphrase", nil)
+		upload(ctx, t, streams, bucket.Name, "object_with_different_passphrase", nil)
 
 		for i, tt := range []struct {
 			options metaclient.ListOptions
@@ -516,9 +514,9 @@ func TestListObjectVersions(t *testing.T) {
 		err = bucket.SetBucketVersioning(ctx, project, testBucket.Name, true)
 		require.NoError(t, err)
 
-		upload(ctx, t, db, streams, testBucket.Name, objectKey, nil)
+		upload(ctx, t, streams, testBucket.Name, objectKey, nil)
 
-		upload(ctx, t, db, streams, testBucket.Name, objectKey, nil)
+		upload(ctx, t, streams, testBucket.Name, objectKey, nil)
 
 		list, err := db.ListObjects(ctx, testBucket.Name, options("", "", 0))
 		require.NoError(t, err)
