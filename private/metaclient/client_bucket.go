@@ -37,6 +37,9 @@ func (params *CreateBucketParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *CreateBucketParams) IsRetriable() bool { return false }
+
 // CreateBucketResponse response for CreateBucket request.
 type CreateBucketResponse struct {
 	Bucket Bucket
@@ -92,6 +95,9 @@ func (params *GetBucketParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketParams) IsRetriable() bool { return true }
 
 // GetBucketResponse response for GetBucket request.
 type GetBucketResponse struct {
@@ -160,6 +166,9 @@ func (params *GetBucketLocationParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketLocationParams) IsRetriable() bool { return true }
+
 // GetBucketLocationResponse response for GetBucketLocation request.
 type GetBucketLocationResponse struct {
 	Location []byte
@@ -203,6 +212,9 @@ func (params *GetBucketTaggingParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketTaggingParams) IsRetriable() bool { return true }
 
 // GetBucketTaggingResponse represents the response to a GetBucketTagging request.
 type GetBucketTaggingResponse struct {
@@ -265,6 +277,9 @@ func (params *SetBucketTaggingParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *SetBucketTaggingParams) IsRetriable() bool { return false }
+
 // SetBucketTagging places a set of tags on a bucket.
 func (client *Client) SetBucketTagging(ctx context.Context, params SetBucketTaggingParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -296,6 +311,9 @@ func (params *GetBucketVersioningParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketVersioningParams) IsRetriable() bool { return true }
 
 // GetBucketVersioningResponse response for GetBucketVersioning request.
 type GetBucketVersioningResponse struct {
@@ -343,6 +361,9 @@ func (params *SetBucketVersioningParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *SetBucketVersioningParams) IsRetriable() bool { return false }
+
 // SetBucketVersioning attempts to enable/disable versioning for a bucket.
 func (client *Client) SetBucketVersioning(ctx context.Context, params SetBucketVersioningParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -374,6 +395,9 @@ func (params *GetBucketObjectLockConfigurationParams) BatchItem() *pb.BatchReque
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketObjectLockConfigurationParams) IsRetriable() bool { return true }
 
 // GetBucketObjectLockConfigurationResponse response for GetBucketObjectLockConfiguration request.
 type GetBucketObjectLockConfigurationResponse struct {
@@ -453,6 +477,9 @@ func (params *SetBucketObjectLockConfigurationParams) BatchItem() *pb.BatchReque
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *SetBucketObjectLockConfigurationParams) IsRetriable() bool { return false }
+
 // SetBucketObjectLockConfiguration updates a bucket object lock configuration.
 func (client *Client) SetBucketObjectLockConfiguration(ctx context.Context, params SetBucketObjectLockConfigurationParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -493,6 +520,9 @@ func (params *DeleteBucketParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *DeleteBucketParams) IsRetriable() bool { return false }
 
 // DeleteBucket deletes a bucket.
 func (client *Client) DeleteBucket(ctx context.Context, params DeleteBucketParams) (_ Bucket, err error) {
@@ -540,6 +570,9 @@ func (params *ListBucketsParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *ListBucketsParams) IsRetriable() bool { return true }
 
 // ListBucketsResponse response for ListBucket request.
 type ListBucketsResponse struct {

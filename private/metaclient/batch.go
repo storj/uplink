@@ -25,6 +25,7 @@ type Batcher interface {
 // BatchItem represents single request in batch.
 type BatchItem interface {
 	BatchItem() *pb.BatchRequestItem
+	IsRetriable() bool
 }
 
 // BatchResponse single response from batch call.

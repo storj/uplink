@@ -47,6 +47,9 @@ func (params *BeginCopyObjectParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *BeginCopyObjectParams) IsRetriable() bool { return false }
+
 func newBeginCopyObjectResponse(response *pb.ObjectBeginCopyResponse) BeginCopyObjectResponse {
 	keys := make([]EncryptedKeyAndNonce, len(response.SegmentKeys))
 	for i, key := range response.SegmentKeys {
@@ -137,6 +140,9 @@ func (params *FinishCopyObjectParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *FinishCopyObjectParams) IsRetriable() bool { return false }
 
 // FinishCopyObjectResponse response for FinishCopyObjectResponse request.
 type FinishCopyObjectResponse struct {

@@ -127,6 +127,12 @@ func WithRetry(ctx context.Context, fn func(ctx context.Context) error) (err err
 	}
 }
 
+// NoopWithRetry just calls fn and return its return value.
+// It's used for situations that WithRetry is conditionally needed.
+func NoopWithRetry(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
 func needsRetry(err error) bool {
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		mon.Event("uplink_error_eof")

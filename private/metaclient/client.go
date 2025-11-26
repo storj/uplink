@@ -186,6 +186,9 @@ func (params *BeginObjectParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *BeginObjectParams) IsRetriable() bool { return false }
+
 // BeginObjectResponse response for BeginObject request.
 type BeginObjectResponse struct {
 	StreamID storj.StreamID
@@ -242,6 +245,9 @@ func (params *CommitObjectParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *CommitObjectParams) IsRetriable() bool { return false }
 
 // CommitObjectResponse response for CommitObject request.
 type CommitObjectResponse struct {
@@ -305,6 +311,9 @@ func (params *GetObjectParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetObjectParams) IsRetriable() bool { return true }
 
 // GetObjectResponse response for GetObject request.
 type GetObjectResponse struct {
@@ -717,6 +726,9 @@ func (params *BeginDeleteObjectParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *BeginDeleteObjectParams) IsRetriable() bool { return false }
+
 // BeginDeleteObjectResponse response for BeginDeleteObject request.
 type BeginDeleteObjectResponse struct {
 }
@@ -784,6 +796,9 @@ func (params *DeleteObjectsParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *DeleteObjectsParams) IsRetriable() bool { return false }
 
 // RawDeleteObjectsResultItem represents the result of an individual DeleteObjects deletion.
 type RawDeleteObjectsResultItem struct {
@@ -905,6 +920,9 @@ func (params *ListObjectsParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *ListObjectsParams) IsRetriable() bool { return true }
+
 // ListObjectsResponse response for ListObjects request.
 type ListObjectsResponse struct {
 	Items []RawObjectListItem
@@ -996,6 +1014,9 @@ func (params *ListPendingObjectStreamsParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *ListPendingObjectStreamsParams) IsRetriable() bool { return true }
 
 // ListPendingObjectStreamsResponse response for ListPendingObjectStreams request.
 type ListPendingObjectStreamsResponse struct {
@@ -1093,6 +1114,9 @@ func (params *ListSegmentsParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *ListSegmentsParams) IsRetriable() bool { return true }
+
 // ListSegmentsResponse response for ListSegments request.
 type ListSegmentsResponse struct {
 	Items                []SegmentListItem
@@ -1176,6 +1200,9 @@ func (params *BeginSegmentParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *BeginSegmentParams) IsRetriable() bool { return true }
+
 // BeginSegmentResponse response for BeginSegment request.
 type BeginSegmentResponse struct {
 	SegmentID          storj.SegmentID
@@ -1233,6 +1260,9 @@ func (params *RetryBeginSegmentPiecesParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *RetryBeginSegmentPiecesParams) IsRetriable() bool { return false }
 
 func (params *RetryBeginSegmentPiecesParams) toRequest(header *pb.RequestHeader) *pb.RetryBeginSegmentPiecesRequest {
 	retryPieceNumbers := make([]int32, len(params.RetryPieceNumbers))
@@ -1336,6 +1366,9 @@ func (params *CommitSegmentParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *CommitSegmentParams) IsRetriable() bool { return false }
+
 // CommitSegment commits an uploaded segment.
 func (client *Client) CommitSegment(ctx context.Context, params CommitSegmentParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -1383,6 +1416,9 @@ func (params *MakeInlineSegmentParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *MakeInlineSegmentParams) IsRetriable() bool { return false }
+
 // MakeInlineSegment creates an inline segment.
 func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSegmentParams) (err error) {
 	defer mon.Task()(&ctx)(&err)
@@ -1395,7 +1431,7 @@ func (client *Client) MakeInlineSegment(ctx context.Context, params MakeInlineSe
 	return Error.Wrap(err)
 }
 
-// DownloadObjectParams parameters for DownloadSegment method.
+// DownloadObjectParams parameters for DownloadObject method.
 type DownloadObjectParams struct {
 	Bucket             []byte
 	EncryptedObjectKey []byte
@@ -1426,7 +1462,10 @@ func (params *DownloadObjectParams) BatchItem() *pb.BatchRequestItem {
 	}
 }
 
-// DownloadObjectResponse response for DownloadSegment request.
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *DownloadObjectParams) IsRetriable() bool { return true }
+
+// DownloadObjectResponse response for DownloadObject request.
 type DownloadObjectResponse struct {
 	Object             RawObjectItem
 	DownloadedSegments []DownloadSegmentWithRSResponse
@@ -1523,6 +1562,9 @@ func (params *DownloadSegmentParams) BatchItem() *pb.BatchRequestItem {
 		},
 	}
 }
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *DownloadSegmentParams) IsRetriable() bool { return true }
 
 // DownloadSegmentResponse response for DownloadSegment request.
 type DownloadSegmentResponse struct {
@@ -1680,8 +1722,13 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 		return client.compressedBatch(ctx, requests...)
 	}
 
+	// We can retry if all the requests in the batch are retriable.
+	isRetriable := true
 	batchItems := make([]*pb.BatchRequestItem, len(requests))
 	for i, request := range requests {
+		if !request.IsRetriable() {
+			isRetriable = false
+		}
 		batchItems[i] = request.BatchItem()
 	}
 
@@ -1689,9 +1736,18 @@ func (client *Client) Batch(ctx context.Context, requests ...BatchItem) (resp []
 		return nil, Error.Wrap(err)
 	}
 
-	response, err := client.client.Batch(ctx, &pb.BatchRequest{
-		Header:   client.header(),
-		Requests: batchItems,
+	withRetry := NoopWithRetry
+	if isRetriable {
+		withRetry = WithRetry
+	}
+
+	var response *pb.BatchResponse
+	err = withRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.Batch(ctx, &pb.BatchRequest{
+			Header:   client.header(),
+			Requests: batchItems,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, Error.Wrap(err)
