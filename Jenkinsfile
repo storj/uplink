@@ -99,22 +99,17 @@ pipeline {
                             environment {
                                 STORJ_TEST_COCKROACH = 'omit'
                                 STORJ_TEST_POSTGRES = 'omit'
-                                STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9010?emulator|'+
-                                                     'spanner://127.0.0.1:9011?emulator|'+
-                                                     'spanner://127.0.0.1:9012?emulator|'+
-                                                     'spanner://127.0.0.1:9013?emulator'
                                 STORJ_TEST_LOG_LEVEL = 'info'
+                                STORJ_HASHSTORE_TABLE_DEFAULT_KIND = 'memtbl'
                                 COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
+                                STORJ_TEST_SPANNER = 'run:/usr/local/bin/spanner_emulator --override_change_stream_partition_token_alive_seconds=1'
+                                SPANNER_DISABLE_BUILTIN_METRICS = 'true'
+                                GOOGLE_CLOUD_SPANNER_DISABLE_LOG_CLIENT_OPTIONS='true'
                             }
                             steps {
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9010 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9011 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9012 &'
-                                sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9013 &'
-
                                 dir('testsuite'){
                                     sh 'go vet ./...'
-                                    sh 'go test -parallel 6 -p 12 -vet=off $COVERFLAGS -timeout 40m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
+                                    sh 'go test -parallel 8 -p 12 -vet=off $COVERFLAGS -timeout 40m -json -race ./... 2>&1 | tee ../.build/testsuite.json | xunit -out ../.build/testsuite.xml'
                                 }
                             }
 
@@ -148,23 +143,15 @@ pipeline {
                     environment {
                         STORJ_TEST_POSTGRES = 'omit'
                         STORJ_TEST_COCKROACH = 'omit'
-                        STORJ_TEST_SPANNER = 'spanner://127.0.0.1:9014?emulator|'+
-                                             'spanner://127.0.0.1:9015?emulator|'+
-                                             'spanner://127.0.0.1:9016?emulator|'+
-                                             'spanner://127.0.0.1:9017?emulator'
+                        STORJ_TEST_SPANNER = 'run:/usr/local/bin/spanner_emulator --override_change_stream_partition_token_alive_seconds=1'
                         GOCACHE = '/root/.cache/go-build-integration'
                     }
                     steps {
-                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9014 &'
-                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9015 &'
-                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9016 &'
-                        sh '/usr/local/bin/spanner_emulator --host_port 127.0.0.1:9017 &'
-
                         dir('testsuite'){
                             sh 'cp go.mod go-temp.mod'
 
                             sh 'go vet -modfile go-temp.mod -mod=mod storj.io/storj/...'
-                            sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 6 -p 12 -vet=off -timeout 80m -json $(go list storj.io/storj/... | grep -v /metabase | grep -v /satellitedb) 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
+                            sh 'go test -modfile go-temp.mod -mod=mod -tags noembed -parallel 8 -p 12 -vet=off -timeout 80m -json $(go list storj.io/storj/... | grep -v /metabase | grep -v /satellitedb) 2>&1 | tee ../.build/testsuite-storj.json | xunit -out ../.build/testsuite-storj.xml'
                         }
                     }
 
