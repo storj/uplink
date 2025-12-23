@@ -286,6 +286,20 @@ type BucketObjectLockConfiguration struct {
 	DefaultRetention *DefaultRetention
 }
 
+// FilterRule represents a filter rule for bucket notification configurations.
+type FilterRule struct {
+	Prefix string
+	Suffix string
+}
+
+// BucketNotificationConfiguration represents a bucket notification configuration.
+type BucketNotificationConfiguration struct {
+	ID         string
+	TopicName  string
+	Events     []string
+	FilterRule FilterRule
+}
+
 // ListDirection specifies listing direction.
 type ListDirection = pb.ListDirection
 

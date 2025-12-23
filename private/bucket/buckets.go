@@ -306,6 +306,53 @@ func SetBucketObjectLockConfiguration(ctx context.Context, project *uplink.Proje
 	return packageConvertKnownErrors(err, bucketName, "")
 }
 
+// GetBucketNotificationConfiguration retrieves bucket notification configuration.
+func GetBucketNotificationConfiguration(ctx context.Context, project *uplink.Project, bucketName string) (_ *metaclient.BucketNotificationConfiguration, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return nil, convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return nil, convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	response, err := metainfoClient.GetBucketNotificationConfiguration(ctx, metaclient.GetBucketNotificationConfigurationParams{
+		Name: []byte(bucketName),
+	})
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, bucketName, "")
+	}
+
+	return response.Configuration, nil
+}
+
+// SetBucketNotificationConfiguration sets bucket notification configuration.
+// Setting config to nil deletes the notification configuration.
+func SetBucketNotificationConfiguration(ctx context.Context, project *uplink.Project, bucketName string, config *metaclient.BucketNotificationConfiguration) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	if bucketName == "" {
+		return convertKnownErrors(metaclient.ErrNoBucket.New(""), bucketName, "")
+	}
+
+	metainfoClient, err := dialMetainfoClient(ctx, project)
+	if err != nil {
+		return convertKnownErrors(err, bucketName, "")
+	}
+	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
+
+	err = metainfoClient.SetBucketNotificationConfiguration(ctx, metaclient.SetBucketNotificationConfigurationParams{
+		Name:          []byte(bucketName),
+		Configuration: config,
+	})
+
+	return packageConvertKnownErrors(err, bucketName, "")
+}
+
 // DeleteBucketWithObjectsBypassGovernanceRetention deletes all objects in the bucket and bypasses any object lock settings.
 func DeleteBucketWithObjectsBypassGovernanceRetention(ctx context.Context, project *uplink.Project, bucketName string) (_ *uplink.Bucket, err error) {
 	defer mon.Task()(&ctx)(&err)

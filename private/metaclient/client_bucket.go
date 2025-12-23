@@ -632,3 +632,116 @@ func convertProtoToBucket(pbBucket *pb.Bucket) (bucket Bucket, err error) {
 		Created: pbBucket.GetCreatedAt(),
 	}, nil
 }
+
+// GetBucketNotificationConfigurationParams parameters for GetBucketNotificationConfiguration method.
+type GetBucketNotificationConfigurationParams struct {
+	Name []byte
+}
+
+func (params *GetBucketNotificationConfigurationParams) toRequest(header *pb.RequestHeader) *pb.GetBucketNotificationConfigurationRequest {
+	return &pb.GetBucketNotificationConfigurationRequest{
+		Header: header,
+		Name:   params.Name,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *GetBucketNotificationConfigurationParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketGetNotificationConfiguration{
+			BucketGetNotificationConfiguration: params.toRequest(nil),
+		},
+	}
+}
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *GetBucketNotificationConfigurationParams) IsRetriable() bool { return true }
+
+// GetBucketNotificationConfigurationResponse response for GetBucketNotificationConfiguration request.
+type GetBucketNotificationConfigurationResponse struct {
+	Configuration *BucketNotificationConfiguration
+}
+
+// GetBucketNotificationConfiguration returns a bucket notification configuration.
+func (client *Client) GetBucketNotificationConfiguration(ctx context.Context, params GetBucketNotificationConfigurationParams) (_ GetBucketNotificationConfigurationResponse, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetBucketNotificationConfigurationResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetBucketNotificationConfiguration(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return GetBucketNotificationConfigurationResponse{}, Error.Wrap(convertErrors(err))
+	}
+
+	var config *BucketNotificationConfiguration
+	if response.Configuration != nil {
+		filter := FilterRule{}
+		if response.Configuration.Filter != nil {
+			filter.Prefix = response.Configuration.Filter.Prefix
+			filter.Suffix = response.Configuration.Filter.Suffix
+		}
+
+		config = &BucketNotificationConfiguration{
+			ID:         response.Configuration.Id,
+			TopicName:  response.Configuration.TopicName,
+			Events:     response.Configuration.Events,
+			FilterRule: filter,
+		}
+	}
+
+	return GetBucketNotificationConfigurationResponse{
+		Configuration: config,
+	}, nil
+}
+
+// SetBucketNotificationConfigurationParams parameters for SetBucketNotificationConfiguration method.
+type SetBucketNotificationConfigurationParams struct {
+	Name          []byte
+	Configuration *BucketNotificationConfiguration
+}
+
+func (params *SetBucketNotificationConfigurationParams) toRequest(header *pb.RequestHeader) *pb.SetBucketNotificationConfigurationRequest {
+	var pbConfig *pb.NotificationConfiguration
+	if params.Configuration != nil {
+		pbConfig = &pb.NotificationConfiguration{
+			Id:        params.Configuration.ID,
+			TopicName: params.Configuration.TopicName,
+			Events:    params.Configuration.Events,
+			Filter: &pb.FilterRule{
+				Prefix: params.Configuration.FilterRule.Prefix,
+				Suffix: params.Configuration.FilterRule.Suffix,
+			},
+		}
+	}
+
+	return &pb.SetBucketNotificationConfigurationRequest{
+		Header:        header,
+		Name:          params.Name,
+		Configuration: pbConfig,
+	}
+}
+
+// BatchItem returns single item for batch request.
+func (params *SetBucketNotificationConfigurationParams) BatchItem() *pb.BatchRequestItem {
+	return &pb.BatchRequestItem{
+		Request: &pb.BatchRequestItem_BucketSetNotificationConfiguration{
+			BucketSetNotificationConfiguration: params.toRequest(nil),
+		},
+	}
+}
+
+// IsRetriable returns true if the request can be retried when a kind of connection error happens, otherwise false.
+func (params *SetBucketNotificationConfigurationParams) IsRetriable() bool { return false }
+
+// SetBucketNotificationConfiguration sets a bucket notification configuration.
+func (client *Client) SetBucketNotificationConfiguration(ctx context.Context, params SetBucketNotificationConfigurationParams) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		_, err = client.client.SetBucketNotificationConfiguration(ctx, params.toRequest(client.header()))
+		return err
+	})
+	return Error.Wrap(convertErrors(err))
+}

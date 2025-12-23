@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -18,6 +19,8 @@ import (
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
 	"storj.io/storj/satellite/console"
+	"storj.io/storj/satellite/eventing/eventingconfig"
+	"storj.io/storj/satellite/kms"
 	"storj.io/storj/satellite/nodeselection"
 	"storj.io/uplink"
 	privateBucket "storj.io/uplink/private/bucket"
@@ -769,5 +772,113 @@ func TestSetBucketTagging(t *testing.T) {
 				require.ErrorIs(t, err, tt.expectedError)
 			})
 		}
+	})
+}
+
+func TestBucketNotificationConfiguration(t *testing.T) {
+	enabledProjects := eventingconfig.ProjectSet{}
+
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.BucketEventing.Projects = enabledProjects
+				config.Console.SatelliteManagedEncryptionEnabled = true
+				config.KeyManagement.KeyInfos = kms.KeyInfos{
+					Values: map[int]kms.KeyInfo{
+						1: {
+							SecretVersion: "secretversion1", SecretChecksum: 12345,
+						},
+					},
+				}
+			},
+			Uplink: func(log *zap.Logger, index int, config *testplanet.UplinkConfig) {
+				config.APIKeyVersion = macaroon.APIKeyVersionEventing
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+
+		// Create a project with path encryption disabled for bucket eventing
+		userCtx, err := sat.UserContext(ctx, planet.Uplinks[0].Projects[0].Owner.ID)
+		require.NoError(t, err)
+
+		proj, err := sat.API.Console.Service.CreateProject(userCtx, console.UpsertProjectInfo{
+			Name:             "no-path-encryption",
+			ManagePassphrase: true,
+		})
+		require.NoError(t, err)
+
+		// Enable eventing for the test project
+		enabledProjects[proj.ID] = struct{}{}
+
+		// Create API key for the project without path encryption
+		_, apiKey, err := sat.API.Console.Service.CreateAPIKey(userCtx, proj.ID, "test-key", macaroon.APIKeyVersionEventing)
+		require.NoError(t, err)
+
+		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), apiKey.Serialize(), "")
+		require.NoError(t, err)
+
+		project, err := uplink.OpenProject(ctx, access)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		bucketName := "test-bucket"
+		_, err = project.CreateBucket(ctx, bucketName)
+		require.NoError(t, err)
+
+		client, err := planet.Uplinks[0].DialMetainfo(ctx, sat, apiKey)
+		require.NoError(t, err)
+		defer ctx.Check(client.Close)
+
+		t.Run("Get non-existent configuration", func(t *testing.T) {
+			resp, err := client.GetBucketNotificationConfiguration(ctx, metaclient.GetBucketNotificationConfigurationParams{
+				Name: []byte(bucketName),
+			})
+			require.NoError(t, err)
+			assert.Nil(t, resp.Configuration)
+		})
+
+		t.Run("Set and Get configuration", func(t *testing.T) {
+			config := &metaclient.BucketNotificationConfiguration{
+				ID:        "test-config",
+				TopicName: "@log",
+				Events:    []string{"s3:ObjectCreated:*"},
+				FilterRule: metaclient.FilterRule{
+					Prefix: "test-prefix/",
+					Suffix: ".txt",
+				},
+			}
+
+			err := client.SetBucketNotificationConfiguration(ctx, metaclient.SetBucketNotificationConfigurationParams{
+				Name:          []byte(bucketName),
+				Configuration: config,
+			})
+			require.NoError(t, err)
+
+			resp, err := client.GetBucketNotificationConfiguration(ctx, metaclient.GetBucketNotificationConfigurationParams{
+				Name: []byte(bucketName),
+			})
+			require.NoError(t, err)
+			require.NotNil(t, resp.Configuration)
+			assert.Equal(t, config, resp.Configuration)
+		})
+
+		t.Run("Delete configuration", func(t *testing.T) {
+			// Setting nil configuration should delete it
+			err := client.SetBucketNotificationConfiguration(ctx, metaclient.SetBucketNotificationConfigurationParams{
+				Name:          []byte(bucketName),
+				Configuration: nil,
+			})
+			require.NoError(t, err)
+
+			resp, err := client.GetBucketNotificationConfiguration(ctx, metaclient.GetBucketNotificationConfigurationParams{
+				Name: []byte(bucketName),
+			})
+			require.NoError(t, err)
+			assert.Nil(t, resp.Configuration)
+		})
 	})
 }
