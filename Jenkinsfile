@@ -15,7 +15,14 @@ pipeline {
                     label 'main'
                     image 'storjlabs/ci:latest'
                     alwaysPull true
-                    args '-u root:root --cap-add SYS_PTRACE -v /tmp/gomod:/go/pkg/mod -v /tmp/golangci-lint:/root/.cache/golangci-lint -v /tmp/gocache/uplink:/root/.cache/go-build -v /tmp/gocache/uplink/integration:/root/.cache/go-build-integration'
+                    args '-u root:root --cap-add SYS_PTRACE' +
+                        ' -v "/cache/gomod":/go/pkg/mod' +
+                        ' -v /cache/golangci-lint:/root/.cache/golangci-lint' +
+                        ' -v /cache/gobuild:/root/.cache/go-build' +
+                        ' -v /cache/gobenchmarks:/root/.cache/go-build-benchmarks' +
+                        ' -v /cache/gomain:/root/.cache/go-build-main' +
+                        ' -v /cache/uplinkintegration:/root/.cache/go-build-integration' +
+                        ' -v "/cache/npm":/npm'
                 }
             }
             stages {
