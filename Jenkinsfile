@@ -4,10 +4,6 @@ pipeline {
     options {
           timeout(time: 80, unit: 'MINUTES')
     }
-    environment {
-        NPM_CONFIG_CACHE = '/tmp/npm/cache'
-        COCKROACH_MEMPROF_INTERVAL=0
-    }
     stages {
         stage('Build') {
             agent {
@@ -25,6 +21,11 @@ pipeline {
                         ' -v "/cache/npm":/npm'
                 }
             }
+            environment {
+                NPM_CONFIG_CACHE = '/tmp/npm/cache'
+                COCKROACH_MEMPROF_INTERVAL=0
+                COVERDIR = "${ env.BRANCH_NAME == 'main' ? env.WORKSPACE + '/.build/cover' : '' }"
+            }
             stages {
                 stage('Preparation') {
                     parallel {
@@ -33,7 +34,7 @@ pipeline {
                                 checkout scm
                                 sh 'git restore-mtime'
 
-                                sh 'mkdir -p .build'
+                                sh 'mkdir -p .build $COVERDIR'
                                 // make a backup of the mod file in case, for later linting
                                 sh 'cp go.mod .build/go.mod.orig'
                                 sh 'cp testsuite/go.mod .build/testsuite.go.mod.orig'
@@ -77,7 +78,7 @@ pipeline {
 
                         stage('Tests') {
                             environment {
-                                COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=.build/coverprofile -coverpkg=./...' : ''}"
+                                COVERFLAGS = "${ env.COVERDIR ? '-coverprofile=' + env.COVERDIR + '/tests.coverprofile -coverpkg=./...' : ''}"
                             }
                             steps {
                                 sh 'go vet ./...'
@@ -89,15 +90,6 @@ pipeline {
                                     sh script: 'cat .build/tests.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/tests.json'
                                     junit '.build/tests.xml'
-
-                                    script {
-                                        if(fileExists(".build/coverprofile")){
-                                            sh script: 'filter-cover-profile < .build/coverprofile > .build/clean.coverprofile', returnStatus: true
-                                            sh script: 'gocov convert .build/clean.coverprofile > .build/cover.json', returnStatus: true
-                                            sh script: 'gocov-xml  < .build/cover.json > .build/cobertura.xml', returnStatus: true
-                                            cobertura coberturaReportFile: '.build/cobertura.xml'
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -108,7 +100,7 @@ pipeline {
                                 STORJ_TEST_POSTGRES = 'omit'
                                 STORJ_TEST_LOG_LEVEL = 'info'
                                 STORJ_HASHSTORE_TABLE_DEFAULT_KIND = 'memtbl'
-                                COVERFLAGS = "${ env.BRANCH_NAME == 'main' ? '-coverprofile=../.build/testsuite_coverprofile -coverpkg=storj.io/uplink/...' : ''}"
+                                COVERFLAGS = "${ env.COVERDIR ? '-coverprofile=' + env.COVERDIR + '/testsuite.coverprofile -coverpkg=storj.io/uplink/...' : ''}"
                                 STORJ_TEST_SPANNER = 'run:/usr/local/bin/spanner_emulator --override_change_stream_partition_token_alive_seconds=1'
                                 SPANNER_DISABLE_BUILTIN_METRICS = 'true'
                                 GOOGLE_CLOUD_SPANNER_DISABLE_LOG_CLIENT_OPTIONS='true'
@@ -125,15 +117,6 @@ pipeline {
                                     sh script: 'cat .build/testsuite.json | tparse -all -slow 100', returnStatus: true
                                     archiveArtifacts artifacts: '.build/testsuite.json'
                                     junit '.build/testsuite.xml'
-
-                                    script {
-                                        if(fileExists(".build/testsuite_coverprofile")){
-                                            sh script: 'filter-cover-profile < .build/testsuite_coverprofile > .build/clean.testsuite_coverprofile', returnStatus: true
-                                            sh script: 'gocov convert .build/clean.testsuite_coverprofile > .build/testsuite_cover.json', returnStatus: true
-                                            sh script: 'gocov-xml  < .build/testsuite_cover.json > .build/testsuite_cobertura.xml', returnStatus: true
-                                            cobertura coberturaReportFile: '.build/testsuite_cobertura.xml'
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -142,6 +125,23 @@ pipeline {
                             steps {
                                 sh 'check-cross-compile -compiler "go,go.min" storj.io/uplink/...'
                             }
+                        }
+                    }
+                }
+
+                stage('Coverage') {
+                    when { not { environment name: 'COVERDIR', value: '' } }
+                    steps {
+                        script {
+                            sh script: "filter-cover-profile < .build/cover/tests.coverprofile > .build/cover/tests.coverprofile.clean", returnStatus: true
+                            sh script: "filter-cover-profile < .build/cover/testsuite.coverprofile > .build/cover/testsuite.coverprofile.clean", returnStatus: true
+                            archiveArtifacts artifacts: '.build/cover/tests.coverprofile.clean'
+                            archiveArtifacts artifacts: '.build/cover/testsuite.coverprofile.clean'
+
+                            recordCoverage(
+                                tools: [[parser: 'GO_COV', pattern: '.build/cover/*.coverprofile.clean']],
+                                sourceCodeRetention: 'NEVER',
+                            )
                         }
                     }
                 }
