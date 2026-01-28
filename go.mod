@@ -11,7 +11,7 @@ require (
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
-	storj.io/common v0.0.0-20260105095953-a53146b5878a
+	storj.io/common v0.0.0-20260123113635-a4b3510b6286
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
 	storj.io/infectious v0.0.2
