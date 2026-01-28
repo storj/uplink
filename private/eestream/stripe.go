@@ -16,8 +16,8 @@ import (
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
-	"storj.io/common/rpc/rpctracing"
 	"storj.io/common/sync2"
+	"storj.io/common/tracing"
 	"storj.io/infectious"
 )
 
@@ -276,7 +276,7 @@ var monReadStripeTask = mon.Task()
 // ReadStripes returns 1 or more stripes. out is overwritten.
 func (s *StripeReader) ReadStripes(ctx context.Context, nextStripe int64, out []byte) (_ []byte, count int, err error) {
 	defer monReadStripeTask(&ctx)(&err)
-	ctx = rpctracing.WithoutDistributedTracing(ctx)
+	ctx = tracing.WithoutDistributedTracing(ctx)
 
 	if nextStripe != int64(s.returnedStripes) {
 		return nil, 0, Error.New("unexpected next stripe")

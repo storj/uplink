@@ -152,8 +152,9 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
+		euPlacement := storj.PlacementConstraint(1)
 		// change the default_placement of the project
-		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, storj.EU)
+		err = planet.Satellites[0].API.DB.Console().Projects().UpdateDefaultPlacement(ctx, projectID, euPlacement)
 		require.NoError(t, err)
 
 		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
@@ -171,7 +172,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 		// check if placement is set to project default
 		placement, err := planet.Satellites[0].API.DB.Buckets().GetBucketPlacement(ctx, []byte(bucketName), projectID)
 		require.NoError(t, err)
-		require.Equal(t, storj.EU, placement)
+		require.Equal(t, euPlacement, placement)
 
 		// delete the bucket
 		err = planet.Satellites[0].API.DB.Buckets().DeleteBucket(ctx, []byte(bucketName), projectID)

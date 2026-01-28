@@ -1,6 +1,6 @@
 module storj.io/uplink/testsuite
 
-go 1.24.7
+go 1.25
 
 replace storj.io/uplink => ../
 
@@ -10,11 +10,11 @@ require (
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.18.0
-	storj.io/common v0.0.0-20260105095953-a53146b5878a
+	storj.io/common v0.0.0-20260123113635-a4b3510b6286
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/infectious v0.0.2
-	storj.io/storj v1.143.0-rc.0.20260106221514-96b22c3cb538
-	storj.io/uplink v1.13.2-0.20251223154123-022b99ae189b
+	storj.io/storj v1.146.0-rc.0.20260127160053-30f955a214ae
+	storj.io/uplink v1.13.2-0.20260121160716-db0bfa67cbce
 )
 
 require (
@@ -63,11 +63,11 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-oauth2/oauth2/v4 v4.4.2 // indirect
+	github.com/go-oauth2/oauth2/v4 v4.5.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
@@ -125,7 +125,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.21.3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/spacemonkeygo/monkit/v3 v3.0.25-0.20251022131615-eb24eb109368 // indirect
+	github.com/spacemonkeygo/monkit/v3 v3.0.25-0.20260113195619-706ad4b46206 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spacemonkeygo/tlshowdy v0.0.0-20160207005338-8fa2cec1d7cd // indirect
 	github.com/spf13/afero v1.11.0 // indirect
