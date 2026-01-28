@@ -1,0 +1,37 @@
+name: Weekly Copilot Task
+
+on:
+  schedule:
+    # Runs every Wednesday at 9:00 AM UTC (cron format: minute hour day-of-month month day-of-week)
+    # Day of week: 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, etc.
+    - cron: '0 9 * * 3'
+  workflow_dispatch: # Allows manual trigger for testing
+
+jobs:
+  copilot-task:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Ask Copilot to review code
+        run: |
+          echo "🤖 GitHub Copilot Weekly Task"
+          echo "=============================="
+          echo "This workflow runs every Wednesday at 9:00 AM UTC"
+          echo ""
+          echo "Current date: $(date)"
+          echo "Repository: ${{ github.repository }}"
+          echo ""
+          echo "✅ Copilot task executed successfully!"
+          echo ""
+          echo "Note: This is a template workflow. You can customize it to:"
+          echo "  - Create issues for code review"
+          echo "  - Generate reports"
+          echo "  - Run automated checks"
+          echo "  - Trigger Copilot-based analysis"
