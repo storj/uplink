@@ -125,6 +125,49 @@ func (client *Client) GetProjectInfo(ctx context.Context) (response *pb.ProjectI
 	return response, err
 }
 
+// AccountLicensesRequest contains parameters for AccountLicenses method.
+type AccountLicensesRequest struct {
+	Type       string
+	BucketName string
+}
+
+func (params *AccountLicensesRequest) toRequest(header *pb.RequestHeader) *pb.AccountLicensesRequest {
+	return &pb.AccountLicensesRequest{
+		Header:     header,
+		Type:       params.Type,
+		BucketName: params.BucketName,
+	}
+}
+
+// Licenses represents license information.
+type Licenses struct {
+	Type      string
+	ExpiresAt string
+}
+
+// AccountLicenses retrieves license information.
+func (client *Client) AccountLicenses(ctx context.Context, params AccountLicensesRequest) (licenses []Licenses, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.AccountLicensesResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.AccountLicenses(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+
+	for _, l := range response.Licenses {
+		licenses = append(licenses, Licenses{
+			Type:      l.Type,
+			ExpiresAt: l.ExpiresAt,
+		})
+	}
+
+	return licenses, nil
+}
+
 // BeginObjectParams parameters for BeginObject method.
 type BeginObjectParams struct {
 	Bucket               []byte
