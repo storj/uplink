@@ -5,6 +5,7 @@ package license
 
 import (
 	"context"
+	"time"
 	_ "unsafe" // for go:linkname
 
 	"github.com/spacemonkeygo/monkit/v3"
@@ -19,7 +20,8 @@ var mon = monkit.Package()
 // Entry contains license information.
 type Entry struct {
 	Type      string
-	ExpiresAt string
+	ExpiresAt time.Time
+	Key       []byte
 }
 
 // List returns license information for the given bucket.
@@ -44,6 +46,7 @@ func List(ctx context.Context, project *uplink.Project, licenseType, bucketName 
 		licenses = append(licenses, Entry{
 			Type:      rawLicense.Type,
 			ExpiresAt: rawLicense.ExpiresAt,
+			Key:       rawLicense.Key,
 		})
 	}
 
