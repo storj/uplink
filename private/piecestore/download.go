@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -32,11 +33,11 @@ type Download struct {
 	ctx        context.Context
 	cancelCtx  func(error)
 
-	offset       int64 // the offset into the piece
-	read         int64 // how much data we have read so far
-	allocated    int64 // how far have we sent orders
-	downloaded   int64 // how much data have we downloaded
-	downloadSize int64 // how much do we want to download
+	offset       int64        // the offset into the piece
+	read         atomic.Int64 // how much data we have read so far
+	allocated    int64        // how far have we sent orders
+	downloaded   int64        // how much data have we downloaded
+	downloadSize int64        // how much do we want to download
 
 	downloadRequestSent bool
 
@@ -99,7 +100,6 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		cancelCtx:  cancel,
 
 		offset: offset,
-		read:   0,
 
 		allocated:    0,
 		downloaded:   0,
@@ -118,10 +118,10 @@ func (client *Download) Read(data []byte) (read int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	for client.read < client.downloadSize {
+	for client.read.Load() < client.downloadSize {
 		// read from buffer
 		n, err := client.unread.Read(data)
-		client.read += int64(n)
+		client.read.Add(int64(n))
 		read += n
 
 		// if we have an error return the error
@@ -286,8 +286,14 @@ func (client *Download) handleClosingError(err error) {
 // closeWithError is used when we include the err in the closing error and also close the stream.
 func (client *Download) closeWithError(err error) {
 	client.close.Do(func() {
-		err := errs.Combine(err, client.stream.Close())
-		client.closingError.Set(err)
+		closeErr := client.stream.Close()
+		// If all data was successfully downloaded, ignore the stream close error.
+		// The close is just the mutual shutdown handshake and the data is already
+		// safely received. The other side may have already closed the connection.
+		if closeErr != nil && client.read.Load() >= client.downloadSize && client.downloadSize > 0 {
+			closeErr = nil
+		}
+		client.closingError.Set(errs.Combine(err, closeErr))
 	})
 }
 
