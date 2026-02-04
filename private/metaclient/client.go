@@ -131,13 +131,13 @@ type AccountLicensesRequest struct {
 	BucketName string
 }
 
-func (params *AccountLicensesRequest) toRequest(header *pb.RequestHeader) *pb.AccountLicensesRequest {
-	return &pb.AccountLicensesRequest{
-		Header:     header,
-		Type:       params.Type,
-		BucketName: params.BucketName,
-	}
-}
+// func (params *AccountLicensesRequest) toRequest(header *pb.RequestHeader) *pb.AccountLicensesRequest {
+// 	return &pb.AccountLicensesRequest{
+// 		Header:     header,
+// 		Type:       params.Type,
+// 		BucketName: params.BucketName,
+// 	}
+// }
 
 // Licenses represents license information.
 type Licenses struct {
@@ -149,21 +149,22 @@ type Licenses struct {
 func (client *Client) AccountLicenses(ctx context.Context, params AccountLicensesRequest) (licenses []Licenses, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	var response *pb.AccountLicensesResponse
-	err = WithRetry(ctx, func(ctx context.Context) error {
-		response, err = client.client.AccountLicenses(ctx, params.toRequest(client.header()))
-		return err
-	})
-	if err != nil {
-		return nil, Error.Wrap(err)
-	}
+	// TODO temporarily commented to resolve cross repo issues
+	// var response *pb.AccountLicensesResponse
+	// err = WithRetry(ctx, func(ctx context.Context) error {
+	// 	response, err = client.client.AccountLicenses(ctx, params.toRequest(client.header()))
+	// 	return err
+	// })
+	// if err != nil {
+	// 	return nil, Error.Wrap(err)
+	// }
 
-	for _, l := range response.Licenses {
-		licenses = append(licenses, Licenses{
-			Type:      l.Type,
-			ExpiresAt: l.ExpiresAt,
-		})
-	}
+	// for _, l := range response.Licenses {
+	// 	licenses = append(licenses, Licenses{
+	// 		Type:      l.Type,
+	// 		ExpiresAt: l.ExpiresAt,
+	// 	})
+	// }
 
 	return licenses, nil
 }
