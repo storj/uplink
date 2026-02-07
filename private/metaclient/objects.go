@@ -854,7 +854,7 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, cu
 
 func (db *DB) fillMetadata(bucket, key string, id storj.StreamID, metadata map[string]string, etag []byte, encryptionParameters storj.EncryptionParameters) (CommitObjectParams, error) {
 	commitObjParams := CommitObjectParams{StreamID: id}
-	if len(metadata) == 0 {
+	if len(metadata) == 0 && len(etag) == 0 {
 		return commitObjParams, nil
 	}
 

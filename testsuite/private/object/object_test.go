@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
 	"storj.io/common/grant"
@@ -2435,6 +2436,8 @@ func TestETag(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		bucketName := "test-bucket"
 		objectKey := "test-object"
+		objectKey2 := "test-object2"
+		eTag := []byte("etag")
 		err := planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName)
 		require.NoError(t, err)
 
@@ -2442,78 +2445,137 @@ func TestETag(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
-		require.NoError(t, err)
+		uploadWithETag := func(bucketName, objectKey string, eTag []byte) error {
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			if err != nil {
+				return errs.Wrap(err)
+			}
+			if _, err = upload.Write([]byte("test1")); err != nil {
+				return errs.Wrap(err)
+			}
+			if err = upload.SetETag(ctx, eTag); err != nil {
+				return errs.Wrap(err)
+			}
+			return errs.Wrap(upload.Commit())
+		}
 
-		_, err = upload.Write([]byte("test1"))
-		require.NoError(t, err)
+		t.Run("SetETag after Commit", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
 
-		require.NoError(t, upload.SetETag(ctx, []byte("etag")))
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
 
-		require.NoError(t, upload.Commit())
+			_, err = upload.Write([]byte("test1"))
+			require.NoError(t, err)
 
-		require.Error(t, upload.SetETag(ctx, []byte("duplicate set")))
+			require.NoError(t, upload.SetETag(ctx, eTag))
 
-		statObj, err := object.StatObject(ctx, project, bucketName, objectKey, upload.Info().Version)
-		require.NoError(t, err)
+			require.NoError(t, upload.Commit())
 
-		require.EqualValues(t, []byte("etag"), statObj.ETag)
+			require.Error(t, upload.SetETag(ctx, []byte("duplicate set")))
+		})
 
-		objectKey2 := "test-object2"
-		objectKey3 := "test-object3"
+		t.Run("Single-part upload", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
 
-		{
+			require.NoError(t, uploadWithETag(bucketName, objectKey, eTag))
+
+			statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			require.EqualValues(t, eTag, statObj.ETag)
+		})
+
+		t.Run("Multipart upload", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+			upload, err := multipart.BeginUpload(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			part, err := project.UploadPart(ctx, bucketName, objectKey, upload.UploadID, 1)
+			require.NoError(t, err)
+
+			_, err = part.Write(testrand.Bytes(32))
+			require.NoError(t, err)
+			require.NoError(t, part.Commit())
+
+			_, err = object.CommitUpload(ctx, project, bucketName, objectKey, upload.UploadID, &metaclient.CommitUploadOptions{
+				ETag: eTag,
+			})
+			require.NoError(t, err)
+
+			statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			require.EqualValues(t, eTag, statObj.ETag)
+		})
+
+		t.Run("MoveObject", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+			require.NoError(t, uploadWithETag(bucketName, objectKey, eTag))
+
 			err = project.MoveObject(ctx, bucketName, objectKey, bucketName, objectKey2, nil)
 			require.NoError(t, err)
 
-			stat, err := object.StatObject(ctx, project, bucketName, objectKey2, upload.Info().Version)
+			stat, err := object.StatObject(ctx, project, bucketName, objectKey2, nil)
 			require.NoError(t, err)
 
-			require.EqualValues(t, []byte("etag"), stat.ETag)
-		}
+			require.EqualValues(t, eTag, stat.ETag)
+		})
 
-		{
-			_, err = project.CopyObject(ctx, bucketName, objectKey2, bucketName, objectKey3, nil)
+		t.Run("CopyObject", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
+
+			require.NoError(t, uploadWithETag(bucketName, objectKey, eTag))
+
+			_, err = project.CopyObject(ctx, bucketName, objectKey, bucketName, objectKey2, nil)
 			require.NoError(t, err)
 
-			stat, err := object.StatObject(ctx, project, bucketName, objectKey3, upload.Info().Version)
+			stat, err := object.StatObject(ctx, project, bucketName, objectKey2, nil)
 			require.NoError(t, err)
 
-			require.EqualValues(t, []byte("etag"), stat.ETag)
-		}
-
-		entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System:       true,
-			Custom:       true,
-			ETag:         true,
-			ETagOrCustom: false,
+			require.EqualValues(t, eTag, stat.ETag)
 		})
-		require.NoError(t, err)
-		for _, entry := range entries {
-			require.EqualValues(t, []byte("etag"), entry.ETag)
-		}
 
-		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System:       false,
-			Custom:       false,
-			ETag:         true,
-			ETagOrCustom: false,
-		})
-		require.NoError(t, err)
-		for _, entry := range entries {
-			require.EqualValues(t, []byte("etag"), entry.ETag)
-		}
+		t.Run("ListObjects", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
 
-		entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
-			System:       false,
-			Custom:       false,
-			ETag:         false,
-			ETagOrCustom: true,
+			require.NoError(t, uploadWithETag(bucketName, objectKey, eTag))
+
+			entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				System:       true,
+				Custom:       true,
+				ETag:         true,
+				ETagOrCustom: false,
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, eTag, entries[0].ETag)
+
+			entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				System:       false,
+				Custom:       false,
+				ETag:         true,
+				ETagOrCustom: false,
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, eTag, entries[0].ETag)
+
+			entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				System:       false,
+				Custom:       false,
+				ETag:         false,
+				ETagOrCustom: true,
+			})
+			require.NoError(t, err)
+			require.EqualValues(t, eTag, entries[0].ETag)
 		})
-		require.NoError(t, err)
-		for _, entry := range entries {
-			require.EqualValues(t, []byte("etag"), entry.ETag)
-		}
 	})
 }
 
