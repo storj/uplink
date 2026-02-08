@@ -4,6 +4,7 @@
 package metaclient
 
 import (
+	"slices"
 	"time"
 
 	"github.com/zeebo/errs"
@@ -40,6 +41,10 @@ type EncryptedUserData struct {
 	EncryptedMetadataEncryptedKey []byte
 	EncryptedMetadataNonce        storj.Nonce
 	EncryptedETag                 []byte
+
+	ChecksumAlgorithm   storj.ObjectChecksumAlgorithm
+	IsChecksumComposite bool
+	EncryptedChecksum   []byte
 }
 
 // Retention represents an object's Object Lock retention information.
@@ -173,8 +178,7 @@ type Object struct {
 	IsDeleteMarker bool
 	IsLatest       bool
 
-	Metadata map[string]string
-	ETag     []byte
+	UserData ObjectUserData
 
 	ContentType string
 	Created     time.Time
@@ -185,6 +189,59 @@ type Object struct {
 	Retention *Retention
 
 	Stream
+}
+
+// ObjectUserData represents a set of object metadata whose values originate from the user,
+// as opposed to metadata that is computed internally. It is stored encrypted in the satellite.
+// Its encrypted counterpart is EncryptedUserData.
+type ObjectUserData struct {
+	Custom   map[string]string
+	ETag     []byte
+	Checksum ObjectChecksum
+}
+
+// IsZero returns whether the ObjectUserData is empty.
+func (meta ObjectUserData) IsZero() bool {
+	return len(meta.Custom) == 0 && len(meta.ETag) == 0 && meta.Checksum.isZero()
+}
+
+// ObjectChecksum represents the checksum of an object's contents.
+type ObjectChecksum struct {
+	Algorithm storj.ObjectChecksumAlgorithm
+	// IsComposite indicates whether the checksum was computed over the checksums of
+	// the object's parts (as opposed to being computed over its contents).
+	IsComposite bool
+	Value       []byte
+}
+
+// Validate returns an error if the checksum is invalid.
+func (checksum ObjectChecksum) Validate() error {
+	if checksum.Algorithm < storj.ObjectChecksumAlgorithmNone || checksum.Algorithm > storj.ObjectChecksumAlgorithmSHA256 {
+		return errs.New("invalid checksum algorithm")
+	}
+	if checksum.Algorithm == storj.ObjectChecksumAlgorithmNone {
+		if len(checksum.Value) != 0 {
+			return errs.New("expected checksum value to be unset because checksum algorithm is unset")
+		}
+		if checksum.IsComposite {
+			return errs.New("expected checksum type to be unset because checksum algorithm is unset")
+		}
+	} else if len(checksum.Value) == 0 {
+		return errs.New("expected checksum value to be set because checksum algorithm is set")
+	}
+	return nil
+}
+
+// Clone returns a clone of the ObjectChecksum.
+func (checksum ObjectChecksum) Clone() ObjectChecksum {
+	newChecksum := checksum
+	newChecksum.Value = slices.Clone(newChecksum.Value)
+	return newChecksum
+}
+
+// isZero returns whether the ObjectChecksum is empty.
+func (checksum ObjectChecksum) isZero() bool {
+	return checksum.Algorithm == storj.ObjectChecksumAlgorithmNone && !checksum.IsComposite && len(checksum.Value) == 0
 }
 
 // Stream is information about an object stream.

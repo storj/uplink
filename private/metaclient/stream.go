@@ -6,6 +6,8 @@ package metaclient
 import (
 	"time"
 
+	"github.com/zeebo/errs"
+
 	"storj.io/common/pb"
 )
 
@@ -14,13 +16,20 @@ type MutableStream struct {
 	info Object
 
 	dynamic         bool
-	dynamicMetadata SerializableMeta
+	dynamicMetadata SerializedUserDataProvider
 }
 
-// SerializableMeta is an interface for getting pb.SerializableMeta.
-type SerializableMeta interface {
-	ETag() ([]byte, error)
-	Metadata() ([]byte, error)
+// SerializedUserDataProvider is an interface for retrieving a serialized set of object user data.
+type SerializedUserDataProvider interface {
+	SerializedUserData() (SerializedUserData, error)
+}
+
+// SerializedUserData represents a set of object metadata whose values originate from the user.
+// Unlike ObjectUserData, the custom metadata is stored serialized as a byte slice.
+type SerializedUserData struct {
+	Custom   []byte
+	ETag     []byte
+	Checksum ObjectChecksum
 }
 
 // BucketName returns streams bucket name.
@@ -35,34 +44,37 @@ func (stream *MutableStream) Info() Object { return stream.info }
 // Expires returns stream expiration time.
 func (stream *MutableStream) Expires() time.Time { return stream.info.Expires }
 
-// Metadata returns metadata associated with the stream.
-func (stream *MutableStream) Metadata() ([]byte, error) {
+// SerializedUserData returns the serialized user data associated with the stream.
+func (stream *MutableStream) SerializedUserData() (SerializedUserData, error) {
 	if stream.dynamic {
-		return stream.dynamicMetadata.Metadata()
+		return stream.dynamicMetadata.SerializedUserData()
 	}
 
 	if stream.info.ContentType != "" {
-		if stream.info.Metadata == nil {
-			stream.info.Metadata = make(map[string]string)
-			stream.info.Metadata[contentTypeKey] = stream.info.ContentType
-		} else if _, found := stream.info.Metadata[contentTypeKey]; !found {
-			stream.info.Metadata[contentTypeKey] = stream.info.ContentType
+		if stream.info.UserData.Custom == nil {
+			stream.info.UserData.Custom = make(map[string]string)
+			stream.info.UserData.Custom[contentTypeKey] = stream.info.ContentType
+		} else if _, found := stream.info.UserData.Custom[contentTypeKey]; !found {
+			stream.info.UserData.Custom[contentTypeKey] = stream.info.ContentType
 		}
 	}
-	if stream.info.Metadata == nil {
-		return []byte{}, nil
-	}
-	return pb.Marshal(&pb.SerializableMeta{
-		UserDefined: stream.info.Metadata,
-	})
-}
 
-// ETag returns the etag for the stream.
-func (stream *MutableStream) ETag() ([]byte, error) {
-	if stream.dynamic {
-		return stream.dynamicMetadata.ETag()
+	var serializedCustom []byte
+	if stream.info.UserData.Custom != nil {
+		var err error
+		serializedCustom, err = pb.Marshal(&pb.SerializableMeta{
+			UserDefined: stream.info.UserData.Custom,
+		})
+		if err != nil {
+			return SerializedUserData{}, errs.Wrap(err)
+		}
 	}
-	return stream.info.ETag, nil
+
+	return SerializedUserData{
+		Custom:   serializedCustom,
+		ETag:     stream.info.UserData.ETag,
+		Checksum: stream.info.UserData.Checksum,
+	}, nil
 }
 
 // UploadOptions contains additional options for uploading.

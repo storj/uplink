@@ -106,7 +106,7 @@ func TestUpload(t *testing.T) {
 	type config struct {
 		bucket   string
 		key      string
-		metadata Metadata
+		userData metaclient.SerializedUserDataProvider
 		backend  uploaderBackend
 	}
 
@@ -156,7 +156,7 @@ func TestUpload(t *testing.T) {
 				c := config{
 					bucket:   "BUCKET",
 					key:      "KEY",
-					metadata: fixedMetadata{},
+					userData: fixedUserData{},
 					backend:  fakeUploaderBackend{},
 				}
 				tc.overrideConfig(&c)
@@ -200,7 +200,7 @@ func TestUpload(t *testing.T) {
 
 	t.Run("Object", func(t *testing.T) {
 		testUpload(t, func(uploader *Uploader, c config) (*Upload, error) {
-			return uploader.UploadObject(context.Background(), c.bucket, c.key, c.metadata, noopScheduler{}, &metaclient.UploadOptions{
+			return uploader.UploadObject(context.Background(), c.bucket, c.key, c.userData, noopScheduler{}, &metaclient.UploadOptions{
 				Expires: expiration,
 			})
 		})
@@ -215,7 +215,7 @@ func TestUpload(t *testing.T) {
 
 func TestEncryptedMetadata(t *testing.T) {
 	e := encryptedMetadata{
-		metadata:    fixedMetadata{},
+		userData:    fixedUserData{},
 		segmentSize: segmentSize,
 		derivedKey:  &storjKey,
 		cipherSuite: cipherSuite,
@@ -300,8 +300,8 @@ func (b fakeUploaderBackend) UploadObject(ctx context.Context, segmentSource str
 		return streamupload.Info{}, errs.New("encMeta is of type %T but expected %T", encMeta, m)
 	}
 
-	if um, ok := m.metadata.(fixedMetadata); !ok {
-		return streamupload.Info{}, errs.New("encryptedMetadata metadata is of type %T but expected %T", m.metadata, um)
+	if um, ok := m.userData.(fixedUserData); !ok {
+		return streamupload.Info{}, errs.New("encryptedMetadata userData is of type %T but expected %T", m.userData, um)
 	}
 	if m.segmentSize != segmentSize {
 		return streamupload.Info{}, errs.New("encryptedMetadata segmentSize should be %d but is %d", segmentSize, m.segmentSize)
@@ -385,14 +385,18 @@ func (piecePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.Ad
 	return nil, errs.New("should not be called")
 }
 
-type fixedMetadata struct{}
+type fixedUserData struct{}
 
-func (fixedMetadata) Metadata() ([]byte, error) {
-	return []byte("METADATA"), nil
-}
-
-func (fixedMetadata) ETag() ([]byte, error) {
-	return []byte("ETAG"), nil
+func (fixedUserData) SerializedUserData() (metaclient.SerializedUserData, error) {
+	return metaclient.SerializedUserData{
+		Custom: []byte("METADATA"),
+		ETag:   []byte("ETAG"),
+		Checksum: metaclient.ObjectChecksum{
+			Algorithm:   storj.ObjectChecksumAlgorithmCRC32,
+			IsComposite: true,
+			Value:       []byte("CHECKSUM"),
+		},
+	}, nil
 }
 
 type noopScheduler struct{}

@@ -79,10 +79,7 @@ func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, k
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	obj, err := db.CreateObject(ctx, bucket, key, nil)
-	if err != nil {
-		return nil, convertKnownErrors(err, bucket, key)
-	}
+	obj := metaclient.NewMutableObject(bucket, key)
 
 	info := obj.Info()
 
@@ -126,14 +123,19 @@ func (project *Project) uploadObjectWithRetention(ctx context.Context, bucket, k
 
 type dynamicMetadata struct{ *metaclient.Object }
 
-func (dyn dynamicMetadata) Metadata() ([]byte, error) {
-	return pb.Marshal(&pb.SerializableMeta{
-		UserDefined: CustomMetadata(dyn.Object.Metadata).Clone(),
+func (dyn dynamicMetadata) SerializedUserData() (metaclient.SerializedUserData, error) {
+	serializedCustom, err := pb.Marshal(&pb.SerializableMeta{
+		UserDefined: dyn.Object.UserData.Custom,
 	})
-}
+	if err != nil {
+		return metaclient.SerializedUserData{}, errs.Wrap(err)
+	}
 
-func (dyn dynamicMetadata) ETag() ([]byte, error) {
-	return slices.Clone(dyn.Object.ETag), nil
+	return metaclient.SerializedUserData{
+		Custom:   serializedCustom,
+		ETag:     slices.Clone(dyn.Object.UserData.ETag),
+		Checksum: dyn.Object.UserData.Checksum,
+	}, nil
 }
 
 type streamUpload interface {
@@ -170,8 +172,8 @@ func (upload *Upload) Info() *Object {
 	if meta != nil {
 		obj.System.ContentLength = meta.Size
 		obj.System.Created = meta.Modified
-		obj.version = meta.Version
-		obj.isVersioned = meta.IsVersioned
+		obj.private.Version = meta.Version
+		obj.private.IsVersioned = meta.IsVersioned
 	}
 	return obj
 }
@@ -291,13 +293,12 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
-	if upload.aborted {
+	switch {
+	case upload.aborted:
 		return errwrapf("%w: upload aborted", ErrUploadDone)
-	}
-	if upload.closed {
+	case upload.closed:
 		return errwrapf("%w: already committed", ErrUploadDone)
-	}
-	if upload.upload.Meta() != nil {
+	case upload.upload.Meta() != nil:
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
@@ -305,7 +306,7 @@ func (upload *Upload) SetCustomMetadata(ctx context.Context, custom CustomMetada
 		if err := custom.Verify(); err != nil {
 			return packageError.Wrap(err)
 		}
-		upload.object.Metadata = custom.Clone()
+		upload.object.UserData.Custom = custom.Clone()
 	}
 
 	return nil
@@ -316,19 +317,40 @@ func (upload *Upload) setETag(ctx context.Context, etag []byte) error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
-	if upload.aborted {
+	switch {
+	case upload.aborted:
 		return errwrapf("%w: upload aborted", ErrUploadDone)
-	}
-	if upload.closed {
+	case upload.closed:
 		return errwrapf("%w: already committed", ErrUploadDone)
-	}
-	if upload.upload.Meta() != nil {
+	case upload.upload.Meta() != nil:
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
 	if etag != nil {
-		upload.object.ETag = slices.Clone(etag)
+		upload.object.UserData.ETag = slices.Clone(etag)
 	}
+
+	return nil
+}
+
+// setChecksum sets the checksum to be included with the object.
+func (upload *Upload) setChecksum(checksum metaclient.ObjectChecksum) error {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+
+	switch {
+	case upload.aborted:
+		return errwrapf("%w: upload aborted", ErrUploadDone)
+	case upload.closed:
+		return errwrapf("%w: already committed", ErrUploadDone)
+	case upload.upload.Meta() != nil:
+		return errwrapf("%w: already committed", ErrUploadDone)
+	}
+
+	if err := checksum.Validate(); err != nil {
+		return packageError.Wrap(err)
+	}
+	upload.object.UserData.Checksum = checksum.Clone()
 
 	return nil
 }
@@ -375,4 +397,16 @@ func upload_getStreamMeta(u *Upload) *streams.Meta { return u.upload.Meta() }
 //go:linkname upload_setETag
 func upload_setETag(ctx context.Context, u *Upload, etag []byte) (err error) {
 	return u.setETag(ctx, etag)
+}
+
+// upload_setChecksum exposes the private upload.setChecksum method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname upload_setChecksum
+func upload_setChecksum(u *Upload, checksum metaclient.ObjectChecksum) (err error) {
+	return u.setChecksum(checksum)
 }

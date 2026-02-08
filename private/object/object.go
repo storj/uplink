@@ -17,6 +17,7 @@ import (
 	"storj.io/common/storj"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/internal/privateprops"
 	privateBucket "storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
 	privateProject "storj.io/uplink/private/project"
@@ -82,6 +83,9 @@ var (
 	// ErrUnimplemented is returned for requests with unimplemented options.
 	ErrUnimplemented = errors.New("unimplemented")
 
+	// ErrChecksumsUnsupported is returned when the satellite does not support object checksums.
+	ErrChecksumsUnsupported = errors.New("checksum options are not supported")
+
 	rpcCodeToError = map[rpcstatus.StatusCode]error{
 		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
 		rpcstatus.ObjectLockBucketRetentionConfigurationMissing:    ErrNoObjectLockConfiguration,
@@ -100,6 +104,7 @@ var (
 		rpcstatus.DeleteObjectsTooManyItems:                        ErrDeleteObjectsTooManyItems,
 		rpcstatus.FailedPrecondition:                               ErrFailedPrecondition,
 		rpcstatus.Unimplemented:                                    ErrUnimplemented,
+		rpcstatus.ChecksumsUnsupported:                             ErrChecksumsUnsupported,
 	}
 )
 
@@ -119,8 +124,9 @@ type DeleteObjectsResultItem = metaclient.DeleteObjectsResultItem
 // TODO find better place of name for this and related things.
 type VersionedObject struct {
 	uplink.Object
-	Version []byte
-	ETag    []byte
+	Version  []byte
+	ETag     []byte
+	Checksum metaclient.ObjectChecksum
 	// IsVersioned reports whether VersionedObject is a truly versioned
 	// object, such as an object uploaded to a bucket with versioning
 	// active. VersionedObject not being versioned can happen when it's
@@ -235,6 +241,11 @@ func (upload *VersionedUpload) SetCustomMetadata(ctx context.Context, custom upl
 // If it is nil, it won't be modified.
 func (upload *VersionedUpload) SetETag(ctx context.Context, etag []byte) error {
 	return upload_setETag(ctx, upload.upload, etag)
+}
+
+// SetChecksum updates checksum to be included with the object.
+func (upload *VersionedUpload) SetChecksum(checksum metaclient.ObjectChecksum) error {
+	return upload_setChecksum(upload.upload, checksum)
 }
 
 // Abort aborts the upload.
@@ -672,9 +683,10 @@ func convertObject(obj *metaclient.Object) *VersionedObject {
 				Expires:       obj.Expires,
 				ContentLength: obj.Size,
 			},
-			Custom: obj.Metadata,
+			Custom: obj.UserData.Custom,
 		},
-		ETag:           obj.ETag,
+		ETag:           obj.UserData.ETag,
+		Checksum:       obj.UserData.Checksum,
 		Version:        obj.Version,
 		IsVersioned:    obj.IsVersioned,
 		IsDeleteMarker: obj.IsDeleteMarker,
@@ -696,12 +708,15 @@ func convertUplinkObject(obj *uplink.Object) *VersionedObject {
 		return nil
 	}
 
+	privateObj := object_getPrivate(obj)
+
 	return &VersionedObject{
 		Object:      *obj,
-		ETag:        objectETag(obj),
-		Version:     objectVersion(obj),
-		IsVersioned: objectIsVersioned(obj),
-		IsLatest:    objectIsLatest(obj),
+		ETag:        privateObj.ETag,
+		Checksum:    privateObj.Checksum,
+		Version:     privateObj.Version,
+		IsVersioned: privateObj.IsVersioned,
+		IsLatest:    privateObj.IsLatest,
 	}
 }
 
@@ -744,17 +759,8 @@ func dialMetainfoDB(ctx context.Context, project *uplink.Project) (_ *metaclient
 //go:linkname encryptionParameters storj.io/uplink.encryptionParameters
 func encryptionParameters(project *uplink.Project) storj.EncryptionParameters
 
-//go:linkname objectETag storj.io/uplink.objectETag
-func objectETag(object *uplink.Object) []byte
-
-//go:linkname objectVersion storj.io/uplink.objectVersion
-func objectVersion(object *uplink.Object) []byte
-
-//go:linkname objectIsVersioned storj.io/uplink.objectIsVersioned
-func objectIsVersioned(object *uplink.Object) bool
-
-//go:linkname objectIsLatest storj.io/uplink.objectIsLatest
-func objectIsLatest(object *uplink.Object) bool
+//go:linkname object_getPrivate storj.io/uplink.object_getPrivate
+func object_getPrivate(object *uplink.Object) privateprops.Object
 
 //go:linkname downloadObjectWithVersion storj.io/uplink.downloadObjectWithVersion
 func downloadObjectWithVersion(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *metaclient.DownloadOptions) (_ *uplink.Download, err error)
@@ -776,3 +782,6 @@ func upload_getStreamMeta(u *uplink.Upload) *streams.Meta
 
 //go:linkname upload_setETag storj.io/uplink.upload_setETag
 func upload_setETag(ctx context.Context, u *uplink.Upload, etag []byte) error
+
+//go:linkname upload_setChecksum storj.io/uplink.upload_setChecksum
+func upload_setChecksum(u *uplink.Upload, checksum metaclient.ObjectChecksum) error

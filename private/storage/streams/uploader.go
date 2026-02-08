@@ -183,7 +183,7 @@ var uploadCounter atomic.Int64
 
 // UploadObject starts an upload of an object to the given location. The object
 // contents can be written to the returned upload, which can then be committed.
-func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey string, metadata Metadata, sched segmentupload.Scheduler, opts *metaclient.UploadOptions) (_ *Upload, err error) {
+func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey string, userData metaclient.SerializedUserDataProvider, sched segmentupload.Scheduler, opts *metaclient.UploadOptions) (_ *Upload, err error) {
 	ctx = testuplink.WithLogWriterContext(ctx, "upload", strconv.FormatInt(uploadCounter.Add(1), 10))
 	testuplink.Log(ctx, "Starting upload")
 	defer testuplink.Log(ctx, "Done starting upload")
@@ -241,7 +241,7 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 		stallDetectionConfig: u.stallDetectionConfig,
 	}
 
-	encMeta := u.newEncryptedMetadata(metadata, derivedKey)
+	encMeta := u.newEncryptedMetadata(userData, derivedKey)
 
 	go func() {
 		info, err := u.backend.UploadObject(
@@ -344,9 +344,9 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 	}, nil
 }
 
-func (u *Uploader) newEncryptedMetadata(metadata Metadata, derivedKey *storj.Key) streamupload.EncryptedMetadata {
+func (u *Uploader) newEncryptedMetadata(userData metaclient.SerializedUserDataProvider, derivedKey *storj.Key) streamupload.EncryptedMetadata {
 	return &encryptedMetadata{
-		metadata:    metadata,
+		userData:    userData,
 		segmentSize: u.segmentSize,
 		derivedKey:  derivedKey,
 		cipherSuite: u.encryptionParameters.CipherSuite,
@@ -380,14 +380,14 @@ func (e limitsExchanger) ExchangeLimits(ctx context.Context, segmentID storj.Seg
 }
 
 type encryptedMetadata struct {
-	metadata    Metadata
+	userData    metaclient.SerializedUserDataProvider
 	segmentSize int64
 	derivedKey  *storj.Key
 	cipherSuite storj.CipherSuite
 }
 
 func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metaclient.EncryptedUserData, err error) {
-	metadataBytes, err := e.metadata.Metadata()
+	userData, err := e.userData.SerializedUserData()
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metacli
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
 		SegmentsSize:    e.segmentSize,
 		LastSegmentSize: lastSegmentSize,
-		Metadata:        metadataBytes,
+		Metadata:        userData.Custom,
 	})
 	if err != nil {
 		return nil, err
@@ -430,12 +430,12 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metacli
 		return nil, err
 	}
 
-	etagBytes, err := e.metadata.ETag()
+	encryptedETag, err := encryption.Encrypt(userData.ETag, e.cipherSuite, &metadataKey, &storj.Nonce{1})
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedETag, err := encryption.Encrypt(etagBytes, e.cipherSuite, &metadataKey, &storj.Nonce{1})
+	encryptedChecksumValue, err := encryption.Encrypt(userData.Checksum.Value, e.cipherSuite, &metadataKey, &storj.Nonce{2})
 	if err != nil {
 		return nil, err
 	}
@@ -445,6 +445,9 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metacli
 		EncryptedMetadataEncryptedKey: encryptedMetadataKey[:],
 		EncryptedMetadataNonce:        encryptedMetadataKeyNonce,
 		EncryptedETag:                 encryptedETag,
+		ChecksumAlgorithm:             userData.Checksum.Algorithm,
+		IsChecksumComposite:           userData.Checksum.IsComposite,
+		EncryptedChecksum:             encryptedChecksumValue,
 	}, nil
 }
 

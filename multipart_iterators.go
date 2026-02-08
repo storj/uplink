@@ -146,7 +146,7 @@ func (uploads *UploadIterator) Item() *UploadInfo {
 
 	// TODO: Make this filtering on the satellite
 	if uploads.uploadOptions.Custom {
-		obj.Custom = item.Metadata
+		obj.Custom = item.UserData.Custom
 	}
 
 	return &obj

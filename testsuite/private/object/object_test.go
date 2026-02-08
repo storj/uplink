@@ -2524,7 +2524,7 @@ func TestETag(t *testing.T) {
 			return errs.Wrap(upload.Commit())
 		}
 
-		t.Run("SetETag after Commit", func(t *testing.T) {
+		t.Run("Single-part upload - SetETag after Commit", func(t *testing.T) {
 			bucketName := testrand.BucketName()
 			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
 
@@ -2640,6 +2640,138 @@ func TestETag(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.EqualValues(t, eTag, entries[0].ETag)
+		})
+	})
+}
+
+func TestChecksum(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, UplinkCount: 1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ChecksumsEnabled = true
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+
+		bucketName := "test-bucket"
+		objectKey := "test-object"
+
+		checksum := metaclient.ObjectChecksum{
+			Algorithm:   storj.ObjectChecksumAlgorithmCRC32,
+			IsComposite: true,
+			Value:       []byte("checksum"),
+		}
+
+		err := up.CreateBucket(ctx, sat, bucketName)
+		require.NoError(t, err)
+
+		project, err := up.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		uploadWithChecksum := func(bucketName, objectKey string, checksum metaclient.ObjectChecksum) error {
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			if err != nil {
+				return errs.Wrap(err)
+			}
+
+			defer func() {
+				abortErr := upload.Abort()
+				if !errs.Is(abortErr, uplink.ErrUploadDone) {
+					err = errs.Combine(err, abortErr)
+				}
+			}()
+
+			if _, err = upload.Write([]byte("test1")); err != nil {
+				return errs.Wrap(err)
+			}
+
+			if err = upload.SetChecksum(checksum); err != nil {
+				return errs.Wrap(err)
+			}
+
+			return errs.Wrap(upload.Commit())
+		}
+
+		requireNoObject := func(t *testing.T, bucketName, objectKey string) {
+			_, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+		}
+
+		t.Run("Upload", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			require.EqualValues(t, checksum, statObj.Checksum)
+		})
+
+		t.Run("Upload - Invalid checksum options", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
+				Algorithm: storj.ObjectChecksumAlgorithmSHA256 + 1,
+				Value:     checksum.Value,
+			})
+			require.ErrorContains(t, err, "invalid checksum algorithm")
+			requireNoObject(t, bucketName, objectKey)
+
+			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
+				Algorithm: storj.ObjectChecksumAlgorithmNone,
+				Value:     checksum.Value,
+			})
+			require.ErrorContains(t, err, "expected checksum value to be unset because checksum algorithm is unset")
+			requireNoObject(t, bucketName, objectKey)
+
+			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
+				Algorithm:   storj.ObjectChecksumAlgorithmNone,
+				IsComposite: true,
+			})
+			require.ErrorContains(t, err, "expected checksum type to be unset because checksum algorithm is unset")
+			requireNoObject(t, bucketName, objectKey)
+
+			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
+				Algorithm: storj.ObjectChecksumAlgorithmCRC32,
+				Value:     nil,
+			})
+			require.ErrorContains(t, err, "expected checksum value to be set because checksum algorithm is set")
+			requireNoObject(t, bucketName, objectKey)
+		})
+
+		t.Run("Upload - SetChecksum after Commit", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			_, err = upload.Write([]byte("test1"))
+			require.NoError(t, err)
+
+			require.NoError(t, upload.SetChecksum(checksum))
+
+			require.NoError(t, upload.Commit())
+
+			require.Error(t, upload.SetChecksum(checksum))
+		})
+
+		t.Run("Upload - Checksums unsupported", func(t *testing.T) {
+			sat.Metainfo.Endpoint.TestingSetChecksumsEnabled(false)
+			defer sat.Metainfo.Endpoint.TestingSetChecksumsEnabled(true)
+
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			err = uploadWithChecksum(bucketName, objectKey, checksum)
+			require.ErrorIs(t, err, object.ErrChecksumsUnsupported)
 		})
 	})
 }

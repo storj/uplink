@@ -209,6 +209,9 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedMetadataNonce:        params.EncryptedMetadataNonce,
 		EncryptedEtag:                 params.EncryptedETag,
+		ChecksumAlgorithm:             pb.ObjectChecksumAlgorithm(params.ChecksumAlgorithm),
+		IsChecksumComposite:           params.IsChecksumComposite,
+		EncryptedChecksum:             params.EncryptedChecksum,
 		LegalHold:                     params.LegalHold,
 	}
 
@@ -278,6 +281,9 @@ func (params *CommitObjectParams) toRequest(header *pb.RequestHeader) *pb.Object
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedEtag:                 params.EncryptedETag,
+		ChecksumAlgorithm:             pb.ObjectChecksumAlgorithm(params.ChecksumAlgorithm),
+		IsChecksumComposite:           params.IsChecksumComposite,
+		EncryptedChecksum:             params.EncryptedChecksum,
 		IfNoneMatch:                   params.IfNoneMatch,
 	}
 }
@@ -392,6 +398,9 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 			EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 			EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 			EncryptedETag:                 object.EncryptedEtag,
+			ChecksumAlgorithm:             storj.ObjectChecksumAlgorithm(object.ChecksumAlgorithm),
+			IsChecksumComposite:           object.IsChecksumComposite,
+			EncryptedChecksum:             object.EncryptedChecksum,
 		},
 	}
 

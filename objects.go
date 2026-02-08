@@ -168,7 +168,7 @@ func (objects *ObjectIterator) Item() *Object {
 
 	// TODO: Make this filtering on the satellite
 	if objects.objOptions.Custom {
-		obj.Custom = item.Metadata
+		obj.Custom = item.UserData.Custom
 	}
 
 	return &obj

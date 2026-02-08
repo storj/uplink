@@ -15,6 +15,7 @@ import (
 
 	"github.com/zeebo/errs"
 
+	"storj.io/uplink/internal/privateprops"
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -33,10 +34,7 @@ type Object struct {
 	System SystemMetadata
 	Custom CustomMetadata
 
-	etag        []byte
-	version     []byte
-	isVersioned bool
-	isLatest    bool
+	private privateprops.Object
 }
 
 // SystemMetadata contains information about the object that cannot be changed directly.
@@ -158,12 +156,15 @@ func convertObject(obj *metaclient.Object) *Object {
 			Expires:       obj.Expires,
 			ContentLength: obj.Size,
 		},
-		Custom: obj.Metadata,
+		Custom: obj.UserData.Custom,
 
-		etag:        obj.ETag,
-		version:     obj.Version,
-		isVersioned: obj.IsVersioned,
-		isLatest:    obj.IsLatest,
+		private: privateprops.Object{
+			ETag:        obj.UserData.ETag,
+			Checksum:    obj.UserData.Checksum,
+			Version:     obj.Version,
+			IsVersioned: obj.IsVersioned,
+			IsLatest:    obj.IsLatest,
+		},
 	}
 
 	if object.Custom == nil {
@@ -173,50 +174,14 @@ func convertObject(obj *metaclient.Object) *Object {
 	return object
 }
 
-// objectETag is exposing object etag field.
+// object_getPrivate exposes the properties of an object that should only be visible to the private API.
 //
-// NB: this is used with linkname in private/object.
+// NB: This is used with linkname in private/object.
 // It needs to be updated when this is updated.
 //
 //lint:ignore U1000, used with linkname
 //nolint:deadcode,unused
-//go:linkname objectETag
-func objectETag(object *Object) []byte {
-	return object.etag
-}
-
-// objectVersion is exposing object version field.
-//
-// NB: this is used with linkname in private/object.
-// It needs to be updated when this is updated.
-//
-//lint:ignore U1000, used with linkname
-//nolint:deadcode,unused
-//go:linkname objectVersion
-func objectVersion(object *Object) []byte {
-	return object.version
-}
-
-// objectIsVersioned is exposing object.isVersioned field.
-//
-// NB: this is used with linkname in private/object.
-// It needs to be updated when this is updated.
-//
-//lint:ignore U1000, used with linkname
-//nolint:deadcode,unused
-//go:linkname objectIsVersioned
-func objectIsVersioned(object *Object) bool {
-	return object.isVersioned
-}
-
-// objectIsLatest is exposing object.isLatest field.
-//
-// NB: this is used with linkname in private/object.
-// It needs to be updated when this is updated.
-//
-//lint:ignore U1000, used with linkname
-//nolint:deadcode,unused
-//go:linkname objectIsLatest
-func objectIsLatest(object *Object) bool {
-	return object.isLatest
+//go:linkname object_getPrivate
+func object_getPrivate(object *Object) privateprops.Object {
+	return object.private
 }

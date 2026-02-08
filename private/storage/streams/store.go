@@ -39,12 +39,6 @@ type Meta struct {
 	LegalHold   *bool
 }
 
-// Metadata interface returns the latest metadata for an object.
-type Metadata interface {
-	Metadata() ([]byte, error)
-	ETag() ([]byte, error)
-}
-
 // Store is a store for streams. It embeds the Uploader, which handles all
 // uploads, and adds the download side on top of it.
 type Store struct {

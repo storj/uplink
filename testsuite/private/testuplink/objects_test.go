@@ -32,35 +32,6 @@ import (
 
 const TestFile = "test-file"
 
-func TestCreateObject(t *testing.T) {
-	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
-		bucket, err := db.CreateBucket(ctx, TestBucket)
-		require.NoError(t, err)
-
-		for i, tt := range []struct {
-			create *metaclient.CreateObject
-		}{
-			{
-				create: nil,
-			},
-			{
-				create: &metaclient.CreateObject{},
-			},
-		} {
-			errTag := fmt.Sprintf("%d. %+v", i, tt)
-
-			obj, err := db.CreateObject(ctx, bucket.Name, TestFile, tt.create)
-			require.NoError(t, err)
-
-			info := obj.Info()
-
-			assert.Equal(t, TestBucket, info.Bucket.Name, errTag)
-			assert.Equal(t, TestFile, info.Path, errTag)
-			assert.EqualValues(t, 0, info.Size, errTag)
-		}
-	})
-}
-
 func TestGetObject(t *testing.T) {
 	runTestWithoutSN(t, func(t *testing.T, ctx context.Context, planet *testplanet.Planet, db *metaclient.DB, streams *streams.Store) {
 		bucket, err := db.CreateBucket(ctx, TestBucket)
