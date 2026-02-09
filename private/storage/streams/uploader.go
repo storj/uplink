@@ -270,11 +270,11 @@ func (u *Uploader) UploadObject(ctx context.Context, bucket, unencryptedKey stri
 }
 
 // UploadPart starts an upload of a part to the given location for the given
-// multipart upload stream. The eTag is an optional channel is used to provide
-// the eTag to be encrypted and included in the final segment of the part. The
-// eTag should be  sent on the channel only after the contents of the part have
-// been fully written to the returned upload, but before calling Commit.
-func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string, streamID storj.StreamID, partNumber int32, eTag <-chan []byte, sched segmentupload.Scheduler) (_ *Upload, err error) {
+// multipart upload stream. The channel userDataCh is used to provide a set of
+// user data for the part and is included in the final segment of the part. The
+// user data should be sent on the channel exactly once, only after the contents
+// of the part have been fully written to the returned upload.
+func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string, streamID storj.StreamID, partNumber int32, userDataCh <-chan metaclient.SegmentUserData, sched segmentupload.Scheduler) (_ *Upload, err error) {
 	ctx = testuplink.WithLogWriterContext(ctx,
 		"upload", strconv.FormatInt(uploadCounter.Add(1), 10),
 		"part_number", strconv.Itoa(int(partNumber)),
@@ -325,7 +325,7 @@ func (u *Uploader) UploadPart(ctx context.Context, bucket, unencryptedKey string
 			uploader,
 			u.metainfo,
 			streamID,
-			eTag,
+			userDataCh,
 		)
 		// On failure, we need to "finish" the splitter with an error so that
 		// outstanding writes to the splitter fail, otherwise the writes will
@@ -453,7 +453,7 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metacli
 
 type uploaderBackend interface {
 	UploadObject(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta streamupload.EncryptedMetadata) (streamupload.Info, error)
-	UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, eTagCh <-chan []byte) (streamupload.Info, error)
+	UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, userDataCh <-chan metaclient.SegmentUserData) (streamupload.Info, error)
 }
 
 type realUploaderBackend struct{}
@@ -462,6 +462,6 @@ func (realUploaderBackend) UploadObject(ctx context.Context, segmentSource strea
 	return streamupload.UploadObject(ctx, segmentSource, segmentUploader, miBatcher, beginObject, encMeta)
 }
 
-func (realUploaderBackend) UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, eTagCh <-chan []byte) (streamupload.Info, error) {
-	return streamupload.UploadPart(ctx, segmentSource, segmentUploader, miBatcher, streamID, eTagCh)
+func (realUploaderBackend) UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, userDataCh <-chan metaclient.SegmentUserData) (streamupload.Info, error) {
+	return streamupload.UploadPart(ctx, segmentSource, segmentUploader, miBatcher, streamID, userDataCh)
 }

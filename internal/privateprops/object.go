@@ -13,3 +13,8 @@ type Object struct {
 	IsVersioned bool
 	IsLatest    bool
 }
+
+// Part contains properties of uplink.Part that should not be exposed to the public API.
+type Part struct {
+	Checksum []byte
+}

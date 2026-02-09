@@ -16,11 +16,14 @@ import (
 )
 
 func TestTracker(t *testing.T) {
-	setup := func(eTag string) (*Tracker, *fakeBatchScheduler) {
-		eTagCh := make(chan []byte, 1)
-		eTagCh <- []byte(eTag)
+	setup := func(eTag, checksum string) (*Tracker, *fakeBatchScheduler) {
+		userDataCh := make(chan metaclient.SegmentUserData, 1)
+		userDataCh <- metaclient.SegmentUserData{
+			ETag:     []byte(eTag),
+			Checksum: []byte(checksum),
+		}
 		scheduler := new(fakeBatchScheduler)
-		return New(scheduler, eTagCh), scheduler
+		return New(scheduler, userDataCh), scheduler
 	}
 
 	segment := func(index int32) Segment {
@@ -31,24 +34,36 @@ func TestTracker(t *testing.T) {
 		return &fakeSegment{index: index, err: errors.New("oh no")}
 	}
 
-	makeInlineSegmentWithEncryptedETag := func(index int32, encryptedETag string) metaclient.BatchItem {
-		return &metaclient.MakeInlineSegmentParams{PlainSize: int64(index), EncryptedETag: []byte(encryptedETag)}
+	makeInlineSegmentWithEncryptedUserData := func(index int32, encryptedETag, encryptedChecksum string) metaclient.BatchItem {
+		return &metaclient.MakeInlineSegmentParams{
+			PlainSize: int64(index),
+			EncryptedUserData: metaclient.EncryptedSegmentUserData{
+				ETag:     []byte(encryptedETag),
+				Checksum: []byte(encryptedChecksum),
+			},
+		}
 	}
 
 	makeInlineSegment := func(index int32) metaclient.BatchItem {
-		return makeInlineSegmentWithEncryptedETag(index, "")
+		return makeInlineSegmentWithEncryptedUserData(index, "", "")
 	}
 
-	commitSegmentWithEncryptedETag := func(index int32, encryptedETag string) metaclient.BatchItem {
-		return &metaclient.CommitSegmentParams{PlainSize: int64(index), EncryptedETag: []byte(encryptedETag)}
+	commitSegmentWithEncryptedUserData := func(index int32, encryptedETag, encryptedChecksum string) metaclient.BatchItem {
+		return &metaclient.CommitSegmentParams{
+			PlainSize: int64(index),
+			EncryptedUserData: metaclient.EncryptedSegmentUserData{
+				ETag:     []byte(encryptedETag),
+				Checksum: []byte(encryptedChecksum),
+			},
+		}
 	}
 
 	commitSegment := func(index int32) metaclient.BatchItem {
-		return commitSegmentWithEncryptedETag(index, "")
+		return commitSegmentWithEncryptedUserData(index, "", "")
 	}
 
 	t.Run("SegmentDone holds back highest seen segment", func(t *testing.T) {
-		tracker, scheduler := setup("")
+		tracker, scheduler := setup("", "")
 
 		// 2 will should be held back
 		tracker.SegmentDone(segment(2), makeInlineSegment(2))
@@ -69,7 +84,7 @@ func TestTracker(t *testing.T) {
 		scheduler.AssertScheduledAndReset(t, makeInlineSegment(3))
 	})
 
-	t.Run("SegmentDone immediately schedules when etag is not a concern", func(t *testing.T) {
+	t.Run("SegmentDone immediately schedules when user data is not a concern", func(t *testing.T) {
 		scheduler := new(fakeBatchScheduler)
 		tracker := New(scheduler, nil)
 
@@ -79,31 +94,31 @@ func TestTracker(t *testing.T) {
 
 	t.Run("Flush flushes the last segment", func(t *testing.T) {
 		t.Run("MakeInlineSegment", func(t *testing.T) {
-			tracker, scheduler := setup("etag")
+			tracker, scheduler := setup("etag", "checksum")
 			tracker.SegmentDone(segment(1), makeInlineSegment(1))
 			tracker.SegmentsScheduled(segment(1))
 
 			scheduler.AssertScheduledAndReset(t)
 			err := tracker.Flush(context.Background())
 			require.NoError(t, err)
-			scheduler.AssertScheduledAndReset(t, makeInlineSegmentWithEncryptedETag(1, "etag-1"))
+			scheduler.AssertScheduledAndReset(t, makeInlineSegmentWithEncryptedUserData(1, "etag-1", "checksum-1"))
 		})
 		t.Run("CommitSegment", func(t *testing.T) {
-			tracker, scheduler := setup("etag")
+			tracker, scheduler := setup("etag", "checksum")
 			tracker.SegmentDone(segment(1), commitSegment(1))
 			tracker.SegmentsScheduled(segment(1))
 
 			scheduler.AssertScheduledAndReset(t)
 			err := tracker.Flush(context.Background())
 			require.NoError(t, err)
-			scheduler.AssertScheduledAndReset(t, commitSegmentWithEncryptedETag(1, "etag-1"))
+			scheduler.AssertScheduledAndReset(t, commitSegmentWithEncryptedUserData(1, "etag-1", "checksum-1"))
 		})
 	})
 
 	t.Run("Flush responds to context cancellation waiting for etag", func(t *testing.T) {
 		scheduler := new(fakeBatchScheduler)
 
-		tracker := New(scheduler, make(chan []byte))
+		tracker := New(scheduler, make(chan metaclient.SegmentUserData))
 		tracker.SegmentDone(segment(1), makeInlineSegment(1))
 		tracker.SegmentsScheduled(segment(1))
 
@@ -115,8 +130,8 @@ func TestTracker(t *testing.T) {
 		require.True(t, errors.Is(err, context.Canceled))
 	})
 
-	t.Run("Flush does not encrypt an empty etag", func(t *testing.T) {
-		tracker, scheduler := setup("")
+	t.Run("Flush does not encrypt empty user data", func(t *testing.T) {
+		tracker, scheduler := setup("", "")
 		tracker.SegmentDone(segment(1), makeInlineSegment(1))
 		tracker.SegmentsScheduled(segment(1))
 
@@ -126,7 +141,7 @@ func TestTracker(t *testing.T) {
 	})
 
 	t.Run("Flush fails if last segment was never done", func(t *testing.T) {
-		tracker, _ := setup("etag")
+		tracker, _ := setup("etag", "checksum")
 		tracker.SegmentDone(segment(1), makeInlineSegment(1))
 		tracker.SegmentsScheduled(segment(2))
 		err := tracker.Flush(context.Background())
@@ -134,7 +149,7 @@ func TestTracker(t *testing.T) {
 	})
 
 	t.Run("Flush fails if last segment batch item is unhandled", func(t *testing.T) {
-		tracker, _ := setup("etag")
+		tracker, _ := setup("etag", "checksum")
 		tracker.SegmentDone(segment(1), &metaclient.BeginSegmentParams{})
 		tracker.SegmentsScheduled(segment(1))
 		err := tracker.Flush(context.Background())
@@ -142,27 +157,27 @@ func TestTracker(t *testing.T) {
 	})
 
 	t.Run("Flush before SegmentDone is an error", func(t *testing.T) {
-		tracker, _ := setup("")
+		tracker, _ := setup("", "")
 		err := tracker.Flush(context.Background())
 		require.EqualError(t, err, "programmer error: no segment has been held back")
 	})
 
 	t.Run("Flush before SegmentsScheduled is an error", func(t *testing.T) {
-		tracker, _ := setup("")
+		tracker, _ := setup("", "")
 		tracker.SegmentDone(segment(1), makeInlineSegment(1))
 		err := tracker.Flush(context.Background())
 		require.EqualError(t, err, "programmer error: cannot flush before last segment known")
 	})
 
-	t.Run("Flush fails if eTag cannot be encrypted", func(t *testing.T) {
-		tracker, _ := setup("etag")
+	t.Run("Flush fails if user data cannot be encrypted", func(t *testing.T) {
+		tracker, _ := setup("etag", "checksum")
 		tracker.SegmentDone(badSegment(1), makeInlineSegment(1))
 		tracker.SegmentsScheduled(segment(1))
 		err := tracker.Flush(context.Background())
-		require.EqualError(t, err, "failed to encrypt eTag: oh no")
+		require.EqualError(t, err, "failed to encrypt user data: oh no")
 	})
 
-	t.Run("Flush is no-op when etag is not a concern", func(t *testing.T) {
+	t.Run("Flush is no-op when user data is not a concern", func(t *testing.T) {
 		tracker := New(new(fakeBatchScheduler), nil)
 		err := tracker.Flush(context.Background())
 		require.NoError(t, err)
@@ -191,9 +206,12 @@ func (s *fakeSegment) Position() metaclient.SegmentPosition {
 	return metaclient.SegmentPosition{Index: s.index}
 }
 
-func (s *fakeSegment) EncryptETag(eTag []byte) ([]byte, error) {
+func (s *fakeSegment) EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error) {
 	if s.err != nil {
-		return nil, s.err
+		return metaclient.EncryptedSegmentUserData{}, s.err
 	}
-	return fmt.Appendf(nil, "%s-%d", string(eTag), s.index), nil
+	return metaclient.EncryptedSegmentUserData{
+		ETag:     fmt.Appendf(nil, "%s-%d", string(userData.ETag), s.index),
+		Checksum: fmt.Appendf(nil, "%s-%d", string(userData.Checksum), s.index),
+	}, nil
 }

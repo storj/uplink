@@ -37,7 +37,7 @@ var (
 	uploadInfo           = streamupload.Info{CreationDate: creationDate, PlainSize: 123}
 	streamID             = storj.StreamID("STREAMID")
 	partNumber           = int32(1)
-	eTagCh               = make(chan []byte)
+	segmentUserDataCh    = make(chan metaclient.SegmentUserData)
 )
 
 func TestNewUploader(t *testing.T) {
@@ -208,7 +208,7 @@ func TestUpload(t *testing.T) {
 
 	t.Run("Part", func(t *testing.T) {
 		testUpload(t, func(uploader *Uploader, c config) (*Upload, error) {
-			return uploader.UploadPart(context.Background(), c.bucket, c.key, streamID, partNumber, eTagCh, noopScheduler{})
+			return uploader.UploadPart(context.Background(), c.bucket, c.key, streamID, partNumber, segmentUserDataCh, noopScheduler{})
 		})
 	})
 }
@@ -316,15 +316,15 @@ func (b fakeUploaderBackend) UploadObject(ctx context.Context, segmentSource str
 	return b.upload()
 }
 
-func (b fakeUploaderBackend) UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamIDIn storj.StreamID, eTagChIn <-chan []byte) (streamupload.Info, error) {
+func (b fakeUploaderBackend) UploadPart(ctx context.Context, segmentSource streamupload.SegmentSource, segmentUploader streamupload.SegmentUploader, miBatcher metaclient.Batcher, streamIDIn storj.StreamID, segmentUserDataChIn <-chan metaclient.SegmentUserData) (streamupload.Info, error) {
 	if err := b.checkCommonParams(segmentSource, segmentUploader, miBatcher); err != nil {
 		return streamupload.Info{}, err
 	}
 	if !bytes.Equal(streamIDIn, streamID) {
 		return streamupload.Info{}, errs.New("expected stream ID %x but got %x", streamID, streamIDIn)
 	}
-	if eTagChIn != eTagCh {
-		return streamupload.Info{}, errs.New("unexpected eTag channel")
+	if segmentUserDataChIn != segmentUserDataCh {
+		return streamupload.Info{}, errs.New("unexpected segment user data channel")
 	}
 	return b.upload()
 }

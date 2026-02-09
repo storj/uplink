@@ -18,7 +18,7 @@ var mon = monkit.Package()
 // Segment represents a segment being tracked.
 type Segment interface {
 	Position() metaclient.SegmentPosition
-	EncryptETag([]byte) ([]byte, error)
+	EncryptUserData(metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error)
 }
 
 // BatchScheduler schedules batch items to be issued.
@@ -27,16 +27,16 @@ type BatchScheduler interface {
 }
 
 // Tracker tracks segments as they are completed for the purpose of encrypting
-// and setting the eTag on the final segment. It hold backs scheduling of the
-// last known segment until Flush is called, at which point it verifies that
-// the held back segment is indeed the last segment, encrypts the eTag using
+// and setting user data final segment. It hold backs scheduling of the last
+// known segment until Flush is called, at which point it verifies that the
+// held back segment is indeed the last segment, encrypts the user data using
 // that segment, and injects it into the batch item that commits that segment
 // (i.e. MakeInlineSegment or CommitSegment). If the segments are not part of
 // a multipart upload (i.e. no eTag to apply), then the tracker schedules
 // the segment batch items immediately.
 type Tracker struct {
-	scheduler BatchScheduler
-	eTagCh    <-chan []byte
+	scheduler  BatchScheduler
+	userDataCh <-chan metaclient.SegmentUserData
 
 	mu sync.Mutex
 
@@ -48,10 +48,10 @@ type Tracker struct {
 
 // New returns a new tracker that uses the given batch scheduler to schedule
 // segment commit items.
-func New(scheduler BatchScheduler, eTagCh <-chan []byte) *Tracker {
+func New(scheduler BatchScheduler, userDataCh <-chan metaclient.SegmentUserData) *Tracker {
 	return &Tracker{
-		scheduler: scheduler,
-		eTagCh:    eTagCh,
+		scheduler:  scheduler,
+		userDataCh: userDataCh,
 	}
 }
 
@@ -59,12 +59,12 @@ func New(scheduler BatchScheduler, eTagCh <-chan []byte) *Tracker {
 // supplies the batchItem that needs to be scheduled to commit the segment ( or
 // create the inline segment). If this is the last segment seen so far, it will
 // not be scheduled immediately, and will instead be scheduled when a later
-// segment finishes or Flush is called. If the tracker was given a nil eTagCh
+// segment finishes or Flush is called. If the tracker was given a nil userDataCh
 // channel, then the segment batch item is scheduled immediately.
 func (t *Tracker) SegmentDone(segment Segment, batchItem metaclient.BatchItem) {
-	// If there will be no eTag to encrypt then there is no reason to gate the
+	// If there is no data to encrypt, then there is no reason to gate the
 	// scheduling.
-	if t.eTagCh == nil {
+	if t.userDataCh == nil {
 		t.scheduler.Schedule(batchItem)
 		return
 	}
@@ -103,14 +103,14 @@ func (t *Tracker) SegmentsScheduled(lastSegment Segment) {
 // Flush schedules the held back segment. It must only be called at least one
 // call to SegmentDone as well as SegmentsScheduled. It verifies that the held
 // back segment is the last segment (as indicited by SegmentsScheduled). Before
-// scheduling the last segment, it reads the eTag from the eTagCh channel
-// provided in New, encryptes that eTag with the last segment, and then injects
-// the encrypted eTag into the batch item that commits that segment (i.e.
+// scheduling the last segment, it reads the user data from the userDataCh channel
+// provided in New, encrypts that user data with the last segment, and then injects
+// the encrypted user data into the batch item that commits that segment (i.e.
 // MakeInlineSegment or CommitSegment).
 func (t *Tracker) Flush(ctx context.Context) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	if t.eTagCh == nil {
+	if t.userDataCh == nil {
 		return nil
 	}
 
@@ -131,7 +131,7 @@ func (t *Tracker) Flush(ctx context.Context) (err error) {
 		return errs.New("programmer error: expected held back segment with index %d to have last segment index %d", heldBackIndex, *t.lastIndex)
 	}
 
-	if err := t.addEncryptedETag(ctx, t.heldBackSegment, t.heldBackBatchItem); err != nil {
+	if err := t.addEncryptedUserData(ctx, t.heldBackSegment, t.heldBackBatchItem); err != nil {
 		return errs.Wrap(err)
 	}
 
@@ -141,26 +141,26 @@ func (t *Tracker) Flush(ctx context.Context) (err error) {
 	return nil
 }
 
-func (t *Tracker) addEncryptedETag(ctx context.Context, lastSegment Segment, batchItem metaclient.BatchItem) (err error) {
+func (t *Tracker) addEncryptedUserData(ctx context.Context, lastSegment Segment, batchItem metaclient.BatchItem) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	select {
-	case eTag := <-t.eTagCh:
-		if len(eTag) == 0 {
-			// Either an empty ETag provided by caller or more likely
-			// the ETag was not provided before Commit was called.
+	case userData := <-t.userDataCh:
+		if userData.IsZero() {
+			// Either an empty set of user data was provided by the caller, or - more likely -
+			// the user data was not provided before Commit was called.
 			return nil
 		}
 
-		encryptedETag, err := lastSegment.EncryptETag(eTag)
+		encryptedUserData, err := lastSegment.EncryptUserData(userData)
 		if err != nil {
-			return errs.New("failed to encrypt eTag: %w", err)
+			return errs.New("failed to encrypt user data: %w", err)
 		}
 		switch batchItem := batchItem.(type) {
 		case *metaclient.MakeInlineSegmentParams:
-			batchItem.EncryptedETag = encryptedETag
+			batchItem.EncryptedUserData = encryptedUserData
 		case *metaclient.CommitSegmentParams:
-			batchItem.EncryptedETag = encryptedETag
+			batchItem.EncryptedUserData = encryptedUserData
 		default:
 			return errs.New("unhandled segment batch item type: %T", batchItem)
 		}

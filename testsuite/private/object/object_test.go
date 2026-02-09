@@ -36,7 +36,6 @@ import (
 	"storj.io/uplink"
 	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
-	"storj.io/uplink/private/multipart"
 	"storj.io/uplink/private/object"
 )
 
@@ -2123,8 +2122,8 @@ func TestConditionalWrites(t *testing.T) {
 		runTest("CommitUpload", func(t *testing.T, bucket, key string, data []byte) {
 			opts := metaclient.CommitUploadOptions{IfNoneMatch: []string{"*"}}
 
-			newUpload := func() uplink.UploadInfo {
-				upload, err := multipart.BeginUpload(ctx, project, bucket, key, nil)
+			newUpload := func() object.UploadInfo {
+				upload, err := object.BeginUpload(ctx, project, bucket, key, nil)
 				require.NoError(t, err)
 
 				part, err := project.UploadPart(ctx, bucket, key, upload.UploadID, 1)
@@ -2557,7 +2556,7 @@ func TestETag(t *testing.T) {
 			bucketName := testrand.BucketName()
 			require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, planet.Satellites[0], bucketName))
 
-			upload, err := multipart.BeginUpload(ctx, project, bucketName, objectKey, nil)
+			upload, err := object.BeginUpload(ctx, project, bucketName, objectKey, nil)
 			require.NoError(t, err)
 
 			part, err := project.UploadPart(ctx, bucketName, objectKey, upload.UploadID, 1)
@@ -2568,7 +2567,9 @@ func TestETag(t *testing.T) {
 			require.NoError(t, part.Commit())
 
 			_, err = object.CommitUpload(ctx, project, bucketName, objectKey, upload.UploadID, &metaclient.CommitUploadOptions{
-				ETag: eTag,
+				UserData: metaclient.ObjectUserData{
+					ETag: eTag,
+				},
 			})
 			require.NoError(t, err)
 
@@ -2656,7 +2657,6 @@ func TestChecksum(t *testing.T) {
 		sat := planet.Satellites[0]
 		up := planet.Uplinks[0]
 
-		bucketName := "test-bucket"
 		objectKey := "test-object"
 
 		checksum := metaclient.ObjectChecksum{
@@ -2664,9 +2664,6 @@ func TestChecksum(t *testing.T) {
 			IsComposite: true,
 			Value:       []byte("checksum"),
 		}
-
-		err := up.CreateBucket(ctx, sat, bucketName)
-		require.NoError(t, err)
 
 		project, err := up.OpenProject(ctx, sat)
 		require.NoError(t, err)
@@ -2696,9 +2693,9 @@ func TestChecksum(t *testing.T) {
 			return errs.Wrap(upload.Commit())
 		}
 
-		requireNoObject := func(t *testing.T, bucketName, objectKey string) {
+		requireNoCommittedObject := func(t *testing.T, bucketName, objectKey string, msgAndArgs ...any) {
 			_, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
-			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound, msgAndArgs...)
 		}
 
 		t.Run("Upload", func(t *testing.T) {
@@ -2717,33 +2714,11 @@ func TestChecksum(t *testing.T) {
 			bucketName := testrand.BucketName()
 			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
 
-			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
-				Algorithm: storj.ObjectChecksumAlgorithmSHA256 + 1,
-				Value:     checksum.Value,
-			})
-			require.ErrorContains(t, err, "invalid checksum algorithm")
-			requireNoObject(t, bucketName, objectKey)
-
-			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
-				Algorithm: storj.ObjectChecksumAlgorithmNone,
-				Value:     checksum.Value,
-			})
-			require.ErrorContains(t, err, "expected checksum value to be unset because checksum algorithm is unset")
-			requireNoObject(t, bucketName, objectKey)
-
-			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
-				Algorithm:   storj.ObjectChecksumAlgorithmNone,
-				IsComposite: true,
-			})
-			require.ErrorContains(t, err, "expected checksum type to be unset because checksum algorithm is unset")
-			requireNoObject(t, bucketName, objectKey)
-
-			err = uploadWithChecksum(bucketName, objectKey, metaclient.ObjectChecksum{
-				Algorithm: storj.ObjectChecksumAlgorithmCRC32,
-				Value:     nil,
-			})
-			require.ErrorContains(t, err, "expected checksum value to be set because checksum algorithm is set")
-			requireNoObject(t, bucketName, objectKey)
+			for _, tt := range invalidChecksumScenarios {
+				err = uploadWithChecksum(bucketName, objectKey, tt.checksum)
+				require.ErrorContains(t, err, tt.errMsg, "test case: %q", tt.errMsg)
+				requireNoCommittedObject(t, bucketName, objectKey, "test case: %q", tt.errMsg)
+			}
 		})
 
 		t.Run("Upload - SetChecksum after Commit", func(t *testing.T) {
@@ -3090,6 +3065,40 @@ func testListObjectsDelimiter(t *testing.T, includeVersion bool, fn func(ctx con
 			require.ErrorIs(t, err, object.ErrUnsupportedDelimiter)
 		})
 	})
+}
+
+var invalidChecksumScenarios = []struct {
+	checksum metaclient.ObjectChecksum
+	errMsg   string
+}{
+	{
+		checksum: metaclient.ObjectChecksum{
+			Algorithm: storj.ObjectChecksumAlgorithmSHA256 + 1,
+			Value:     []byte{1, 2, 3, 4},
+		},
+		errMsg: "invalid checksum algorithm",
+	},
+	{
+		checksum: metaclient.ObjectChecksum{
+			Algorithm: storj.ObjectChecksumAlgorithmNone,
+			Value:     []byte{1, 2, 3, 4},
+		},
+		errMsg: "expected checksum value to be unset because checksum algorithm is unset",
+	},
+	{
+		checksum: metaclient.ObjectChecksum{
+			Algorithm:   storj.ObjectChecksumAlgorithmNone,
+			IsComposite: true,
+		},
+		errMsg: "expected checksum type to be unset because checksum algorithm is unset",
+	},
+	{
+		checksum: metaclient.ObjectChecksum{
+			Algorithm: storj.ObjectChecksumAlgorithmCRC32,
+			Value:     nil,
+		},
+		errMsg: "expected checksum value to be set because checksum algorithm is set",
+	},
 }
 
 func randVersion() []byte {

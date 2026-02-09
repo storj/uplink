@@ -13,6 +13,7 @@ import (
 	"github.com/zeebo/errs"
 
 	"storj.io/common/storj"
+	"storj.io/uplink/private/metaclient"
 )
 
 func TestSplitter(t *testing.T) {
@@ -63,7 +64,11 @@ func TestSplitter(t *testing.T) {
 			return result{"seg_error", 0, 0, err, 0}, false
 		}
 
-		data, err := seg.EncryptETag([]byte("some etag")) // ensure this can even be called
+		// ensure this can even be called
+		data, err := seg.EncryptUserData(metaclient.SegmentUserData{
+			ETag:     []byte("some etag"),
+			Checksum: []byte("some checksum"),
+		})
 		require.NoError(t, err)
 		require.NotNil(t, data)
 

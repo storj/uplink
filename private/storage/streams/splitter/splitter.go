@@ -32,9 +32,9 @@ type Segment interface {
 	// Reader returns a fresh io.Reader that reads the data of the segment.
 	Reader() io.Reader
 
-	// EncryptETag encrypts the provided etag with the correct encryption
+	// EncryptUserData encrypts the provided user data with the correct encryption
 	// keys that the segment is using.
-	EncryptETag(eTag []byte) ([]byte, error)
+	EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error)
 
 	// Finalize returns a SegmentInfo if the segment is done being read
 	// from.

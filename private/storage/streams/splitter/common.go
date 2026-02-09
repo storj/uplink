@@ -4,24 +4,40 @@
 package splitter
 
 import (
+	"github.com/zeebo/errs"
+
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
 	"storj.io/uplink/private/metaclient"
 )
 
 // TODO: move it to separate package?
-func encryptETag(etag []byte, cipherSuite storj.CipherSuite, contentKey *storj.Key) ([]byte, error) {
-	etagKey, err := encryption.DeriveKey(contentKey, "storj-etag-v1")
-	if err != nil {
-		return nil, err
+func encryptUserData(userData metaclient.SegmentUserData, cipherSuite storj.CipherSuite, contentKey *storj.Key) (encUserData metaclient.EncryptedSegmentUserData, _ error) {
+	if len(userData.ETag) > 0 {
+		etagKey, err := encryption.DeriveKey(contentKey, "storj-etag-v1")
+		if err != nil {
+			return metaclient.EncryptedSegmentUserData{}, errs.Wrap(err)
+		}
+		encryptedETag, err := encryption.Encrypt(userData.ETag, cipherSuite, etagKey, &storj.Nonce{})
+		if err != nil {
+			return metaclient.EncryptedSegmentUserData{}, errs.Wrap(err)
+		}
+		encUserData.ETag = encryptedETag
 	}
 
-	encryptedETag, err := encryption.Encrypt(etag, cipherSuite, etagKey, &storj.Nonce{})
-	if err != nil {
-		return nil, err
+	if len(userData.Checksum) > 0 {
+		checksumKey, err := encryption.DeriveKey(contentKey, "storj-checksum-v1")
+		if err != nil {
+			return metaclient.EncryptedSegmentUserData{}, errs.Wrap(err)
+		}
+		encryptedChecksum, err := encryption.Encrypt(userData.Checksum, cipherSuite, checksumKey, &storj.Nonce{})
+		if err != nil {
+			return metaclient.EncryptedSegmentUserData{}, errs.Wrap(err)
+		}
+		encUserData.Checksum = encryptedChecksum
 	}
 
-	return encryptedETag, nil
+	return encUserData, nil
 }
 
 func nonceForPosition(position metaclient.SegmentPosition) (storj.Nonce, error) {

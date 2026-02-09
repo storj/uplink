@@ -200,9 +200,10 @@ type ObjectUserData struct {
 	Checksum ObjectChecksum
 }
 
-// IsZero returns whether the ObjectUserData is empty.
-func (meta ObjectUserData) IsZero() bool {
-	return len(meta.Custom) == 0 && len(meta.ETag) == 0 && meta.Checksum.isZero()
+// RequiresEncryption returns whether the ObjectUserData contains any values that must be encrypted
+// before they are included in EncryptedUserData.
+func (meta ObjectUserData) RequiresEncryption() bool {
+	return len(meta.ETag) > 0 || len(meta.Custom) > 0 || len(meta.Checksum.Value) > 0
 }
 
 // ObjectChecksum represents the checksum of an object's contents.
@@ -216,6 +217,18 @@ type ObjectChecksum struct {
 
 // Validate returns an error if the checksum is invalid.
 func (checksum ObjectChecksum) Validate() error {
+	if err := checksum.ValidateIncomplete(); err != nil {
+		return err
+	}
+	if checksum.Algorithm != storj.ObjectChecksumAlgorithmNone && len(checksum.Value) == 0 {
+		return errs.New("expected checksum value to be set because checksum algorithm is set")
+	}
+	return nil
+}
+
+// ValidateIncomplete returns an error if the checksum is invalid.
+// Unlike Validate, it allows a checksum value to be unset even when a checksum algorithm is set.
+func (checksum ObjectChecksum) ValidateIncomplete() error {
 	if checksum.Algorithm < storj.ObjectChecksumAlgorithmNone || checksum.Algorithm > storj.ObjectChecksumAlgorithmSHA256 {
 		return errs.New("invalid checksum algorithm")
 	}
@@ -226,8 +239,6 @@ func (checksum ObjectChecksum) Validate() error {
 		if checksum.IsComposite {
 			return errs.New("expected checksum type to be unset because checksum algorithm is unset")
 		}
-	} else if len(checksum.Value) == 0 {
-		return errs.New("expected checksum value to be set because checksum algorithm is set")
 	}
 	return nil
 }
@@ -239,9 +250,19 @@ func (checksum ObjectChecksum) Clone() ObjectChecksum {
 	return newChecksum
 }
 
-// isZero returns whether the ObjectChecksum is empty.
-func (checksum ObjectChecksum) isZero() bool {
-	return checksum.Algorithm == storj.ObjectChecksumAlgorithmNone && !checksum.IsComposite && len(checksum.Value) == 0
+// SegmentUserData represents a set of segment metadata whose values originate from the user.
+// It is the segment counterpart of ObjectUserData, which is for objects.
+type SegmentUserData struct {
+	ETag     []byte
+	Checksum []byte
+}
+
+// EncryptedSegmentUserData represents an encrypted set of segment user data.
+type EncryptedSegmentUserData SegmentUserData
+
+// IsZero returns whether the user data is empty.
+func (userData SegmentUserData) IsZero() bool {
+	return len(userData.Checksum) == 0 && len(userData.ETag) == 0
 }
 
 // Stream is information about an object stream.

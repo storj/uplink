@@ -796,6 +796,10 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, us
 		return Object{}, ErrUploadIDInvalid.New("")
 	}
 
+	if err := userData.Checksum.Validate(); err != nil {
+		return Object{}, ErrObjectMetadata.Wrap(err)
+	}
+
 	decodedStreamID, version, err := base58.CheckDecode(uploadID)
 	if err != nil || version != 1 {
 		return Object{}, ErrUploadIDInvalid.New("")
@@ -821,8 +825,15 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, us
 }
 
 func (db *DB) fillUserData(bucket, key string, id storj.StreamID, userData ObjectUserData, encryptionParameters storj.EncryptionParameters) (CommitObjectParams, error) {
-	commitObjParams := CommitObjectParams{StreamID: id}
-	if userData.IsZero() {
+	commitObjParams := CommitObjectParams{
+		StreamID: id,
+		EncryptedUserData: EncryptedUserData{
+			ChecksumAlgorithm:   userData.Checksum.Algorithm,
+			IsChecksumComposite: userData.Checksum.IsComposite,
+		},
+	}
+
+	if !userData.RequiresEncryption() {
 		return commitObjParams, nil
 	}
 
@@ -900,8 +911,6 @@ func (db *DB) fillUserData(bucket, key string, id storj.StreamID, userData Objec
 	commitObjParams.EncryptedMetadataEncryptedKey = encryptedKey
 	commitObjParams.EncryptedMetadataNonce = encryptedKeyNonce
 	commitObjParams.EncryptedMetadata = streamMetaBytes
-	commitObjParams.ChecksumAlgorithm = userData.Checksum.Algorithm
-	commitObjParams.IsChecksumComposite = userData.Checksum.IsComposite
 
 	return commitObjParams, nil
 }

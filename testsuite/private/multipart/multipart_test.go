@@ -27,6 +27,7 @@ func TestBeginUpload(t *testing.T) {
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
+		//lint:ignore SA1019 this deprecated function is ours and is kept for downstream callers
 		_, err = multipart.BeginUpload(ctx, project, "not-existing-testbucket", "multipart-object", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
@@ -37,6 +38,7 @@ func TestBeginUpload(t *testing.T) {
 		// assert there is no pending multipart upload
 		assertUploadList(ctx, t, project, "testbucket", nil)
 
+		//lint:ignore SA1019 this deprecated function is ours and is kept for downstream callers
 		info, err := multipart.BeginUpload(ctx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
@@ -45,10 +47,12 @@ func TestBeginUpload(t *testing.T) {
 		assertUploadList(ctx, t, project, "testbucket", nil, "multipart-object")
 
 		// we allow to start several multipart uploads for the same key
+		//lint:ignore SA1019 this deprecated function is ours and is kept for downstream callers
 		_, err = multipart.BeginUpload(ctx, project, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
 
+		//lint:ignore SA1019 this deprecated function is ours and is kept for downstream callers
 		info, err = multipart.BeginUpload(ctx, project, "testbucket", "multipart-object-1", nil)
 		require.NoError(t, err)
 		require.NotNil(t, info.UploadID)
@@ -81,6 +85,7 @@ func TestBeginUploadWithMetadata(t *testing.T) {
 
 		for name, metadata := range expectedMetadata {
 			t.Run(name, func(t *testing.T) {
+				//lint:ignore SA1019 this deprecated function is ours and is kept for downstream callers
 				info, err := multipart.BeginUpload(ctx, project, "testbucket", name, &multipart.UploadOptions{
 					CustomMetadata: metadata,
 				})

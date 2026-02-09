@@ -65,12 +65,12 @@ func UploadObject(ctx context.Context, segmentSource SegmentSource, segmentUploa
 
 // UploadPart uploads a stream of segments as a part of a multipart upload
 // identified by the given streamID.
-func UploadPart(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, eTagCh <-chan []byte) (_ Info, err error) {
+func UploadPart(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, streamID storj.StreamID, userDataCh <-chan metaclient.SegmentUserData) (_ Info, err error) {
 	defer mon.Task()(&ctx)(&err)
-	return uploadSegments(ctx, segmentSource, segmentUploader, miBatcher, nil, nil, streamID, eTagCh)
+	return uploadSegments(ctx, segmentSource, segmentUploader, miBatcher, nil, nil, streamID, userDataCh)
 }
 
-func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata, streamID storj.StreamID, eTagCh <-chan []byte) (_ Info, err error) {
+func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUploader SegmentUploader, miBatcher metaclient.Batcher, beginObject *metaclient.BeginObjectParams, encMeta EncryptedMetadata, streamID storj.StreamID, userDataCh <-chan metaclient.SegmentUserData) (_ Info, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	testuplink.Log(ctx, "Uploading segments...")
@@ -92,7 +92,7 @@ func uploadSegments(ctx context.Context, segmentSource SegmentSource, segmentUpl
 		}()
 	}
 
-	tracker := segmenttracker.New(aggregator, eTagCh)
+	tracker := segmenttracker.New(aggregator, userDataCh)
 
 	var segments []splitter.Segment
 	defer func() {

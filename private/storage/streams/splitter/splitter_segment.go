@@ -35,8 +35,8 @@ func (s *splitterSegment) Inline() bool                         { return false }
 func (s *splitterSegment) Reader() io.Reader                    { return s.encBuf.Reader() }
 func (s *splitterSegment) DoneReading(err error)                { s.encBuf.DoneReading(err) }
 
-func (s *splitterSegment) EncryptETag(eTag []byte) ([]byte, error) {
-	return encryptETag(eTag, s.encParams.CipherSuite, s.contentKey)
+func (s *splitterSegment) EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error) {
+	return encryptUserData(userData, s.encParams.CipherSuite, s.contentKey)
 }
 
 func (s *splitterSegment) Finalize() *SegmentInfo {

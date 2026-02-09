@@ -32,6 +32,7 @@ var (
 	encMetadataKeyNonce = storj.Nonce{0: 0, 1: 1, 2: 2, 3: 3}
 	creationDate        = time.Now().UTC()
 	eTag                = []byte("ETAG")
+	checksum            = []byte("CHECKSUM")
 )
 
 func TestUploadObject(t *testing.T) {
@@ -192,10 +193,13 @@ func TestUploadPart(t *testing.T) {
 				miBatcher       = newMetainfoBatcher(t, true, len(tc.segments))
 			)
 
-			eTagCh := make(chan []byte, 1)
-			eTagCh <- eTag
+			userDataCh := make(chan metaclient.SegmentUserData, 1)
+			userDataCh <- metaclient.SegmentUserData{
+				ETag:     eTag,
+				Checksum: checksum,
+			}
 
-			info, err := UploadPart(context.Background(), segmentSource, segmentUploader, miBatcher, streamID, eTagCh)
+			info, err := UploadPart(context.Background(), segmentSource, segmentUploader, miBatcher, streamID, userDataCh)
 			if tc.expectErr != "" {
 				require.NoError(t, miBatcher.CheckObject(false, false, false))
 				require.EqualError(t, err, tc.expectErr)
@@ -320,11 +324,14 @@ func (s *segment) Check(uploadErr error) error {
 	return nil
 }
 
-func (s *segment) EncryptETag(eTagIn []byte) ([]byte, error) {
-	if !bytes.Equal(eTagIn, eTag) {
-		return nil, errs.New("expected eTag %q but got %q", string(eTag), string(eTagIn))
+func (s *segment) EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error) {
+	if !bytes.Equal(userData.ETag, eTag) {
+		return metaclient.EncryptedSegmentUserData{}, errs.New("expected eTag %q but got %q", string(eTag), string(userData.ETag))
 	}
-	return encryptETag(s.index), nil
+	if !bytes.Equal(userData.Checksum, checksum) {
+		return metaclient.EncryptedSegmentUserData{}, errs.New("expected checksum %q but got %q", string(checksum), string(userData.Checksum))
+	}
+	return encryptUserData(s.index), nil
 }
 
 func (s *segment) beginUpload(ctx context.Context) (SegmentUpload, error) {
@@ -442,13 +449,13 @@ func (m *metainfoBatcher) Batch(ctx context.Context, items ...metaclient.BatchIt
 
 		case *pb.BatchRequestItem_SegmentCommit:
 			segmentIndex := int32(req.SegmentCommit.PlainSize)
-			m.assertEncryptedETag(segmentIndex, req.SegmentCommit.EncryptedETag)
+			m.assertEncryptedUserData(segmentIndex, req.SegmentCommit.EncryptedETag, req.SegmentCommit.EncryptedChecksum)
 			m.commitSegment[segmentIndex] = struct{}{}
 			resp.Response = &pb.BatchResponseItem_SegmentCommit{SegmentCommit: &pb.CommitSegmentResponse{}}
 
 		case *pb.BatchRequestItem_SegmentMakeInline:
 			segmentIndex := req.SegmentMakeInline.Position.Index
-			m.assertEncryptedETag(segmentIndex, req.SegmentMakeInline.EncryptedETag)
+			m.assertEncryptedUserData(segmentIndex, req.SegmentMakeInline.EncryptedETag, req.SegmentMakeInline.EncryptedChecksum)
 			m.makeInlineSegment[segmentIndex] = struct{}{}
 			resp.Response = &pb.BatchResponseItem_SegmentMakeInline{SegmentMakeInline: &pb.MakeInlineSegmentResponse{}}
 		default:
@@ -508,12 +515,17 @@ func (m *metainfoBatcher) CheckSegments(segments []splitter.Segment) error {
 	return eg.Err()
 }
 
-func (m *metainfoBatcher) assertEncryptedETag(segmentIndex int32, encryptedETag []byte) {
-	// Last segment in a part upload needs to include the encrypted ETag
+func (m *metainfoBatcher) assertEncryptedUserData(segmentIndex int32, encryptedETag, encryptedChecksum []byte) {
+	// Last segment in a part upload needs to include the encrypted user data
+	actual := metaclient.EncryptedSegmentUserData{
+		ETag:     encryptedETag,
+		Checksum: encryptedChecksum,
+	}
 	if m.partUpload && segmentIndex == m.lastSegmentIndex {
-		assert.Equal(m.t, encryptETag(int(segmentIndex)), encryptedETag, "unexpected encrypted eTag on segment %d", segmentIndex)
+		expected := encryptUserData(int(segmentIndex))
+		assert.Equal(m.t, expected, actual, "unexpected encrypted user data on segment %d", segmentIndex)
 	} else {
-		assert.Nil(m.t, encryptedETag, "unexpected encrypted eTag on segment %d", segmentIndex)
+		assert.Zero(m.t, actual, "unexpected encrypted user data on segment %d", segmentIndex)
 	}
 }
 
@@ -556,8 +568,11 @@ func segmentPlainSize(index int) int64 {
 	return int64(index)
 }
 
-func encryptETag(index int) []byte {
-	return fmt.Appendf(nil, "%s-%d", string(eTag), index)
+func encryptUserData(index int) metaclient.EncryptedSegmentUserData {
+	return metaclient.EncryptedSegmentUserData{
+		ETag:     fmt.Appendf(nil, "%s-%d", eTag, index),
+		Checksum: fmt.Appendf(nil, "%s-%d", checksum, index),
+	}
 }
 
 func encryptMetadata(lastSegmentSize int64) []byte {

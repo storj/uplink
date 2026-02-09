@@ -1394,7 +1394,7 @@ type CommitSegmentParams struct {
 	Encryption        SegmentEncryption
 	SizeEncryptedData int64
 	PlainSize         int64
-	EncryptedETag     []byte
+	EncryptedUserData EncryptedSegmentUserData
 
 	UploadResult []*pb.SegmentPieceUploadResult
 }
@@ -1408,7 +1408,8 @@ func (params *CommitSegmentParams) toRequest(header *pb.RequestHeader) *pb.Segme
 		EncryptedKey:      params.Encryption.EncryptedKey,
 		SizeEncryptedData: params.SizeEncryptedData,
 		PlainSize:         params.PlainSize,
-		EncryptedETag:     params.EncryptedETag,
+		EncryptedETag:     params.EncryptedUserData.ETag,
+		EncryptedChecksum: params.EncryptedUserData.Checksum,
 		UploadResult:      params.UploadResult,
 	}
 }
@@ -1444,7 +1445,7 @@ type MakeInlineSegmentParams struct {
 	Encryption          SegmentEncryption
 	EncryptedInlineData []byte
 	PlainSize           int64
-	EncryptedETag       []byte
+	EncryptedUserData   EncryptedSegmentUserData
 }
 
 func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.SegmentMakeInlineRequest {
@@ -1459,7 +1460,8 @@ func (params *MakeInlineSegmentParams) toRequest(header *pb.RequestHeader) *pb.S
 		EncryptedKey:        params.Encryption.EncryptedKey,
 		EncryptedInlineData: params.EncryptedInlineData,
 		PlainSize:           params.PlainSize,
-		EncryptedETag:       params.EncryptedETag,
+		EncryptedETag:       params.EncryptedUserData.ETag,
+		EncryptedChecksum:   params.EncryptedUserData.Checksum,
 	}
 }
 

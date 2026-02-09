@@ -327,7 +327,7 @@ func (upload *Upload) Wait() (_ *metaclient.CommitSegmentParams, err error) {
 		Encryption:        info.Encryption,
 		SizeEncryptedData: info.EncryptedSize,
 		PlainSize:         info.PlainSize,
-		EncryptedETag:     nil, // encrypted eTag is injected by a different layer
+		EncryptedUserData: metaclient.EncryptedSegmentUserData{}, // encrypted user data is injected by a different layer
 		UploadResult:      uploadResults,
 	}, nil
 }

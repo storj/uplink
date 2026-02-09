@@ -90,8 +90,7 @@ type UploadOptions struct {
 
 // CommitUploadOptions contains additional options for committing an upload.
 type CommitUploadOptions struct {
-	CustomMetadata map[string]string
-	ETag           []byte
+	UserData ObjectUserData
 
 	IfNoneMatch []string
 }

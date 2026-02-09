@@ -28,7 +28,7 @@ func (s *splitterInline) Begin() metaclient.BatchItem {
 		Encryption:          s.encryption,
 		EncryptedInlineData: s.encData,
 		PlainSize:           s.plainSize,
-		EncryptedETag:       nil, // set by the segment tracker
+		EncryptedUserData:   metaclient.EncryptedSegmentUserData{}, // set by the segment tracker
 	}
 }
 
@@ -37,8 +37,8 @@ func (s *splitterInline) Inline() bool                         { return true }
 func (s *splitterInline) Reader() io.Reader                    { return bytes.NewReader(s.encData) }
 func (s *splitterInline) DoneReading(err error)                {}
 
-func (s *splitterInline) EncryptETag(eTag []byte) ([]byte, error) {
-	return encryptETag(eTag, s.encParams.CipherSuite, s.contentKey)
+func (s *splitterInline) EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error) {
+	return encryptUserData(userData, s.encParams.CipherSuite, s.contentKey)
 }
 
 func (s *splitterInline) Finalize() *SegmentInfo {

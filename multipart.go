@@ -22,6 +22,7 @@ import (
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/eventkit"
+	"storj.io/uplink/internal/privateprops"
 	"storj.io/uplink/private/eestream/scheduler"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/testuplink"
@@ -108,7 +109,7 @@ func (project *Project) CommitUpload(ctx context.Context, bucket, key, uploadID 
 
 	metaOpts := &metaclient.CommitUploadOptions{}
 	if opts != nil {
-		metaOpts.CustomMetadata = opts.CustomMetadata
+		metaOpts.UserData.Custom = opts.CustomMetadata
 	}
 	return project.commitUpload(ctx, bucket, key, uploadID, metaOpts)
 }
@@ -127,12 +128,7 @@ func (project *Project) commitUpload(ctx context.Context, bucket, key string, up
 	}
 	defer func() { err = errs.Combine(err, metainfoDB.Close()) }()
 
-	userData := metaclient.ObjectUserData{
-		Custom: opts.CustomMetadata,
-		ETag:   opts.ETag,
-	}
-
-	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, userData, project.encryptionParameters, opts.IfNoneMatch)
+	mObject, err := metainfoDB.CommitObject(ctx, bucket, key, uploadID, opts.UserData, project.encryptionParameters, opts.IfNoneMatch)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -150,8 +146,8 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 		part: &Part{
 			PartNumber: partNumber,
 		},
-		stats:  newOperationStats(ctx, project.access.satelliteURL),
-		eTagCh: make(chan []byte, 1),
+		stats:      newOperationStats(ctx, project.access.satelliteURL),
+		userDataCh: make(chan metaclient.SegmentUserData, 1),
 	}
 	upload.task = mon.TaskNamed("PartUpload")(&ctx)
 	defer func() {
@@ -192,7 +188,7 @@ func (project *Project) UploadPart(ctx context.Context, bucket, key, uploadID st
 	}
 
 	sched := scheduler.New(project.concurrentSegmentUploadConfig.SchedulerOptions)
-	u, err := streams.UploadPart(ctx, bucket, key, decodedStreamID, int32(partNumber), upload.eTagCh, sched)
+	u, err := streams.UploadPart(ctx, bucket, key, decodedStreamID, int32(partNumber), upload.userDataCh, sched)
 	if err != nil {
 		return nil, convertKnownErrors(err, bucket, key)
 	}
@@ -344,19 +340,21 @@ type Part struct {
 	Size     int64
 	Modified time.Time
 	ETag     []byte
+
+	private privateprops.Part
 }
 
 // PartUpload is a part upload to started multipart upload.
 type PartUpload struct {
-	mu      sync.Mutex
-	closed  bool
-	aborted bool
-	cancel  context.CancelFunc
-	upload  streamUpload
-	bucket  string
-	key     string
-	part    *Part
-	eTagCh  chan []byte
+	mu         sync.Mutex
+	closed     bool
+	aborted    bool
+	cancel     context.CancelFunc
+	upload     streamUpload
+	bucket     string
+	key        string
+	part       *Part
+	userDataCh chan metaclient.SegmentUserData
 
 	stats operationStats
 	task  func(*error)
@@ -383,19 +381,34 @@ func (upload *PartUpload) SetETag(eTag []byte) error {
 	upload.mu.Lock()
 	defer upload.mu.Unlock()
 
-	if upload.part.ETag != nil {
+	switch {
+	case upload.part.ETag != nil:
 		return packageError.New("etag already set")
-	}
-
-	if upload.aborted {
+	case upload.aborted:
 		return errwrapf("%w: upload aborted", ErrUploadDone)
-	}
-	if upload.closed {
+	case upload.closed:
 		return errwrapf("%w: already committed", ErrUploadDone)
 	}
 
 	upload.part.ETag = eTag
-	upload.eTagCh <- eTag
+	return nil
+}
+
+// setChecksum sets checksum value for a part.
+func (upload *PartUpload) setChecksum(checksum []byte) error {
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+
+	switch {
+	case upload.part.private.Checksum != nil:
+		return packageError.New("checksum already set")
+	case upload.aborted:
+		return errwrapf("%w: upload aborted", ErrUploadDone)
+	case upload.closed:
+		return errwrapf("%w: already committed", ErrUploadDone)
+	}
+
+	upload.part.private.Checksum = checksum
 	return nil
 }
 
@@ -417,12 +430,11 @@ func (upload *PartUpload) Commit() error {
 
 	upload.closed = true
 
-	// ETag must not be sent after a call to commit. The upload code waits on
-	// the channel before committing the last segment. Closing the channel
-	// allows the upload code to unblock if no eTag has been set. Not all
-	// multipart uploaders care about setting the eTag so we can't assume it
-	// has been set.
-	close(upload.eTagCh)
+	// The upload code waits on the channel before committing the last segment.
+	upload.userDataCh <- metaclient.SegmentUserData{
+		ETag:     upload.part.ETag,
+		Checksum: upload.part.private.Checksum,
+	}
 
 	err := errs.Combine(
 		upload.upload.Commit(),
@@ -511,4 +523,28 @@ func (upload *PartUpload) emitEvent(aborted bool) {
 //go:linkname commitUpload
 func commitUpload(ctx context.Context, project *Project, bucket, key string, uploadID string, opts *metaclient.CommitUploadOptions) (object *Object, err error) {
 	return project.commitUpload(ctx, bucket, key, uploadID, opts)
+}
+
+// partUpload_setChecksum exposes the (*PartUpload).setChecksum method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname partUpload_setChecksum
+func partUpload_setChecksum(upload *PartUpload, checksum []byte) error {
+	return upload.setChecksum(checksum)
+}
+
+// part_getPrivate exposes the properties of an object part that should only be visible to the private API.
+//
+// NB: This is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname part_getPrivate
+func part_getPrivate(part *Part) privateprops.Part {
+	return part.private
 }
