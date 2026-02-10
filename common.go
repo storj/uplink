@@ -60,6 +60,8 @@ func convertKnownErrors(err error, bucket, key string) error {
 		return errwrapf("%w (%q)", ErrObjectNotFound, key)
 	case metaclient.ErrUploadIDInvalid.Has(err):
 		return errwrapf("%w (%q)", ErrUploadIDInvalid, key)
+	case metaclient.ErrObjectMetadataUpdateUnsafe.Has(err):
+		return errwrapf("%w (%q)", ErrObjectMetadataUpdateUnsafe, key)
 	case encryption.ErrMissingEncryptionBase.Has(err):
 		// Some of our test harnesses need to be able to distinguish between
 		// client rejection and Satellite rejection.

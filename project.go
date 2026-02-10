@@ -195,6 +195,7 @@ func (project *Project) dialMetainfoClient(ctx context.Context) (_ *metaclient.C
 		metaclient.DialNodeURLOpts{
 			UserAgent:       project.config.UserAgent,
 			SatelliteSigner: project.satelliteSigner,
+			WrapDRPCClient:  testuplink.GetDRPCMetainfoClientWrapper(ctx),
 		})
 	if err != nil {
 		return nil, packageError.Wrap(err)

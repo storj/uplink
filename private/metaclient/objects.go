@@ -59,9 +59,22 @@ func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *Mut
 	return nil, errors.New("not implemented")
 }
 
+// UpdateObjectMetadataOptions contains additional options for replacing an object's user data.
+type UpdateObjectMetadataOptions struct {
+	// CustomOnly, if set, ensures that the operation will only succeed if the object's user data
+	// consists solely of custom metadata. If the user data contains additional information such
+	// as an ETag or checksum, the operation will fail.
+	//
+	// This field is set by the public API. User data must be updated atomically, and public API
+	// operations only operate on custom metadata. Therefore, the operation must fail if the
+	// existing user data includes additional fields (for example, the ETag or checksum) to prevent
+	// the unintentional removal of user data set by the private API.
+	CustomOnly bool
+}
+
 // UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
 // Any existing custom metadata will be deleted.
-func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newMetadata map[string]string, etag []byte, setETag bool) (err error) {
+func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, userData ObjectUserData, opts UpdateObjectMetadataOptions) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if bucket == "" {
@@ -72,9 +85,13 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		return ErrNoPath.New("")
 	}
 
+	if err := userData.Checksum.Validate(); err != nil {
+		return ErrObjectMetadata.Wrap(err)
+	}
+
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	// TODO: check if we could avoid this round-trip to satellite
@@ -90,19 +107,19 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		RedundancySchemePerSegment: true,
 	})
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	object, err := db.ObjectFromRawObjectItem(ctx, bucket, key, objectInfo)
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	metadataBytes, err := pb.Marshal(&pb.SerializableMeta{
-		UserDefined: newMetadata,
+		UserDefined: userData.Custom,
 	})
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	streamInfo, err := pb.Marshal(&pb.StreamInfo{
@@ -111,38 +128,38 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		Metadata:        metadataBytes,
 	})
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	derivedKey, err := encryption.DeriveContentKey(bucket, paths.NewUnencrypted(key), db.encStore)
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	var metadataKey storj.Key
 	// generate random key for encrypting the segment's content
 	_, err = rand.Read(metadataKey[:])
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	var encryptedKeyNonce storj.Nonce
 	// generate random nonce for encrypting the metadata key
 	_, err = rand.Read(encryptedKeyNonce[:])
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	encryptionParameters := objectInfo.EncryptionParameters
 	encryptedKey, err := encryption.EncryptKey(&metadataKey, encryptionParameters.CipherSuite, derivedKey, &encryptedKeyNonce)
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	// encrypt metadata with the content encryption key and zero nonce.
 	encryptedStreamInfo, err := encryption.Encrypt(streamInfo, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{})
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
 	// TODO should we commit StreamMeta or commit only encrypted StreamInfo
@@ -150,12 +167,25 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 		EncryptedStreamInfo: encryptedStreamInfo,
 	})
 	if err != nil {
-		return err
+		return errs.Wrap(err)
 	}
 
-	encryptedETag, err := encryption.Encrypt(etag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
-	if err != nil {
-		return err
+	var encryptedETag, encryptedChecksum []byte
+	if !opts.CustomOnly {
+		encryptedETag, err = encryption.Encrypt(userData.ETag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
+		if err != nil {
+			return errs.Wrap(err)
+		}
+
+		// encryption.Encrypt returns a non-nil value even for empty inputs.
+		// Only encrypt when a checksum is present to prevent sending a non-nil
+		// checksum alongside a zero checksum algorithm.
+		if len(userData.Checksum.Value) > 0 {
+			encryptedChecksum, err = encryption.Encrypt(userData.Checksum.Value, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{2})
+			if err != nil {
+				return errs.Wrap(err)
+			}
+		}
 	}
 
 	return db.metainfo.UpdateObjectMetadata(ctx, UpdateObjectMetadataParams{
@@ -167,8 +197,15 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, newM
 			EncryptedMetadataEncryptedKey: encryptedKey,
 			EncryptedMetadataNonce:        encryptedKeyNonce,
 			EncryptedETag:                 encryptedETag,
+			ChecksumAlgorithm:             userData.Checksum.Algorithm,
+			IsChecksumComposite:           userData.Checksum.IsComposite,
+			EncryptedChecksum:             encryptedChecksum,
 		},
-		SetEncryptedETag: setETag,
+		Includes: &ObjectUserDataIncludes{
+			Custom:   true,
+			ETag:     !opts.CustomOnly,
+			Checksum: !opts.CustomOnly,
+		},
 	})
 }
 

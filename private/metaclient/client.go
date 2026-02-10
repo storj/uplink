@@ -57,6 +57,8 @@ type Client struct {
 type DialNodeURLOpts struct {
 	UserAgent       string
 	SatelliteSigner signing.Signer
+
+	WrapDRPCClient func(pb.DRPCMetainfoClient) pb.DRPCMetainfoClient
 }
 
 // DialNodeURLWithOpts is like DialNodeURL but takes options.
@@ -75,9 +77,14 @@ func DialNodeURLWithOpts(ctx context.Context, dialer rpc.Dialer, nodeURL string,
 		return nil, Error.Wrap(err)
 	}
 
+	client := pb.NewDRPCMetainfoClient(conn)
+	if opts.WrapDRPCClient != nil {
+		client = opts.WrapDRPCClient(client)
+	}
+
 	return &Client{
 		conn:      conn,
-		client:    pb.NewDRPCMetainfoClient(conn),
+		client:    client,
 		apiKeyRaw: apiKey.SerializeRaw(),
 
 		opts: opts,
@@ -518,7 +525,14 @@ type UpdateObjectMetadataParams struct {
 	StreamID           storj.StreamID
 
 	EncryptedUserData
-	SetEncryptedETag bool
+	Includes *ObjectUserDataIncludes
+}
+
+// ObjectUserDataIncludes represents the parts of an object's user data that an operation should affect.
+type ObjectUserDataIncludes struct {
+	Custom   bool
+	ETag     bool
+	Checksum bool
 }
 
 func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.ObjectUpdateMetadataRequest {
@@ -531,7 +545,16 @@ func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *p
 		EncryptedMetadata:             params.EncryptedMetadata,
 		EncryptedMetadataEncryptedKey: params.EncryptedMetadataEncryptedKey,
 		EncryptedEtag:                 params.EncryptedETag,
-		SetEncryptedEtag:              params.SetEncryptedETag,
+		ChecksumAlgorithm:             pb.ObjectChecksumAlgorithm(params.ChecksumAlgorithm),
+		IsChecksumComposite:           params.IsChecksumComposite,
+		EncryptedChecksum:             params.EncryptedChecksum,
+		Includes: &pb.ObjectMetadataIncludes{
+			Custom:   params.Includes.Custom,
+			Etag:     params.Includes.ETag,
+			Checksum: params.Includes.Checksum,
+		},
+		// Backward compatibility for satellites that do not support Includes
+		SetEncryptedEtag: params.Includes.ETag,
 	}
 }
 
@@ -549,7 +572,7 @@ func (client *Client) UpdateObjectMetadata(ctx context.Context, params UpdateObj
 		}
 	}
 
-	return Error.Wrap(err)
+	return Error.Wrap(convertErrors(err))
 }
 
 // SetObjectLegalHoldParams are params for the SetObjectLegalHold request.
@@ -742,6 +765,8 @@ func convertErrors(err error) error {
 		return ErrBucketTagKeyDuplicate.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.TagValueInvalid):
 		return ErrBucketTagValueInvalid.Wrap(err)
+	case errs2.IsRPC(err, rpcstatus.InsufficientObjectMetadataIncludes):
+		return ErrObjectMetadataUpdateUnsafe.Wrap(err)
 	case errs2.IsRPC(err, rpcstatus.Unimplemented):
 		return ErrUnimplemented.Wrap(err)
 	default:

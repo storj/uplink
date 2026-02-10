@@ -166,6 +166,10 @@ var (
 
 	// ErrObjectMetadata is an error class for object metadata-related issues.
 	ErrObjectMetadata = errs.Class("object metadata")
+
+	// ErrObjectMetadataUpdateUnsafe is returned when a request to update an object's metadata fails
+	// because the existing metadata contains more fields than were expected.
+	ErrObjectMetadataUpdateUnsafe = errs.Class("existing object metadata contains more fields than were expected")
 )
 
 // Object contains information about a specific object.

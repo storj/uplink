@@ -19,11 +19,17 @@ import (
 	"storj.io/uplink/private/metaclient"
 )
 
-// ErrObjectKeyInvalid is returned when the object key is invalid.
-var ErrObjectKeyInvalid = errors.New("object key invalid")
+var (
+	// ErrObjectKeyInvalid is returned when the object key is invalid.
+	ErrObjectKeyInvalid = errors.New("object key invalid")
 
-// ErrObjectNotFound is returned when the object is not found.
-var ErrObjectNotFound = errors.New("object not found")
+	// ErrObjectNotFound is returned when the object is not found.
+	ErrObjectNotFound = errors.New("object not found")
+
+	// ErrObjectMetadataUpdateUnsafe is returned when a request to update an object's metadata fails
+	// because the existing metadata contains more fields than were expected.
+	ErrObjectMetadataUpdateUnsafe = errors.New("existing object metadata contains more fields than were expected")
+)
 
 // Object contains information about an object.
 type Object struct {
@@ -134,7 +140,13 @@ func (project *Project) UpdateObjectMetadata(ctx context.Context, bucket, key st
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone(), nil, false)
+	userData := metaclient.ObjectUserData{
+		Custom: newMetadata,
+	}
+
+	err = db.UpdateObjectMetadata(ctx, bucket, key, userData, metaclient.UpdateObjectMetadataOptions{
+		CustomOnly: true,
+	})
 	if err != nil {
 		return convertKnownErrors(err, bucket, key)
 	}

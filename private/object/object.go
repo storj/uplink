@@ -153,11 +153,6 @@ type DeleteObjectOptions = metaclient.DeleteObjectOptions
 // SetObjectRetentionOptions contains additional options for setting an object's retention.
 type SetObjectRetentionOptions = metaclient.SetObjectRetentionOptions
 
-// UpdateObjectMetadataOptions contains additional options for updating object's metadata.
-type UpdateObjectMetadataOptions struct {
-	ETag []byte
-}
-
 // ListObjectVersionsOptions defines listing options for versioned objects.
 type ListObjectVersionsOptions struct {
 	Prefix        string
@@ -650,13 +645,12 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 }
 
 // UpdateObjectMetadata replaces the custom metadata for the object at the specific key with newMetadata.
-// Any existing custom metadata will be deleted. This version allows setting ETag parameters.
-func UpdateObjectMetadata(ctx context.Context, project *uplink.Project, bucket, key string, newMetadata uplink.CustomMetadata, options *UpdateObjectMetadataOptions) (err error) {
+// Any existing custom metadata will be deleted. This version allows setting an object's ETag and checksum.
+//
+// All properties of the object's user data are replaced together. Any of the custom metadata, ETag, or
+// checksum omitted from newMetadata will be cleared even if it was previously set.
+func UpdateObjectMetadata(ctx context.Context, project *uplink.Project, bucket, key string, newMetadata metaclient.ObjectUserData) (err error) {
 	defer mon.Task()(&ctx)(&err)
-
-	if options == nil {
-		options = &UpdateObjectMetadataOptions{}
-	}
 
 	db, err := dialMetainfoDB(ctx, project)
 	if err != nil {
@@ -664,9 +658,9 @@ func UpdateObjectMetadata(ctx context.Context, project *uplink.Project, bucket, 
 	}
 	defer func() { err = errs.Combine(err, db.Close()) }()
 
-	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata.Clone(), options.ETag, options.ETag != nil)
+	err = db.UpdateObjectMetadata(ctx, bucket, key, newMetadata, metaclient.UpdateObjectMetadataOptions{})
 	if err != nil {
-		return convertKnownErrors(err, bucket, key)
+		return packageConvertKnownErrors(err, bucket, key)
 	}
 
 	return nil

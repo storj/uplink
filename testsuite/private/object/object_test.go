@@ -22,7 +22,9 @@ import (
 	"storj.io/common/grant"
 	"storj.io/common/macaroon"
 	"storj.io/common/memory"
+	"storj.io/common/pb"
 	"storj.io/common/pkcrypto"
+	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -37,6 +39,7 @@ import (
 	"storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/object"
+	"storj.io/uplink/private/testuplink"
 )
 
 // TODO(ver) add tests for versioned/unversioned/suspended objects as well as delete markers
@@ -2424,74 +2427,171 @@ func TestUpdateMetadata(t *testing.T) {
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
 		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ChecksumsEnabled = true
+			},
+		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		project, err := planet.Uplinks[0].OpenProject(ctx, planet.Satellites[0])
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+
+		project, err := up.OpenProject(ctx, sat)
 		require.NoError(t, err)
 		defer ctx.Check(project.Close)
 
-		_, err = project.EnsureBucket(ctx, "testbucket")
-		require.NoError(t, err)
+		objectKey := "obj"
 
-		expected := testrand.Bytes(1 * memory.KiB)
-
-		// upload object with no custom metadata
-		upload, err := object.UploadObject(ctx, project, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		_, err = upload.Write(expected)
-		require.NoError(t, err)
-		require.NoError(t, upload.SetETag(ctx, []byte("etag")))
-		require.NoError(t, upload.Commit())
-
-		// check that there is no custom metadata after the upload
-		obj, err := object.StatObject(ctx, project, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		require.Empty(t, obj.Custom)
-
-		newMetadata := uplink.CustomMetadata{
-			"key1": "value1",
-			"key2": "value2",
+		eTag := []byte("etag")
+		checksum := metaclient.ObjectChecksum{
+			Algorithm:   storj.ObjectChecksumAlgorithmCRC32,
+			IsComposite: true,
+			Value:       []byte("checksum"),
 		}
 
-		// update the object's metadata
-		err = object.UpdateObjectMetadata(ctx, project, "testbucket", "obj", newMetadata, &object.UpdateObjectMetadataOptions{
-			ETag: obj.ETag,
+		t.Run("Basic", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			expectedContents := testrand.Bytes(1 * memory.KiB)
+
+			// upload object with no custom metadata
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			_, err = upload.Write(expectedContents)
+			require.NoError(t, err)
+			require.NoError(t, upload.SetETag(ctx, eTag))
+			require.NoError(t, upload.SetChecksum(checksum))
+			require.NoError(t, upload.Commit())
+
+			// check that there is no custom metadata after the upload
+			obj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.Empty(t, obj.Custom)
+
+			newMetadata := uplink.CustomMetadata{
+				"key1": "value1",
+				"key2": "value2",
+			}
+
+			// update the object's metadata
+			err = object.UpdateObjectMetadata(ctx, project, bucketName, objectKey, metaclient.ObjectUserData{
+				Custom:   newMetadata,
+				ETag:     obj.ETag,
+				Checksum: obj.Checksum,
+			})
+			require.NoError(t, err)
+
+			// check that the metadata has been updated as expected
+			statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.EqualValues(t, eTag, statObj.ETag)
+			require.EqualValues(t, checksum, statObj.Checksum)
+			require.Equal(t, newMetadata, statObj.Custom)
+
+			// confirm that the object is still downloadable
+			download, err := project.DownloadObject(ctx, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			downloaded, err := io.ReadAll(download)
+			require.NoError(t, err)
+			require.NoError(t, download.Close())
+			require.Equal(t, expectedContents, downloaded)
+
+			// remove a part of the object's metadata
+			err = object.UpdateObjectMetadata(ctx, project, bucketName, objectKey, metaclient.ObjectUserData{
+				ETag: obj.ETag,
+			})
+			require.NoError(t, err)
+
+			// check that the metadata has been removed
+			statObj, err = object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.EqualValues(t, eTag, statObj.ETag)
+			require.Empty(t, statObj.Checksum)
+			require.Empty(t, statObj.Custom)
+
+			// confirm that the object is still downloadable
+			download, err = project.DownloadObject(ctx, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			downloaded, err = io.ReadAll(download)
+			require.NoError(t, err)
+			require.NoError(t, download.Close())
+			require.Equal(t, expectedContents, downloaded)
 		})
-		require.NoError(t, err)
 
-		// check that the metadata has been updated as expected
-		statObj, err := object.StatObject(ctx, project, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		require.EqualValues(t, []byte("etag"), statObj.ETag)
-		require.Equal(t, newMetadata, statObj.Custom)
+		t.Run("Invalid checksum options", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
 
-		// confirm that the object is still downloadable
-		download, err := project.DownloadObject(ctx, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		downloaded, err := io.ReadAll(download)
-		require.NoError(t, err)
-		require.NoError(t, download.Close())
-		require.Equal(t, expected, downloaded)
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
 
-		// remove the object's metadata
-		err = object.UpdateObjectMetadata(ctx, project, "testbucket", "obj", nil, &object.UpdateObjectMetadataOptions{
-			ETag: obj.ETag,
+			for _, tt := range invalidChecksumScenarios {
+				err := object.UpdateObjectMetadata(ctx, project, bucketName, objectKey, metaclient.ObjectUserData{
+					Checksum: tt.checksum,
+				})
+				require.ErrorContains(t, err, tt.errMsg, "test case: %q", tt.errMsg)
+
+				statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+				require.NoError(t, err)
+				require.Empty(t, statObj.Checksum, "test case: %q", tt.errMsg)
+			}
 		})
-		require.NoError(t, err)
 
-		// check that the metadata has been removed
-		statObj, err = object.StatObject(ctx, project, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		require.EqualValues(t, []byte("etag"), statObj.ETag)
-		require.Empty(t, statObj.Custom)
+		t.Run("Checksums disabled", func(t *testing.T) {
+			sat.Metainfo.Endpoint.TestingSetChecksumsEnabled(false)
+			defer sat.Metainfo.Endpoint.TestingSetChecksumsEnabled(true)
 
-		// confirm that the object is still downloadable
-		download, err = project.DownloadObject(ctx, "testbucket", "obj", nil)
-		require.NoError(t, err)
-		downloaded, err = io.ReadAll(download)
-		require.NoError(t, err)
-		require.NoError(t, download.Close())
-		require.Equal(t, expected, downloaded)
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			err = object.UpdateObjectMetadata(ctx, project, bucketName, objectKey, metaclient.ObjectUserData{
+				Checksum: checksum,
+			})
+			require.ErrorIs(t, err, object.ErrChecksumsUnsupported)
+
+			statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.Empty(t, statObj.Checksum)
+		})
+
+		t.Run("Unsafe update", func(t *testing.T) {
+			// Test the case where the existing metadata contains fields that were introduced in the future.
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+
+			require.NoError(t, upload.SetChecksum(metaclient.ObjectChecksum{
+				Algorithm: storj.ObjectChecksumAlgorithmCRC32,
+				Value:     []byte("checksum"),
+			}))
+
+			require.NoError(t, upload.Commit())
+
+			wrapCtx := testuplink.WithDRPCMetainfoClientWrapper(ctx, func(inner pb.DRPCMetainfoClient) pb.DRPCMetainfoClient {
+				return &mockUpdateMetadataClient{inner}
+			})
+			err = object.UpdateObjectMetadata(wrapCtx, project, bucketName, objectKey, metaclient.ObjectUserData{
+				ETag: eTag,
+			})
+			require.ErrorIs(t, err, uplink.ErrObjectMetadataUpdateUnsafe)
+		})
 	})
+}
+
+type mockUpdateMetadataClient struct {
+	pb.DRPCMetainfoClient
+}
+
+func (client *mockUpdateMetadataClient) UpdateObjectMetadata(ctx context.Context, req *pb.UpdateObjectMetadataRequest) (*pb.UpdateObjectMetadataResponse, error) {
+	return nil, rpcstatus.Error(rpcstatus.InsufficientObjectMetadataIncludes, "")
 }
 
 func TestETag(t *testing.T) {

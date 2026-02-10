@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"storj.io/common/memory"
+	"storj.io/common/pb"
 	"storj.io/uplink/private/eestream/scheduler"
 )
 
@@ -190,4 +191,18 @@ func Log(ctx context.Context, args ...any) {
 
 	_, _ = io.WriteString(w, ": ")
 	_, _ = fmt.Fprintln(w, args...)
+}
+
+type drpcMetainfoClientWrapperKey struct{}
+
+// WithDRPCMetainfoClientWrapper returns a derived context with a function that wraps a pb.DRPCMetainfoClient.
+// The wrapper can be used to modify behavior of the client.
+func WithDRPCMetainfoClientWrapper(ctx context.Context, wrap func(pb.DRPCMetainfoClient) pb.DRPCMetainfoClient) context.Context {
+	return context.WithValue(ctx, drpcMetainfoClientWrapperKey{}, wrap)
+}
+
+// GetDRPCMetainfoClientWrapper returns the DRPC metainfo client wrapper attached to the context if it exists.
+func GetDRPCMetainfoClientWrapper(ctx context.Context) func(pb.DRPCMetainfoClient) pb.DRPCMetainfoClient {
+	wrap, _ := ctx.Value(drpcMetainfoClientWrapperKey{}).(func(pb.DRPCMetainfoClient) pb.DRPCMetainfoClient)
+	return wrap
 }
