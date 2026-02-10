@@ -40,6 +40,8 @@ type UploadInfo struct {
 
 	System SystemMetadata
 	Custom CustomMetadata
+
+	private privateprops.UploadInfo
 }
 
 // CommitUploadOptions options for committing multipart upload.
@@ -300,6 +302,7 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		Direction: metaclient.After,
 		Status:    int32(pb.Object_UPLOADING), // TODO: define object status constants in storj package?
 		Delimiter: "/",
+		Limit:     testuplink.GetListLimit(ctx),
 	}
 
 	if options != nil {
@@ -311,8 +314,10 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		opts.IncludeETag = false // TODO: ETag not in the public API
 	}
 
-	opts.Limit = testuplink.GetListLimit(ctx)
+	return project.listUploads(ctx, bucket, opts)
+}
 
+func (project *Project) listUploads(ctx context.Context, bucket string, opts metaclient.ListOptions) *UploadIterator {
 	uploads := UploadIterator{
 		ctx:     ctx,
 		project: project,
@@ -324,10 +329,6 @@ func (project *Project) ListUploads(ctx context.Context, bucket string, options 
 		uploads.listObjects = listPendingObjectStreams
 	} else {
 		uploads.listObjects = listObjects
-	}
-
-	if options != nil {
-		uploads.uploadOptions = *options
 	}
 
 	return &uploads
@@ -547,4 +548,16 @@ func partUpload_setChecksum(upload *PartUpload, checksum []byte) error {
 //go:linkname part_getPrivate
 func part_getPrivate(part *Part) privateprops.Part {
 	return part.private
+}
+
+// listUploads exposes the (*Project).listUploads method.
+//
+// NB: this is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname listUploads
+func listUploads(ctx context.Context, project *Project, bucket string, opts metaclient.ListOptions) *UploadIterator {
+	return project.listUploads(ctx, bucket, opts)
 }

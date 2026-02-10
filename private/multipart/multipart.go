@@ -64,6 +64,6 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 		Key:      info.Key,
 		IsPrefix: info.IsPrefix,
 		System:   info.System,
-		Custom:   info.UserData.Custom,
+		Custom:   info.Custom,
 	}, nil
 }

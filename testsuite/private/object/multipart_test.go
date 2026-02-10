@@ -6,6 +6,7 @@ package object_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,6 +165,62 @@ func TestChecksum_Multipart(t *testing.T) {
 			_, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
 			require.ErrorIs(t, err, uplink.ErrObjectNotFound, msgAndArgs...)
 		}
+
+		t.Run("Begin upload", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			etag := []byte("etag")
+
+			info, err := object.BeginUpload(ctx, project, bucketName, objectKey, &object.MultipartUploadOptions{
+				UserData: metaclient.ObjectUserData{
+					ETag:     etag,
+					Checksum: checksum,
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, etag, info.ETag)
+			require.Equal(t, checksum, info.Checksum)
+
+			for _, tt := range []struct {
+				listMethod string
+				prefix     string
+			}{
+				{"ListObjects", ""},
+				{"ListPendingObjectStreams", objectKey},
+			} {
+				t.Run(fmt.Sprintf("List with checksum and ETag included/%s", tt.listMethod), func(t *testing.T) {
+					iter := object.ListUploads(ctx, project, bucketName, &object.ListUploadsOptions{
+						Prefix:   tt.prefix,
+						ETag:     true,
+						Checksum: true,
+					})
+					require.True(t, iter.Next(), tt.listMethod)
+					require.Equal(t, etag, iter.Item().ETag, tt.listMethod)
+					require.Equal(t, checksum, iter.Item().Checksum, tt.listMethod)
+					require.False(t, iter.Next(), tt.listMethod)
+					require.NoError(t, iter.Err(), tt.listMethod)
+				})
+
+				t.Run(fmt.Sprintf("List with checksum and ETag excluded/%s", tt.listMethod), func(t *testing.T) {
+					iter := object.ListUploads(ctx, project, bucketName, &object.ListUploadsOptions{
+						Prefix: tt.prefix,
+					})
+					require.True(t, iter.Next(), tt.listMethod)
+					require.Empty(t, iter.Item().ETag, tt.listMethod)
+					require.Equal(t, metaclient.ObjectChecksum{}, iter.Item().Checksum, tt.listMethod)
+					require.NoError(t, iter.Err(), tt.listMethod)
+				})
+			}
+
+			t.Run("List with nil options", func(t *testing.T) {
+				iter := object.ListUploads(ctx, project, bucketName, nil)
+				require.True(t, iter.Next())
+				require.Empty(t, iter.Item().ETag)
+				require.Equal(t, metaclient.ObjectChecksum{}, iter.Item().Checksum)
+				require.NoError(t, iter.Err())
+			})
+		})
 
 		t.Run("Begin upload - Invalid checksum options", func(t *testing.T) {
 			bucketName := testrand.BucketName()

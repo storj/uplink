@@ -7,12 +7,14 @@ import (
 	"context"
 	"sort"
 	"strings"
+	_ "unsafe" // for go:linkname
 
 	"github.com/zeebo/errs"
 
 	"storj.io/common/base58"
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
+	"storj.io/uplink/internal/privateprops"
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -35,16 +37,15 @@ type ListUploadsOptions struct {
 
 // UploadIterator is an iterator over a collection of uncommitted uploads.
 type UploadIterator struct {
-	ctx           context.Context
-	project       *Project
-	bucket        string
-	options       metaclient.ListOptions
-	uploadOptions ListUploadsOptions
-	list          *metaclient.ObjectList
-	position      int
-	completed     bool
-	err           error
-	listObjects   func(tx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error)
+	ctx         context.Context
+	project     *Project
+	bucket      string
+	options     metaclient.ListOptions
+	list        *metaclient.ObjectList
+	position    int
+	completed   bool
+	err         error
+	listObjects func(tx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error)
 }
 
 func listObjects(ctx context.Context, db *metaclient.DB, bucket string, options metaclient.ListOptions) (metaclient.ObjectList, error) {
@@ -135,18 +136,28 @@ func (uploads *UploadIterator) Item() *UploadInfo {
 		UploadID: base58.CheckEncode(item.Stream.ID, 1),
 	}
 
-	// TODO: Make this filtering on the satellite
-	if uploads.uploadOptions.System {
+	// We retrieve items either via the ListObjects or ListPendingObjectStreams
+	// satellite metainfo endpoint. The satellite performs metadata filtering itself
+	// for the former endpoint based on the provided set of includes
+	// (IncludeCustomMetadata, IncludeSystemMetadata, etc.). However, the latter
+	// endpoint doesn't support this, so we filter all metadata here for both
+	// endpoints based on the same includes.
+
+	if uploads.options.IncludeSystemMetadata {
 		obj.System = SystemMetadata{
 			Created:       item.Created,
 			Expires:       item.Expires,
 			ContentLength: item.Size,
 		}
 	}
-
-	// TODO: Make this filtering on the satellite
-	if uploads.uploadOptions.Custom {
+	if uploads.options.IncludeCustomMetadata {
 		obj.Custom = item.UserData.Custom
+	}
+	if uploads.options.IncludeETag {
+		obj.private.ETag = item.UserData.ETag
+	}
+	if uploads.options.IncludeChecksum {
+		obj.private.Checksum = item.UserData.Checksum
 	}
 
 	return &obj
@@ -369,4 +380,16 @@ func decryptETag(project *Project, bucket, key string, encryptionParameters stor
 // TODO move it to be accesible here and from streams/store.go.
 func deriveETagKey(key *storj.Key) (*storj.Key, error) {
 	return encryption.DeriveKey(key, "storj-etag-v1")
+}
+
+// uploadInfo_getPrivate exposes the properties of an UploadInfo that should only be visible to the private API.
+//
+// NB: This is used with linkname in private/object.
+// It needs to be updated when this is updated.
+//
+//lint:ignore U1000, used with linkname
+//nolint:deadcode,unused
+//go:linkname uploadInfo_getPrivate
+func uploadInfo_getPrivate(uploadInfo *UploadInfo) privateprops.UploadInfo {
+	return uploadInfo.private
 }

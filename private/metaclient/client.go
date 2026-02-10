@@ -1102,6 +1102,9 @@ func newListPendingObjectStreamsResponse(response *pb.ObjectListPendingStreamsRe
 				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 				EncryptedMetadata:             object.EncryptedMetadata,
 				EncryptedETag:                 object.EncryptedEtag,
+				ChecksumAlgorithm:             storj.ObjectChecksumAlgorithm(object.ChecksumAlgorithm),
+				IsChecksumComposite:           object.IsChecksumComposite,
+				EncryptedChecksum:             object.EncryptedChecksum,
 			},
 
 			IsPrefix: false,

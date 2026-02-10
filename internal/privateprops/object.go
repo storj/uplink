@@ -18,3 +18,9 @@ type Object struct {
 type Part struct {
 	Checksum []byte
 }
+
+// UploadInfo contains properties of uplink.UploadInfo that should not be exposed to the public API.
+type UploadInfo struct {
+	ETag     []byte
+	Checksum metaclient.ObjectChecksum
+}

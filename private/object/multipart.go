@@ -31,13 +31,9 @@ type Part struct {
 
 // UploadInfo contains information about an upload.
 type UploadInfo struct {
-	UploadID string
-	Key      string
-
-	IsPrefix bool
-
-	System   uplink.SystemMetadata
-	UserData metaclient.ObjectUserData
+	uplink.UploadInfo
+	ETag     []byte
+	Checksum metaclient.ObjectChecksum
 }
 
 // MultipartUploadOptions contains additional options for uploading multipart objects.
@@ -109,12 +105,16 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 
 	encodedStreamID := base58.CheckEncode(response.StreamID[:], 1)
 	return UploadInfo{
-		Key:      key,
-		UploadID: encodedStreamID,
-		System: uplink.SystemMetadata{
-			Expires: options.Expires,
+		UploadInfo: uplink.UploadInfo{
+			Key:      key,
+			UploadID: encodedStreamID,
+			System: uplink.SystemMetadata{
+				Expires: options.Expires,
+			},
+			Custom: options.UserData.Custom,
 		},
-		UserData: options.UserData,
+		ETag:     options.UserData.ETag,
+		Checksum: options.UserData.Checksum,
 	}, nil
 }
 
