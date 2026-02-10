@@ -403,6 +403,7 @@ type ListOptions struct {
 	IncludeSystemMetadata       bool
 	IncludeETag                 bool
 	IncludeETagOrCustomMetadata bool
+	IncludeChecksum             bool
 
 	Status             int32
 	IncludeAllVersions bool
@@ -426,6 +427,7 @@ func (opts ListOptions) NextPage(list ObjectList) ListOptions {
 		IncludeCustomMetadata:       opts.IncludeCustomMetadata,
 		IncludeETag:                 opts.IncludeETag,
 		IncludeETagOrCustomMetadata: opts.IncludeETagOrCustomMetadata,
+		IncludeChecksum:             opts.IncludeChecksum,
 
 		Direction: After,
 		Limit:     opts.Limit,

@@ -171,6 +171,7 @@ type ListObjectVersionsOptions struct {
 	ETag   bool
 	// ETagOrCustom fetches ETag and when it doesn't exist then Custom.
 	ETagOrCustom bool
+	Checksum     bool
 
 	Limit int
 }
@@ -187,6 +188,7 @@ type ListObjectsOptions struct {
 	ETag   bool
 	// ETagOrCustom fetches ETag and when it doesn't exist then Custom.
 	ETagOrCustom bool
+	Checksum     bool
 
 	Limit int
 }
@@ -414,6 +416,7 @@ func ListObjectVersions(ctx context.Context, project *uplink.Project, bucket str
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeETag = options.ETag
 		opts.IncludeETagOrCustomMetadata = options.ETagOrCustom
+		opts.IncludeChecksum = options.Checksum
 
 		opts.Limit = options.Limit
 
@@ -459,6 +462,7 @@ func ListObjects(ctx context.Context, project *uplink.Project, bucket string, op
 		opts.IncludeSystemMetadata = options.System
 		opts.IncludeETag = options.ETag
 		opts.IncludeETagOrCustomMetadata = options.ETagOrCustom
+		opts.IncludeChecksum = options.Checksum
 
 		opts.Limit = options.Limit
 

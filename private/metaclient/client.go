@@ -937,6 +937,7 @@ type ListObjectsParams struct {
 	IncludeSystemMetadata       bool
 	IncludeETag                 bool
 	IncludeETagOrCustomMetadata bool
+	IncludeChecksum             bool
 
 	Recursive          bool
 	Status             int32
@@ -957,6 +958,7 @@ func (params *ListObjectsParams) toRequest(header *pb.RequestHeader) *pb.ObjectL
 			ExcludeSystemMetadata:       !params.IncludeSystemMetadata,
 			IncludeEtag:                 params.IncludeETag,
 			IncludeEtagOrCustomMetadata: params.IncludeETagOrCustomMetadata,
+			IncludeChecksum:             params.IncludeChecksum,
 		},
 		UseObjectIncludes:  true,
 		Recursive:          params.Recursive,
@@ -1001,6 +1003,9 @@ func newListObjectsResponse(response *pb.ObjectListResponse, encryptedPrefix []b
 				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 				EncryptedMetadata:             object.EncryptedMetadata,
 				EncryptedETag:                 object.EncryptedEtag,
+				ChecksumAlgorithm:             storj.ObjectChecksumAlgorithm(object.ChecksumAlgorithm),
+				IsChecksumComposite:           object.IsChecksumComposite,
+				EncryptedChecksum:             object.EncryptedChecksum,
 			},
 			IsPrefix: object.Status == pb.Object_PREFIX,
 		}

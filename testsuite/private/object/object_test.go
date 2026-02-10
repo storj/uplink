@@ -2658,6 +2658,7 @@ func TestChecksum(t *testing.T) {
 		up := planet.Uplinks[0]
 
 		objectKey := "test-object"
+		objectKey2 := "test-object-2"
 
 		checksum := metaclient.ObjectChecksum{
 			Algorithm:   storj.ObjectChecksumAlgorithmCRC32,
@@ -2747,6 +2748,86 @@ func TestChecksum(t *testing.T) {
 
 			err = uploadWithChecksum(bucketName, objectKey, checksum)
 			require.ErrorIs(t, err, object.ErrChecksumsUnsupported)
+		})
+
+		t.Run("ListObjects", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				Checksum: true,
+			})
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, checksum, entries[0].Checksum)
+		})
+
+		t.Run("ListObjectVersions", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			entries, _, err := object.ListObjectVersions(ctx, project, bucketName, &object.ListObjectVersionsOptions{
+				Checksum: true,
+			})
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, checksum, entries[0].Checksum)
+		})
+
+		t.Run("ListObjects - Checksum not requested", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			entries, _, err := object.ListObjects(ctx, project, bucketName, nil)
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, metaclient.ObjectChecksum{}, entries[0].Checksum)
+
+			entries, _, err = object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				Checksum: false,
+			})
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, metaclient.ObjectChecksum{}, entries[0].Checksum)
+		})
+
+		t.Run("ListObjectVersions - Checksum not requested", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			entries, _, err := object.ListObjectVersions(ctx, project, bucketName, nil)
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			require.Equal(t, metaclient.ObjectChecksum{}, entries[0].Checksum)
+		})
+
+		t.Run("ListObjects - Object without checksum", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+			require.NoError(t, up.Upload(ctx, sat, bucketName, objectKey2, []byte("test2")))
+
+			entries, _, err := object.ListObjects(ctx, project, bucketName, &object.ListObjectsOptions{
+				Checksum: true,
+			})
+			require.NoError(t, err)
+			require.Len(t, entries, 2)
+
+			checksumByKey := map[string]metaclient.ObjectChecksum{}
+			for _, e := range entries {
+				checksumByKey[e.Key] = e.Checksum
+			}
+			require.Equal(t, checksum, checksumByKey[objectKey])
+			require.Equal(t, metaclient.ObjectChecksum{}, checksumByKey[objectKey2])
 		})
 	})
 }
