@@ -266,13 +266,10 @@ func (parts *PartIterator) tryLoadNext() (ok bool, err error) {
 		}
 
 		for _, item := range list.Items {
-			var etag []byte
-			if item.EncryptedETag != nil {
-				// ETag will be only with last segment in a part
-				etag, err = decryptETag(parts.project, parts.bucket, parts.key, list.EncryptionParameters, item)
-				if err != nil {
-					return false, convertKnownErrors(err, parts.bucket, parts.key)
-				}
+			// User data will only be set on the last segment in a part
+			userData, err := decryptUserData(parts.project, parts.bucket, parts.key, list.EncryptionParameters, item)
+			if err != nil {
+				return false, convertKnownErrors(err, parts.bucket, parts.key)
 			}
 
 			partNumber := uint32(item.Position.PartNumber)
@@ -282,18 +279,23 @@ func (parts *PartIterator) tryLoadNext() (ok bool, err error) {
 					PartNumber: partNumber,
 					Size:       item.PlainSize,
 					Modified:   item.CreatedAt,
-					ETag:       etag,
+					ETag:       userData.ETag,
+					private: privateprops.Part{
+						Checksum: userData.Checksum,
+					},
 				}
 			} else {
 				partsMap[partNumber].Size += item.PlainSize
 				if item.CreatedAt.After(partsMap[partNumber].Modified) {
 					partsMap[partNumber].Modified = item.CreatedAt
 				}
-				// The satellite returns the segments ordered by position. So it is
-				// OK to just overwrite the ETag with the one from the next segment.
-				// Eventually, the map will contain the ETag of the last segment,
-				// which is the part's ETag.
-				partsMap[partNumber].ETag = etag
+				// The satellite returns the segments ordered by position, so it is
+				// OK to just overwrite the last seen user data of this part with the
+				// user data associated with the current segment. Eventually, the map
+				// will contain the user data of the last segment, which we consider
+				// to be the user data of the part.
+				partsMap[partNumber].ETag = userData.ETag
+				partsMap[partNumber].private.Checksum = userData.Checksum
 			}
 		}
 
@@ -352,34 +354,48 @@ func (parts *PartIterator) Err() error {
 	return packageError.Wrap(parts.err)
 }
 
-func decryptETag(project *Project, bucket, key string, encryptionParameters storj.EncryptionParameters, segment metaclient.SegmentListItem) ([]byte, error) {
-	if segment.EncryptedETag == nil {
-		return nil, nil
+func decryptUserData(project *Project, bucket, key string, encryptionParameters storj.EncryptionParameters, segment metaclient.SegmentListItem) (userData metaclient.SegmentUserData, err error) {
+	if segment.EncryptedUserData.IsZero() {
+		return metaclient.SegmentUserData{}, nil
 	}
 
 	derivedKey, err := deriveContentKey(project, bucket, key)
 	if err != nil {
-		return nil, err
+		return metaclient.SegmentUserData{}, errs.Wrap(err)
 	}
 
-	contentKey, err := encryption.DecryptKey(segment.EncryptedKey, encryptionParameters.CipherSuite, derivedKey, &segment.EncryptedKeyNonce)
+	contentKey, err := encryption.DecryptKey(segment.Encryption.EncryptedKey, encryptionParameters.CipherSuite, derivedKey, &segment.Encryption.EncryptedKeyNonce)
 	if err != nil {
-		return nil, err
+		return metaclient.SegmentUserData{}, errs.Wrap(err)
 	}
 
-	// Derive another key from the randomly generated content key to decrypt
-	// the segment's ETag.
-	etagKey, err := deriveETagKey(contentKey)
-	if err != nil {
-		return nil, err
+	if len(segment.EncryptedUserData.ETag) > 0 {
+		// Derive another key from the randomly generated content key to decrypt
+		// the segment's ETag.
+		etagKey, err := encryption.DeriveKey(contentKey, "storj-etag-v1")
+		if err != nil {
+			return metaclient.SegmentUserData{}, errs.Wrap(err)
+		}
+		eTag, err := encryption.Decrypt(segment.EncryptedUserData.ETag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
+		if err != nil {
+			return metaclient.SegmentUserData{}, errs.Wrap(err)
+		}
+		userData.ETag = eTag
 	}
 
-	return encryption.Decrypt(segment.EncryptedETag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
-}
+	if len(segment.EncryptedUserData.Checksum) > 0 {
+		checksumKey, err := encryption.DeriveKey(contentKey, "storj-checksum-v1")
+		if err != nil {
+			return metaclient.SegmentUserData{}, errs.Wrap(err)
+		}
+		checksum, err := encryption.Decrypt(segment.EncryptedUserData.Checksum, encryptionParameters.CipherSuite, checksumKey, &storj.Nonce{})
+		if err != nil {
+			return metaclient.SegmentUserData{}, errs.Wrap(err)
+		}
+		userData.Checksum = checksum
+	}
 
-// TODO move it to be accesible here and from streams/store.go.
-func deriveETagKey(key *storj.Key) (*storj.Key, error) {
-	return encryption.DeriveKey(key, "storj-etag-v1")
+	return userData, nil
 }
 
 // uploadInfo_getPrivate exposes the properties of an UploadInfo that should only be visible to the private API.

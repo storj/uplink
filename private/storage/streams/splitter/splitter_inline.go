@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"storj.io/common/storj"
+	internalenc "storj.io/uplink/internal/encryption"
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -38,7 +39,7 @@ func (s *splitterInline) Reader() io.Reader                    { return bytes.Ne
 func (s *splitterInline) DoneReading(err error)                {}
 
 func (s *splitterInline) EncryptUserData(userData metaclient.SegmentUserData) (metaclient.EncryptedSegmentUserData, error) {
-	return encryptUserData(userData, s.encParams.CipherSuite, s.contentKey)
+	return internalenc.EncryptSegmentUserData(userData, s.encParams.CipherSuite, s.contentKey)
 }
 
 func (s *splitterInline) Finalize() *SegmentInfo {

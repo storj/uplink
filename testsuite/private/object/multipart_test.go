@@ -14,6 +14,7 @@ import (
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
+	"storj.io/common/memory"
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -22,6 +23,7 @@ import (
 	"storj.io/uplink"
 	"storj.io/uplink/private/metaclient"
 	"storj.io/uplink/private/object"
+	"storj.io/uplink/private/testuplink"
 )
 
 func TestBeginUpload(t *testing.T) {
@@ -116,13 +118,16 @@ func TestBeginUploadWithMetadata(t *testing.T) {
 
 func TestChecksum_Multipart(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
-		SatelliteCount: 1, UplinkCount: 1,
+		SatelliteCount:   1,
+		StorageNodeCount: 1,
+		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Metainfo.ChecksumsEnabled = true
+				config.Metainfo.ProjectLimits.MaxBuckets = 100
 			},
 		},
-	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+	}, func(t *testing.T, testCtx *testcontext.Context, planet *testplanet.Planet) {
 		sat := planet.Satellites[0]
 		up := planet.Uplinks[0]
 
@@ -134,9 +139,18 @@ func TestChecksum_Multipart(t *testing.T) {
 			Value:       []byte("checksum"),
 		}
 
+		partETag := []byte("part etag")
+		partChecksum := []byte("part checksum")
+
+		// Create parts consisting of multiple segments to verify that this doesn't
+		// disrupt user data resolution.
+		maxSegmentSize := 5 * memory.KiB
+		partContents := testrand.Bytes(maxSegmentSize + 1)
+		ctx := testuplink.WithMaxSegmentSize(testCtx, maxSegmentSize)
+
 		project, err := up.OpenProject(ctx, sat)
 		require.NoError(t, err)
-		defer ctx.Check(project.Close)
+		defer testCtx.Check(project.Close)
 
 		requireNoPendingObjects := func(t *testing.T, bucketName string, msgAndArgs ...any) {
 			iter := project.ListUploads(ctx, bucketName, &uplink.ListUploadsOptions{})
@@ -152,7 +166,7 @@ func TestChecksum_Multipart(t *testing.T) {
 			if err != nil {
 				return "", errs.Wrap(err)
 			}
-			if _, err = part.Write(testrand.Bytes(32)); err != nil {
+			if _, err = part.Write(partContents); err != nil {
 				return "", errs.Wrap(err)
 			}
 			if err := part.Commit(); err != nil {
@@ -272,8 +286,46 @@ func TestChecksum_Multipart(t *testing.T) {
 			require.ErrorIs(t, err, object.ErrChecksumsUnsupported)
 		})
 
-		// TODO: Test whether the part checksum set by UploadPart can be retrieved
-		// once the ability to retrieve part checksums has been implemented.
+		for _, tt := range []struct {
+			name     string
+			etag     []byte
+			checksum []byte
+		}{
+			{"No user data", nil, nil},
+			{"Checksum only", nil, partChecksum},
+			{"ETag only", partETag, nil},
+			{"Checksum and ETag", partETag, partChecksum},
+		} {
+			t.Run(fmt.Sprintf("Upload part/%s", tt.name), func(t *testing.T) {
+				bucketName := testrand.BucketName()
+				require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+				upload, err := object.BeginUpload(ctx, project, bucketName, objectKey, nil)
+				require.NoError(t, err)
+
+				part, err := object.UploadPart(ctx, project, bucketName, objectKey, upload.UploadID, 1)
+				require.NoError(t, err)
+
+				_, err = part.Write(partContents)
+				require.NoError(t, err)
+
+				if tt.etag != nil {
+					require.NoError(t, part.SetETag(tt.etag))
+				}
+				if tt.checksum != nil {
+					require.NoError(t, part.SetChecksum(tt.checksum))
+				}
+
+				require.NoError(t, part.Commit())
+
+				iter := object.ListUploadParts(ctx, project, bucketName, objectKey, upload.UploadID, nil)
+				require.True(t, iter.Next())
+				require.Equal(t, tt.etag, iter.Item().ETag)
+				require.Equal(t, tt.checksum, iter.Item().Checksum)
+				require.False(t, iter.Next())
+				require.NoError(t, iter.Err())
+			})
+		}
 
 		t.Run("Commit part - Checksums unsupported", func(t *testing.T) {
 			sat.Metainfo.Endpoint.TestingSetChecksumsEnabled(false)
@@ -288,11 +340,10 @@ func TestChecksum_Multipart(t *testing.T) {
 			part, err := object.UploadPart(ctx, project, bucketName, objectKey, upload.UploadID, 1)
 			require.NoError(t, err)
 
-			_, err = part.Write(testrand.Bytes(32))
+			_, err = part.Write(partContents)
 			require.NoError(t, err)
 
-			checksumValue := []byte("part checksum")
-			require.NoError(t, part.SetChecksum(checksumValue))
+			require.NoError(t, part.SetChecksum(partChecksum))
 
 			require.ErrorIs(t, part.Commit(), object.ErrChecksumsUnsupported)
 		})

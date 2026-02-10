@@ -95,6 +95,45 @@ func (uploads *UploadIterator) Item() *UploadInfo {
 	}
 }
 
+// ListUploadParts returns an iterator over the parts of a multipart upload started with BeginUpload.
+func ListUploadParts(ctx context.Context, project *uplink.Project, bucket, key, uploadID string, options *uplink.ListUploadPartsOptions) *PartIterator {
+	defer mon.Task()(&ctx)(nil)
+
+	return &PartIterator{
+		iter: project.ListUploadParts(ctx, bucket, key, uploadID, options),
+	}
+}
+
+// PartIterator is an iterator over a collection of parts of an upload.
+type PartIterator struct {
+	iter *uplink.PartIterator
+}
+
+// Next prepares next entry for reading.
+func (parts *PartIterator) Next() bool {
+	return parts.iter.Next()
+}
+
+// Item returns the current entry in the iterator.
+func (parts *PartIterator) Item() *Part {
+	item := parts.iter.Item()
+	if item == nil {
+		return nil
+	}
+
+	privateItem := part_getPrivate(item)
+
+	return &Part{
+		Part:     *item,
+		Checksum: privateItem.Checksum,
+	}
+}
+
+// Err returns error, if one happened during iteration.
+func (parts *PartIterator) Err() error {
+	return packageError.Wrap(parts.iter.Err())
+}
+
 //go:linkname listUploads storj.io/uplink.listUploads
 func listUploads(ctx context.Context, project *uplink.Project, bucket string, opts metaclient.ListOptions) *uplink.UploadIterator
 

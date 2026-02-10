@@ -257,12 +257,17 @@ type SegmentUserData struct {
 	Checksum []byte
 }
 
-// EncryptedSegmentUserData represents an encrypted set of segment user data.
-type EncryptedSegmentUserData SegmentUserData
-
 // IsZero returns whether the user data is empty.
 func (userData SegmentUserData) IsZero() bool {
 	return len(userData.Checksum) == 0 && len(userData.ETag) == 0
+}
+
+// EncryptedSegmentUserData represents an encrypted set of segment user data.
+type EncryptedSegmentUserData SegmentUserData
+
+// IsZero returns whether the encrypted user data is empty.
+func (userData EncryptedSegmentUserData) IsZero() bool {
+	return SegmentUserData(userData).IsZero()
 }
 
 // Stream is information about an object stream.
