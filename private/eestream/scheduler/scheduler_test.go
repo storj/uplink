@@ -116,7 +116,6 @@ func TestScheduler_Limits(t *testing.T) {
 	var counts [maxConcurrent]int64
 	var wg sync.WaitGroup
 	for i := range numHandles {
-		i := i
 
 		wg.Add(1)
 		go func() {
