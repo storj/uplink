@@ -20,7 +20,7 @@ func TestWithRetry(t *testing.T) {
 
 	numberOfExecutions := 0
 	err := metaclient.WithRetry(ctx, func(cxt context.Context) error {
-		numberOfExecutions++
+		numberOfExecutions++ //check-retry:ignore
 		return nil
 	})
 
@@ -29,7 +29,7 @@ func TestWithRetry(t *testing.T) {
 
 	numberOfExecutions = 0
 	err = metaclient.WithRetry(ctx, func(cxt context.Context) error {
-		numberOfExecutions++
+		numberOfExecutions++ //check-retry:ignore
 		return syscall.ECONNRESET
 	})
 	require.Error(t, err)
@@ -40,7 +40,7 @@ func TestWithRetry(t *testing.T) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	cancel()
 	err = metaclient.WithRetry(cancelCtx, func(cxt context.Context) error {
-		numberOfExecutions++
+		numberOfExecutions++ //check-retry:ignore
 		return nil
 	})
 	require.Error(t, err)
