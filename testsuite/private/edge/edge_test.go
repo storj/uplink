@@ -33,7 +33,6 @@ func (server *drpcServerMock) RegisterAccess(context.Context, *pb.EdgeRegisterAc
 
 func TestFreeTierAccessExpiration(t *testing.T) {
 	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
-	defer ctx.Cleanup()
 
 	expiration := time.Now().Add(time.Hour).UTC()
 

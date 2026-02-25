@@ -130,7 +130,6 @@ func TestSettingMaximumBufferSize(t *testing.T) {
 	transport.SetMaximumBufferSize(&config, 1)
 
 	ctx := testcontext.New(t)
-	defer ctx.Cleanup()
 
 	d, err := expose.ConfigGetDialer(config, ctx)
 	require.NoError(t, err)

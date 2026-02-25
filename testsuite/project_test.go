@@ -45,7 +45,7 @@ func TestProject_OpenProjectMalformedUserAgent(t *testing.T) {
 	}
 
 	ctx := testcontext.New(t)
-	defer ctx.Cleanup()
+
 	_, err := config.OpenProject(ctx, &uplink.Access{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "user agent")
@@ -55,7 +55,6 @@ func BenchmarkProject_OpenProject(b *testing.B) {
 	b.ReportAllocs()
 
 	ctx := testcontext.New(b)
-	defer ctx.Cleanup()
 
 	clientCertPEM, clientKeyPEM := loadPEMs(b, "testdata/testidentity/identity.cert", "testdata/testidentity/identity.key")
 

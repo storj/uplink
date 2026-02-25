@@ -636,7 +636,6 @@ func BenchmarkReedSolomonErasureScheme(b *testing.B) {
 func TestCalcPieceSize(t *testing.T) {
 	const uint32Size = 4
 	ctx := testcontext.New(t)
-	defer ctx.Cleanup()
 
 	for i, dataSize := range []int64{
 		0,

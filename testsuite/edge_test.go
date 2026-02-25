@@ -33,7 +33,6 @@ func (g *DRPCServerMock) RegisterAccess(context.Context, *pb.EdgeRegisterAccessR
 
 func TestRegisterAccessUnencrypted(t *testing.T) {
 	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
-	defer ctx.Cleanup()
 
 	cancelCtx, authCancel := context.WithCancel(ctx)
 	port := internal.StartAuthServiceUnencrypted(cancelCtx, ctx, t, &DRPCServerMock{})
@@ -64,7 +63,6 @@ func TestRegisterAccessUnencrypted(t *testing.T) {
 
 func TestRegisterAccessTLS(t *testing.T) {
 	ctx := testcontext.NewWithTimeout(t, 10*time.Second)
-	defer ctx.Cleanup()
 
 	certificatePEM, privateKeyPEM := internal.CreateSelfSignedCertificate(t, "localhost")
 

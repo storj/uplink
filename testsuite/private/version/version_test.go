@@ -14,10 +14,9 @@ import (
 
 func TestAppendVersionToUserAgent(t *testing.T) {
 	ctx := testcontext.New(t)
-	defer ctx.Cleanup()
 
 	{
-		cmd := exec.Command("go", "run", "testbuild.go", "")
+		cmd := exec.CommandContext(ctx, "go", "run", "testbuild.go", "")
 
 		data, err := cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -27,7 +26,7 @@ func TestAppendVersionToUserAgent(t *testing.T) {
 	}
 
 	{
-		cmd := exec.Command("go", "run", "testbuild.go", "zenko")
+		cmd := exec.CommandContext(ctx, "go", "run", "testbuild.go", "zenko")
 
 		data, err := cmd.CombinedOutput()
 		require.NoError(t, err)
