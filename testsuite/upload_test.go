@@ -42,7 +42,7 @@ func TestSetMetadata(t *testing.T) {
 		assertObjectEmptyCreated(t, upload.Info(), key)
 
 		expectedCustomMetadata := uplink.CustomMetadata{}
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			// TODO figure out why its failing with
 			// expectedCustomMetadata[string(testrand.BytesInt(10))] = string(testrand.BytesInt(100))
 			expectedCustomMetadata["key"+strconv.Itoa(i)] = "value" + strconv.Itoa(i)
@@ -355,7 +355,7 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 			Satellite: testplanet.ReconfigureRS(1, 2, 3, 4),
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
-		for i := 0; i < 40; i++ {
+		for i := range 40 {
 			require.NoError(t, planet.StopPeer(planet.StorageNodes[i]))
 		}
 

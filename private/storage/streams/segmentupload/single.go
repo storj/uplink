@@ -146,7 +146,7 @@ func Begin(ctx context.Context,
 	var successful int32
 	uploadStart := time.Now()
 	uploadID := generateUploadID()
-	for i := 0; i < uploaderCount; i++ {
+	for range uploaderCount {
 		res, ok := handle.Get(ctx)
 		if !ok {
 			return nil, errs.New("failed to obtain piece upload resource")

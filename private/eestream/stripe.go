@@ -128,9 +128,7 @@ func (s *StripeReader) start() {
 		close(done)
 	}()
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 
 		s1 := s.bundy.ProgressSnapshot(nil)
 		var s2 []int32
@@ -161,7 +159,7 @@ func (s *StripeReader) start() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // readShares is the method that does the actual work of reading an individual

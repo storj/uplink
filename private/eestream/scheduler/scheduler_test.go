@@ -117,9 +117,7 @@ func TestScheduler_Limits(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range numHandles {
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			rng := rand.New(rand.NewSource(seed + int64(i)))
 
 			h, _ := s.Join(ctx)
@@ -166,7 +164,7 @@ func TestScheduler_Limits(t *testing.T) {
 				}
 				atomic.AddInt64(&counts[c-1], 1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
