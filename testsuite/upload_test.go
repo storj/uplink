@@ -466,7 +466,7 @@ func TestUploadLimits(t *testing.T) {
 			_, err = project.CreateBucket(ctx, "testbucket")
 			require.NoError(t, err)
 
-			// should fail on Write beause we uploaded more than segment
+			// should fail on Write because we uploaded more than segment
 			// and request to satellite were made. The Write call may not fail
 			// immmediately, since writes are buffered and the segment uploads
 			// are handled concurrently.
@@ -497,7 +497,7 @@ func TestUploadLimits(t *testing.T) {
 			err = accountingDB.UpdateProjectSegmentLimit(ctx, upl.Projects[0].ID, 0)
 			require.NoError(t, err)
 
-			// should fail on Write beause we uploaded more than segment
+			// should fail on Write because we uploaded more than segment
 			// and request to satellite were made. The Write call may not fail
 			// immmediately, since writes are buffered and the segment uploads
 			// are handled concurrently.
@@ -526,7 +526,7 @@ func TestUploadLimits(t *testing.T) {
 			_, err = project.CreateBucket(ctx, "testbucket")
 			require.NoError(t, err)
 
-			// should fail on Write beause we uploaded more than segment
+			// should fail on Write because we uploaded more than segment
 			// and request to satellite were made. The Write call may not fail
 			// immmediately, since writes are buffered and the segment uploads
 			// are handled concurrently.
@@ -556,7 +556,7 @@ func TestUploadLimits(t *testing.T) {
 			err = accountingDB.UpdateProjectUsageLimit(ctx, upl.Projects[0].ID, 0)
 			require.NoError(t, err)
 
-			// should fail on Write beause we uploaded more than segment
+			// should fail on Write because we uploaded more than segment
 			// and request to satellite were made. The Write call may not fail
 			// immmediately, since writes are buffered and the segment uploads
 			// are handled concurrently.
