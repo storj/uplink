@@ -518,6 +518,46 @@ func (client *Client) GetObjectIPs(ctx context.Context, params GetObjectIPsParam
 	}, nil
 }
 
+// GetPendingObjectMetadataParams contains parameters for a GetPendingObjectMetadata request.
+type GetPendingObjectMetadataParams struct {
+	Bucket             []byte
+	EncryptedObjectKey []byte
+	StreamID           storj.StreamID
+}
+
+func (params *GetPendingObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.GetPendingObjectMetadataRequest {
+	return &pb.GetPendingObjectMetadataRequest{
+		Header:             header,
+		Bucket:             params.Bucket,
+		EncryptedObjectKey: params.EncryptedObjectKey,
+		StreamId:           params.StreamID,
+	}
+}
+
+// GetPendingObjectMetadata returns the metadata of a pending object.
+func (client *Client) GetPendingObjectMetadata(ctx context.Context, params GetPendingObjectMetadataParams) (userData EncryptedUserData, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	var response *pb.GetPendingObjectMetadataResponse
+	err = WithRetry(ctx, func(ctx context.Context) error {
+		response, err = client.client.GetPendingObjectMetadata(ctx, params.toRequest(client.header()))
+		return err
+	})
+	if err != nil {
+		return EncryptedUserData{}, Error.Wrap(convertErrors(err))
+	}
+
+	return EncryptedUserData{
+		EncryptedMetadataNonce:        response.EncryptedMetadataNonce,
+		EncryptedMetadataEncryptedKey: response.EncryptedMetadataEncryptedKey,
+		EncryptedMetadata:             response.EncryptedMetadata,
+		EncryptedETag:                 response.EncryptedEtag,
+		ChecksumAlgorithm:             storj.ObjectChecksumAlgorithm(response.ChecksumAlgorithm),
+		IsChecksumComposite:           response.IsChecksumComposite,
+		EncryptedChecksum:             response.EncryptedChecksum,
+	}, nil
+}
+
 // UpdateObjectMetadataParams are params for the UpdateObjectMetadata request.
 type UpdateObjectMetadataParams struct {
 	Bucket             []byte

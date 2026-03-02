@@ -59,6 +59,54 @@ func (db *DB) ModifyObject(ctx context.Context, bucket, key string) (object *Mut
 	return nil, errors.New("not implemented")
 }
 
+// GetPendingObjectMetadata returns the user data of an upload.
+func (db *DB) GetPendingObjectMetadata(ctx context.Context, bucket, key, uploadID string) (userData ObjectUserData, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	switch {
+	case bucket == "":
+		return ObjectUserData{}, ErrNoBucket.New("")
+	case key == "":
+		return ObjectUserData{}, ErrNoPath.New("")
+	}
+
+	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
+	if err != nil {
+		return ObjectUserData{}, errs.Wrap(err)
+	}
+
+	decodedStreamID, version, err := base58.CheckDecode(uploadID)
+	if err != nil || version != 1 {
+		return ObjectUserData{}, ErrUploadIDInvalid.New("")
+	}
+
+	id, err := storj.StreamIDFromBytes(decodedStreamID)
+	if err != nil {
+		return ObjectUserData{}, ErrUploadIDInvalid.Wrap(err)
+	}
+
+	encUserData, err := db.metainfo.GetPendingObjectMetadata(ctx, GetPendingObjectMetadataParams{
+		Bucket:             []byte(bucket),
+		EncryptedObjectKey: []byte(encPath.Raw()),
+		StreamID:           id,
+	})
+	if err != nil {
+		return ObjectUserData{}, errs.Wrap(err)
+	}
+
+	streamInfo, _, userData, err := db.typedDecryptStreamInfo(ctx, bucket, paths.NewUnencrypted(key), encUserData)
+	if err != nil {
+		return ObjectUserData{}, err
+	}
+
+	userData.Custom, err = customMetadataFromStreamInfo(streamInfo)
+	if err != nil {
+		return ObjectUserData{}, ErrObjectMetadata.Wrap(err)
+	}
+
+	return userData, nil
+}
+
 // UpdateObjectMetadataOptions contains additional options for replacing an object's user data.
 type UpdateObjectMetadataOptions struct {
 	// CustomOnly, if set, ensures that the operation will only succeed if the object's user data
@@ -1052,10 +1100,32 @@ func updateObjectWithStream(object *Object, stream *pb.StreamInfo, streamMeta pb
 		return nil
 	}
 
-	serializableMeta := pb.SerializableMeta{}
-	err := pb.Unmarshal(stream.Metadata, &serializableMeta)
+	customMeta, err := customMetadataFromStreamInfo(stream)
 	if err != nil {
 		return err
+	}
+	object.UserData.Custom = customMeta
+
+	segmentCount := streamMeta.NumberOfSegments
+
+	if object.Stream.Size == 0 {
+		object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
+	}
+	object.Stream.SegmentCount = segmentCount
+	object.Stream.FixedSegmentSize = stream.SegmentsSize
+	object.Stream.LastSegment.Size = stream.LastSegmentSize
+
+	return nil
+}
+
+func customMetadataFromStreamInfo(stream *pb.StreamInfo) (map[string]string, error) {
+	if stream == nil {
+		return nil, nil
+	}
+
+	var serializableMeta pb.SerializableMeta
+	if err := pb.Unmarshal(stream.Metadata, &serializableMeta); err != nil {
+		return nil, errs.Wrap(err)
 	}
 
 	// ensure that the map is not nil
@@ -1068,17 +1138,7 @@ func updateObjectWithStream(object *Object, stream *pb.StreamInfo, streamMeta pb
 		serializableMeta.UserDefined[contentTypeKey] = serializableMeta.ContentType
 	}
 
-	segmentCount := streamMeta.NumberOfSegments
-	object.UserData.Custom = serializableMeta.UserDefined
-
-	if object.Stream.Size == 0 {
-		object.Stream.Size = ((segmentCount - 1) * stream.SegmentsSize) + stream.LastSegmentSize
-	}
-	object.Stream.SegmentCount = segmentCount
-	object.Stream.FixedSegmentSize = stream.SegmentsSize
-	object.Stream.LastSegment.Size = stream.LastSegmentSize
-
-	return nil
+	return serializableMeta.UserDefined, nil
 }
 
 // MutableObject is for creating an object stream.

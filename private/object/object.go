@@ -105,6 +105,7 @@ var (
 		rpcstatus.FailedPrecondition:                               ErrFailedPrecondition,
 		rpcstatus.Unimplemented:                                    ErrUnimplemented,
 		rpcstatus.ChecksumsUnsupported:                             ErrChecksumsUnsupported,
+		rpcstatus.StreamIDInvalid:                                  uplink.ErrUploadIDInvalid,
 	}
 )
 

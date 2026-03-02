@@ -190,6 +190,24 @@ func (upload *PartUpload) Info() *Part {
 	}
 }
 
+// GetUploadMetadata returns the user data of an upload.
+func GetUploadMetadata(ctx context.Context, project *uplink.Project, bucket, key, uploadID string) (userData metaclient.ObjectUserData, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return metaclient.ObjectUserData{}, packageConvertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	userData, err = db.GetPendingObjectMetadata(ctx, bucket, key, uploadID)
+	if err != nil {
+		return metaclient.ObjectUserData{}, packageConvertKnownErrors(err, bucket, key)
+	}
+
+	return userData, nil
+}
+
 func encryptUserData(project *uplink.Project, bucket, key string, userData metaclient.ObjectUserData) (metaclient.EncryptedUserData, error) {
 	if !userData.RequiresEncryption() {
 		return metaclient.EncryptedUserData{
