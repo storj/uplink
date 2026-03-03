@@ -29,7 +29,7 @@ func TestErrRateLimitExceeded(t *testing.T) {
 		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.Metainfo.RateLimiter.CacheExpiration = 500 * time.Millisecond
+				config.Metainfo.RateLimiter.CacheExpiration = 2 * time.Second
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -38,7 +38,7 @@ func TestErrRateLimitExceeded(t *testing.T) {
 
 		// TODO find a way to reset limiter before test is executed, currently
 		// testplanet is doing one additional request to get access
-		time.Sleep(1 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		limit := 1
 		err := satellite.DB.Console().Projects().UpdateRateLimit(ctx, project.ID, &limit)
