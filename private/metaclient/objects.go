@@ -134,7 +134,7 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, user
 	}
 
 	if err := userData.Checksum.Validate(); err != nil {
-		return ErrObjectMetadata.Wrap(err)
+		return ErrInvalidChecksum.Wrap(err)
 	}
 
 	encPath, err := encryption.EncryptPathWithStoreCipher(bucket, paths.NewUnencrypted(key), db.encStore)
@@ -883,7 +883,7 @@ func (db *DB) CommitObject(ctx context.Context, bucket, key, uploadID string, us
 	}
 
 	if err := userData.Checksum.Validate(); err != nil {
-		return Object{}, ErrObjectMetadata.Wrap(err)
+		return Object{}, ErrInvalidChecksum.Wrap(err)
 	}
 
 	decodedStreamID, version, err := base58.CheckDecode(uploadID)

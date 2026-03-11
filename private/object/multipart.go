@@ -69,7 +69,7 @@ func BeginUpload(ctx context.Context, project *uplink.Project, bucket, key strin
 	if options == nil {
 		options = &MultipartUploadOptions{}
 	} else if err := options.UserData.Checksum.ValidateIncomplete(); err != nil {
-		return UploadInfo{}, convertKnownErrors(metaclient.ErrObjectMetadata.Wrap(err), bucket, key)
+		return UploadInfo{}, convertKnownErrors(metaclient.ErrInvalidChecksum.Wrap(err), bucket, key)
 	}
 
 	encPath, err := encryptPath(project, bucket, key)

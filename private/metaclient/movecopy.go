@@ -16,6 +16,9 @@ import (
 	"storj.io/common/storj"
 )
 
+// ErrUnexpectedChecksumAlgorithm is returned when an object's checksum algorithm does not match what was expected.
+var ErrUnexpectedChecksumAlgorithm = errs.Class("unexpected checksum algorithm")
+
 // EncryptedKeyAndNonce holds single segment encrypted key.
 type EncryptedKeyAndNonce struct {
 	Position          SegmentPosition
@@ -28,6 +31,10 @@ type CopyObjectOptions struct {
 	Retention Retention
 	LegalHold bool
 
+	// ExpectedChecksumAlgorithm is the checksum algorithm that the source object
+	// must have in order for the copy to succeed. It has no effect if unset.
+	ExpectedChecksumAlgorithm storj.ObjectChecksumAlgorithm
+
 	IfNoneMatch []string
 }
 
@@ -38,6 +45,10 @@ func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, so
 	err = validateMoveCopyInput(sourceBucket, sourceKey, targetBucket, targetKey)
 	if err != nil {
 		return nil, errs.Wrap(err)
+	}
+
+	if opts.ExpectedChecksumAlgorithm < storj.ObjectChecksumAlgorithmNone || opts.ExpectedChecksumAlgorithm > storj.ObjectChecksumAlgorithmSHA256 {
+		return nil, ErrInvalidChecksum.New("invalid expected checksum algorithm")
 	}
 
 	sourceEncKey, err := encryption.EncryptPathWithStoreCipher(sourceBucket, paths.NewUnencrypted(sourceKey), db.encStore)
@@ -59,6 +70,10 @@ func (db *DB) CopyObject(ctx context.Context, sourceBucket, sourceKey string, so
 	})
 	if err != nil {
 		return nil, errs.Wrap(err)
+	}
+
+	if opts.ExpectedChecksumAlgorithm != storj.ObjectChecksumAlgorithmNone && opts.ExpectedChecksumAlgorithm != response.ChecksumAlgorithm {
+		return nil, ErrUnexpectedChecksumAlgorithm.New("expected %d, but source object has %d", opts.ExpectedChecksumAlgorithm, response.ChecksumAlgorithm)
 	}
 
 	oldDerivedKey, err := encryption.DeriveContentKey(sourceBucket, paths.NewUnencrypted(sourceKey), db.encStore)

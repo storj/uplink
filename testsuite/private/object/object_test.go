@@ -2532,6 +2532,7 @@ func TestUpdateMetadata(t *testing.T) {
 					Checksum: tt.checksum,
 				})
 				require.ErrorContains(t, err, tt.errMsg, "test case: %q", tt.errMsg)
+				require.True(t, metaclient.ErrInvalidChecksum.Has(err), "test case: %q", tt.errMsg)
 
 				statObj, err := object.StatObject(ctx, project, bucketName, objectKey, nil)
 				require.NoError(t, err)
@@ -2751,6 +2752,7 @@ func TestChecksum(t *testing.T) {
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
 				config.Metainfo.ChecksumsEnabled = true
+				config.Metainfo.ProjectLimits.MaxBuckets = 100
 			},
 		},
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
@@ -2848,6 +2850,78 @@ func TestChecksum(t *testing.T) {
 
 			err = uploadWithChecksum(bucketName, objectKey, checksum)
 			require.ErrorIs(t, err, object.ErrChecksumsUnsupported)
+		})
+
+		t.Run("CopyObject", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			copyObjectKey := "test-object-2"
+			copyObj, err := object.CopyObject(ctx, project, bucketName, objectKey, nil, bucketName, copyObjectKey, object.CopyObjectOptions{})
+			require.NoError(t, err)
+			require.Equal(t, checksum, copyObj.Checksum)
+
+			copyObj, err = object.StatObject(ctx, project, bucketName, copyObjectKey, nil)
+			require.NoError(t, err)
+			require.Equal(t, checksum, copyObj.Checksum)
+
+			// The copy should also succeed if the expected checksum algorithm is equal to
+			// the source object's checksum algorithm.
+			copyObjectKey = "test-object-3"
+			copyObj, err = object.CopyObject(ctx, project, bucketName, objectKey, nil, bucketName, copyObjectKey, object.CopyObjectOptions{
+				ExpectedChecksumAlgorithm: checksum.Algorithm,
+			})
+			require.NoError(t, err)
+			require.Equal(t, checksum, copyObj.Checksum)
+
+			copyObj, err = object.StatObject(ctx, project, bucketName, copyObjectKey, nil)
+			require.NoError(t, err)
+			require.Equal(t, checksum, copyObj.Checksum)
+		})
+
+		t.Run("CopyObject - Unexpected checksum algorithm", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			_, err := object.CopyObject(ctx, project, bucketName, objectKey, nil, bucketName, "test-object-2", object.CopyObjectOptions{
+				ExpectedChecksumAlgorithm: storj.ObjectChecksumAlgorithmSHA256,
+			})
+			require.ErrorIs(t, err, object.ErrUnexpectedChecksumAlgorithm)
+		})
+
+		t.Run("CopyObject - Unexpected checksum algorithm with unchecksummed source", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
+			require.NoError(t, err)
+			require.NoError(t, upload.Commit())
+
+			copyKey := "test-object-2"
+			_, err = object.CopyObject(ctx, project, bucketName, objectKey, nil, bucketName, copyKey, object.CopyObjectOptions{
+				ExpectedChecksumAlgorithm: checksum.Algorithm,
+			})
+			require.ErrorIs(t, err, object.ErrUnexpectedChecksumAlgorithm)
+
+			// Assert that the aborted copy did not produce an object at the destination.
+			_, err = object.StatObject(ctx, project, bucketName, copyKey, nil)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+		})
+
+		t.Run("CopyObject - Invalid expected checksum algorithm", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			require.NoError(t, uploadWithChecksum(bucketName, objectKey, checksum))
+
+			_, err := object.CopyObject(ctx, project, bucketName, objectKey, nil, bucketName, "test-object-2", object.CopyObjectOptions{
+				ExpectedChecksumAlgorithm: storj.ObjectChecksumAlgorithmSHA256 + 1,
+			})
+			require.True(t, metaclient.ErrInvalidChecksum.Has(err))
 		})
 
 		t.Run("ListObjects", func(t *testing.T) {

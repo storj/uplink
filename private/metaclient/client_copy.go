@@ -25,6 +25,7 @@ type BeginCopyObjectResponse struct {
 	EncryptedMetadataKeyNonce storj.Nonce
 	EncryptedMetadataKey      []byte
 	SegmentKeys               []EncryptedKeyAndNonce
+	ChecksumAlgorithm         storj.ObjectChecksumAlgorithm
 }
 
 func (params *BeginCopyObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectBeginCopyRequest {
@@ -70,6 +71,7 @@ func newBeginCopyObjectResponse(response *pb.ObjectBeginCopyResponse) BeginCopyO
 		EncryptedMetadataKeyNonce: response.EncryptedMetadataKeyNonce,
 		EncryptedMetadataKey:      response.EncryptedMetadataKey,
 		SegmentKeys:               keys,
+		ChecksumAlgorithm:         storj.ObjectChecksumAlgorithm(response.ChecksumAlgorithm),
 	}
 }
 

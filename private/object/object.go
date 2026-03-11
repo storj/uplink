@@ -86,6 +86,9 @@ var (
 	// ErrChecksumsUnsupported is returned when the satellite does not support object checksums.
 	ErrChecksumsUnsupported = errors.New("checksum options are not supported")
 
+	// ErrUnexpectedChecksumAlgorithm is returned when an object's checksum algorithm does not match what was expected.
+	ErrUnexpectedChecksumAlgorithm = errors.New("unexpected checksum algorithm")
+
 	rpcCodeToError = map[rpcstatus.StatusCode]error{
 		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
 		rpcstatus.ObjectLockBucketRetentionConfigurationMissing:    ErrNoObjectLockConfiguration,
@@ -193,6 +196,10 @@ type ListObjectsOptions struct {
 type CopyObjectOptions struct {
 	Retention metaclient.Retention
 	LegalHold bool
+
+	// ExpectedChecksumAlgorithm is the checksum algorithm that the source object
+	// must have in order for the copy to succeed. It has no effect if unset.
+	ExpectedChecksumAlgorithm storj.ObjectChecksumAlgorithm
 
 	IfNoneMatch []string
 }
@@ -559,11 +566,12 @@ func CopyObject(ctx context.Context, project *uplink.Project, sourceBucket, sour
 	if !reflect.DeepEqual(options, (CopyObjectOptions{})) {
 		metaOpts.Retention = options.Retention
 		metaOpts.LegalHold = options.LegalHold
+		metaOpts.ExpectedChecksumAlgorithm = options.ExpectedChecksumAlgorithm
 		metaOpts.IfNoneMatch = options.IfNoneMatch
 	}
 	obj, err := db.CopyObject(ctx, sourceBucket, sourceKey, sourceVersion, targetBucket, targetKey, metaOpts)
 	if err != nil {
-		return nil, packageConvertKnownErrors(err, sourceBucket, sourceKey)
+		return nil, packageConvertKnownErrors(convertErrors(err), sourceBucket, sourceKey)
 	}
 
 	return convertObject(obj), nil
@@ -744,6 +752,8 @@ func convertErrors(err error) error {
 		err = ErrObjectLockInvalidObjectState
 	case metaclient.ErrUnsupportedDelimiter.Has(err):
 		err = ErrUnsupportedDelimiter
+	case metaclient.ErrUnexpectedChecksumAlgorithm.Has(err):
+		err = ErrUnexpectedChecksumAlgorithm
 	}
 
 	return err

@@ -170,6 +170,9 @@ var (
 	// ErrObjectMetadataUpdateUnsafe is returned when a request to update an object's metadata fails
 	// because the existing metadata contains more fields than were expected.
 	ErrObjectMetadataUpdateUnsafe = errs.Class("existing object metadata contains more fields than were expected")
+
+	// ErrInvalidChecksum is an error class for cases when invalid checksum options are provided.
+	ErrInvalidChecksum = errs.Class("invalid checksum")
 )
 
 // Object contains information about a specific object.
