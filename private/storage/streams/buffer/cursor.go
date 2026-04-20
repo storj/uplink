@@ -109,6 +109,7 @@ func (c *Cursor) WaitWrite(n int64) (m int64, ok bool, err error) {
 
 	for {
 		doneReading := atomic.LoadUint32(&c.doneReading) != 0
+		doneWriting := atomic.LoadUint32(&c.doneWriting) != 0
 		maxRead := atomic.LoadInt64(&c.maxRead)
 		written := atomic.LoadInt64(&c.written)
 
@@ -116,6 +117,14 @@ func (c *Cursor) WaitWrite(n int64) (m int64, ok bool, err error) {
 		// first, return any read error if there is one.
 		case c.readErr != nil:
 			return 0, false, c.readErr
+
+		// next, if DoneWriting has been signalled concurrently (e.g. the
+		// upload is being aborted while a writer is blocked in backpressure),
+		// return with whatever write-side error was recorded so the writer
+		// can unwind instead of waiting indefinitely for a reader that will
+		// never advance.
+		case doneWriting:
+			return written, false, c.writeErr
 
 		// next, don't allow more writes if the reader is done.
 		case doneReading:
