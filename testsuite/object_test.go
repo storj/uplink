@@ -235,6 +235,7 @@ func TestDownloadObjectWithBadMetadata(t *testing.T) {
 				EncryptedMetadataNonce:        object.EncryptedMetadataNonce,
 				EncryptedMetadataEncryptedKey: object.EncryptedMetadataEncryptedKey,
 			},
+			Includes: metabase.EncryptedUserDataIncludes{Metadata: true},
 		})
 		require.NoError(t, err)
 
@@ -396,10 +397,19 @@ func TestAbortUpload(t *testing.T) {
 		err = upload.Abort()
 		require.NoError(t, err)
 
-		// we should have NO objects after abort
+		// we should have NO live objects after abort. DeletePendingObject
+		// now soft-deletes by setting expires_at = now() rather than
+		// removing the row outright, so filter those out.
 		objects, err = planet.Satellites[0].Metabase.DB.TestingAllObjects(ctx)
 		require.NoError(t, err)
-		require.Len(t, objects, 0)
+		now := time.Now()
+		var live []metabase.Object
+		for _, o := range objects {
+			if o.ExpiresAt == nil || o.ExpiresAt.After(now) {
+				live = append(live, o)
+			}
+		}
+		require.Len(t, live, 0)
 
 		err = upload.Commit()
 		require.Error(t, err)

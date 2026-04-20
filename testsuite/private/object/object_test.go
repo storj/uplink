@@ -2661,7 +2661,7 @@ func TestListObjects_ETagOrCustom(t *testing.T) {
 }
 
 func TestListObjectsDelimiter(t *testing.T) {
-	testListObjectsDelimiter(t, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
+	testListObjectsDelimiter(t, false, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
 		objects, _, err := object.ListObjects(ctx, project, params.bucketName, &object.ListObjectsOptions{
 			Prefix:    params.prefix,
 			Delimiter: params.delimiter,
@@ -2672,7 +2672,7 @@ func TestListObjectsDelimiter(t *testing.T) {
 }
 
 func TestListObjectVersionsDelimiter(t *testing.T) {
-	testListObjectsDelimiter(t, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
+	testListObjectsDelimiter(t, true, func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error) {
 		objects, _, err := object.ListObjectVersions(ctx, project, params.bucketName, &object.ListObjectVersionsOptions{
 			Prefix:    params.prefix,
 			Delimiter: params.delimiter,
@@ -2689,7 +2689,7 @@ type testListObjectsDelimiterParams struct {
 	recursive  bool
 }
 
-func testListObjectsDelimiter(t *testing.T, fn func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error)) {
+func testListObjectsDelimiter(t *testing.T, includeVersion bool, fn func(ctx context.Context, project *uplink.Project, params testListObjectsDelimiterParams) ([]*object.VersionedObject, error)) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
 		Reconfigure: testplanet.Reconfigure{
@@ -2730,27 +2730,33 @@ func testListObjectsDelimiter(t *testing.T, fn func(ctx context.Context, project
 				StreamID:   testrand.UUID(),
 			}, 0)
 
-			objects[objectKey] = &object.VersionedObject{
+			expected := &object.VersionedObject{
 				Object: uplink.Object{
 					Key:    string(obj.ObjectKey),
 					System: uplink.SystemMetadata{},
 					Custom: uplink.CustomMetadata{},
 				},
-				Version:  obj.StreamVersionID().Bytes(),
-				IsLatest: true,
 			}
+			if includeVersion {
+				expected.Version = obj.StreamVersionID().Bytes()
+				expected.IsLatest = true
+			}
+			objects[objectKey] = expected
 		}
 
 		prefixEntry := func(objectKey string) *object.VersionedObject {
-			return &object.VersionedObject{
+			entry := &object.VersionedObject{
 				Object: uplink.Object{
 					Key:      objectKey,
 					System:   uplink.SystemMetadata{},
 					Custom:   uplink.CustomMetadata{},
 					IsPrefix: true,
 				},
-				Version: make([]byte, 16),
 			}
+			if includeVersion {
+				entry.Version = make([]byte, 16)
+			}
+			return entry
 		}
 
 		withoutPrefix := func(prefix string, obj *object.VersionedObject) *object.VersionedObject {

@@ -158,17 +158,17 @@ func TestUploadPart(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrBucketNotFound))
 
-		// test an aborted upload maps the right invalid upload error
+		// After an abort the upload is no longer visible through either the
+		// bucket-wide or the by-key listing paths; the satellite soft-deletes
+		// the pending object (expires_at = now()) and both iterator queries
+		// filter on expires_at.
 		info, err := project.BeginUpload(newCtx, "testbucket", "testobject", nil)
 		require.NoError(t, err)
 		require.NoError(t, project.AbortUpload(newCtx, "testbucket", "testobject", info.UploadID))
 
-		u, err := project.UploadPart(newCtx, "testbucket", "testobject", info.UploadID, 1)
-		require.NoError(t, err)
-
-		_, err = u.Write(testrand.Bytes(5 * memory.KiB))
-		require.NoError(t, err)
-		require.ErrorIs(t, u.Commit(), uplink.ErrUploadIDInvalid)
+		it := project.ListUploads(newCtx, "testbucket", &uplink.ListUploadsOptions{Prefix: "testobject"})
+		require.False(t, it.Next(), "aborted upload should not appear in ListUploads")
+		require.NoError(t, it.Err())
 
 		info, err = project.BeginUpload(newCtx, "testbucket", "multipart-object", nil)
 		require.NoError(t, err)

@@ -15,11 +15,11 @@ import (
 	"storj.io/common/storj"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
+	"storj.io/common/uuid"
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/storj/satellite/buckets"
 	"storj.io/storj/satellite/console"
-	"storj.io/storj/satellite/eventing/eventingconfig"
 	"storj.io/storj/satellite/kms"
 	"storj.io/storj/satellite/nodeselection"
 	"storj.io/uplink"
@@ -756,15 +756,12 @@ func TestSetBucketTagging(t *testing.T) {
 }
 
 func TestBucketNotificationConfiguration(t *testing.T) {
-	enabledProjects := eventingconfig.ProjectSet{}
-
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount:   1,
 		StorageNodeCount: 0,
 		UplinkCount:      1,
 		Reconfigure: testplanet.Reconfigure{
 			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
-				config.BucketEventing.Projects = enabledProjects
 				config.Console.SatelliteManagedEncryptionEnabled = true
 				config.KeyManagement.KeyInfos = kms.KeyInfos{
 					Values: map[int]kms.KeyInfo{
@@ -791,12 +788,24 @@ func TestBucketNotificationConfiguration(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Enable eventing for the test project
-		enabledProjects[proj.ID] = struct{}{}
-
+		// createAPIKey bypasses the restriction in sat.API.Console.Service.CreateAPIKey that
+		// prevents creating an API key for satellite managed encryption projects.
+		createAPIKey := func(t *testing.T, projectID uuid.UUID, name string, version macaroon.APIKeyVersion) *macaroon.APIKey {
+			secret, err := macaroon.NewSecret()
+			require.NoError(t, err)
+			key, err := macaroon.NewAPIKey(secret)
+			require.NoError(t, err)
+			_, err = sat.DB.Console().APIKeys().Create(ctx, key.Head(), console.APIKeyInfo{
+				Name:      name,
+				ProjectID: projectID,
+				Secret:    secret,
+				Version:   version,
+			})
+			require.NoError(t, err)
+			return key
+		}
 		// Create API key for the project without path encryption
-		_, apiKey, err := sat.API.Console.Service.CreateAPIKey(userCtx, proj.ID, "test-key", macaroon.APIKeyVersionEventing)
-		require.NoError(t, err)
+		apiKey := createAPIKey(t, proj.ID, "test-key", macaroon.APIKeyVersionEventing)
 
 		access, err := uplink.RequestAccessWithPassphrase(ctx, sat.URL(), apiKey.Serialize(), "")
 		require.NoError(t, err)
