@@ -90,16 +90,16 @@ func concurrently(fns ...func()) func() {
 func TestScheduler_Limits(t *testing.T) {
 	seed := time.Now().UnixNano()
 	ctx := context.Background()
-	concurrent := int64(0)
-	max := int64(0)
+	var concurrent atomic.Int64
+	var max atomic.Int64
 
 	updateMax := func(c int64) {
 		for {
-			m := atomic.LoadInt64(&max)
+			m := max.Load()
 			if c <= m {
 				return
 			}
-			if atomic.CompareAndSwapInt64(&max, m, c) {
+			if max.CompareAndSwap(m, c) {
 				return
 			}
 		}
@@ -126,7 +126,7 @@ func TestScheduler_Limits(t *testing.T) {
 			held := make([]Resource, 0, maxConcurrent)
 			done := func() {
 				if len(held) > 0 {
-					atomic.AddInt64(&concurrent, -1)
+					concurrent.Add(-1)
 					held[len(held)-1].Done()
 					held = held[:len(held)-1]
 				}
@@ -145,7 +145,7 @@ func TestScheduler_Limits(t *testing.T) {
 				for rng.Intn(3) == 0 {
 					done()
 				}
-				for len(held) > 0 && atomic.LoadInt64(&concurrent) == maxConcurrent {
+				for len(held) > 0 && concurrent.Load() == maxConcurrent {
 					done()
 				}
 
@@ -156,7 +156,7 @@ func TestScheduler_Limits(t *testing.T) {
 				}
 				held = append(held, r)
 
-				c := atomic.AddInt64(&concurrent, 1)
+				c := concurrent.Add(1)
 				updateMax(c)
 				if c > maxConcurrent {
 					t.Error("maximum concurrent:", c)
@@ -168,10 +168,10 @@ func TestScheduler_Limits(t *testing.T) {
 	}
 	wg.Wait()
 
-	t.Log("observed max:", max)
+	t.Log("observed max:", max.Load())
 	t.Log("histogram:", counts)
 
-	require.LessOrEqual(t, max, int64(maxConcurrent))
+	require.LessOrEqual(t, max.Load(), int64(maxConcurrent))
 }
 
 func TestScheduler_MaxHandles(t *testing.T) {
