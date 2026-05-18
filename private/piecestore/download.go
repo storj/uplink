@@ -71,7 +71,10 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 
 	ctx, cancel := context2.WithCustomCancel(ctx)
 
-	var underlyingStream downloadStream
+	var (
+		underlyingStream downloadStream
+		timedOut         bool
+	)
 	sync2.WithTimeout(client.config.MessageTimeout, func() {
 		if client.replaySafe != nil {
 			underlyingStream, err = client.replaySafe.Download(ctx)
@@ -80,11 +83,16 @@ func (client *Client) Download(ctx context.Context, limit *pb.OrderLimit, pieceP
 		}
 	}, func() {
 		cancel(errMessageTimeout)
+		timedOut = true
 	})
 	if err != nil {
 		cancel(context.Canceled)
 		return nil, err
 	}
+	if timedOut {
+		return nil, errMessageTimeout
+	}
+
 	stream := &timedDownloadStream{
 		timeout: client.config.MessageTimeout,
 		stream:  underlyingStream,
@@ -386,25 +394,46 @@ func (stream *timedDownloadStream) cancelTimeout() {
 	stream.cancel(errMessageTimeout)
 }
 
-func (stream *timedDownloadStream) Close() (err error) {
-	sync2.WithTimeout(stream.timeout, func() {
-		err = stream.stream.Close()
-	}, stream.cancelTimeout)
-	return CloseError.Wrap(err)
+func (stream *timedDownloadStream) Close() error {
+	return stream.withTimeout(stream.stream.Close)
 }
 
-func (stream *timedDownloadStream) Send(req *pb.PieceDownloadRequest) (err error) {
-	sync2.WithTimeout(stream.timeout, func() {
-		err = stream.stream.Send(req)
-	}, stream.cancelTimeout)
-	return err
+func (stream *timedDownloadStream) Send(req *pb.PieceDownloadRequest) error {
+	return stream.withTimeout(func() error {
+		return stream.stream.Send(req)
+	})
 }
 
 func (stream *timedDownloadStream) Recv() (resp *pb.PieceDownloadResponse, err error) {
+	err = stream.withTimeout(func() error {
+		var recvErr error
+		resp, recvErr = stream.stream.Recv()
+		return recvErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (stream *timedDownloadStream) withTimeout(fn func() error) error {
+	var (
+		err      error
+		timedOut bool
+	)
 	sync2.WithTimeout(stream.timeout, func() {
-		resp, err = stream.stream.Recv()
-	}, stream.cancelTimeout)
-	return resp, err
+		err = fn()
+	}, func() {
+		stream.cancelTimeout()
+		timedOut = true
+	})
+	if err != nil {
+		return CloseError.Wrap(err)
+	}
+	if timedOut {
+		return CloseError.Wrap(errMessageTimeout)
+	}
+	return nil
 }
 
 // syncError synchronizes access to an error and keeps
