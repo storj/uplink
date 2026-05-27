@@ -77,10 +77,10 @@ var (
 	ErrUnsupportedDelimiter = errors.New("unsupported delimiter")
 
 	// ErrFailedPrecondition is returned when requests cannot be completed due to failed preconditions.
-	ErrFailedPrecondition = errs.New("failed precondition")
+	ErrFailedPrecondition = errors.New("failed precondition")
 
 	// ErrUnimplemented is returned for requests with unimplemented options.
-	ErrUnimplemented = errs.New("unimplemented")
+	ErrUnimplemented = errors.New("unimplemented")
 
 	rpcCodeToError = map[rpcstatus.StatusCode]error{
 		rpcstatus.MethodNotAllowed:                                 ErrMethodNotAllowed,
