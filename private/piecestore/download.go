@@ -295,10 +295,18 @@ func (client *Download) handleClosingError(err error) {
 func (client *Download) closeWithError(err error) {
 	client.close.Do(func() {
 		closeErr := client.stream.Close()
-		// If all data was successfully downloaded, ignore the stream close error.
-		// The close is just the mutual shutdown handshake and the data is already
-		// safely received. The other side may have already closed the connection.
-		if closeErr != nil && client.read.Load() >= client.downloadSize && client.downloadSize > 0 {
+		// A nil err means nothing went wrong while reading: either all the
+		// requested data was received, or the caller is intentionally abandoning
+		// the download (e.g. closing a partially read stream). In that case
+		// closeErr can only be a stream shutdown-handshake failure (such as
+		// "use of closed network connection" or a close timeout) — the other side
+		// often closes the connection right after sending data. That describes the
+		// connection teardown, not the data, which was already delivered through
+		// Read. Real download errors are reported separately: node-side failures
+		// arrive via Recv and are recorded by handleClosingError, and cancellations
+		// are passed in here as a non-nil err. So only suppress closeErr when err
+		// is nil.
+		if err == nil {
 			closeErr = nil
 		}
 		client.closingError.Set(errs.Combine(err, closeErr))
