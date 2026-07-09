@@ -9,7 +9,9 @@ package buffer
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"io"
+	"sync"
 	"testing"
 	"testing/iotest"
 
@@ -96,6 +98,48 @@ func TestChunkBackend(t *testing.T) {
 		_, err := backend.Write(double[:2])
 		require.ErrorIs(t, err, io.ErrShortWrite)
 	})
+}
+
+func TestBackendCloseConcurrency(t *testing.T) {
+	// A failed or canceled upload closes the backend to interrupt an
+	// in-flight Write (see Buffer.DoneWriting), so Close must be safe to
+	// call concurrently with Write and ReadAt.
+	backends := map[string]func() Backend{
+		"memory": func() Backend { return NewMemoryBackend(chunkSize * 3) },
+		"chunks": func() Backend { return NewChunkBackend(chunkSize * 3) },
+	}
+
+	for name, newBackend := range backends {
+		t.Run(name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				backend := newBackend()
+
+				var wg sync.WaitGroup
+				wg.Add(2)
+				go func() {
+					defer wg.Done()
+					data := make([]byte, 1024)
+					for {
+						if _, err := backend.Write(data); err != nil {
+							return
+						}
+					}
+				}()
+				go func() {
+					defer wg.Done()
+					data := make([]byte, 1024)
+					for {
+						if _, err := backend.ReadAt(data, 0); errors.Is(err, io.ErrClosedPipe) {
+							return
+						}
+					}
+				}()
+
+				require.NoError(t, backend.Close())
+				wg.Wait()
+			}
+		})
+	}
 }
 
 func TestChunksNeeded(t *testing.T) {
