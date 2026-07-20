@@ -29,11 +29,13 @@ storj-up build -s remote github satellite-api -c "$COMMIT_HASH"
 storj-up build -s remote github storagenode -c "$COMMIT_HASH"
 storj-up port remove cockroach 26257
 storj-up port add cockroach 26257 -e 26666
+storj-up port remove postgres 5432
+storj-up port add postgres 5432 -e 5433
 
 # start the services
 docker compose build
 docker compose up -d
-storj-up health -d 60 -p 26666
+storj-up health -d 60 -p 5433
 eval $(storj-up credentials -e)
 
 git clone https://github.com/rclone/rclone

@@ -98,6 +98,7 @@ pipeline {
                             environment {
                                 STORJ_TEST_COCKROACH = 'omit'
                                 STORJ_TEST_POSTGRES = 'omit'
+                                STORJ_TEST_TIDB = 'omit'
                                 STORJ_TEST_LOG_LEVEL = 'info'
                                 STORJ_HASHSTORE_TABLE_DEFAULT_KIND = 'memtbl'
                                 COVERFLAGS = "${ env.COVERDIR ? '-coverprofile=' + env.COVERDIR + '/testsuite.coverprofile -coverpkg=storj.io/uplink/...' : ''}"
@@ -150,6 +151,7 @@ pipeline {
                     environment {
                         STORJ_TEST_POSTGRES = 'omit'
                         STORJ_TEST_COCKROACH = 'omit'
+                        STORJ_TEST_TIDB = 'omit'
                         STORJ_TEST_SPANNER = 'run:/usr/local/bin/spanner_emulator --override_change_stream_partition_token_alive_seconds=1'
                         GOCACHE = '/root/.cache/go-build-integration'
                     }

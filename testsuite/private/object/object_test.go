@@ -1774,7 +1774,7 @@ func TestDeleteObjects(t *testing.T) {
 			version []byte
 		}
 
-		createPrefixedObject := func(t *testing.T, prefix string) minimalObject {
+		createPrefixedObject := func(t *testing.T, bucketName string, prefix string) minimalObject {
 			objectKey := prefix + testrand.Path()
 			upload, err := object.UploadObject(ctx, project, bucketName, objectKey, nil)
 			require.NoError(t, err)
@@ -1785,8 +1785,8 @@ func TestDeleteObjects(t *testing.T) {
 			}
 		}
 
-		createObject := func(t *testing.T) minimalObject {
-			return createPrefixedObject(t, "")
+		createObject := func(t *testing.T, bucketName string) minimalObject {
+			return createPrefixedObject(t, bucketName, "")
 		}
 
 		getLastCommittedVersion := func(t *testing.T, bucketName string, objectKey string) *object.VersionedObject {
@@ -1803,8 +1803,8 @@ func TestDeleteObjects(t *testing.T) {
 		}
 
 		t.Run("Basic", func(t *testing.T) {
-			obj1 := createObject(t)
-			obj2 := createObject(t)
+			obj1 := createObject(t, bucketName)
+			obj2 := createObject(t, bucketName)
 
 			result, err := object.DeleteObjects(ctx, project, bucketName, []object.DeleteObjectsItem{
 				{
@@ -1842,6 +1842,71 @@ func TestDeleteObjects(t *testing.T) {
 			}, result)
 		})
 
+		t.Run("Delete a delete marker", func(t *testing.T) {
+			bucketName := "versioning-suspended-bucket"
+			err := planet.Uplinks[0].CreateBucket(ctx, sat, bucketName)
+			require.NoError(t, err)
+
+			require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, true))
+
+			obj1 := createObject(t, bucketName)
+			obj1Marker, err := object.DeleteObject(ctx, project, bucketName, obj1.key, nil, nil)
+			require.NoError(t, err)
+			require.True(t, obj1Marker.IsDeleteMarker)
+
+			require.NoError(t, bucket.SetBucketVersioning(ctx, project, bucketName, false))
+
+			obj2 := createObject(t, bucketName)
+			_, err = object.DeleteObject(ctx, project, bucketName, obj2.key, nil, nil)
+			require.NoError(t, err)
+
+			obj2Marker := getLastCommittedVersion(t, bucketName, obj2.key)
+			require.True(t, obj2Marker.IsDeleteMarker)
+
+			result, err := object.DeleteObjects(ctx, project, bucketName, []object.DeleteObjectsItem{
+				{
+					ObjectKey: obj1Marker.Key,
+					Version:   obj1Marker.Version,
+				},
+				{
+					ObjectKey: obj2Marker.Key,
+				},
+			}, nil)
+			require.NoError(t, err)
+
+			obj2NewMarker := getLastCommittedVersion(t, bucketName, obj2.key)
+			require.True(t, obj2NewMarker.IsDeleteMarker)
+			require.NotEqual(t, obj2Marker.Version, obj2NewMarker.Version)
+
+			require.ElementsMatch(t, []object.DeleteObjectsResultItem{
+				{
+					ObjectKey:        obj1Marker.Key,
+					RequestedVersion: obj1Marker.Version,
+					Status:           storj.DeleteObjectsStatusOK,
+					Removed: &metaclient.DeleteObjectsResultItemRemoved{
+						Version:        obj1Marker.Version,
+						IsCommitted:    true,
+						IsVersioned:    true,
+						IsDeleteMarker: true,
+					},
+				},
+				{
+					ObjectKey: obj2Marker.Key,
+					Status:    storj.DeleteObjectsStatusOK,
+					Removed: &metaclient.DeleteObjectsResultItemRemoved{
+						Version:        obj2Marker.Version,
+						IsCommitted:    true,
+						IsVersioned:    false,
+						IsDeleteMarker: true,
+					},
+					Marker: &metaclient.DeleteObjectsResultItemMarker{
+						Version:     obj2NewMarker.Version,
+						IsVersioned: false,
+					},
+				},
+			}, result)
+		})
+
 		t.Run("Quiet mode", func(t *testing.T) {
 			const prefix = "prefix/"
 
@@ -1856,8 +1921,8 @@ func TestDeleteObjects(t *testing.T) {
 			require.NoError(t, err)
 			defer ctx.Check(project.Close)
 
-			obj := createPrefixedObject(t, prefix)
-			unauthorizedObj := createObject(t)
+			obj := createPrefixedObject(t, bucketName, prefix)
+			unauthorizedObj := createObject(t, bucketName)
 			notFoundObj := minimalObject{
 				key:     prefix + testrand.Path(),
 				version: randVersion(),
