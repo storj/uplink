@@ -12,7 +12,7 @@ require (
 	golang.org/x/sync v0.20.0
 	storj.io/common v0.0.0-20260629224719-ba1bff0a7846
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
-	storj.io/infectious v0.0.2
+	storj.io/infectious v1.0.1
 	storj.io/storj v1.160.2-0.20260718043329-79fac9ad693b
 	storj.io/uplink v1.14.3
 )

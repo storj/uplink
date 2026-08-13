@@ -14,7 +14,7 @@ require (
 	storj.io/common v0.0.0-20260514184426-9f076a4a8d52
 	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
 	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
-	storj.io/infectious v0.0.2
+	storj.io/infectious v1.0.1
 	storj.io/picobuf v0.0.4
 )
 
