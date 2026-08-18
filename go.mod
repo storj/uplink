@@ -11,9 +11,9 @@ require (
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
-	storj.io/common v0.0.0-20260514184426-9f076a4a8d52
-	storj.io/drpc v0.0.35-0.20250513201419-f7819ea69b55
-	storj.io/eventkit v0.0.0-20250410172343-61f26d3de156
+	storj.io/common v0.0.0-20260818140313-d38275a3768b
+	storj.io/drpc v1.0.0
+	storj.io/eventkit v0.0.0-20260707062648-170ec15e6f3f
 	storj.io/infectious v1.0.1
 	storj.io/picobuf v0.0.4
 )
@@ -21,14 +21,14 @@ require (
 require (
 	github.com/calebcase/tmpfile v1.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/flynn/noise v1.0.0 // indirect
-	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
-	github.com/jtolio/noiseconn v0.0.0-20230301220541-88105e6c8ac6 // indirect
+	github.com/flynn/noise v1.1.0 // indirect
+	github.com/google/pprof v0.0.0-20260604005048-7023385849c0 // indirect
+	github.com/jtolio/noiseconn v0.0.0-20231127013910-f6d9ecbf1de7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/zeebo/blake3 v0.2.3 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.1-0.20260303015103-eaaaaee1dc1a // indirect
+	github.com/zeebo/blake3 v0.2.4 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
