@@ -8,10 +8,13 @@ import (
 	"io"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/pb"
+	"storj.io/common/storj"
+	"storj.io/common/testrand"
 )
 
 // fakeDownloadStream is a downloadStream whose Close returns a configurable
@@ -72,4 +75,14 @@ func TestDownloadCloseSuppressesBenignStreamError(t *testing.T) {
 		download.cancelCtx(context.Canceled)
 		require.ErrorIs(t, download.closingError.Get(), realErr)
 	})
+}
+
+// TestNodeTask checks that the task name derived once per download is the one
+// the task was named with before, when it was derived on every read.
+func TestNodeTask(t *testing.T) {
+	for range 100 {
+		id := testrand.NodeID()
+		assert.Equal(t, "node: "+id.String()[0:8], nodeTask(id))
+	}
+	assert.Equal(t, "node: "+storj.NodeID{}.String()[0:8], nodeTask(storj.NodeID{}))
 }
