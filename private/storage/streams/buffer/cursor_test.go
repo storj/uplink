@@ -98,10 +98,8 @@ func TestCursor(t *testing.T) {
 				cursor := NewCursor(1)
 
 				var wg sync.WaitGroup
-				for i := 0; i < readers; i++ {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+				for range readers {
+					wg.Go(func() {
 						for at := int64(0); at < rounds; {
 							m, ok, err := cursor.WaitRead(at + 1)
 							require.NoError(t, err)
@@ -111,7 +109,7 @@ func TestCursor(t *testing.T) {
 							at = m
 							cursor.ReadTo(at)
 						}
-					}()
+					})
 				}
 
 				for at := int64(0); at < rounds; {
@@ -179,6 +177,70 @@ func BenchmarkCursorFanOut(b *testing.B) {
 				b.ResetTimer()
 				for at := int64(0); at < int64(b.N); {
 					m, _, err := cursor.WaitWrite(at + 1)
+					if err != nil {
+						b.Fatal(err)
+					}
+					at = m
+					cursor.WroteTo(at)
+				}
+				b.StopTimer()
+
+				cursor.DoneWriting(nil)
+				wg.Wait()
+			})
+		}
+	}
+}
+
+// BenchmarkCursorStripeReads models the upload path more closely than
+// BenchmarkCursorFanOut, which advances a byte at a time. Every reader here is
+// one erasure coded piece consuming a whole stripe per step, the way
+// segmentupload.EncodedReader does via io.ReadFull.
+//
+// The two windows bracket the write ahead against that stripe size. A window
+// narrower than a stripe cannot satisfy any reader in a single WaitRead, so the
+// lock free fast path never fires, every write has readers parked on it, and
+// each WroteTo broadcasts to the whole fan-out.
+func BenchmarkCursorStripeReads(b *testing.B) {
+	const stripeSize = 256 * 29 // erasure share size times required count
+
+	windows := []struct {
+		name       string
+		writeAhead int64
+	}{
+		{"BelowStripe", 4096},
+		{"AboveStripe", 1 << 20},
+	}
+
+	for _, window := range windows {
+		for _, readers := range []int{16, 110} {
+			b.Run(fmt.Sprintf("%s/Readers%d", window.name, readers), func(b *testing.B) {
+				cursor := NewCursor(window.writeAhead)
+
+				var wg sync.WaitGroup
+				for i := 0; i < readers; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						// Consume a stripe at a time, looping on partial
+						// results the way io.ReadFull does.
+						for at := int64(0); ; {
+							want := at + stripeSize
+							for at < want {
+								m, ok, err := cursor.WaitRead(want)
+								if err != nil || !ok {
+									return
+								}
+								at = m
+								cursor.ReadTo(at)
+							}
+						}
+					}()
+				}
+
+				b.ResetTimer()
+				for at := int64(0); at < int64(b.N)*stripeSize; {
+					m, _, err := cursor.WaitWrite(at + stripeSize)
 					if err != nil {
 						b.Fatal(err)
 					}

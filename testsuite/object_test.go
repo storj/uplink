@@ -384,7 +384,14 @@ func TestAbortUpload(t *testing.T) {
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")
 
-		randData := testrand.Bytes(10 * memory.KiB)
+		// Write more than the splitter's write ahead window (1 MiB). BeginObject
+		// is sent from the goroutine that uploads the first segment, and the
+		// splitter cannot get further than the window ahead of the piece
+		// readers, which only exist once that goroutine has the BeginObject and
+		// BeginSegment responses. So a Write this large returning means the
+		// client knows the stream ID and Abort can delete the pending object;
+		// aborting earlier leaves it behind for the zombie deletion chore.
+		randData := testrand.Bytes(2 * memory.MiB)
 		_, err = upload.Write(randData)
 		require.NoError(t, err)
 		assertObjectEmptyCreated(t, upload.Info(), "test.dat")

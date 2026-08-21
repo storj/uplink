@@ -370,8 +370,14 @@ func TestUploadEventuallyFailsWithNoNodes(t *testing.T) {
 		upload, err := project.UploadObject(ctx, bucket.Name, "test/path", nil)
 		require.NoError(t, err)
 
-		_, err = upload.Write(data)
-		require.Error(t, err)
+		// The splitter's write ahead window can swallow a whole write before
+		// the doomed segment upload reports back, so a single Write is not
+		// guaranteed to observe the failure. Keep writing until it does.
+		require.Eventually(t, func() bool {
+			_, err := upload.Write(data)
+			return err != nil
+		}, 30*time.Second, 10*time.Millisecond, "expected the upload to fail")
+
 		require.NoError(t, upload.Abort())
 	})
 }

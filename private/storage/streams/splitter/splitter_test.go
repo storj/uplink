@@ -151,3 +151,49 @@ func TestSplitter(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitterWriteAhead(t *testing.T) {
+	newOpts := func() Options {
+		return Options{
+			Split:   20,
+			Minimum: 10,
+			Params: storj.EncryptionParameters{
+				CipherSuite: storj.EncAESGCM,
+				BlockSize:   21,
+			},
+			Key: new(storj.Key),
+		}
+	}
+
+	t.Run("defaults when unset", func(t *testing.T) {
+		s, err := New(newOpts())
+		require.NoError(t, err)
+		require.EqualValues(t, defaultWriteAhead, s.opts.WriteAhead)
+	})
+
+	t.Run("honors an explicit value", func(t *testing.T) {
+		opts := newOpts()
+		opts.WriteAhead = 8 << 20
+
+		s, err := New(opts)
+		require.NoError(t, err)
+		require.EqualValues(t, 8<<20, s.opts.WriteAhead)
+	})
+
+	// Minimum decides whether a segment is stored inline and has nothing to do
+	// with the write ahead window. Tying the two together starves the erasure
+	// piece readers, which consume a stripe at a time, so the default has to
+	// stay well clear of any plausible stripe size.
+	t.Run("is independent of Minimum", func(t *testing.T) {
+		opts := newOpts()
+		opts.WriteAhead = 8 << 20
+
+		s, err := New(opts)
+		require.NoError(t, err)
+		require.EqualValues(t, 8<<20, s.opts.WriteAhead)
+		require.EqualValues(t, 10, s.opts.Minimum)
+
+		const maxPlausibleStripeSize = 64 << 10
+		require.Greater(t, int64(defaultWriteAhead), int64(maxPlausibleStripeSize))
+	})
+}
