@@ -94,6 +94,8 @@ func TestCustomDialContext(t *testing.T) {
 	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
 		{
 			config := uplink.Config{
+				//lint:ignore SA1019 deprecated okay,
+				//nolint:staticcheck // deprecated okay.
 				DialContext: badDialContext,
 			}
 
@@ -107,6 +109,8 @@ func TestCustomDialContext(t *testing.T) {
 
 		{
 			config := uplink.Config{
+				//lint:ignore SA1019 deprecated okay,
+				//nolint:staticcheck // deprecated okay.
 				DialContext: (new(net.Dialer)).DialContext,
 			}
 

@@ -59,6 +59,8 @@ func BenchmarkProject_OpenProject(b *testing.B) {
 	clientCertPEM, clientKeyPEM := loadPEMs(b, "testdata/testidentity/identity.cert", "testdata/testidentity/identity.key")
 
 	config := uplink.Config{
+		//lint:ignore SA1019 deprecated okay,
+		//nolint:staticcheck // deprecated okay.
 		DialTimeout: 10 * time.Second,
 		ChainPEM:    clientCertPEM,
 		KeyPEM:      clientKeyPEM,
