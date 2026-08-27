@@ -3,7 +3,6 @@ module storj.io/uplink
 go 1.26.0
 
 require (
-	github.com/gogo/protobuf v1.3.2
 	github.com/klauspost/compress v1.18.7
 	github.com/spacemonkeygo/monkit/v3 v3.0.25-0.20251022131615-eb24eb109368
 	github.com/stretchr/testify v1.11.1
@@ -11,11 +10,11 @@ require (
 	github.com/zeebo/errs v1.4.0
 	github.com/zeebo/mwc v0.0.7
 	github.com/zeebo/sudo v1.0.2
-	storj.io/common v0.0.0-20261123080358-901b7ac4bda7
+	storj.io/common v0.0.0-20261124124401-cc2efb62fbfb
 	storj.io/drpc v1.1.0
 	storj.io/eventkit v0.0.0-20260707062648-170ec15e6f3f
 	storj.io/infectious v1.0.1
-	storj.io/picobuf v0.9.4
+	storj.io/picobuf v0.9.6
 )
 
 require (

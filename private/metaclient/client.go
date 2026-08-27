@@ -420,7 +420,8 @@ func newObjectInfo(object *pb.Object) RawObjectItem {
 	}
 
 	if object.LegalHold != nil {
-		info.LegalHold = &object.LegalHold.Value
+		legalHold := *object.LegalHold
+		info.LegalHold = &legalHold
 	}
 
 	if object.EncryptionParameters != nil {

@@ -2,8 +2,6 @@ module storj.io/uplink/testsuite
 
 go 1.26.0
 
-replace storj.io/uplink => ../
-
 require (
 	github.com/klauspost/compress v1.18.7
 	github.com/stretchr/testify v1.12.1
@@ -14,7 +12,7 @@ require (
 	storj.io/drpc v1.1.0
 	storj.io/infectious v1.0.1
 	storj.io/storj v1.167.0-rc.0.20261123084150-df2c3b1917da
-	storj.io/uplink v1.14.6-0.20261109055925-e5a98a79f2f6
+	storj.io/uplink v1.14.6-0.20261123213720-b4546d577e78
 )
 
 require (
