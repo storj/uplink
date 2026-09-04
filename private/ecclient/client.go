@@ -7,16 +7,12 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sort"
-	"strconv"
 	"sync"
-	"time"
 
 	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 
 	"storj.io/common/encryption"
-	"storj.io/common/errs2"
 	"storj.io/common/pb"
 	"storj.io/common/ranger"
 	"storj.io/common/rpc"
@@ -27,28 +23,25 @@ import (
 
 var mon = monkit.Package()
 
-// GetOptions is a struct of options for GetWithOptions.
+// GetOptions is a struct of options for Get.
 type GetOptions struct {
 	ErrorDetection bool
 }
 
 // Client defines an interface for storing erasure coded data to piece store nodes.
 type Client interface {
-	// TODO remove it
-	PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error)
-	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (ranger.Ranger, error)
-	GetWithOptions(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (ranger.Ranger, error)
-	WithForceErrorDetection(force bool) Client
-	// PutPiece is not intended to be used by normal uplinks directly, but is exported to support storagenode graceful exit transfers.
-	PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, id *struct{}, err error)
+	Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (ranger.Ranger, error)
+	// PutPiece uploads a single erasure share to the node addressed by the
+	// limit. Segment-level uploads are driven by private/storage/streams,
+	// which uses this to satisfy pieceupload.PiecePutter.
+	PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, err error)
 }
 
 type dialPiecestoreFunc func(context.Context, storj.NodeURL) (*piecestore.Client, error)
 
 type ecClient struct {
-	dialer              rpc.Dialer
-	memoryLimit         int
-	forceErrorDetection bool
+	dialer      rpc.Dialer
+	memoryLimit int
 }
 
 // New creates a client from the given dialer and max buffer memory.
@@ -57,11 +50,6 @@ func New(dialer rpc.Dialer, memoryLimit int) Client {
 		dialer:      dialer,
 		memoryLimit: memoryLimit,
 	}
-}
-
-func (ec *ecClient) WithForceErrorDetection(force bool) Client {
-	ec.forceErrorDetection = force
-	return ec
 }
 
 func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piecestore.Client, error) {
@@ -74,160 +62,25 @@ func (ec *ecClient) dialPiecestore(ctx context.Context, n storj.NodeURL) (*piece
 	return client, nil
 }
 
-func (ec *ecClient) PutSingleResult(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader) (results []*pb.SegmentPieceUploadResult, err error) {
-	successfulNodes, successfulHashes, err := ec.put(ctx, limits, privateKey, rs, data, time.Time{})
-	if err != nil {
-		return nil, err
-	}
-
-	uploadResults := make([]*pb.SegmentPieceUploadResult, 0, len(successfulNodes))
-	for i := range successfulNodes {
-		if successfulNodes[i] == nil {
-			continue
-		}
-
-		uploadResults = append(uploadResults, &pb.SegmentPieceUploadResult{
-			PieceNum: int32(i),
-			NodeId:   successfulNodes[i].Id,
-			Hash:     successfulHashes[i],
-		})
-	}
-
-	if l := len(uploadResults); l < rs.OptimalThreshold() {
-		return nil, Error.New("uploaded results (%d) are below the optimal threshold (%d)", l, rs.OptimalThreshold())
-	}
-
-	return uploadResults, nil
-}
-
-func (ec *ecClient) put(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, rs eestream.RedundancyStrategy, data io.Reader, expiration time.Time) (successfulNodes []*pb.Node, successfulHashes []*pb.PieceHash, err error) {
-	defer mon.Task()(&ctx,
-		"erasure:"+strconv.Itoa(rs.ErasureShareSize()),
-		"stripe:"+strconv.Itoa(rs.StripeSize()),
-		"repair:"+strconv.Itoa(rs.RepairThreshold()),
-		"optimal:"+strconv.Itoa(rs.OptimalThreshold()),
-	)(&err)
-
-	pieceCount := len(limits)
-	if pieceCount != rs.TotalCount() {
-		return nil, nil, Error.New("size of limits slice (%d) does not match total count (%d) of erasure scheme", pieceCount, rs.TotalCount())
-	}
-
-	nonNilLimits := nonNilCount(limits)
-	if nonNilLimits <= rs.RepairThreshold() && nonNilLimits < rs.OptimalThreshold() {
-		return nil, nil, Error.New("number of non-nil limits (%d) is less than or equal to the repair threshold (%d) of erasure scheme", nonNilLimits, rs.RepairThreshold())
-	}
-
-	if !unique(limits) {
-		return nil, nil, Error.New("duplicated nodes are not allowed")
-	}
-
-	padded := encryption.PadReader(io.NopCloser(data), rs.StripeSize())
-	readers, err := eestream.EncodeReader2(ctx, padded, rs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	type info struct {
-		i    int
-		err  error
-		hash *pb.PieceHash
-	}
-	infos := make(chan info, pieceCount)
-
-	piecesCtx, piecesCancel := context.WithCancel(ctx)
-	defer piecesCancel()
-
-	for i, addressedLimit := range limits {
-		go func(i int, addressedLimit *pb.AddressedOrderLimit) {
-			hash, _, err := ec.PutPiece(piecesCtx, ctx, addressedLimit, privateKey, readers[i])
-			infos <- info{i: i, err: err, hash: hash}
-		}(i, addressedLimit)
-	}
-
-	successfulNodes = make([]*pb.Node, pieceCount)
-	successfulHashes = make([]*pb.PieceHash, pieceCount)
-	var successfulCount, failureCount, cancellationCount int32
-
-	// all the piece upload errors, combined
-	var pieceErrors errs.Group
-	for range limits {
-		info := <-infos
-
-		if limits[info.i] == nil {
-			continue
-		}
-
-		if info.err != nil {
-			pieceErrors.Add(info.err)
-			if !errs2.IsCanceled(info.err) {
-				failureCount++
-			} else {
-				cancellationCount++
-			}
-			continue
-		}
-
-		successfulNodes[info.i] = &pb.Node{
-			Id:      limits[info.i].GetLimit().StorageNodeId,
-			Address: limits[info.i].GetStorageNodeAddress(),
-		}
-		successfulHashes[info.i] = info.hash
-
-		successfulCount++
-		if int(successfulCount) >= rs.OptimalThreshold() {
-			// cancelling remaining uploads
-			piecesCancel()
-		}
-	}
-
-	defer func() {
-		select {
-		case <-ctx.Done():
-			// make sure context.Canceled is the primary error in the error chain
-			// for later errors.Is/errs2.IsCanceled checking
-			err = errs.Combine(context.Canceled, Error.New("upload cancelled by user"))
-		default:
-		}
-	}()
-
-	mon.IntVal("put_segment_pieces_total").Observe(int64(pieceCount))
-	mon.IntVal("put_segment_pieces_optimal").Observe(int64(rs.OptimalThreshold()))
-	mon.IntVal("put_segment_pieces_successful").Observe(int64(successfulCount))
-	mon.IntVal("put_segment_pieces_failed").Observe(int64(failureCount))
-	mon.IntVal("put_segment_pieces_canceled").Observe(int64(cancellationCount))
-
-	if int(successfulCount) <= rs.RepairThreshold() && int(successfulCount) < rs.OptimalThreshold() {
-		return nil, nil, Error.New("successful puts (%d) less than or equal to repair threshold (%d), %w", successfulCount, rs.RepairThreshold(), pieceErrors.Err())
-	}
-
-	if int(successfulCount) < rs.OptimalThreshold() {
-		return nil, nil, Error.New("successful puts (%d) less than success threshold (%d), %w", successfulCount, rs.OptimalThreshold(), pieceErrors.Err())
-	}
-
-	return successfulNodes, successfulHashes, nil
-}
-
-func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error) {
+func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, err error) {
 	if limit == nil {
 		defer mon.Task()(&ctx, "node: nil")(&err)
 		defer func() { err = errs.Combine(err, data.Close()) }()
 		_, _ = io.Copy(io.Discard, data)
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	storageNodeID := limit.GetLimit().StorageNodeId
 	defer mon.Task()(&ctx, "node: "+storageNodeID.String()[0:8])(&err)
-	measuredReader := countingReader{R: data}
 	defer func() { err = errs.Combine(err, data.Close()) }()
 
 	ps, err := ec.dialPiecestore(ctx, limitToNodeURL(limit))
 	if err != nil {
-		return nil, nil, Error.New("failed to dial (node:%v): %w", storageNodeID, err)
+		return nil, Error.New("failed to dial (node:%v): %w", storageNodeID, err)
 	}
 	defer func() { err = errs.Combine(err, ps.Close()) }()
 
-	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, &measuredReader)
+	hash, err = ps.UploadReader(ctx, limit.GetLimit(), privateKey, data)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) {
 			// Canceled context means the piece upload was interrupted by user or due
@@ -249,28 +102,13 @@ func (ec *ecClient) PutPiece(ctx, parent context.Context, limit *pb.AddressedOrd
 			err = Error.New("upload failed (node:%v, address:%v): %w", storageNodeID, nodeAddress, err)
 		}
 
-		return nil, nil, err
+		return nil, err
 	}
 
-	return hash, nil, nil
+	return hash, nil
 }
 
-type countingReader struct {
-	N int64
-	R io.Reader
-}
-
-func (c *countingReader) Read(p []byte) (n int, err error) {
-	n, err = c.R.Read(p)
-	c.N += int64(n)
-	return n, err
-}
-
-func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64) (rr ranger.Ranger, err error) {
-	return ec.GetWithOptions(ctx, limits, privateKey, es, size, GetOptions{})
-}
-
-func (ec *ecClient) GetWithOptions(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (rr ranger.Ranger, err error) {
+func (ec *ecClient) Get(ctx context.Context, limits []*pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, es eestream.ErasureScheme, size int64, opts GetOptions) (rr ranger.Ranger, err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	if len(limits) != es.TotalCount() {
@@ -298,36 +136,13 @@ func (ec *ecClient) GetWithOptions(ctx context.Context, limits []*pb.AddressedOr
 		}
 	}
 
-	rr, err = eestream.Decode(rrs, es, ec.memoryLimit, opts.ErrorDetection || ec.forceErrorDetection)
+	rr, err = eestream.Decode(rrs, es, ec.memoryLimit, opts.ErrorDetection)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
 	ranger, err := encryption.Unpad(rr, int(paddedSize-size))
 	return ranger, Error.Wrap(err)
-}
-
-func unique(limits []*pb.AddressedOrderLimit) bool {
-	if len(limits) < 2 {
-		return true
-	}
-	ids := make(storj.NodeIDList, len(limits))
-	for i, addressedLimit := range limits {
-		if addressedLimit != nil {
-			ids[i] = addressedLimit.GetLimit().StorageNodeId
-		}
-	}
-
-	// sort the ids and check for identical neighbors
-	sort.Sort(ids)
-	// sort.Slice(ids, func(i, k int) bool { return ids[i].Less(ids[k]) })
-	for i := 1; i < len(ids); i++ {
-		if ids[i] != (storj.NodeID{}) && ids[i] == ids[i-1] {
-			return false
-		}
-	}
-
-	return true
 }
 
 func calcPadded(size int64, blockSize int) int64 {
@@ -441,14 +256,6 @@ func (lr *lazyPieceRanger) dial(ctx context.Context, offset, length int64) (_ *p
 		return nil, nil, errs.Combine(err, ps.Close())
 	}
 	return ps, download, nil
-}
-
-// GetHashAndLimit gets the download's hash and original order limit.
-func (lr *lazyPieceReader) GetHashAndLimit() (*pb.PieceHash, *pb.OrderLimit) {
-	if lr.download == nil {
-		return nil, nil
-	}
-	return lr.download.GetHashAndLimit()
 }
 
 func (lr *lazyPieceReader) Close() (err error) {

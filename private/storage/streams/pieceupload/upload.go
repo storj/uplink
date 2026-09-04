@@ -23,7 +23,7 @@ type PiecePutter interface {
 	// PutPiece puts a piece using the given limit and private key. The
 	// operation can be cancelled using the longTailCtx or uploadCtx is
 	// cancelled.
-	PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error)
+	PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, err error)
 }
 
 var (
@@ -105,7 +105,7 @@ func UploadOne(
 			}
 			defer cleanup()
 
-			hash, _, err := putter.PutPiece(ctx, uploadCtx, limit, privateKey, io.NopCloser(piece))
+			hash, err := putter.PutPiece(ctx, uploadCtx, limit, privateKey, io.NopCloser(piece))
 			testuplink.Log(logCtx, "Done uploading piece. err:", err)
 
 			// Track success or failure

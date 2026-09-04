@@ -381,8 +381,8 @@ func (metainfoUpload) Close() error {
 
 type piecePutter struct{}
 
-func (piecePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error) {
-	return nil, nil, errs.New("should not be called")
+func (piecePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, err error) {
+	return nil, errs.New("should not be called")
 }
 
 type fixedMetadata struct{}

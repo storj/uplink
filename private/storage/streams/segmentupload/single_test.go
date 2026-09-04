@@ -414,27 +414,27 @@ func (fakeLimitsExchanger) ExchangeLimits(ctx context.Context, segmentID storj.S
 
 type fakePiecePutter struct{}
 
-func (fakePiecePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, deprecated *struct{}, err error) {
+func (fakePiecePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (hash *pb.PieceHash, err error) {
 	if !bytes.Equal(fakePrivateKey.Bytes(), privateKey.Bytes()) {
-		return nil, nil, errs.New("private key was not passed correctly")
+		return nil, errs.New("private key was not passed correctly")
 	}
 
 	if _, err := io.ReadAll(data); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	switch {
 	case isNodeKind(limit.Limit.StorageNodeId, badKind):
-		return nil, nil, errs.New("piece upload failed")
+		return nil, errs.New("piece upload failed")
 	case isNodeKind(limit.Limit.StorageNodeId, slowKind):
 		select {
 		case <-longTailCtx.Done():
-			return nil, nil, longTailCtx.Err()
+			return nil, longTailCtx.Err()
 		case <-uploadCtx.Done():
-			return nil, nil, uploadCtx.Err()
+			return nil, uploadCtx.Err()
 		}
 	}
-	return &pb.PieceHash{PieceId: limit.Limit.PieceId}, nil, nil
+	return &pb.PieceHash{PieceId: limit.Limit.PieceId}, nil
 }
 
 type wrappedScheduler struct {

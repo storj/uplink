@@ -36,7 +36,7 @@ type Project struct {
 	ec                            ecclient.Client
 	segmentSize                   int64
 	encryptionParameters          storj.EncryptionParameters
-	concurrentSegmentUploadConfig *testuplink.ConcurrentSegmentUploadsConfig
+	concurrentSegmentUploadConfig testuplink.ConcurrentSegmentUploadsConfig
 	satelliteSigner               signing.Signer
 	tracker                       leak.Ref
 }

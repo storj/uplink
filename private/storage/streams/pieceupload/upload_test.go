@@ -521,22 +521,22 @@ type fakePutter struct {
 	failPuts int
 }
 
-func (p *fakePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *fakePutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
 	if p.failPuts > 0 {
 		p.failPuts--
-		return nil, nil, errs.New("put failed for piece: %d", num)
+		return nil, errs.New("put failed for piece: %d", num)
 	}
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }
 
@@ -546,7 +546,7 @@ type slowPutter struct {
 	delay time.Duration
 }
 
-func (p *slowPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *slowPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	// Simulate slow upload
@@ -554,12 +554,12 @@ func (p *slowPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
 		num := pieceReaderNum(data)
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }
 
@@ -572,7 +572,7 @@ type mixedPutter struct {
 	mu        sync.Mutex
 }
 
-func (p *mixedPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *mixedPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
@@ -590,11 +590,11 @@ func (p *mixedPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }
 
@@ -607,7 +607,7 @@ type tripleStallPutter struct {
 	mu        sync.Mutex
 }
 
-func (p *tripleStallPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *tripleStallPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
@@ -625,11 +625,11 @@ func (p *tripleStallPutter) PutPiece(longTailCtx, uploadCtx context.Context, lim
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }
 
@@ -643,7 +643,7 @@ type nodeTrackingPutter struct {
 	mu        sync.Mutex
 }
 
-func (p *nodeTrackingPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *nodeTrackingPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
@@ -665,11 +665,11 @@ func (p *nodeTrackingPutter) PutPiece(longTailCtx, uploadCtx context.Context, li
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }
 
@@ -682,7 +682,7 @@ type mixedFailureStallPutter struct {
 	mu        sync.Mutex
 }
 
-func (p *mixedFailureStallPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, *struct{}, error) {
+func (p *mixedFailureStallPutter) PutPiece(longTailCtx, uploadCtx context.Context, limit *pb.AddressedOrderLimit, privateKey storj.PiecePrivateKey, data io.ReadCloser) (*pb.PieceHash, error) {
 	assert.Equal(p.t, fakePrivateKey, privateKey, "private key was not passed correctly")
 
 	num := pieceReaderNum(data)
@@ -694,7 +694,7 @@ func (p *mixedFailureStallPutter) PutPiece(longTailCtx, uploadCtx context.Contex
 
 	// First call: return an error
 	if currentCall == 0 {
-		return nil, nil, errs.New("simulated upload error")
+		return nil, errs.New("simulated upload error")
 	}
 
 	// Second call: stall (slow upload that will trigger stall detection)
@@ -706,10 +706,10 @@ func (p *mixedFailureStallPutter) PutPiece(longTailCtx, uploadCtx context.Contex
 
 	select {
 	case <-uploadCtx.Done():
-		return nil, nil, uploadCtx.Err()
+		return nil, uploadCtx.Err()
 	case <-longTailCtx.Done():
-		return nil, nil, longTailCtx.Err()
+		return nil, longTailCtx.Err()
 	default:
-		return hash(num), nil, nil
+		return hash(num), nil
 	}
 }

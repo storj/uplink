@@ -68,7 +68,7 @@ func GetListLimit(ctx context.Context) int {
 }
 
 // ConcurrentSegmentUploadsConfig is the configuration for concurrent
-// segment uploads using the new upload codepath.
+// segment uploads.
 type ConcurrentSegmentUploadsConfig struct {
 	// SchedulerOptions are the options for the scheduler used to place limits
 	// on the amount of concurrent piece limits per-upload, across all
@@ -86,34 +86,32 @@ func DefaultConcurrentSegmentUploadsConfig() ConcurrentSegmentUploadsConfig {
 	}
 }
 
-// WithConcurrentSegmentUploadsDefaultConfig creates a context that enables the
-// new concurrent segment upload codepath for testing purposes using the
-// default configuration.
+// WithConcurrentSegmentUploadsDefaultConfig creates a context that configures
+// concurrent segment uploads for testing purposes using the default
+// configuration.
 //
 // The context needs to be used with uplink.OpenProject to have effect.
 func WithConcurrentSegmentUploadsDefaultConfig(ctx context.Context) context.Context {
 	return WithConcurrentSegmentUploadsConfig(ctx, DefaultConcurrentSegmentUploadsConfig())
 }
 
-// WithConcurrentSegmentUploadsConfig creates a context that enables the
-// new concurrent segment upload codepath for testing purposes using the
-// given scheduler options.
+// WithConcurrentSegmentUploadsConfig creates a context that configures
+// concurrent segment uploads for testing purposes using the given scheduler
+// options.
 //
 // The context needs to be used with uplink.OpenProject to have effect.
 func WithConcurrentSegmentUploadsConfig(ctx context.Context, config ConcurrentSegmentUploadsConfig) context.Context {
 	return context.WithValue(ctx, concurrentSegmentUploadsConfigKey{}, config)
 }
 
-// GetConcurrentSegmentUploadsConfig returns the scheduler options to
-// use with the new concurrent segment upload codepath, if no scheduler
-// options have been set it will return default configuration. Concurrent
-// segment upload code path can be disabled with DisableConcurrentSegmentUploads.
-func GetConcurrentSegmentUploadsConfig(ctx context.Context) *ConcurrentSegmentUploadsConfig {
+// GetConcurrentSegmentUploadsConfig returns the concurrent segment upload
+// configuration to use. If none has been set it returns the default
+// configuration.
+func GetConcurrentSegmentUploadsConfig(ctx context.Context) ConcurrentSegmentUploadsConfig {
 	if config, ok := ctx.Value(concurrentSegmentUploadsConfigKey{}).(ConcurrentSegmentUploadsConfig); ok {
-		return &config
+		return config
 	}
-	config := DefaultConcurrentSegmentUploadsConfig()
-	return &config
+	return DefaultConcurrentSegmentUploadsConfig()
 }
 
 // WithLogWriter creates context with information about upload log file.

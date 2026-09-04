@@ -26,11 +26,6 @@ import (
 	"storj.io/uplink/private/stalldetection"
 )
 
-// DisableDeleteOnCancel is now a no-op.
-func DisableDeleteOnCancel(ctx context.Context) context.Context {
-	return ctx
-}
-
 var mon = monkit.Package()
 
 // Meta info about a stream.
@@ -38,19 +33,10 @@ type Meta struct {
 	Modified    time.Time
 	Expiration  time.Time
 	Size        int64
-	Data        []byte
 	Version     []byte
 	IsVersioned bool
 	Retention   *metaclient.Retention
 	LegalHold   *bool
-}
-
-// Part info about a part.
-type Part struct {
-	PartNumber uint32
-	Size       int64
-	Modified   time.Time
-	ETag       []byte
 }
 
 // Metadata interface returns the latest metadata for an object.
@@ -59,51 +45,29 @@ type Metadata interface {
 	ETag() ([]byte, error)
 }
 
-// Store is a store for streams. It implements typedStore as part of an ongoing migration
-// to use typed paths. See the shim for the store that the rest of the world interacts with.
+// Store is a store for streams. It embeds the Uploader, which handles all
+// uploads, and adds the download side on top of it.
 type Store struct {
 	*Uploader
 
-	metainfo             *metaclient.Client
-	ec                   ecclient.Client
-	segmentSize          int64
-	encStore             *encryption.Store
-	encryptionParameters storj.EncryptionParameters
-	inlineThreshold      int
+	metainfo *metaclient.Client
+	ec       ecclient.Client
 }
 
 // NewStreamStore constructs a stream store.
 func NewStreamStore(metainfo *metaclient.Client, ec ecclient.Client, segmentSize int64, encStore *encryption.Store, encryptionParameters storj.EncryptionParameters, inlineThreshold int) (*Store, error) {
-	if segmentSize <= 0 {
-		return nil, errs.New("segment size must be larger than 0")
-	}
-	if encryptionParameters.BlockSize <= 0 {
-		return nil, errs.New("encryption block size must be larger than 0")
-	}
 	// Load stall detection env variables
 	stallDetectionConfig := stalldetection.ConfigFromEnv()
-	// TODO: this is a hack for now. Once the new upload codepath is enabled
-	// by default, we can clean this up and stop embedding the uploader in
-	// the streams store.
 	uploader, err := NewUploader(metainfo, ec, segmentSize, encStore, encryptionParameters, inlineThreshold, stallDetectionConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Store{
-		Uploader:             uploader,
-		metainfo:             metainfo,
-		ec:                   ec,
-		segmentSize:          segmentSize,
-		encStore:             encStore,
-		encryptionParameters: encryptionParameters,
-		inlineThreshold:      inlineThreshold,
+		Uploader: uploader,
+		metainfo: metainfo,
+		ec:       ec,
 	}, nil
-}
-
-// Close closes the underlying resources passed to the metainfo DB.
-func (s *Store) Close() error {
-	return s.metainfo.Close()
 }
 
 // ErrorDetection is a struct that contains information about whether error detection is enabled
@@ -398,7 +362,7 @@ func (s *Store) Ranger(ctx context.Context, response metaclient.DownloadSegmentW
 		return nil, err
 	}
 
-	rr, err = s.ec.GetWithOptions(ctx, limits, info.PiecePrivateKey, redundancy, info.EncryptedSize, ecclient.GetOptions{ErrorDetection: errorDetection})
+	rr, err = s.ec.Get(ctx, limits, info.PiecePrivateKey, redundancy, info.EncryptedSize, ecclient.GetOptions{ErrorDetection: errorDetection})
 	return rr, err
 }
 

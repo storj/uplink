@@ -8,12 +8,9 @@ import (
 	"io"
 	"os"
 
-	"storj.io/common/encryption"
 	"storj.io/common/fpath"
 	"storj.io/common/memory"
 	"storj.io/common/pb"
-	"storj.io/common/ranger"
-	"storj.io/common/readcloser"
 	"storj.io/common/storj"
 	"storj.io/common/sync2"
 	"storj.io/infectious"
@@ -160,14 +157,13 @@ func (er *encodedReader) fillBuffer(ctx context.Context, r io.Reader, w sync2.Pi
 }
 
 type encodedPiece struct {
-	er            *encodedReader
-	pipeReader    sync2.PipeReader
-	num           int
-	currentStripe int64
-	stripeBuf     []byte
-	shareBuf      []byte
-	available     int
-	err           error
+	er         *encodedReader
+	pipeReader sync2.PipeReader
+	num        int
+	stripeBuf  []byte
+	shareBuf   []byte
+	available  int
+	err        error
 }
 
 func (ep *encodedPiece) Read(p []byte) (n int, err error) {
@@ -189,7 +185,6 @@ func (ep *encodedPiece) Read(p []byte) (n int, err error) {
 			return 0, err
 		}
 
-		ep.currentStripe++
 		ep.available = ep.er.rs.ErasureShareSize()
 	}
 
@@ -205,66 +200,6 @@ func (ep *encodedPiece) Close() (err error) {
 	ctx := ep.er.ctx
 	defer mon.Task()(&ctx)(&err)
 	return ep.pipeReader.Close()
-}
-
-// EncodedRanger will take an existing Ranger and provide a means to get
-// multiple Ranged sub-Readers. EncodedRanger does not match the normal Ranger
-// interface.
-type EncodedRanger struct {
-	rr ranger.Ranger
-	rs RedundancyStrategy
-}
-
-// NewEncodedRanger from the given Ranger and RedundancyStrategy. See the
-// comments for EncodeReader about the repair and success thresholds.
-func NewEncodedRanger(rr ranger.Ranger, rs RedundancyStrategy) (*EncodedRanger, error) {
-	if rr.Size()%int64(rs.StripeSize()) != 0 {
-		return nil, Error.New("invalid erasure encoder and range reader combo. range reader size must be a multiple of erasure encoder block size")
-	}
-	return &EncodedRanger{
-		rs: rs,
-		rr: rr,
-	}, nil
-}
-
-// OutputSize is like Ranger.Size but returns the Size of the erasure encoded
-// pieces that come out.
-func (er *EncodedRanger) OutputSize() int64 {
-	blocks := er.rr.Size() / int64(er.rs.StripeSize())
-	return blocks * int64(er.rs.ErasureShareSize())
-}
-
-// Range is like Ranger.Range, but returns a slice of Readers.
-func (er *EncodedRanger) Range(ctx context.Context, offset, length int64) (_ []io.ReadCloser, err error) {
-	defer mon.Task()(&ctx)(&err)
-	// the offset and length given may not be block-aligned, so let's figure
-	// out which blocks contain the request.
-	firstBlock, blockCount := encryption.CalcEncompassingBlocks(
-		offset, length, er.rs.ErasureShareSize())
-	// okay, now let's encode the reader for the range containing the blocks
-	r, err := er.rr.Range(ctx,
-		firstBlock*int64(er.rs.StripeSize()),
-		blockCount*int64(er.rs.StripeSize()))
-	if err != nil {
-		return nil, err
-	}
-	readers, err := EncodeReader2(ctx, r, er.rs)
-	if err != nil {
-		return nil, err
-	}
-	for i, r := range readers {
-		// the offset might start a few bytes in, so we potentially have to
-		// discard the beginning bytes
-		_, err := io.CopyN(io.Discard, r,
-			offset-firstBlock*int64(er.rs.ErasureShareSize()))
-		if err != nil {
-			return nil, Error.Wrap(err)
-		}
-		// the length might be shorter than a multiple of the block size, so
-		// limit it
-		readers[i] = readcloser.LimitReadCloser(r, length)
-	}
-	return readers, nil
 }
 
 // CalcPieceSize calculates what would be the piece size of the encoded data
