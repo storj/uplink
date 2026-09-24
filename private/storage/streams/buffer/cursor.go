@@ -117,10 +117,7 @@ func (c *Cursor) WaitRead(n int64) (m int64, ok bool, err error) {
 // with an error, then 0 and that error are returned. If reading is done with no error, then
 // it returns the amount written, false, and nil.
 func (c *Cursor) WaitWrite(n int64) (m int64, ok bool, err error) {
-	if c.doneWriting.Load() {
-		return 0, false, errs.New("WaitWrite called after DoneWriting")
-	}
-	if maxRead := c.maxRead.Load(); n <= maxRead+c.writeAhead {
+	if maxRead := c.maxRead.Load(); !c.doneWriting.Load() && n <= maxRead+c.writeAhead {
 		return n, true, nil
 	}
 
@@ -128,6 +125,13 @@ func (c *Cursor) WaitWrite(n int64) (m int64, ok bool, err error) {
 	defer c.mu.Unlock()
 
 	if c.doneWriting.Load() {
+		// DoneWriting with an error is how an upload is aborted from another
+		// goroutine, while the writer may still be between two WaitWrite
+		// calls. Hand it the abort reason rather than a generic error, so
+		// that the caller sees why the upload failed.
+		if c.writeErr != nil {
+			return 0, false, c.writeErr
+		}
 		return 0, false, errs.New("WaitWrite called after DoneWriting")
 	}
 

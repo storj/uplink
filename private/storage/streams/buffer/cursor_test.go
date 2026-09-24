@@ -60,6 +60,19 @@ func TestCursor(t *testing.T) {
 		require.Equal(t, result{10, false, nil}, <-done)
 	})
 
+	t.Run("WriteAfterAbortReturnsAbortError", func(t *testing.T) {
+		cursor := NewCursor(10)
+		cursor.DoneWriting(canceled)
+		require.Equal(t, result{0, false, canceled}, wrap(cursor.WaitWrite(1)))
+	})
+
+	t.Run("WriteAfterDoneWritingFails", func(t *testing.T) {
+		cursor := NewCursor(10)
+		cursor.DoneWriting(nil)
+		_, _, err := cursor.WaitWrite(1)
+		require.Error(t, err)
+	})
+
 	t.Run("ReadAllWritten", func(t *testing.T) {
 		cursor := NewCursor(10)
 		cursor.WroteTo(1)
