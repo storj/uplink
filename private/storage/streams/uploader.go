@@ -435,9 +435,13 @@ func (e *encryptedMetadata) EncryptedMetadata(lastSegmentSize int64) (_ *metacli
 		return nil, err
 	}
 
-	encryptedChecksumValue, err := encryption.Encrypt(userData.Checksum.Value, e.cipherSuite, &metadataKey, &storj.Nonce{2})
-	if err != nil {
-		return nil, err
+	// The satellite rejects a non-nil checksum when no checksum algorithm is set.
+	var encryptedChecksumValue []byte
+	if len(userData.Checksum.Value) > 0 {
+		encryptedChecksumValue, err = encryption.Encrypt(userData.Checksum.Value, e.cipherSuite, &metadataKey, &storj.Nonce{2})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &metaclient.EncryptedUserData{

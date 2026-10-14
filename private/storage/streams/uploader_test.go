@@ -255,6 +255,20 @@ func TestEncryptedMetadata(t *testing.T) {
 	require.Equal(t, []byte("ETAG"), etagBytes)
 }
 
+func TestEncryptedMetadataNoChecksum(t *testing.T) {
+	e := encryptedMetadata{
+		userData:    emptyUserData{},
+		segmentSize: segmentSize,
+		derivedKey:  &storjKey,
+		cipherSuite: cipherSuite,
+	}
+
+	encData, err := e.EncryptedMetadata(segmentSize - 1)
+	require.NoError(t, err)
+	// the satellite rejects a non-nil checksum when no checksum algorithm is set
+	require.Nil(t, encData.EncryptedChecksum)
+}
+
 func TestLimitsExchanger(t *testing.T) {
 	e := limitsExchanger{metainfo: retryBeginSegments{}}
 
@@ -397,6 +411,12 @@ func (fixedUserData) SerializedUserData() (metaclient.SerializedUserData, error)
 			Value:       []byte("CHECKSUM"),
 		},
 	}, nil
+}
+
+type emptyUserData struct{}
+
+func (emptyUserData) SerializedUserData() (metaclient.SerializedUserData, error) {
+	return metaclient.SerializedUserData{}, nil
 }
 
 type noopScheduler struct{}

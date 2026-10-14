@@ -256,9 +256,13 @@ func encryptUserData(project *uplink.Project, bucket, key string, userData metac
 		return metaclient.EncryptedUserData{}, errs.Wrap(err)
 	}
 
-	encryptedChecksum, err := encryption.Encrypt(userData.Checksum.Value, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{2})
-	if err != nil {
-		return metaclient.EncryptedUserData{}, errs.Wrap(err)
+	// The satellite rejects a non-nil checksum when no checksum algorithm is set.
+	var encryptedChecksum []byte
+	if len(userData.Checksum.Value) > 0 {
+		encryptedChecksum, err = encryption.Encrypt(userData.Checksum.Value, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{2})
+		if err != nil {
+			return metaclient.EncryptedUserData{}, errs.Wrap(err)
+		}
 	}
 
 	return metaclient.EncryptedUserData{
