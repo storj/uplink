@@ -14,6 +14,7 @@ import (
 	"storj.io/common/base58"
 	"storj.io/common/encryption"
 	"storj.io/common/storj"
+	internalenc "storj.io/uplink/internal/encryption"
 	"storj.io/uplink/internal/privateprops"
 	"storj.io/uplink/private/metaclient"
 )
@@ -369,33 +370,7 @@ func decryptUserData(project *Project, bucket, key string, encryptionParameters 
 		return metaclient.SegmentUserData{}, errs.Wrap(err)
 	}
 
-	if len(segment.EncryptedUserData.ETag) > 0 {
-		// Derive another key from the randomly generated content key to decrypt
-		// the segment's ETag.
-		etagKey, err := encryption.DeriveKey(contentKey, "storj-etag-v1")
-		if err != nil {
-			return metaclient.SegmentUserData{}, errs.Wrap(err)
-		}
-		eTag, err := encryption.Decrypt(segment.EncryptedUserData.ETag, encryptionParameters.CipherSuite, etagKey, &storj.Nonce{})
-		if err != nil {
-			return metaclient.SegmentUserData{}, errs.Wrap(err)
-		}
-		userData.ETag = eTag
-	}
-
-	if len(segment.EncryptedUserData.Checksum) > 0 {
-		checksumKey, err := encryption.DeriveKey(contentKey, "storj-checksum-v1")
-		if err != nil {
-			return metaclient.SegmentUserData{}, errs.Wrap(err)
-		}
-		checksum, err := encryption.Decrypt(segment.EncryptedUserData.Checksum, encryptionParameters.CipherSuite, checksumKey, &storj.Nonce{})
-		if err != nil {
-			return metaclient.SegmentUserData{}, errs.Wrap(err)
-		}
-		userData.Checksum = checksum
-	}
-
-	return userData, nil
+	return internalenc.DecryptSegmentUserData(segment.EncryptedUserData, encryptionParameters.CipherSuite, contentKey)
 }
 
 // uploadInfo_getPrivate exposes the properties of an UploadInfo that should only be visible to the private API.

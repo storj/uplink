@@ -133,7 +133,7 @@ func (dyn dynamicMetadata) SerializedUserData() (metaclient.SerializedUserData, 
 
 	return metaclient.SerializedUserData{
 		Custom:   serializedCustom,
-		ETag:     slices.Clone(dyn.Object.UserData.ETag),
+		ETag:     dyn.Object.UserData.ETag,
 		Checksum: dyn.Object.UserData.Checksum,
 	}, nil
 }
