@@ -657,7 +657,9 @@ func GetObjectRetention(ctx context.Context, project *uplink.Project, bucket, ke
 // Any existing custom metadata will be deleted. This version allows setting an object's ETag and checksum.
 //
 // All properties of the object's user data are replaced together. Any of the custom metadata, ETag, or
-// checksum omitted from newMetadata will be cleared even if it was previously set.
+// checksum omitted from newMetadata will be cleared even if it was previously set. To change only some
+// of them, read the current values first (e.g. with StatObject) and pass the ones to keep in newMetadata.
+// Satellites that predate checksum support silently ignore the checksum.
 func UpdateObjectMetadata(ctx context.Context, project *uplink.Project, bucket, key string, newMetadata metaclient.ObjectUserData) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
