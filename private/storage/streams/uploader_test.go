@@ -255,7 +255,7 @@ func TestEncryptedMetadata(t *testing.T) {
 	require.Equal(t, []byte("ETAG"), etagBytes)
 }
 
-func TestEncryptedMetadataNoChecksum(t *testing.T) {
+func TestEncryptedMetadataNoETagOrChecksum(t *testing.T) {
 	e := encryptedMetadata{
 		userData:    emptyUserData{},
 		segmentSize: segmentSize,
@@ -267,6 +267,7 @@ func TestEncryptedMetadataNoChecksum(t *testing.T) {
 	require.NoError(t, err)
 	// the satellite rejects a non-nil checksum when no checksum algorithm is set
 	require.Nil(t, encData.EncryptedChecksum)
+	require.Nil(t, encData.EncryptedETag)
 }
 
 func TestLimitsExchanger(t *testing.T) {

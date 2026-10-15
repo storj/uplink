@@ -220,9 +220,11 @@ func (db *DB) UpdateObjectMetadata(ctx context.Context, bucket, key string, user
 
 	var encryptedETag, encryptedChecksum []byte
 	if !opts.CustomOnly {
-		encryptedETag, err = encryption.Encrypt(userData.ETag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
-		if err != nil {
-			return errs.Wrap(err)
+		if len(userData.ETag) > 0 {
+			encryptedETag, err = encryption.Encrypt(userData.ETag, encryptionParameters.CipherSuite, &metadataKey, &storj.Nonce{1})
+			if err != nil {
+				return errs.Wrap(err)
+			}
 		}
 
 		// encryption.Encrypt returns a non-nil value even for empty inputs.
