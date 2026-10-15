@@ -565,6 +565,8 @@ type UpdateObjectMetadataParams struct {
 	StreamID           storj.StreamID
 
 	EncryptedUserData
+	// Includes specifies which parts of the user data are updated.
+	// When nil, only custom metadata is updated.
 	Includes *ObjectUserDataIncludes
 }
 
@@ -576,6 +578,11 @@ type ObjectUserDataIncludes struct {
 }
 
 func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *pb.ObjectUpdateMetadataRequest {
+	includes := params.Includes
+	if includes == nil {
+		includes = &ObjectUserDataIncludes{Custom: true}
+	}
+
 	return &pb.ObjectUpdateMetadataRequest{
 		Header:                        header,
 		Bucket:                        params.Bucket,
@@ -589,12 +596,12 @@ func (params *UpdateObjectMetadataParams) toRequest(header *pb.RequestHeader) *p
 		IsChecksumComposite:           params.IsChecksumComposite,
 		EncryptedChecksum:             params.EncryptedChecksum,
 		Includes: &pb.ObjectMetadataIncludes{
-			Custom:   params.Includes.Custom,
-			Etag:     params.Includes.ETag,
-			Checksum: params.Includes.Checksum,
+			Custom:   includes.Custom,
+			Etag:     includes.ETag,
+			Checksum: includes.Checksum,
 		},
 		// Backward compatibility for satellites that do not support Includes
-		SetEncryptedEtag: params.Includes.ETag,
+		SetEncryptedEtag: includes.ETag,
 	}
 }
 
