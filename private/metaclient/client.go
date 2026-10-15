@@ -775,6 +775,11 @@ func convertErrors(err error) error {
 	}
 
 	message := internal.RootError(err).Error()
+	if strings.HasPrefix(message, "protocol error: unknown rpc:") {
+		// Satellites that predate an RPC reject it with a drpc protocol error that has no status code.
+		err = rpcstatus.Wrap(rpcstatus.Unimplemented, err)
+	}
+
 	switch {
 	case strings.HasPrefix(message, "bucket not found"):
 		return ErrBucketNotFound.Wrap(err)
