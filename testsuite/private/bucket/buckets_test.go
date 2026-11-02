@@ -162,7 +162,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 			Placement: "Poland",
 		})
 		// cannot create bucket with custom placement if there is project default.
-		require.True(t, metaclient.ErrConflictingPlacement.Has(err))
+		require.ErrorIs(t, err, privateBucket.ErrConflictingPlacement)
 
 		_, err = privateBucket.CreateBucketWithObjectLock(ctx, project, privateBucket.CreateBucketWithObjectLockParams{
 			Name: bucketName,
@@ -205,7 +205,7 @@ func TestCreateBucketWithLocation(t *testing.T) {
 			Name:      bucketName1,
 			Placement: "EU", // invalid placement
 		})
-		require.True(t, metaclient.ErrInvalidPlacement.Has(err))
+		require.ErrorIs(t, err, privateBucket.ErrInvalidPlacement)
 
 		// disable self-serve placement
 		planet.Satellites[0].API.Metainfo.Endpoint.TestSelfServePlacementEnabled(false)

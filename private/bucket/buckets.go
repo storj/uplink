@@ -48,6 +48,12 @@ var (
 
 	// ErrUnimplemented is returned when a method is not implemented.
 	ErrUnimplemented = errors.New("unimplemented")
+
+	// ErrInvalidPlacement is returned when the requested bucket placement doesn't exist or isn't available to the project.
+	ErrInvalidPlacement = errors.New("invalid placement")
+
+	// ErrConflictingPlacement is returned when a bucket placement is requested for a project that has a default placement.
+	ErrConflictingPlacement = errors.New("conflicting placement")
 )
 
 // Bucket contains information about the bucket.
@@ -243,8 +249,13 @@ func CreateBucketWithObjectLock(ctx context.Context, project *uplink.Project, pa
 		ObjectLockEnabled: params.ObjectLockEnabled,
 	})
 	if err != nil {
-		if errs2.IsRPC(err, rpcstatus.AlreadyExists) {
+		switch {
+		case errs2.IsRPC(err, rpcstatus.AlreadyExists):
 			return nil, convertKnownErrors(uplink.ErrBucketAlreadyExists, params.Name, "")
+		case metaclient.ErrInvalidPlacement.Has(err):
+			err = ErrInvalidPlacement
+		case metaclient.ErrConflictingPlacement.Has(err):
+			err = ErrConflictingPlacement
 		}
 		return nil, convertKnownErrors(err, params.Name, "")
 	}
