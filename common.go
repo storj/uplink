@@ -42,6 +42,9 @@ var ErrStorageLimitExceeded = errors.New("storage limit exceeded")
 // ErrSegmentsLimitExceeded is returned when project will exceeded segments limit.
 var ErrSegmentsLimitExceeded = errors.New("segments limit exceeded")
 
+// ErrBucketLimitExceeded is returned when the project has reached its bucket limit.
+var ErrBucketLimitExceeded = errors.New("bucket limit exceeded")
+
 // ErrPermissionDenied is returned when the request is denied due to invalid permissions.
 var ErrPermissionDenied = errors.New("permission denied")
 
@@ -83,6 +86,10 @@ func convertKnownErrors(err error, bucket, key string) error {
 		} else if strings.Contains(message, "Exceeded Segments Limit") {
 			// contains used to have some flexibility in constructing error message on server-side
 			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, ErrSegmentsLimitExceeded))
+		} else if strings.Contains(message, "number of allocated buckets") {
+			// TODO: match on a dedicated rpcstatus code once the satellite sends one.
+			// Keep the satellite message, storj tests match on it.
+			return packageError.Wrap(rpcstatus.Wrap(rpcstatus.ResourceExhausted, fmt.Errorf("%w: %s", ErrBucketLimitExceeded, message)))
 		}
 	case errs2.IsRPC(err, rpcstatus.NotFound):
 		const (

@@ -20,6 +20,7 @@ import (
 	"storj.io/storj/private/testplanet"
 	"storj.io/storj/satellite"
 	"storj.io/uplink"
+	"storj.io/uplink/private/bucket"
 )
 
 func TestErrRateLimitExceeded(t *testing.T) {
@@ -96,6 +97,31 @@ func TestErrResourceExhausted(t *testing.T) {
 		err = planet.Uplinks[0].Upload(ctx, planet.Satellites[0], "test-bucket", "object", testrand.Bytes(1*memory.KiB))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, uplink.ErrSegmentsLimitExceeded), err.Error())
+	})
+}
+
+func TestErrBucketLimitExceeded(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1,
+		UplinkCount:    1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ProjectLimits.MaxBuckets = 1
+			},
+		},
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		project := openProject(t, ctx, planet)
+		defer ctx.Check(project.Close)
+
+		_, err := project.CreateBucket(ctx, "first")
+		require.NoError(t, err)
+
+		_, err = project.CreateBucket(ctx, "second")
+		require.ErrorIs(t, err, uplink.ErrBucketLimitExceeded)
+		require.ErrorContains(t, err, "number of allocated buckets (1) exceeded")
+
+		_, err = bucket.CreateBucketWithObjectLock(ctx, project, bucket.CreateBucketWithObjectLockParams{Name: "second"})
+		require.ErrorIs(t, err, uplink.ErrBucketLimitExceeded)
 	})
 }
 
