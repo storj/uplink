@@ -7,17 +7,22 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/memory"
+	"storj.io/common/rpc/rpcpool"
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/storj/private/testplanet"
 	"storj.io/uplink"
-	"storj.io/uplink/internal/expose"
+	"storj.io/uplink/private/object"
+	privateProject "storj.io/uplink/private/project"
 	"storj.io/uplink/private/transport"
 )
 
@@ -128,15 +133,137 @@ func badDialContext(ctx context.Context, network, address string) (net.Conn, err
 	return nil, errors.New("dial error")
 }
 
-func TestSettingMaximumBufferSize(t *testing.T) {
-	var config uplink.Config
+// TestSharedConnectionPoolStaysOpen checks that one-off satellite requests made
+// with shared connection pools dial through the pool a project uses for the
+// satellite, and leave it open for the rest of its users.
+func TestSharedConnectionPoolStaysOpen(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		require.NoError(t, planet.Uplinks[0].Upload(ctx, satellite, "bucket", "object", testrand.BytesInt(100)))
 
-	transport.SetMaximumBufferSize(&config, 1)
+		access := planet.Uplinks[0].Access[satellite.ID()]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()].Serialize()
 
-	ctx := testcontext.New(t)
+		newPool := func() *rpcpool.Pool {
+			return rpcpool.New(rpcpool.Options{Capacity: 10, KeyCapacity: 2, IdleExpiration: time.Minute})
+		}
 
-	d, err := expose.ConfigGetDialer(config, ctx)
-	require.NoError(t, err)
+		for _, tc := range []struct {
+			name          string
+			satellitePool bool
+		}{
+			{name: "shared pool"},
+			{name: "separate satellite pool", satellitePool: true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				var dials atomic.Int64
+				config := uplink.Config{
+					//lint:ignore SA1019 deprecated okay,
+					//nolint:staticcheck // deprecated okay.
+					DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+						dials.Add(1)
+						return new(net.Dialer).DialContext(ctx, network, address)
+					},
+				}
 
-	assert.Equal(t, 1, d.ConnectionOptions.Manager.Stream.MaximumBufferSize)
+				pool := newPool()
+				defer ctx.Check(pool.Close)
+				require.NoError(t, transport.SetConnectionPool(ctx, &config, pool))
+
+				if tc.satellitePool {
+					satellitePool := newPool()
+					defer ctx.Check(satellitePool.Close)
+					require.NoError(t, transport.SetSatelliteConnectionPool(ctx, &config, satellitePool))
+				}
+
+				// Every request returns its satellite connection to the pool
+				// when it is done, so as long as they all use the same pool and
+				// it stays open, they share one dial.
+				_, err := config.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "passphrase")
+				require.NoError(t, err)
+
+				_, err = object.GetObjectIPSummary(ctx, config, access, "bucket", "object")
+				require.NoError(t, err)
+
+				_, err = privateProject.GetProjectInfo(ctx, config, access)
+				require.NoError(t, err)
+
+				project, err := config.OpenProject(ctx, access)
+				require.NoError(t, err)
+				defer ctx.Check(project.Close)
+
+				_, err = project.StatObject(ctx, "bucket", "object")
+				require.NoError(t, err)
+
+				require.EqualValues(t, 1, dials.Load())
+			})
+		}
+	})
+}
+
+// TestOneOffRequestsCloseConnections checks that one-off satellite requests
+// made without a shared connection pool close the connections they dial.
+func TestOneOffRequestsCloseConnections(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 0,
+		UplinkCount:      1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		satellite := planet.Satellites[0]
+		require.NoError(t, planet.Uplinks[0].Upload(ctx, satellite, "bucket", "object", testrand.BytesInt(100)))
+
+		access := planet.Uplinks[0].Access[satellite.ID()]
+		apiKey := planet.Uplinks[0].APIKey[satellite.ID()].Serialize()
+
+		var dials, closes atomic.Int64
+		config := uplink.Config{
+			//lint:ignore SA1019 deprecated okay,
+			//nolint:staticcheck // deprecated okay.
+			DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+				conn, err := new(net.Dialer).DialContext(ctx, network, address)
+				if err != nil {
+					return nil, err
+				}
+				dials.Add(1)
+				return &closeCountingConn{Conn: conn, closes: &closes}, nil
+			},
+		}
+
+		for name, request := range map[string]func() error{
+			"request access": func() error {
+				_, err := config.RequestAccessWithPassphrase(ctx, satellite.URL(), apiKey, "passphrase")
+				return err
+			},
+			"object ip summary": func() error {
+				_, err := object.GetObjectIPSummary(ctx, config, access, "bucket", "object")
+				return err
+			},
+			"project info": func() error {
+				_, err := privateProject.GetProjectInfo(ctx, config, access)
+				return err
+			},
+		} {
+			dialed := dials.Load()
+			require.NoError(t, request(), name)
+			require.Greater(t, dials.Load(), dialed, name)
+			require.Equal(t, dials.Load(), closes.Load(), name)
+		}
+	})
+}
+
+// closeCountingConn counts the first Close of a connection, since TLS can
+// close the underlying connection again after the caller does.
+type closeCountingConn struct {
+	net.Conn
+	once   sync.Once
+	closes *atomic.Int64
+}
+
+func (c *closeCountingConn) Close() error {
+	c.once.Do(func() { c.closes.Add(1) })
+	return c.Conn.Close()
 }

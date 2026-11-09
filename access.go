@@ -207,13 +207,15 @@ func config_requestAccessWithPassphraseAndConcurrency(config Config, ctx context
 		return nil, packageError.Wrap(err)
 	}
 
-	dialer, err := config.getDialer(ctx)
+	// The access has no encryption yet, but talking to the satellite only
+	// needs its address and API key.
+	project, err := config.OpenProject(ctx, &Access{satelliteURL: satelliteURL, apiKey: parsedAPIKey})
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
-	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
+	defer func() { err = errs.Combine(err, project.Close()) }()
 
-	metainfo, err := metaclient.DialNodeURL(ctx, dialer, satelliteURL.String(), parsedAPIKey, config.UserAgent)
+	metainfo, err := project.dialMetainfoClient(ctx)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}

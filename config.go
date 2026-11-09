@@ -82,11 +82,6 @@ type Config struct {
 	disableBackgroundQoS bool
 }
 
-// getDialer returns a new rpc.Dialer corresponding to the config.
-func (config Config) getDialer(ctx context.Context) (_ rpc.Dialer, err error) {
-	return config.getDialerForPool(ctx, nil)
-}
-
 // getDialerForPool returns a new rpc.Dialer corresponding to the config, using the chosen pool (or config.pool if pool is nil).
 func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (_ rpc.Dialer, err error) {
 	var tlsOptions *tlsopts.Options
@@ -123,16 +118,6 @@ func (config Config) getDialerForPool(ctx context.Context, pool *rpcpool.Pool) (
 	dialer.ConnectionOptions.Manager.Stream.MaximumBufferSize = config.maximumBufferSize
 
 	return dialer, nil
-}
-
-// NB: this is used with linkname in internal/expose.
-// It needs to be updated when this is updated.
-//
-//lint:ignore U1000, used with linkname
-//nolint:unused,revive
-//go:linkname config_getDialer
-func config_getDialer(config Config, ctx context.Context) (_ rpc.Dialer, err error) {
-	return config.getDialer(ctx)
 }
 
 // setConnectionPool exposes setting connection pool.

@@ -16,7 +16,6 @@ import (
 	"storj.io/common/signing"
 	"storj.io/common/uuid"
 	"storj.io/uplink"
-	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/private/metaclient"
 )
 
@@ -49,13 +48,13 @@ type Info struct {
 }
 
 func getProjectInfo(ctx context.Context, config uplink.Config, access *uplink.Access) (_ *pb.ProjectInfoResponse, err error) {
-	dialer, err := expose.ConfigGetDialer(config, ctx)
+	project, err := config.OpenProject(ctx, access)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
-	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
+	defer func() { err = errs.Combine(err, project.Close()) }()
 
-	client, err := metaclient.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
+	client, err := dialMetainfoClient(ctx, project)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
@@ -108,6 +107,9 @@ func GetProjectInfo(ctx context.Context, config uplink.Config, access *uplink.Ac
 
 //go:linkname convertKnownErrors storj.io/uplink.convertKnownErrors
 func convertKnownErrors(err error, bucket, key string) error
+
+//go:linkname dialMetainfoClient storj.io/uplink.dialMetainfoClient
+func dialMetainfoClient(ctx context.Context, project *uplink.Project) (_ *metaclient.Client, err error)
 
 //go:linkname setSatelliteSigner storj.io/uplink.setSatelliteSigner
 func setSatelliteSigner(project *uplink.Project, signer signing.Signer)

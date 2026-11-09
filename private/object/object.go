@@ -16,7 +16,6 @@ import (
 	"storj.io/common/rpc/rpcstatus"
 	"storj.io/common/storj"
 	"storj.io/uplink"
-	"storj.io/uplink/internal/expose"
 	"storj.io/uplink/internal/privateprops"
 	privateBucket "storj.io/uplink/private/bucket"
 	"storj.io/uplink/private/metaclient"
@@ -296,19 +295,17 @@ func GetObjectIPs(ctx context.Context, config uplink.Config, access *uplink.Acce
 func GetObjectIPSummary(ctx context.Context, config uplink.Config, access *uplink.Access, bucket, key string) (_ *IPSummary, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	dialer, err := expose.ConfigGetDialer(config, ctx)
+	project, err := config.OpenProject(ctx, access)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
-	defer func() { err = errs.Combine(err, dialer.Pool.Close()) }()
+	defer func() { err = errs.Combine(err, project.Close()) }()
 
-	metainfoClient, err := metaclient.DialNodeURL(ctx, dialer, access.SatelliteAddress(), expose.AccessGetAPIKey(access), config.UserAgent)
+	db, err := dialMetainfoDB(ctx, project)
 	if err != nil {
 		return nil, packageError.Wrap(err)
 	}
-	defer func() { err = errs.Combine(err, metainfoClient.Close()) }()
-
-	db := metaclient.New(metainfoClient, storj.EncryptionParameters{}, expose.AccessGetEncAccess(access).Store)
+	defer func() { err = errs.Combine(err, db.Close()) }()
 
 	summary, err := db.GetObjectIPs(ctx, metaclient.Bucket{Name: bucket}, key)
 	return summary, packageError.Wrap(err)

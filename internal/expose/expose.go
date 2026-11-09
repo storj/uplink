@@ -9,7 +9,6 @@ import (
 
 	"storj.io/common/grant"
 	"storj.io/common/macaroon"
-	"storj.io/common/rpc"
 	"storj.io/common/rpc/rpcpool"
 	"storj.io/uplink"
 )
@@ -23,12 +22,6 @@ func ConfigSetConnectionPool(*uplink.Config, *rpcpool.Pool)
 //
 //go:linkname ConfigSetSatelliteConnectionPool storj.io/uplink.config_setSatelliteConnectionPool
 func ConfigSetSatelliteConnectionPool(*uplink.Config, *rpcpool.Pool)
-
-// ConfigGetDialer exposes Config.getDialer.
-//
-//go:linkname ConfigGetDialer storj.io/uplink.config_getDialer
-//nolint:revive
-func ConfigGetDialer(uplink.Config, context.Context) (rpc.Dialer, error)
 
 // ConfigSetMaximumBufferSize exposes Config.setMaximumBufferSize.
 //

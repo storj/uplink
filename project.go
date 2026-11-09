@@ -133,7 +133,7 @@ func (config Config) OpenProject(ctx context.Context, access *Access) (project *
 
 // Close closes the project and all associated resources.
 func (project *Project) Close() (err error) {
-	// only close the connection pools if it's created through OpenProject / getDialer()
+	// only close the connection pools if OpenProject created them
 	if project.config.pool == nil {
 		err = errs.Combine(err, project.storagenodeDialer.Pool.Close())
 
