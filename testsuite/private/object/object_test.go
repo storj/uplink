@@ -166,6 +166,29 @@ func TestUploadObject(t *testing.T) {
 	})
 }
 
+func TestUploadObjectMetadataTooLarge(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,
+	}, func(t *testing.T, ctx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		bucketName := "test-bucket"
+		require.NoError(t, planet.Uplinks[0].CreateBucket(ctx, sat, bucketName))
+
+		project, err := planet.Uplinks[0].OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer ctx.Check(project.Close)
+
+		upload, err := object.UploadObject(ctx, project, bucketName, "test-object", nil)
+		require.NoError(t, err)
+
+		// Encryption makes the metadata larger than the limit.
+		require.NoError(t, upload.SetCustomMetadata(ctx, uplink.CustomMetadata{
+			"key": string(testrand.RandAlphaNumeric(sat.Config.Metainfo.MaxMetadataSize.Int())),
+		}))
+		require.ErrorIs(t, upload.Commit(), object.ErrMetadataTooLarge)
+	})
+}
+
 func TestUploadObjectWithObjectLock(t *testing.T) {
 	testplanet.Run(t, testplanet.Config{
 		SatelliteCount: 1, StorageNodeCount: 0, UplinkCount: 1,

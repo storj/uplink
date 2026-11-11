@@ -38,6 +38,10 @@ var (
 	// ErrObjectKeyTooLong is returned when an object key is too long.
 	ErrObjectKeyTooLong = errors.New("object key is too long")
 
+	// ErrMetadataTooLarge is returned when an object's encrypted metadata is larger than the
+	// satellite allows.
+	ErrMetadataTooLarge = errors.New("object metadata is too large")
+
 	// ErrObjectVersionInvalid is returned when an object version is invalid.
 	ErrObjectVersionInvalid = errors.New("object version is invalid")
 
@@ -98,6 +102,7 @@ var (
 		rpcstatus.ObjectLockUploadWithTTLAPIKeyAndDefaultRetention: ErrObjectLockUploadWithTTLAPIKeyAndDefaultRetention,
 		rpcstatus.ObjectKeyMissing:                                 ErrObjectKeyMissing,
 		rpcstatus.ObjectKeyTooLong:                                 ErrObjectKeyTooLong,
+		rpcstatus.MetadataTooLarge:                                 ErrMetadataTooLarge,
 		rpcstatus.ObjectVersionInvalid:                             ErrObjectVersionInvalid,
 		rpcstatus.BucketNotFound:                                   uplink.ErrBucketNotFound,
 		rpcstatus.BucketNameMissing:                                ErrBucketNameMissing,
