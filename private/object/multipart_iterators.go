@@ -7,6 +7,9 @@ import (
 	"context"
 	_ "unsafe" // for go:linkname
 
+	"github.com/zeebo/errs"
+
+	"storj.io/common/base58"
 	"storj.io/common/pb"
 	"storj.io/uplink"
 	"storj.io/uplink/internal/privateprops"
@@ -102,6 +105,42 @@ func ListUploadParts(ctx context.Context, project *uplink.Project, bucket, key, 
 	return &PartIterator{
 		iter: project.ListUploadParts(ctx, bucket, key, uploadID, options),
 	}
+}
+
+// ListObjectParts returns an iterator over the parts of a committed object version, or of its
+// latest version if version is nil. The segments of an object that wasn't uploaded in parts are
+// in part 0.
+func ListObjectParts(ctx context.Context, project *uplink.Project, bucket, key string, version []byte, options *uplink.ListUploadPartsOptions) (_ *VersionedPartIterator, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	db, err := dialMetainfoDB(ctx, project)
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, bucket, key)
+	}
+	defer func() { err = errs.Combine(err, db.Close()) }()
+
+	obj, err := db.GetObject(ctx, bucket, key, version)
+	if err != nil {
+		return nil, packageConvertKnownErrors(err, bucket, key)
+	}
+
+	// An upload ID encodes the stream ID that the parts are listed by, which a committed object
+	// still has.
+	return &VersionedPartIterator{
+		PartIterator: ListUploadParts(ctx, project, bucket, key, base58.CheckEncode(obj.Stream.ID, 1), options),
+		object:       convertObject(&obj),
+	}, nil
+}
+
+// VersionedPartIterator is a PartIterator over the parts of a committed object version.
+type VersionedPartIterator struct {
+	*PartIterator
+	object *VersionedObject
+}
+
+// Info returns the object.
+func (parts *VersionedPartIterator) Info() *VersionedObject {
+	return parts.object
 }
 
 // PartIterator is an iterator over a collection of parts of an upload.

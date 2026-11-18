@@ -607,3 +607,111 @@ func assertUploadList(ctx context.Context, t *testing.T, project *uplink.Project
 	require.NoError(t, list.Err())
 	require.Nil(t, list.Item())
 }
+
+func TestListObjectParts(t *testing.T) {
+	testplanet.Run(t, testplanet.Config{
+		SatelliteCount:   1,
+		StorageNodeCount: 1,
+		UplinkCount:      1,
+		Reconfigure: testplanet.Reconfigure{
+			Satellite: func(log *zap.Logger, index int, config *satellite.Config) {
+				config.Metainfo.ChecksumsEnabled = true
+			},
+		},
+	}, func(t *testing.T, testCtx *testcontext.Context, planet *testplanet.Planet) {
+		sat := planet.Satellites[0]
+		up := planet.Uplinks[0]
+
+		// Parts of several segments check that the parts are put together from their segments.
+		maxSegmentSize := 5 * memory.KiB
+		ctx := testuplink.WithMaxSegmentSize(testCtx, maxSegmentSize)
+
+		project, err := up.OpenProject(ctx, sat)
+		require.NoError(t, err)
+		defer testCtx.Check(project.Close)
+
+		bucketName := testrand.BucketName()
+		require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+		type part struct {
+			data, etag, checksum []byte
+		}
+		parts := []part{
+			{data: testrand.Bytes(2*maxSegmentSize + 1), etag: []byte("etag 1"), checksum: []byte("checksum 1")},
+			{data: testrand.Bytes(memory.KiB), etag: []byte("etag 2"), checksum: []byte("checksum 2")},
+		}
+
+		upload, err := object.BeginUpload(ctx, project, bucketName, "multipart", &object.MultipartUploadOptions{
+			UserData: metaclient.ObjectUserData{
+				Checksum: metaclient.ObjectChecksum{Algorithm: storj.ObjectChecksumAlgorithmCRC32, IsComposite: true},
+			},
+		})
+		require.NoError(t, err)
+		for i, p := range parts {
+			partUpload, err := object.UploadPart(ctx, project, bucketName, "multipart", upload.UploadID, uint32(i+1))
+			require.NoError(t, err)
+			_, err = partUpload.Write(p.data)
+			require.NoError(t, err)
+			require.NoError(t, partUpload.SetETag(p.etag))
+			require.NoError(t, partUpload.SetChecksum(p.checksum))
+			require.NoError(t, partUpload.Commit())
+		}
+		committed, err := object.CommitUpload(ctx, project, bucketName, "multipart", upload.UploadID, &metaclient.CommitUploadOptions{
+			UserData: metaclient.ObjectUserData{
+				Checksum: metaclient.ObjectChecksum{Algorithm: storj.ObjectChecksumAlgorithmCRC32, IsComposite: true, Value: []byte("checksum")},
+			},
+		})
+		require.NoError(t, err)
+
+		requireParts := func(t *testing.T, iter *object.VersionedPartIterator) {
+			for i, p := range parts {
+				require.True(t, iter.Next(), i)
+				item := iter.Item()
+				assert.EqualValues(t, i+1, item.PartNumber)
+				assert.EqualValues(t, len(p.data), item.Size)
+				assert.Equal(t, p.etag, item.ETag)
+				assert.Equal(t, p.checksum, item.Checksum)
+			}
+			require.False(t, iter.Next())
+			require.NoError(t, iter.Err())
+		}
+
+		iter, err := object.ListObjectParts(ctx, project, bucketName, "multipart", nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "multipart", iter.Info().Key)
+		assert.Equal(t, committed.Version, iter.Info().Version)
+		assert.Equal(t, committed.Checksum, iter.Info().Checksum)
+		requireParts(t, iter)
+
+		iter, err = object.ListObjectParts(ctx, project, bucketName, "multipart", committed.Version, nil)
+		require.NoError(t, err)
+		assert.Equal(t, committed.Version, iter.Info().Version)
+		requireParts(t, iter)
+
+		// The parts after the cursor.
+		iter, err = object.ListObjectParts(ctx, project, bucketName, "multipart", nil, &uplink.ListUploadPartsOptions{Cursor: 1})
+		require.NoError(t, err)
+		require.True(t, iter.Next())
+		assert.EqualValues(t, 2, iter.Item().PartNumber)
+		require.False(t, iter.Next())
+
+		t.Run("regular upload", func(t *testing.T) {
+			data := testrand.Bytes(2*maxSegmentSize + 1)
+			require.NoError(t, up.Upload(ctx, sat, bucketName, "regular", data))
+
+			iter, err := object.ListObjectParts(ctx, project, bucketName, "regular", nil, nil)
+			require.NoError(t, err)
+			assert.EqualValues(t, len(data), iter.Info().System.ContentLength)
+			require.True(t, iter.Next())
+			assert.EqualValues(t, 0, iter.Item().PartNumber)
+			assert.EqualValues(t, len(data), iter.Item().Size)
+			require.False(t, iter.Next())
+			require.NoError(t, iter.Err())
+		})
+
+		t.Run("missing object", func(t *testing.T) {
+			_, err := object.ListObjectParts(ctx, project, bucketName, "missing", nil, nil)
+			require.ErrorIs(t, err, uplink.ErrObjectNotFound)
+		})
+	})
+}
