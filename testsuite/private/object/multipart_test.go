@@ -184,6 +184,38 @@ func TestChecksum_Multipart(t *testing.T) {
 			require.ErrorIs(t, err, uplink.ErrObjectNotFound, msgAndArgs...)
 		}
 
+		// The satellite keeps whether an upload's checksum algorithm is the default in its
+		// upload ID, where the gateway reads it.
+		t.Run("Default checksum", func(t *testing.T) {
+			bucketName := testrand.BucketName()
+			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))
+
+			for key, checksum := range map[string]metaclient.ObjectChecksum{
+				"default":   {Algorithm: storj.ObjectChecksumAlgorithmCRC64NVME, IsDefault: true},
+				"requested": {Algorithm: storj.ObjectChecksumAlgorithmCRC64NVME},
+			} {
+				info, err := object.BeginUpload(ctx, project, bucketName, key, &object.MultipartUploadOptions{
+					UserData: metaclient.ObjectUserData{Checksum: checksum},
+				})
+				require.NoError(t, err, key)
+
+				data, version, err := base58.CheckDecode(info.UploadID)
+				require.NoError(t, err, key)
+				require.Equal(t, byte(1), version, key)
+				var streamID internalpb.StreamID
+				require.NoError(t, pb.Unmarshal(data, &streamID), key)
+				require.Equal(t, &internalpb.StreamIDChecksum{
+					Algorithm: pb.ObjectChecksumAlgorithm(checksum.Algorithm),
+					IsDefault: checksum.IsDefault,
+				}, streamID.Checksum, key)
+			}
+
+			_, err := object.BeginUpload(ctx, project, bucketName, "default-without-algorithm", &object.MultipartUploadOptions{
+				UserData: metaclient.ObjectUserData{Checksum: metaclient.ObjectChecksum{IsDefault: true}},
+			})
+			require.Error(t, err)
+		})
+
 		t.Run("Begin upload", func(t *testing.T) {
 			bucketName := testrand.BucketName()
 			require.NoError(t, up.CreateBucket(ctx, sat, bucketName))

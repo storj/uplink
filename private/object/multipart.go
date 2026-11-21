@@ -213,6 +213,7 @@ func encryptUserData(project *uplink.Project, bucket, key string, userData metac
 		return metaclient.EncryptedUserData{
 			ChecksumAlgorithm:   userData.Checksum.Algorithm,
 			IsChecksumComposite: userData.Checksum.IsComposite,
+			IsChecksumDefault:   userData.Checksum.IsDefault,
 		}, nil
 	}
 
@@ -294,6 +295,7 @@ func encryptUserData(project *uplink.Project, bucket, key string, userData metac
 		ChecksumAlgorithm:             userData.Checksum.Algorithm,
 		IsChecksumComposite:           userData.Checksum.IsComposite,
 		EncryptedChecksum:             encryptedChecksum,
+		IsChecksumDefault:             userData.Checksum.IsDefault,
 	}, nil
 }
 

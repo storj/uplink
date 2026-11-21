@@ -219,6 +219,7 @@ func (params *BeginObjectParams) toRequest(header *pb.RequestHeader) *pb.ObjectB
 		ChecksumAlgorithm:             pb.ObjectChecksumAlgorithm(params.ChecksumAlgorithm),
 		IsChecksumComposite:           params.IsChecksumComposite,
 		EncryptedChecksum:             params.EncryptedChecksum,
+		IsChecksumDefault:             params.IsChecksumDefault,
 		LegalHold:                     params.LegalHold,
 	}
 

@@ -45,6 +45,7 @@ type EncryptedUserData struct {
 	ChecksumAlgorithm   storj.ObjectChecksumAlgorithm
 	IsChecksumComposite bool
 	EncryptedChecksum   []byte
+	IsChecksumDefault   bool
 }
 
 // Retention represents an object's Object Lock retention information.
@@ -220,6 +221,9 @@ type ObjectChecksum struct {
 	// the object's parts (as opposed to being computed over its contents).
 	IsComposite bool
 	Value       []byte
+	// IsDefault indicates that the uploader chose the algorithm, rather than its client. It's
+	// only sent when an upload begins.
+	IsDefault bool
 }
 
 // Validate returns an error if the checksum is invalid.
@@ -245,6 +249,9 @@ func (checksum ObjectChecksum) ValidateIncomplete() error {
 		}
 		if checksum.IsComposite {
 			return errs.New("expected checksum type to be unset because checksum algorithm is unset")
+		}
+		if checksum.IsDefault {
+			return errs.New("expected checksum to not be the default because checksum algorithm is unset")
 		}
 	}
 	return nil
