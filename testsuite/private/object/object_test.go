@@ -2097,7 +2097,7 @@ func TestConditionalWrites(t *testing.T) {
 				{name: "inline versioned bucket", bucket: versionedBucket, data: testDataInline},
 			} {
 				t.Run(fmt.Sprintf("%s %s", name, tc.name), func(t *testing.T) {
-					fn(t, tc.bucket, testrand.Path(), tc.data)
+					fn(t, tc.bucket, string(testrand.RandAlphaNumeric(32)), tc.data)
 				})
 			}
 		}
@@ -2125,7 +2125,7 @@ func TestConditionalWrites(t *testing.T) {
 		})
 
 		runTest("CopyObject", func(t *testing.T, bucket, key string, data []byte) {
-			srcKey, dstKey := key, testrand.Path()
+			srcKey, dstKey := key, string(testrand.RandAlphaNumeric(32))
 			copyOpts := object.CopyObjectOptions{IfNoneMatch: []string{"*"}}
 
 			obj, err := upl.UploadWithOptions(ctx, sat, bucket, srcKey, testData, &metaclient.UploadOptions{

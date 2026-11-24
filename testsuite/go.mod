@@ -2,17 +2,19 @@ module storj.io/uplink/testsuite
 
 go 1.26.0
 
+replace storj.io/uplink => ../
+
 require (
 	github.com/klauspost/compress v1.18.7
 	github.com/stretchr/testify v1.12.1
 	github.com/zeebo/errs v1.4.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.24.0
-	storj.io/common v0.0.0-20261123080358-901b7ac4bda7
+	storj.io/common v0.0.0-20261124133153-aa14b91fff09
 	storj.io/drpc v1.1.0
 	storj.io/infectious v1.0.1
-	storj.io/storj v1.167.0-rc.0.20261123084150-df2c3b1917da
-	storj.io/uplink v1.14.6-0.20261123213720-b4546d577e78
+	storj.io/storj v1.167.0-rc.0.20261124133820-c0ca925bc68b
+	storj.io/uplink v1.14.6-0.20261124125653-208dbcd34d2f
 )
 
 require (
